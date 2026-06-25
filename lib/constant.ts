@@ -1,3 +1,4 @@
+import type { MediaToolName } from '@/types/chat-tools';
 import type { ModelCapability } from '@/types/model';
 
 /**
@@ -28,6 +29,7 @@ export const CAPABILITIES = [
  * Image size labels mapping
  */
 export const ImageSizeLabels: Record<string, string> = {
+  auto: 'Auto',
   '256x256': 'Small Square (256x256)',
   '512x512': 'Medium Square (512x512)',
   '1024x1024': 'Large Square (1024x1024)',
@@ -45,6 +47,7 @@ export const ImageSizeLabels: Record<string, string> = {
  * Aspect ratio labels mapping
  */
 export const AspectRatioLabels: Record<string, string> = {
+  auto: 'Auto',
   '1:1': 'Square (1:1)',
   '1:4': 'Ultra Portrait (1:4)',
   '1:8': 'Ultra Portrait (1:8)',
@@ -65,6 +68,7 @@ export const AspectRatioLabels: Record<string, string> = {
  * Video resolution labels mapping
  */
 export const VideoResolutionLabels: Record<string, string> = {
+  auto: 'Auto',
   '480p': '480p (SD)',
   '720p': '720p (HD)',
   '1080p': '1080p (Full HD)',
@@ -108,6 +112,36 @@ export const BedrockModels: Record<string, string> = {
   'claude-opus-4-0': 'anthropic.claude-opus-4-20250514-v1:0',
   'claude-opus-4-20250514': 'anthropic.claude-opus-4-20250514-v1:0'
 };
+
+/** Media tool names plus transcription (separate output shape, same prompt). */
+export type ChatMediaToolName = MediaToolName | 'transcribe_audio';
+
+const MediaToolDescriptions: Record<ChatMediaToolName, string> = {
+  generate_image:
+    '- generate_image: create a new image from a text description. Use when the user asks for a picture, illustration, photo, logo, or any visual.',
+  edit_image:
+    "- edit_image: modify an existing image from this conversation (a user upload or a previously generated image). Pass that image's URL as `imageUrl` and describe the change in `prompt`.",
+  generate_video:
+    '- generate_video: create a short video from a text description.',
+  text_to_speech:
+    '- text_to_speech: convert text to spoken audio (e.g. "read this aloud", "say this"). Pass the exact final text to speak — write it out first if it needs composing.',
+  transcribe_audio:
+    "- transcribe_audio: transcribe an audio file from this conversation to text (speech-to-text). Pass that audio's URL as `audioUrl`. Use when the user asks what an audio says or to transcribe/translate it."
+};
+
+export function buildMediaToolsSystemPrompt(
+  tools: ChatMediaToolName[]
+): string {
+  if (tools.length === 0) return '';
+  return [
+    'You also have media generation tools:',
+    ...tools.map(name => MediaToolDescriptions[name]),
+    '',
+    "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields and the defaults apply.",
+    '',
+    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. If the tool returns an error, briefly relay it to the user instead of retrying repeatedly.'
+  ].join('\n');
+}
 
 export const ArtifactSystemPrompt = [
   'Use the create_artifact tool for substantial, self-contained, reusable content: code files, runnable React UIs, full documents, data tables, or generated media. Do NOT use it for short snippets, brief explanations, or conversational replies — keep those inline in the chat.',

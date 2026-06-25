@@ -27,6 +27,22 @@ export type { Result } from './result';
 export type { SharedLink } from './shared-link';
 export { artifactTypeSchema } from './artifact';
 export type { Artifact, ArtifactType } from './artifact';
+export {
+  createArtifactInputSchema,
+  generateImageInputSchema,
+  editImageInputSchema,
+  generateVideoInputSchema,
+  textToSpeechInputSchema,
+  transcribeAudioInputSchema,
+  mediaToolNames
+} from './chat-tools';
+export type {
+  ChatTools,
+  CreateArtifactInput,
+  MediaToolName,
+  MediaToolOutput,
+  TranscribeToolOutput
+} from './chat-tools';
 export type {
   PricingRecord,
   ChatUsage,
@@ -40,6 +56,7 @@ export type {
   RecordImageUsageInput,
   RecordVideoUsageInput,
   RecordAudioUsageInput,
+  RecordTranscriptionUsageInput,
   UsageRow,
   UsageKpi,
   UserUsageRow,

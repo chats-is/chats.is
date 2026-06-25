@@ -1,8 +1,7 @@
-import { Image, MessageSquare, Mic, Video } from 'lucide-react';
+import { LibraryBig, MessageSquare, TextQuote } from 'lucide-react';
 
 export const contentTypes = [
-  { type: 'chat', label: 'Chat', icon: MessageSquare, path: '/' },
-  { type: 'audio', label: 'Audio', icon: Mic, path: '/audio' },
-  { type: 'image', label: 'Image', icon: Image, path: '/image' },
-  { type: 'video', label: 'Video', icon: Video, path: '/video' }
+  { type: 'chat', label: 'New Chat', icon: MessageSquare, path: '/' },
+  { type: 'library', label: 'Library', icon: LibraryBig, path: '/library' },
+  { type: 'prompts', label: 'Prompts', icon: TextQuote, path: '/prompts' }
 ] as const;

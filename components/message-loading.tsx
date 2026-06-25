@@ -1,14 +1,11 @@
 import { IconLoading } from '@/components/ui/icons';
-import { MediaPlaceholder, PendingMedia } from '@/components/media-placeholder';
 import { ModelIcon } from '@/components/model-icon';
 
 export interface MessageLoadingProps {
   image?: string | null;
-  /** When set, show an aspect-ratio-correct media placeholder instead of dots. */
-  pendingMedia?: PendingMedia;
 }
 
-export function MessageLoading({ image, pendingMedia }: MessageLoadingProps) {
+export function MessageLoading({ image }: MessageLoadingProps) {
   return (
     <div
       tabIndex={0}
@@ -20,13 +17,7 @@ export function MessageLoading({ image, pendingMedia }: MessageLoadingProps) {
         </div>
         <div className="ml-3 flex min-h-9 flex-1 flex-col items-start justify-center overflow-hidden px-1">
           <div className="mr-12">
-            {pendingMedia ? (
-              <div className="my-2">
-                <MediaPlaceholder {...pendingMedia} />
-              </div>
-            ) : (
-              <IconLoading className="text-muted-foreground" />
-            )}
+            <IconLoading className="text-muted-foreground" />
           </div>
         </div>
       </div>

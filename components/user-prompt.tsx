@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from 'react';
 import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { CAPABILITIES } from '@/lib/constant';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { api, RouterOutputs } from '@/trpc/react';
 import {
@@ -29,13 +28,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -44,45 +36,57 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 
-const PROVIDERS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'google', label: 'Google' },
-  { value: 'xai', label: 'xAI' },
-  { value: 'deepseek', label: 'DeepSeek' }
-] as const;
-
 type MyPrompt = RouterOutputs['prompt']['list'][number];
-type PromptCapability = (typeof CAPABILITIES)[number]['value'];
+type Visibility = 'private' | 'public';
 
 type PromptFormData = {
   name: string;
-  capability: PromptCapability;
-  providers: string[];
-  image: string;
   content: string;
-  isPublic: boolean;
+  image: string;
+  // tags & providers are free-text labels entered as a comma-separated string.
+  tags: string;
+  providers: string;
+  // models references real model ids.
+  models: string[];
+  visibility: Visibility;
 };
 
 const EMPTY_FORM: PromptFormData = {
   name: '',
-  capability: 'chat',
-  providers: [],
-  image: '',
   content: '',
-  isPublic: false
+  image: '',
+  tags: '',
+  providers: '',
+  models: [],
+  visibility: 'private'
 };
 
-const matchesCapability = (
-  capability: string | null | undefined,
-  filterCapability: string
-) => {
-  if (filterCapability === 'all') return true;
-  return (capability ?? 'chat') === filterCapability;
-};
+const parseList = (value: string) =>
+  value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
 
-const getVisibilitySummary = (isPublic: boolean) =>
-  isPublic ? 'Visible in the shared prompt picker.' : 'Only visible to you.';
+const joinList = (value?: string[] | null) => (value ?? []).join(', ');
+
+const LabelBadges = ({
+  values,
+  className
+}: {
+  values?: string[] | null;
+  className: string;
+}) => {
+  if (!values?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {values.map(value => (
+        <span key={value} className={className}>
+          {value}
+        </span>
+      ))}
+    </div>
+  );
+};
 
 const PromptThumbnail = ({
   content,
@@ -120,11 +124,14 @@ export const UserPrompt = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [filterCapability, setFilterCapability] = useState<string>('all');
   const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { data: myPrompts, isLoading } = api.prompt.list.useQuery();
+  const { data: models } = api.model.list.useQuery();
+
+  const modelName = (modelId: string) =>
+    models?.find(m => m.modelId === modelId)?.name ?? modelId;
 
   const resetForm = () => {
     setEditingId(null);
@@ -179,23 +186,14 @@ export const UserPrompt = () => {
 
   const filteredPrompts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
+    if (!keyword) return myPrompts ?? [];
 
-    return (myPrompts ?? []).filter(prompt => {
-      if (!matchesCapability(prompt.capability, filterCapability)) {
-        return false;
-      }
-
-      if (
-        keyword &&
-        !prompt.name.toLowerCase().includes(keyword) &&
-        !prompt.content.toLowerCase().includes(keyword)
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [filterCapability, myPrompts, search]);
+    return (myPrompts ?? []).filter(
+      prompt =>
+        prompt.name.toLowerCase().includes(keyword) ||
+        prompt.content.toLowerCase().includes(keyword)
+    );
+  }, [myPrompts, search]);
 
   const deletePrompt =
     myPrompts?.find(prompt => prompt.id === deleteId) ?? null;
@@ -209,11 +207,12 @@ export const UserPrompt = () => {
     setEditingId(prompt.id);
     setFormData({
       name: prompt.name,
-      capability: (prompt.capability ?? 'chat') as PromptCapability,
-      providers: prompt.providers || [],
-      image: prompt.image || '',
       content: prompt.content,
-      isPublic: prompt.isPublic
+      image: prompt.image || '',
+      tags: joinList(prompt.tags),
+      providers: joinList(prompt.providers),
+      models: prompt.models || [],
+      visibility: prompt.visibility
     });
     setIsOpen(true);
   };
@@ -229,13 +228,16 @@ export const UserPrompt = () => {
       return;
     }
 
+    const tags = parseList(formData.tags);
+    const providers = parseList(formData.providers);
     const payload = {
       name,
-      capability: formData.capability,
-      providers: formData.providers.length > 0 ? formData.providers : null,
-      image: formData.image || null,
       content,
-      isPublic: formData.isPublic
+      image: formData.image || null,
+      tags: tags.length > 0 ? tags : null,
+      providers: providers.length > 0 ? providers : null,
+      models: formData.models.length > 0 ? formData.models : null,
+      visibility: formData.visibility
     };
 
     if (editingId) {
@@ -246,12 +248,12 @@ export const UserPrompt = () => {
     createMutation.mutate(payload);
   };
 
-  const handleProviderToggle = (provider: string) => {
+  const toggleModel = (modelId: string) => {
     setFormData(current => ({
       ...current,
-      providers: current.providers.includes(provider)
-        ? current.providers.filter(item => item !== provider)
-        : [...current.providers, provider]
+      models: current.models.includes(modelId)
+        ? current.models.filter(item => item !== modelId)
+        : [...current.models, modelId]
     }));
   };
 
@@ -281,10 +283,7 @@ export const UserPrompt = () => {
         return;
       }
 
-      setFormData(current => ({
-        ...current,
-        image: result.url
-      }));
+      setFormData(current => ({ ...current, image: result.url }));
     } catch {
       toast.error('Upload failed');
     } finally {
@@ -304,7 +303,7 @@ export const UserPrompt = () => {
   return (
     <div className="flex flex-col">
       <div className="space-y-4">
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_128px_auto]">
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="relative flex-1">
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -314,19 +313,6 @@ export const UserPrompt = () => {
               className="pl-9"
             />
           </div>
-          <Select value={filterCapability} onValueChange={setFilterCapability}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Capability" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              {CAPABILITIES.map(capability => (
-                <SelectItem key={capability.value} value={capability.value}>
-                  {capability.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Button className="gap-2" onClick={handleCreate}>
             <Plus className="size-4" />
             Add Prompt
@@ -341,12 +327,10 @@ export const UserPrompt = () => {
                   Image
                 </th>
                 <th className="p-3 text-left text-sm font-medium">Name</th>
-                <th className="p-3 text-left text-sm font-medium">Providers</th>
-                <th className="w-28 p-3 text-left text-sm font-medium">
-                  Capability
-                </th>
+                <th className="p-3 text-left text-sm font-medium">Tags</th>
+                <th className="p-3 text-left text-sm font-medium">Models</th>
                 <th className="w-24 p-3 text-left text-sm font-medium">
-                  Public
+                  Visibility
                 </th>
                 <th className="w-28 p-3 text-right text-sm font-medium">
                   Actions
@@ -372,29 +356,20 @@ export const UserPrompt = () => {
                   </td>
                   <td className="p-3">{prompt.name}</td>
                   <td className="p-3">
-                    {prompt.providers?.length ? (
-                      <div className="flex flex-wrap gap-1">
-                        {prompt.providers.map(provider => (
-                          <span
-                            key={provider}
-                            className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                          >
-                            {provider}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
+                    <LabelBadges
+                      values={prompt.tags}
+                      className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                    />
                   </td>
                   <td className="p-3">
-                    {prompt.capability ? (
-                      <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                        {prompt.capability}
-                      </span>
-                    ) : null}
+                    <LabelBadges
+                      values={prompt.models?.map(modelName)}
+                      className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                    />
                   </td>
                   <td className="p-3">
                     <span className="rounded bg-muted px-2 py-1 text-xs">
-                      {prompt.isPublic ? 'public' : 'private'}
+                      {prompt.visibility}
                     </span>
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
@@ -479,50 +454,21 @@ export const UserPrompt = () => {
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div className="-mx-6 max-h-[60vh] space-y-3.5 overflow-y-auto px-6">
-              <div className="grid gap-3 sm:grid-cols-[1fr_132px]">
-                <div className="space-y-2">
-                  <Label htmlFor="prompt-name">Name</Label>
-                  <Input
-                    id="prompt-name"
-                    value={formData.name}
-                    onChange={e =>
-                      setFormData(current => ({
-                        ...current,
-                        name: e.target.value
-                      }))
-                    }
-                    placeholder="Research prompt"
-                    required
-                    disabled={isFormBusy}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prompt-capability">Capability</Label>
-                  <Select
-                    value={formData.capability}
-                    onValueChange={value =>
-                      setFormData(current => ({
-                        ...current,
-                        capability: value as PromptCapability
-                      }))
-                    }
-                    disabled={isFormBusy}
-                  >
-                    <SelectTrigger id="prompt-capability">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CAPABILITIES.map(capability => (
-                        <SelectItem
-                          key={capability.value}
-                          value={capability.value}
-                        >
-                          {capability.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="prompt-name">Name</Label>
+                <Input
+                  id="prompt-name"
+                  value={formData.name}
+                  onChange={e =>
+                    setFormData(current => ({
+                      ...current,
+                      name: e.target.value
+                    }))
+                  }
+                  placeholder="Research prompt"
+                  required
+                  disabled={isFormBusy}
+                />
               </div>
 
               <div className="space-y-2">
@@ -541,6 +487,71 @@ export const UserPrompt = () => {
                   required
                   disabled={isFormBusy}
                 />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="prompt-tags">Tags</Label>
+                  <Input
+                    id="prompt-tags"
+                    value={formData.tags}
+                    onChange={e =>
+                      setFormData(current => ({
+                        ...current,
+                        tags: e.target.value
+                      }))
+                    }
+                    placeholder="writing, english"
+                    disabled={isFormBusy}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated. Used for filtering.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prompt-providers">Providers</Label>
+                  <Input
+                    id="prompt-providers"
+                    value={formData.providers}
+                    onChange={e =>
+                      setFormData(current => ({
+                        ...current,
+                        providers: e.target.value
+                      }))
+                    }
+                    placeholder="openai, anthropic"
+                    disabled={isFormBusy}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated labels (display only).
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Models</Label>
+                <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2.5">
+                  {models?.length ? (
+                    models.map(model => (
+                      <label
+                        key={model.id}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={formData.models.includes(model.modelId)}
+                          onCheckedChange={() => toggleModel(model.modelId)}
+                          disabled={isFormBusy}
+                        />
+                        <span>{model.name}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No models.</p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Target models — used for filtering.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -579,10 +590,7 @@ export const UserPrompt = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            setFormData(current => ({
-                              ...current,
-                              image: ''
-                            }))
+                            setFormData(current => ({ ...current, image: '' }))
                           }
                           disabled={isFormBusy}
                         >
@@ -595,44 +603,22 @@ export const UserPrompt = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Providers</Label>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {PROVIDERS.map(provider => (
-                    <label
-                      key={provider.value}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Checkbox
-                        checked={formData.providers.includes(provider.value)}
-                        onCheckedChange={() =>
-                          handleProviderToggle(provider.value)
-                        }
-                        disabled={isFormBusy}
-                      />
-                      <span>{provider.label}</span>
-                    </label>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Leave empty to allow all providers.
-                </p>
-              </div>
-
               <div className="flex items-center justify-between rounded-lg border p-2.5">
                 <div className="space-y-1">
                   <Label htmlFor="prompt-public">Public</Label>
                   <p className="text-xs text-muted-foreground">
-                    {getVisibilitySummary(formData.isPublic)}
+                    {formData.visibility === 'public'
+                      ? 'Visible to everyone in the prompt picker.'
+                      : 'Only visible to you.'}
                   </p>
                 </div>
                 <Switch
                   id="prompt-public"
-                  checked={formData.isPublic}
+                  checked={formData.visibility === 'public'}
                   onCheckedChange={checked =>
                     setFormData(current => ({
                       ...current,
-                      isPublic: checked
+                      visibility: checked ? 'public' : 'private'
                     }))
                   }
                   disabled={isFormBusy}

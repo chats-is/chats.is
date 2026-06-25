@@ -40,7 +40,9 @@ export function SidebarItem({ chat }: SidebarItemProps) {
         tooltip={chat.title}
         className="group-hover/menu-item:bg-background group-hover/menu-item:shadow-sm hover:bg-background hover:shadow-sm data-[active=true]:bg-background data-[active=true]:shadow-sm dark:group-hover/menu-item:bg-accent dark:hover:bg-accent dark:data-[active=true]:bg-accent"
       >
-        <Link href={`/${chat.type}/${chat.id}`}>
+        {/* All chats open in the unified chat view — legacy media chats
+            (type image/video/audio) render their file parts there too. */}
+        <Link href={`/chat/${chat.id}`}>
           <ChatTypeIcon type={chat.type} />
           <span className="truncate">{chat.title}</span>
         </Link>

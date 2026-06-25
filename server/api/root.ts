@@ -1,5 +1,6 @@
 import { artifactRouter } from '@/server/api/routers/artifact';
 import { chatRouter } from '@/server/api/routers/chat';
+import { libraryRouter } from '@/server/api/routers/library';
 import { messageRouter } from '@/server/api/routers/message';
 import { modelRouter } from '@/server/api/routers/model';
 import { planRouter } from '@/server/api/routers/plan';
@@ -22,6 +23,7 @@ export const appRouter = createTRPCRouter({
   chat: chatRouter,
   message: messageRouter,
   artifact: artifactRouter,
+  library: libraryRouter,
   share: shareRouter,
   // Admin console routers
   provider: providerRouter,

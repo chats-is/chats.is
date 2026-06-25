@@ -19,7 +19,8 @@ const EMPTY_SNAPSHOT: PriceSnapshot = {
   videoSecondsPrice: null,
   audioInputPrice: null,
   audioOutputPrice: null,
-  audioCharactersPrice: null
+  audioCharactersPrice: null,
+  audioSecondsPrice: null
 };
 
 /** Coerce a numeric-column string to a number, defaulting to 0 (cost math
@@ -74,13 +75,16 @@ export class PricingMissingError extends Error {
  *   image  → Image (per item) OR token-based (Input + Output), e.g.
  *            gpt-image-1 bills per token while DALL-E bills per image.
  *   video  → Either Per video OR Per second.
- *   audio  → At least one of Audio input / Audio output / Per second.
+ *   audio  → direction-aware: TTS bills per character or per token; STT
+ *            (opts.transcription) bills per second. Without the direction
+ *            hint, any of the three satisfies (legacy callers).
  *
  * Returns the user-facing labels of the missing required fields, empty when valid.
  */
 export function pricingMissingFields(
   capability: 'chat' | 'image' | 'video' | 'audio',
-  p: PricingRecord
+  p: PricingRecord,
+  opts?: { transcription?: boolean }
 ): string[] {
   const set = (x: string | null) => x !== null;
   switch (capability) {
@@ -99,11 +103,25 @@ export function pricingMissingFields(
       return set(p.video) || set(p.videoSeconds)
         ? []
         : ['Per video / Per second'];
-    case 'audio':
-      // Per-character (classic TTS) OR token-based (gpt-4o-mini-tts, omni).
-      return set(p.audioCharacters) || set(p.audioInput) || set(p.audioOutput)
+    case 'audio': {
+      // STT bills per second; TTS bills per character or per token. The
+      // billed dimension must match the model's direction — a mismatched
+      // style would pass the gate but compute $0 cost.
+      if (opts?.transcription === true) {
+        return set(p.audioSeconds) ? [] : ['Per second'];
+      }
+      if (opts?.transcription === false) {
+        return set(p.audioCharacters) || set(p.audioInput) || set(p.audioOutput)
+          ? []
+          : ['Per 1M characters, or Audio input / Audio output'];
+      }
+      return set(p.audioCharacters) ||
+        set(p.audioInput) ||
+        set(p.audioOutput) ||
+        set(p.audioSeconds)
         ? []
-        : ['Per 1M characters, or Audio input / Audio output'];
+        : ['Per 1M characters, Audio input / Audio output, or Per second'];
+    }
   }
 }
 
@@ -116,11 +134,12 @@ export function pricingMissingFields(
 export async function requirePricing(
   modelKey: string,
   capability: 'chat' | 'image' | 'video' | 'audio',
-  modelLabel: string
+  modelLabel: string,
+  opts?: { transcription?: boolean }
 ): Promise<PricingRecord> {
   const pricing = await getPricingByModelKey(modelKey);
   if (!pricing) throw new PricingMissingError(modelLabel);
-  const missing = pricingMissingFields(capability, pricing);
+  const missing = pricingMissingFields(capability, pricing, opts);
   if (missing.length > 0) {
     throw new PricingMissingError(modelLabel, `missing ${missing.join(', ')}`);
   }
@@ -345,6 +364,25 @@ export function calculateAudioCost(
       ...EMPTY_SNAPSHOT,
       audioInputPrice: numToStr(pricing.audioInput),
       audioOutputPrice: numToStr(pricing.audioOutput)
+    }
+  };
+}
+
+/**
+ * Cost for a transcription (STT) call: audioSeconds × per-second rate.
+ */
+export function calculateTranscriptionCost(
+  args: { audioSeconds?: number },
+  pricing: PricingRecord | null
+): { cost: number; snapshot: PriceSnapshot } {
+  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
+
+  const perSecond = toNum(pricing.audioSeconds);
+  return {
+    cost: roundCost((args.audioSeconds ?? 0) * perSecond),
+    snapshot: {
+      ...EMPTY_SNAPSHOT,
+      audioSecondsPrice: numToStr(pricing.audioSeconds)
     }
   };
 }

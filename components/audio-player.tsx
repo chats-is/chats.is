@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Pause, Play } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { cn, formatMediaTime } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface AudioPlayerProps {
@@ -83,13 +83,6 @@ export function AudioPlayer({ src, className }: AudioPlayerProps) {
     document.body.removeChild(link);
   }, [src]);
 
-  const formatTime = (time: number) => {
-    if (isNaN(time) || time === 0) return '0:00';
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
@@ -131,8 +124,8 @@ export function AudioPlayer({ src, className }: AudioPlayerProps) {
           />
         </div>
         <div className="flex justify-between text-[10px] text-muted-foreground">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
+          <span>{formatMediaTime(currentTime)}</span>
+          <span>{formatMediaTime(duration)}</span>
         </div>
       </div>
 

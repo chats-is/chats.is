@@ -1,9 +1,9 @@
 'use client';
 
 import { Download } from 'lucide-react';
-import { toast } from 'sonner';
 
 import { Artifact } from '@/types';
+import { downloadArtifact } from '@/lib/download';
 import { cn } from '@/lib/utils';
 import {
   artifactRegistry,
@@ -33,43 +33,7 @@ export function DocumentPreview({
       : '';
   const canDownload = Boolean(artifact.fileUrl || artifact.content);
 
-  const handleDownload = () => {
-    if (artifact.fileUrl) {
-      const link = document.createElement('a');
-      link.href = artifact.fileUrl;
-      link.target = '_blank';
-      link.download = artifact.fileName || artifact.title;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    }
-
-    if (!artifact.content) {
-      toast.error('Nothing to download');
-      return;
-    }
-
-    const extension =
-      artifact.type === 'json'
-        ? 'json'
-        : artifact.type === 'html'
-          ? 'html'
-          : artifact.type === 'markdown'
-            ? 'md'
-            : artifact.language || 'txt';
-    const blob = new Blob([artifact.content], {
-      type: 'text/plain;charset=utf-8'
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${artifact.title}.${extension}`.replace(/\s+/g, '-');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+  const handleDownload = () => downloadArtifact(artifact);
 
   return (
     <div

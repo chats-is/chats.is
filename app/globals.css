@@ -67,6 +67,47 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  /* Media generation placeholder: a wide soft luminance band drifts across
+     the skeleton while the icon breathes in the same rhythm. */
+  --animate-media-flow: media-flow 3s ease-in-out infinite;
+  --animate-media-breathe: media-breathe 3s ease-in-out infinite;
+
+  @keyframes media-flow {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  @keyframes media-breathe {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.85;
+      transform: scale(1.06);
+    }
+  }
+}
+
+/* Animated backdrop for media-generation placeholders. Pure luminance wave
+   over the muted token — hue-free so it works in both themes. */
+@utility media-generating {
+  background-color: var(--muted);
+  background-image: linear-gradient(
+    115deg,
+    var(--muted) 20%,
+    color-mix(in oklab, var(--muted-foreground) 18%, var(--muted)) 50%,
+    var(--muted) 80%
+  );
+  background-size: 250% 250%;
+  animation: var(--animate-media-flow);
 }
 
 /*

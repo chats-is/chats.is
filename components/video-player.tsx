@@ -8,6 +8,7 @@ import {
   VolumeX
 } from 'lucide-react';
 
+import { formatMediaTime } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface VideoPlayerProps {
@@ -108,13 +109,6 @@ export function VideoPlayer({ src }: VideoPlayerProps) {
     setCurrentTime(newTime);
   };
 
-  const formatTime = (time: number) => {
-    if (isNaN(time)) return '0:00';
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
   // Calculate progress percentage
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -170,8 +164,8 @@ export function VideoPlayer({ src }: VideoPlayerProps) {
               />
             </div>
             <div className="flex justify-between text-xs text-white">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+              <span>{formatMediaTime(currentTime)}</span>
+              <span>{formatMediaTime(duration)}</span>
             </div>
           </div>
 

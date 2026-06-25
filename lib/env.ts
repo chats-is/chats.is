@@ -48,6 +48,11 @@ export const env = createEnv({
     // Upload Path
     UPLOAD_PATH: z.string().default('uploads'),
 
+    // Resumable chat streams (optional). When unset, resume is disabled and
+    // chat falls back to one-shot streaming. Use an Upstash Redis `rediss://`
+    // URL (or any Redis URL).
+    REDIS_URL: z.string().optional(),
+
     // Analytics
     UMAMI_SCRIPT_URL: z.string().optional(),
     UMAMI_WEBSITE_ID: z.string().optional()
@@ -85,6 +90,9 @@ export const env = createEnv({
 
     // Upload Path
     UPLOAD_PATH: process.env.UPLOAD_PATH,
+
+    // Resumable chat streams
+    REDIS_URL: process.env.REDIS_URL,
 
     // Analytics
     UMAMI_SCRIPT_URL: process.env.UMAMI_SCRIPT_URL,

@@ -11,7 +11,13 @@ import {
   ListFoundationModelsCommand
 } from '@aws-sdk/client-bedrock';
 import { GoogleGenAI } from '@google/genai';
-import { APICallError, ImageModel, LanguageModel, SpeechModel } from 'ai';
+import {
+  APICallError,
+  ImageModel,
+  LanguageModel,
+  SpeechModel,
+  TranscriptionModel
+} from 'ai';
 
 import type {
   ProviderConfig,
@@ -192,6 +198,17 @@ export function getSpeechModel(
 export function getVideoModel(provider: ProviderConfig, modelId: string) {
   const sdk = createProviderSDK(provider);
   return sdk.video(modelId);
+}
+
+/**
+ * Get a transcription (STT) model by provider config and model ID
+ */
+export function getTranscriptionModel(
+  provider: ProviderConfig,
+  modelId: string
+): TranscriptionModel {
+  const sdk = createProviderSDK(provider);
+  return sdk.transcription(modelId);
 }
 
 // ============================================================================

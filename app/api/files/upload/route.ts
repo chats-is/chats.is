@@ -16,7 +16,20 @@ const UPLOAD_CONFIG = {
   },
   attachment: {
     maxSize: 5 * 1024 * 1024,
-    allowedTypes: ['image/jpeg', 'image/png'],
+    allowedTypes: [
+      'image/jpeg',
+      'image/png',
+      // Audio attachments feed the chat transcribe_audio (STT) tool.
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/x-wav',
+      'audio/mp4',
+      'audio/x-m4a',
+      'audio/ogg',
+      'audio/webm',
+      'audio/flac'
+    ],
     folder: 'attachments',
     useUUID: false
   },

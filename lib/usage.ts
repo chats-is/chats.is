@@ -4,12 +4,14 @@ import type {
   RecordAudioUsageInput,
   RecordChatUsageInput,
   RecordImageUsageInput,
+  RecordTranscriptionUsageInput,
   RecordVideoUsageInput
 } from '@/types';
 import {
   calculateAudioCost,
   calculateChatCost,
   calculateImageCost,
+  calculateTranscriptionCost,
   calculateVideoCost,
   resolveModelByKey
 } from '@/lib/pricing';
@@ -223,5 +225,47 @@ export async function recordAudioUsage(
     });
   } catch (err) {
     console.error('Failed to record audio usage:', err);
+  }
+}
+
+/**
+ * Compute cost and insert a usage row for a transcription (STT) call.
+ * Safe to call inside tool execution; failures are logged but never thrown.
+ */
+export async function recordTranscriptionUsage(
+  input: RecordTranscriptionUsageInput
+): Promise<void> {
+  try {
+    const lookup = await resolveModelByKey(input.modelId, 'audio');
+    const pricing = lookup?.pricing ?? null;
+
+    // Per-second billed: without a duration the cost would be 0 — surface it.
+    const secondsBilled =
+      pricing != null && parseNumber(pricing.audioSeconds) != null;
+    if (secondsBilled && (input.audioSeconds ?? 0) === 0) {
+      console.warn(
+        `[transcription] no duration reported for model=${input.modelId}; cost will be 0`
+      );
+    }
+
+    const { cost, snapshot } = calculateTranscriptionCost(
+      { audioSeconds: input.audioSeconds },
+      pricing
+    );
+
+    await db.insert(usage).values({
+      id: generateUUID(),
+      userId: input.userId,
+      chatId: input.chatId ?? null,
+      messageId: input.messageId,
+      modelId: lookup?.model.modelId ?? input.modelId,
+      providerId: input.providerId ?? lookup?.model.providerId,
+      capability: 'audio',
+      audioSeconds: (input.audioSeconds ?? 0).toString(),
+      cost: cost.toString(),
+      ...snapshot
+    });
+  } catch (err) {
+    console.error('Failed to record transcription usage:', err);
   }
 }

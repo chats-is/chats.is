@@ -6,6 +6,7 @@ import {
   calculateAudioCost,
   calculateChatCost,
   calculateImageCost,
+  calculateTranscriptionCost,
   calculateVideoCost,
   PricingMissingError,
   pricingMissingFields
@@ -31,6 +32,7 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     audioInput: null,
     audioOutput: null,
     audioCharacters: null,
+    audioSeconds: null,
     source: 'manual',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -228,7 +230,60 @@ describe('PricingMissingError', () => {
   });
 });
 
+describe('calculateTranscriptionCost', () => {
+  it('bills per second of input audio', () => {
+    const { cost, snapshot } = calculateTranscriptionCost(
+      { audioSeconds: 90 },
+      pricing({ audioSeconds: '0.0001' })
+    );
+    expect(cost).toBeCloseTo(0.009, 10);
+    expect(snapshot.audioSecondsPrice).toBe('0.0001');
+  });
+
+  it('returns 0 for null pricing or missing duration', () => {
+    expect(calculateTranscriptionCost({ audioSeconds: 60 }, null).cost).toBe(0);
+    expect(
+      calculateTranscriptionCost({}, pricing({ audioSeconds: '0.0001' })).cost
+    ).toBe(0);
+  });
+});
+
 describe('pricingMissingFields', () => {
+  it('audio accepts per-second (STT) as a valid pricing style', () => {
+    expect(pricingMissingFields('audio', pricing())).toEqual([
+      'Per 1M characters, Audio input / Audio output, or Per second'
+    ]);
+    expect(
+      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }))
+    ).toEqual([]);
+  });
+
+  it('audio direction must match the billed dimension', () => {
+    // STT models must carry the per-second rate — a chars/token-only row
+    // would pass the gate but bill $0.
+    expect(
+      pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
+        transcription: true
+      })
+    ).toEqual(['Per second']);
+    expect(
+      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
+        transcription: true
+      })
+    ).toEqual([]);
+    // TTS models must carry chars/tokens — a seconds-only row is invalid.
+    expect(
+      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
+        transcription: false
+      })
+    ).toEqual(['Per 1M characters, or Audio input / Audio output']);
+    expect(
+      pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
+        transcription: false
+      })
+    ).toEqual([]);
+  });
+
   it('chat requires input and output', () => {
     expect(pricingMissingFields('chat', pricing())).toEqual([
       'Input',

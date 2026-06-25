@@ -9,7 +9,6 @@ import { db } from '@/server/db';
 import {
   modelProviders,
   models,
-  prompts,
   providers,
   quotas,
   settings,
@@ -109,31 +108,6 @@ export const findModelByModelId = cache(
 );
 
 // ============================================================================
-// Prompt Queries
-// ============================================================================
-
-type PromptRecord = typeof prompts.$inferSelect;
-
-const getPromptRecordById = cache(
-  async (id: string): Promise<PromptRecord | null> => {
-    const result = await db.select().from(prompts).where(eq(prompts.id, id));
-    return result[0] ?? null;
-  }
-);
-
-const getSystemPromptContentById = cache(
-  async (id: string): Promise<string | null> => {
-    const prompt = await getPromptRecordById(id);
-
-    if (!prompt || prompt.type !== 'system') {
-      return null;
-    }
-
-    return prompt.content;
-  }
-);
-
-// ============================================================================
 // Settings Queries
 // ============================================================================
 
@@ -158,6 +132,23 @@ export const getSpeechSettings = cache(async () => {
   };
 });
 
+/** Admin-configured default media models for the chat media tools. */
+export const getMediaDefaultModelIds = cache(async () => {
+  const values = await getSettings([
+    'default.image.modelId',
+    'default.video.modelId',
+    'default.tts.modelId',
+    'default.stt.modelId'
+  ]);
+
+  return {
+    imageModelId: values['default.image.modelId'],
+    videoModelId: values['default.video.modelId'],
+    ttsModelId: values['default.tts.modelId'],
+    sttModelId: values['default.stt.modelId']
+  };
+});
+
 const DEFAULT_TITLE_PROMPT = `
 - Generate a short title that summarizes the user's first message.
 - Respond in the same language as the user's message.
@@ -167,15 +158,14 @@ const DEFAULT_TITLE_PROMPT = `
 `.trim();
 
 export const getTitleSettings = cache(async () => {
-  const values = await getSettings(['title.systemPrompt', 'title.modelId']);
-  const promptId = values['title.systemPrompt'];
+  const values = await getSettings(['title.modelId']);
   const modelId = values['title.modelId'];
 
   const model = modelId ? await findModelByModelId(modelId) : undefined;
-  const prompt = promptId ? await getSystemPromptContentById(promptId) : null;
 
+  // Title generation uses a fixed internal prompt (no longer admin-configurable).
   return {
-    prompt: prompt || DEFAULT_TITLE_PROMPT,
+    prompt: DEFAULT_TITLE_PROMPT,
     modelId,
     provider: model?.provider ?? null
   };
@@ -186,15 +176,14 @@ export const getTitleSettings = cache(async () => {
 // ============================================================================
 
 export const getSystemPrompt = cache(
-  async (promptId?: string | null): Promise<string | null> => {
-    if (promptId) {
-      const content = await getSystemPromptContentById(promptId);
-      if (content) return content;
+  async (modelSystemPrompt?: string | null): Promise<string | null> => {
+    // The model carries its own inline system prompt; fall back to the global
+    // default chat system prompt setting when the model leaves it empty.
+    if (modelSystemPrompt && modelSystemPrompt.trim()) {
+      return modelSystemPrompt;
     }
     const values = await getSettings(['default.chat.systemPrompt']);
-    const defaultPromptId = values['default.chat.systemPrompt'];
-    if (!defaultPromptId) return null;
-    return getSystemPromptContentById(defaultPromptId);
+    return values['default.chat.systemPrompt'] || null;
   }
 );
 
@@ -272,6 +261,7 @@ export async function getSystemSettings() {
       'default.image.modelId',
       'default.video.modelId',
       'default.tts.modelId',
+      'default.stt.modelId',
       'default.speech.modelId',
       'default.speech.voice'
     ])
@@ -285,12 +275,18 @@ export async function getSystemSettings() {
     chatModels: allModels.filter(m => m.capability === 'chat'),
     imageModels: allModels.filter(m => m.capability === 'image'),
     videoModels: allModels.filter(m => m.capability === 'video'),
-    ttsModels: allModels.filter(m => m.capability === 'audio'),
+    ttsModels: allModels.filter(
+      m => m.capability === 'audio' && !m.supportsTranscription
+    ),
+    sttModels: allModels.filter(
+      m => m.capability === 'audio' && m.supportsTranscription
+    ),
     defaults: {
       chatModelId: values['default.chat.modelId'],
       imageModelId: values['default.image.modelId'],
       videoModelId: values['default.video.modelId'],
       ttsModelId: values['default.tts.modelId'],
+      sttModelId: values['default.stt.modelId'],
       speechModelId: values['default.speech.modelId'],
       speechVoice: values['default.speech.voice']
     }

@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { messages } from '@/server/db/schema';
 
+import type { ChatTools } from './chat-tools';
 import {
   dataUIPartSchema,
   dynamicToolUIPartSchema,
@@ -31,7 +32,11 @@ export const messageMetadataSchema = z.object({
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
 
-export type ChatMessage = UIMessage<MessageMetadata, CustomUIDataTypes>;
+export type ChatMessage = UIMessage<
+  MessageMetadata,
+  CustomUIDataTypes,
+  ChatTools
+>;
 
 export const messageSchema = z.object({
   id: z.string().min(1),

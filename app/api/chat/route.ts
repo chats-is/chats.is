@@ -1,20 +1,24 @@
 import { NextResponse } from 'next/server';
 import {
+  consumeStream,
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
   generateText,
+  JsonToSseTransformStream,
   parsePartialJson,
   smoothStream,
   stepCountIs,
   streamText,
-  tool
+  tool,
+  UI_MESSAGE_STREAM_HEADERS
 } from 'ai';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import {
-  artifactTypeSchema,
   ChatMessage,
+  createArtifactInputSchema,
   MessageMetadata,
   type Artifact
 } from '@/types';
@@ -23,6 +27,8 @@ import {
   assertArtifactPayload,
   type ArtifactKind
 } from '@/lib/artifact';
+import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
+import { buildMediaTools, MediaToolsOptions } from '@/lib/chat-tools';
 import { normalizeChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
 import { preflightGate } from '@/lib/preflight';
@@ -37,17 +43,21 @@ import {
   getSystemPrompt,
   getTitleSettings
 } from '@/lib/queries';
+import { getResumableStreamContext } from '@/lib/resumable-stream';
 import { recordChatUsage } from '@/lib/usage';
 import { convertToChatMessages, formatString, generateUUID } from '@/lib/utils';
 import { auth } from '@/server/auth';
 import { db } from '@/server/db';
 import {
   artifacts as artifactsTable,
+  chats as chatsTable,
   messages as messagesTable
 } from '@/server/db/schema';
 import { api } from '@/trpc/server';
 
-export const maxDuration = 60;
+// Media tools (video generation especially — Sora polls for up to 5 minutes)
+// can far outlive a plain chat completion.
+export const maxDuration = 800;
 
 type PostData = {
   id: string;
@@ -55,7 +65,42 @@ type PostData = {
   userMessage: Omit<ChatMessage, 'role'> & { role: 'user' };
   parentMessageId?: string;
   isReasoning?: boolean;
+  mediaOptions?: MediaToolsOptions;
 };
+
+// Verbose error serializer — resumable-stream / node-redis failures often
+// surface as empty `Error` objects under Next's ignore-listed stack redaction,
+// so dig out name/code/cause/aggregate to make the real reason visible.
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) {
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  const e = err as Error & {
+    code?: unknown;
+    errors?: unknown[];
+    cause?: unknown;
+  };
+  const parts = [`${e.name}: ${e.message || '(no message)'}`];
+  if (e.code != null) parts.push(`code=${String(e.code)}`);
+  if (Array.isArray(e.errors)) {
+    parts.push(
+      `aggregate=[${e.errors
+        .map(x => (x instanceof Error ? `${x.name}: ${x.message}` : String(x)))
+        .join(' | ')}]`
+    );
+  }
+  if (e.cause != null) {
+    parts.push(
+      `cause=${e.cause instanceof Error ? `${e.cause.name}: ${e.cause.message}` : String(e.cause)}`
+    );
+  }
+  if (e.stack) parts.push(`\n${e.stack}`);
+  return parts.join(' ');
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -66,7 +111,8 @@ export async function POST(req: Request) {
 
   const json: PostData = await req.json();
   const id = json.id || generateUUID();
-  const { modelId, userMessage, parentMessageId, isReasoning } = json;
+  const { modelId, userMessage, parentMessageId, isReasoning, mediaOptions } =
+    json;
 
   if (!modelId || !userMessage) {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
@@ -95,9 +141,9 @@ export async function POST(req: Request) {
   if (gate) return gate;
 
   let title = 'Untitled';
+  // No type filter: continuing a legacy media chat reuses its row.
   const chat = await api.chat.detail({
     id,
-    type: 'chat',
     includeMessages: false
   });
   if (!chat) {
@@ -144,8 +190,24 @@ export async function POST(req: Request) {
     const historyMessages = await api.message.list({ chatId: id });
     const chatMessages = convertToChatMessages(historyMessages);
 
-    // Build system prompt (only if configured)
-    const systemPromptContent = await getSystemPrompt(dbModel.systemPromptId);
+    let reasonStartedAt: Date | null = null;
+    let reasonDuration = 0;
+    const assistantMessageId = generateUUID();
+    // Separate id for the resumable stream (used only when REDIS_URL is set).
+    const streamId = generateUUID();
+
+    // Independent setup queries — run concurrently to keep time-to-first-token
+    // down (media tool resolution should not delay plain text chats).
+    const [systemPromptContent, mediaTools] = await Promise.all([
+      getSystemPrompt(dbModel.systemPrompt),
+      buildMediaTools({
+        userId: session.user.id,
+        chatId: id,
+        assistantMessageId,
+        mediaOptions,
+        chatMessages
+      })
+    ]);
     const systemMessage = systemPromptContent
       ? formatString(systemPromptContent, {
           provider: dbModel.provider?.name || '',
@@ -153,9 +215,6 @@ export async function POST(req: Request) {
           date: new Date().toISOString()
         })
       : undefined;
-    let reasonStartedAt: Date | null = null;
-    let reasonDuration = 0;
-    const assistantMessageId = generateUUID();
     const completedArtifacts = new Map<string, Artifact>();
     const completedArtifactOrder: string[] = [];
 
@@ -267,17 +326,7 @@ export async function POST(req: Request) {
           });
         };
 
-        const createArtifactSchema = z.object({
-          id: z.string().min(1).optional(),
-          title: z.string().min(1),
-          type: artifactTypeSchema,
-          language: z.string().optional(),
-          content: z.string().optional(),
-          fileUrl: z.url().optional(),
-          fileName: z.string().optional(),
-          mimeType: z.string().optional(),
-          size: z.number().int().nonnegative().optional()
-        });
+        const createArtifactSchema = createArtifactInputSchema;
         type CreateArtifactInput = z.infer<typeof createArtifactSchema>;
 
         const createArtifactRecord = (
@@ -525,16 +574,27 @@ export async function POST(req: Request) {
         writer.write({ type: 'data-chat', data: { title } });
         writer.write({ type: 'data-messageId', data: assistantMessageId });
 
-        const modelMessages = await convertToModelMessages(chatMessages);
+        // Media the chat model can't consume (audio/video always, images on
+        // non-vision models) becomes text markers carrying the URL, so the
+        // model can still reference them via the media tools.
+        const modelMessages = await convertToModelMessages(
+          maskUnsupportedFileParts(chatMessages, {
+            supportsVision: dbModel.supportsVision
+          })
+        );
 
         const buildStream = (failoverProvider: FailoverProvider) =>
           streamText({
             model: getLanguageModel(failoverProvider, modelId),
-            system: systemMessage
-              ? `${systemMessage}\n\n${ArtifactSystemPrompt}`
-              : ArtifactSystemPrompt,
+            system: [
+              systemMessage,
+              ArtifactSystemPrompt,
+              mediaTools.systemPrompt
+            ]
+              .filter(Boolean)
+              .join('\n\n'),
             messages: modelMessages,
-            tools: artifactTools,
+            tools: { ...artifactTools, ...mediaTools.tools },
             ...(failoverProvider.apiOptions && {
               providerOptions: {
                 [failoverProvider.type]: failoverProvider.apiOptions
@@ -769,7 +829,48 @@ export async function POST(req: Request) {
       }
     });
 
-    return createUIMessageStreamResponse({ stream });
+    // When Redis is configured, wrap the stream as a resumable one so a page
+    // refresh can re-attach to an in-progress generation (see the GET handler).
+    // resumableStream drains the source into Redis, which — like consumeStream
+    // below — keeps tool work, usage and persistence running past a client
+    // disconnect.
+    const streamContext = await getResumableStreamContext();
+    if (streamContext) {
+      try {
+        // Record this generation's stream id on the chat so the GET handler
+        // can resume it after a refresh (overwrites any prior, finished one).
+        await db
+          .update(chatsTable)
+          .set({ activeStreamId: streamId })
+          .where(eq(chatsTable.id, id));
+        const resumable = await streamContext.resumableStream(streamId, () =>
+          stream.pipeThrough(new JsonToSseTransformStream())
+        );
+        if (resumable) {
+          // resumable yields SSE *strings*; a Response body needs bytes, so
+          // encode (createUIMessageStreamResponse does this internally).
+          return new Response(resumable.pipeThrough(new TextEncoderStream()), {
+            headers: UI_MESSAGE_STREAM_HEADERS
+          });
+        }
+      } catch (err) {
+        // Redis hiccup — fall back to a normal one-shot stream below rather
+        // than failing the whole request.
+        console.warn(
+          '[chat] resumable stream unavailable, falling back —',
+          describeError(err)
+        );
+      }
+    }
+
+    // consumeSseStream keeps a tee'd copy flowing server-side so tool work,
+    // usage records and message persistence complete even when the client
+    // disconnects mid-stream (otherwise usage is billed but the assistant
+    // message is never saved).
+    return createUIMessageStreamResponse({
+      stream,
+      consumeSseStream: consumeStream
+    });
   } catch (err: any) {
     console.error('Chat error:', err);
     return NextResponse.json(
@@ -777,4 +878,60 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Resume an in-progress chat generation after a page refresh. The client
+ * (useChat `resume: true`) calls this with `?chatId=`; we re-attach to the most
+ * recent resumable stream recorded for that chat. Returns 204 when resume is
+ * disabled (no REDIS_URL), the chat isn't the caller's, or the stream already
+ * finished — in which case the final message is already persisted in the DB.
+ */
+export async function GET(req: Request) {
+  const streamContext = await getResumableStreamContext();
+  if (!streamContext) {
+    return new Response(null, { status: 204 });
+  }
+
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const chatId = new URL(req.url).searchParams.get('chatId');
+  if (!chatId) {
+    return NextResponse.json({ error: 'chatId is required' }, { status: 400 });
+  }
+
+  // Only the chat owner may resume, and only if it has an active stream.
+  const chat = await db.query.chats.findFirst({
+    where: (c, { and, eq }) =>
+      and(eq(c.id, chatId), eq(c.userId, session.user.id))
+  });
+  if (!chat?.activeStreamId) {
+    return new Response(null, { status: 204 });
+  }
+
+  // resumeExistingStream returns null/undefined once the stream has finished or
+  // expired, in which case the final message is already persisted and the
+  // client uses that. A Redis blip must not turn a reconnect into a 500 — since
+  // resume fires on every chat mount, swallow errors and fall back to the DB.
+  let resumed: ReadableStream<string> | null | undefined;
+  try {
+    resumed = await streamContext.resumeExistingStream(chat.activeStreamId);
+  } catch (err) {
+    console.warn(
+      '[chat] resume failed, falling back to persisted message —',
+      describeError(err)
+    );
+    return new Response(null, { status: 204 });
+  }
+  if (!resumed) {
+    return new Response(null, { status: 204 });
+  }
+
+  // resumed yields SSE strings; encode to bytes for the Response body.
+  return new Response(resumed.pipeThrough(new TextEncoderStream()), {
+    headers: UI_MESSAGE_STREAM_HEADERS
+  });
 }

@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useCallback, useTransition } from 'react';
-import { XCircle } from 'lucide-react';
+import { AudioLines, XCircle } from 'lucide-react';
 
 import { Attachment } from '@/types';
 import { deleteFile } from '@/lib/api';
@@ -44,11 +44,20 @@ export const AttachmentsPreview = ({
                 { 'opacity-50': isPending }
               )}
             >
-              <img
-                src={attachment.url}
-                alt={attachment.name}
-                className="size-full rounded-md object-cover"
-              />
+              {attachment.contentType?.startsWith('audio/') ? (
+                <div
+                  title={attachment.name}
+                  className="flex size-full items-center justify-center rounded-md bg-background"
+                >
+                  <AudioLines className="size-5 text-muted-foreground" />
+                </div>
+              ) : (
+                <img
+                  src={attachment.url}
+                  alt={attachment.name}
+                  className="size-full rounded-md object-cover"
+                />
+              )}
             </div>
             <Button
               type="button"

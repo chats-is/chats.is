@@ -9,6 +9,7 @@ import { DefaultChatTransport } from 'ai';
 import { toast } from 'sonner';
 
 import { Artifact, Attachment, ChatMessage, CustomUIDataTypes } from '@/types';
+import { takePendingPrompt } from '@/lib/pending-prompt';
 import { generateUUID, getMostRecentUserMessage } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
 import { api } from '@/trpc/react';
@@ -105,9 +106,51 @@ export function ChatUI({
   const chatRequestBody = useMemo(
     () => ({
       modelId: currentModelId,
-      isReasoning: supportsReasoning ? isReasoning : undefined
+      isReasoning: supportsReasoning ? isReasoning : undefined,
+      // Media model selections for the chat media tools; the server falls
+      // back to the admin-configured defaults when a modelId is empty.
+      mediaOptions: {
+        image: preferences.imageModelId
+          ? {
+              modelId: preferences.imageModelId,
+              size: preferences.imageSize,
+              aspectRatio: preferences.imageAspectRatio
+            }
+          : undefined,
+        video: preferences.videoModelId
+          ? {
+              modelId: preferences.videoModelId,
+              aspectRatio: preferences.videoAspectRatio,
+              resolution: preferences.videoResolution,
+              duration: preferences.videoDuration
+            }
+          : undefined,
+        audio: preferences.audioModelId
+          ? {
+              modelId: preferences.audioModelId,
+              voice: preferences.audioVoice
+            }
+          : undefined,
+        stt: preferences.sttModelId
+          ? { modelId: preferences.sttModelId }
+          : undefined
+      }
     }),
-    [currentModelId, supportsReasoning, isReasoning]
+    [
+      currentModelId,
+      supportsReasoning,
+      isReasoning,
+      preferences.imageModelId,
+      preferences.imageSize,
+      preferences.imageAspectRatio,
+      preferences.videoModelId,
+      preferences.videoAspectRatio,
+      preferences.videoResolution,
+      preferences.videoDuration,
+      preferences.audioModelId,
+      preferences.audioVoice,
+      preferences.sttModelId
+    ]
   );
   const chatRequestBodyRef = useRef(chatRequestBody);
 
@@ -149,6 +192,9 @@ export function ChatUI({
       messages: initialMessages,
       experimental_throttle: 100,
       generateId: generateUUID,
+      // Re-attach to an in-progress generation after a page refresh. Server
+      // resume is a no-op when REDIS_URL is unset, so this stays safe.
+      resume: true,
       transport: new DefaultChatTransport({
         api: '/api/chat',
         prepareSendMessagesRequest({ messages, body }) {
@@ -162,6 +208,11 @@ export function ChatUI({
               ...body
             }
           };
+        },
+        // Resume hits the same route as a GET; pass the chat id as a query
+        // param so the handler knows which stream to re-attach to.
+        prepareReconnectToStreamRequest({ id, api }) {
+          return { api: `${api}?chatId=${id}` };
         }
       }),
       onData: dataPart => {
@@ -221,6 +272,16 @@ export function ChatUI({
   useEffect(() => {
     setPanelOpen(false);
   }, [id, setPanelOpen]);
+
+  // Seed the composer from a prompt picked on the Prompts page. Read after
+  // mount (not during render) to avoid a hydration mismatch, and only for a
+  // fresh chat so an in-progress conversation is never clobbered.
+  useEffect(() => {
+    if (initialMessages.length > 0) return;
+    const pending = takePendingPrompt();
+    if (pending) setInput(pending);
+    // Mount-only: consume the one-shot hand-off exactly once.
+  }, []);
 
   useEffect(() => {
     if (status === 'ready') {

@@ -18,7 +18,6 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   const id = params.id;
   const chat = await api.chat.detail({
     id,
-    type: 'chat',
     includeArtifacts: true
   });
 
@@ -31,9 +30,9 @@ export default async function Page(props: PageProps) {
   const params = await props.params;
   const id = params.id;
 
+  // No type filter: legacy media chats (image/video/audio) open here too.
   const chat = await api.chat.detail({
     id,
-    type: 'chat',
     includeArtifacts: true
   });
   if (!chat) {

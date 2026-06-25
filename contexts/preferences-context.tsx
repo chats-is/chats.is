@@ -26,6 +26,8 @@ export interface Preferences {
   // Audio (TTS)
   audioModelId: string;
   audioVoice: string;
+  // Transcription (STT)
+  sttModelId: string;
   // Speech (read aloud)
   speechModelId: string;
   speechVoice: string;
@@ -77,6 +79,8 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       // Audio (TTS)
       audioModelId: defaults.ttsModelId ?? '',
       audioVoice: 'alloy',
+      // Transcription (STT)
+      sttModelId: defaults.sttModelId ?? '',
       // Speech (read aloud)
       speechModelId: defaults.speechModelId ?? 'tts-1',
       speechVoice: defaults.speechVoice ?? 'alloy'
@@ -84,7 +88,15 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
 
     const stored = getStoredPreferences();
     if (stored) {
-      return { ...defaultPrefs, ...stored };
+      // Drop empty stored values: the whole prefs object is persisted on any
+      // write, so a modality the user never picked is saved as '' and would
+      // otherwise shadow a system default the admin configures later.
+      const sanitized = Object.fromEntries(
+        Object.entries(stored).filter(
+          ([, value]) => value !== '' && value !== null && value !== undefined
+        )
+      );
+      return { ...defaultPrefs, ...sanitized };
     }
 
     return defaultPrefs;

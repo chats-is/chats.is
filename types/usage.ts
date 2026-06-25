@@ -35,6 +35,12 @@ export type RecordAudioUsageInput = RecordUsageBase & {
   audioOutputTokens?: number;
 };
 
+export type RecordTranscriptionUsageInput = RecordUsageBase & {
+  // STT bills per second of input audio (transcribe() reports
+  // durationInSeconds; no token usage is exposed).
+  audioSeconds?: number;
+};
+
 /** Raw row shape returned from `usage` router queries. The browser owns
  *  "which local day this row belongs to" (see `bucketByLocalDay`). */
 export type UsageRow = {
@@ -103,6 +109,7 @@ export type UsageRowLike = {
   audioInputTokens?: number | null;
   audioOutputTokens?: number | null;
   audioCharacters?: number | null;
+  audioSeconds?: string | number | null;
   // Per-unit price snapshot (USD per unit at compute time). Optional — only
   // the admin log surfaces these for the "Unit Price" column.
   inputPrice?: string | null;
@@ -116,6 +123,7 @@ export type UsageRowLike = {
   audioInputPrice?: string | null;
   audioOutputPrice?: string | null;
   audioCharactersPrice?: string | null;
+  audioSecondsPrice?: string | null;
 };
 
 /** Sum-by-group for a single day, used by the daily stacked bar chart. */

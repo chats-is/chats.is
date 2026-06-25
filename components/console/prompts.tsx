@@ -4,8 +4,6 @@ import { useMemo, useState } from 'react';
 import { Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { ModelCapability } from '@/types/model';
-import { CAPABILITIES } from '@/lib/constant';
 import { api, RouterOutputs } from '@/trpc/react';
 import {
   AlertDialog,
@@ -42,127 +40,134 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 
-const PROMPT_TYPES = [
-  { value: 'system', label: 'System' },
-  { value: 'user', label: 'User' }
-] as const;
-
-const PROVIDERS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'google', label: 'Google' },
-  { value: 'xai', label: 'xAI' },
-  { value: 'deepseek', label: 'DeepSeek' }
-] as const;
-
 type AdminPrompt = RouterOutputs['prompt']['adminList'][number];
-type PromptType = 'system' | 'user';
-type PromptTypeFilter = 'all' | PromptType;
+type Visibility = 'private' | 'public';
 
 type PromptFormData = {
   name: string;
-  type: PromptType;
-  capability: ModelCapability;
-  providers: string[];
-  image: string;
   content: string;
+  image: string;
+  tags: string;
+  providers: string;
+  models: string[];
+  visibility: Visibility;
 };
 
+// Admin-created prompts default to public (available to all users).
 const EMPTY_FORM: PromptFormData = {
   name: '',
-  type: 'system',
-  capability: 'chat',
-  providers: [],
+  content: '',
   image: '',
-  content: ''
+  tags: '',
+  providers: '',
+  models: [],
+  visibility: 'public'
 };
 
-const matchesCapability = (
-  capability: string | null | undefined,
-  filterCapability: string
-) => {
-  if (filterCapability === 'all') return true;
-  return capability === null || capability === filterCapability;
+const parseList = (value: string) =>
+  value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+
+const joinList = (value?: string[] | null) => (value ?? []).join(', ');
+
+const LabelBadges = ({
+  values,
+  className
+}: {
+  values?: string[] | null;
+  className: string;
+}) => {
+  if (!values?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {values.map(value => (
+        <span key={value} className={className}>
+          {value}
+        </span>
+      ))}
+    </div>
+  );
 };
 
 export default function PromptsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null);
   const [deletePrompt, setDeletePrompt] = useState<AdminPrompt | null>(null);
-  const [filterType, setFilterType] = useState<PromptTypeFilter>('all');
-  const [filterCapability, setFilterCapability] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
 
   const utils = api.useUtils();
   const { data: prompts, isLoading } = api.prompt.adminList.useQuery();
+  const { data: models } = api.model.list.useQuery();
+
+  const modelName = (modelId: string) =>
+    models?.find(m => m.modelId === modelId)?.name ?? modelId;
 
   const resetForm = () => {
-    setFormData(EMPTY_FORM);
     setEditingPrompt(null);
+    setFormData(EMPTY_FORM);
   };
 
-  const invalidatePrompts = async () => {
-    await Promise.all([
+  const invalidate = () =>
+    Promise.all([
       utils.prompt.adminList.invalidate(),
       utils.prompt.listUsable.invalidate()
     ]);
-  };
 
   const adminCreateMutation = api.prompt.adminCreate.useMutation({
     onSuccess: async () => {
-      await invalidatePrompts();
+      await invalidate();
       setIsOpen(false);
       resetForm();
+      toast.success('Prompt created');
     },
     onError: error => toast.error(error.message)
   });
 
   const adminUpdateMutation = api.prompt.adminUpdate.useMutation({
     onSuccess: async () => {
-      await invalidatePrompts();
+      await invalidate();
       setIsOpen(false);
       resetForm();
+      toast.success('Prompt updated');
     },
     onError: error => toast.error(error.message)
   });
 
   const adminDeleteMutation = api.prompt.adminDelete.useMutation({
     onSuccess: async () => {
-      await invalidatePrompts();
+      await invalidate();
       setDeletePrompt(null);
+      toast.success('Prompt deleted');
     },
     onError: error => toast.error(error.message)
   });
 
   const isPending =
     adminCreateMutation.isPending || adminUpdateMutation.isPending;
-  const isDeleting = adminDeleteMutation.isPending;
 
   const filteredPrompts = useMemo(() => {
-    return prompts?.filter(prompt => {
-      if (filterType !== 'all' && prompt.type !== filterType) return false;
-      if (!matchesCapability(prompt.capability, filterCapability)) return false;
-      if (
-        search &&
-        !prompt.name.toLowerCase().includes(search.toLowerCase()) &&
-        !prompt.content.toLowerCase().includes(search.toLowerCase())
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [filterCapability, filterType, prompts, search]);
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return prompts ?? [];
+    return (prompts ?? []).filter(
+      prompt =>
+        prompt.name.toLowerCase().includes(keyword) ||
+        prompt.content.toLowerCase().includes(keyword)
+    );
+  }, [prompts, search]);
 
   const handleEdit = (prompt: AdminPrompt) => {
     setEditingPrompt(prompt);
     setFormData({
       name: prompt.name,
-      type: prompt.type,
-      capability: prompt.capability || 'chat',
-      providers: prompt.providers || [],
+      content: prompt.content,
       image: prompt.image || '',
-      content: prompt.content
+      tags: joinList(prompt.tags),
+      providers: joinList(prompt.providers),
+      models: prompt.models || [],
+      visibility: prompt.visibility
     });
     setIsOpen(true);
   };
@@ -172,40 +177,37 @@ export default function PromptsPage() {
 
     const name = formData.name.trim();
     const content = formData.content.trim();
-
     if (!name || !content) {
       toast.error('Name and content are required');
       return;
     }
 
+    const tags = parseList(formData.tags);
+    const providers = parseList(formData.providers);
     const payload = {
       name,
-      isPublic: formData.type === 'user',
-      capability: formData.capability,
-      providers: formData.providers.length > 0 ? formData.providers : null,
+      content,
       image: formData.image || null,
-      content
+      tags: tags.length > 0 ? tags : null,
+      providers: providers.length > 0 ? providers : null,
+      models: formData.models.length > 0 ? formData.models : null,
+      visibility: formData.visibility
     };
 
     if (editingPrompt) {
       adminUpdateMutation.mutate({ id: editingPrompt.id, ...payload });
     } else {
-      adminCreateMutation.mutate({ type: formData.type, ...payload });
+      adminCreateMutation.mutate(payload);
     }
   };
 
-  const toggleProvider = (provider: string) => {
-    if (formData.providers.includes(provider)) {
-      setFormData({
-        ...formData,
-        providers: formData.providers.filter(item => item !== provider)
-      });
-    } else {
-      setFormData({
-        ...formData,
-        providers: [...formData.providers, provider]
-      });
-    }
+  const toggleModel = (modelId: string) => {
+    setFormData(current => ({
+      ...current,
+      models: current.models.includes(modelId)
+        ? current.models.filter(item => item !== modelId)
+        : [...current.models, modelId]
+    }));
   };
 
   if (isLoading) {
@@ -217,158 +219,129 @@ export default function PromptsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex max-w-2xl flex-1 items-center gap-2">
-          <div className="relative max-w-xs flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search prompts..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select
-            value={filterType}
-            onValueChange={value => setFilterType(value as PromptTypeFilter)}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {PROMPT_TYPES.map(type => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterCapability} onValueChange={setFilterCapability}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Capability" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Capabilities</SelectItem>
-              {CAPABILITIES.map(capability => (
-                <SelectItem key={capability.value} value={capability.value}>
-                  {capability.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or content"
+            className="pl-9"
+          />
         </div>
 
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog
+          open={isOpen}
+          onOpenChange={open => {
+            setIsOpen(open);
+            if (!open) resetForm();
+          }}
+        >
           <DialogTrigger asChild>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                resetForm();
-              }}
-            >
+            <Button className="gap-2" onClick={resetForm}>
               <Plus className="size-4" />
               Add Prompt
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>
                 {editingPrompt ? 'Edit Prompt' : 'Add Prompt'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
-                <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div className="-mx-6 max-h-[60vh] space-y-3.5 overflow-y-auto px-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={e =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="Research prompt"
+                    required
+                    disabled={isPending}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="content">Content</Label>
+                  <Textarea
+                    id="content"
+                    value={formData.content}
+                    onChange={e =>
+                      setFormData({ ...formData, content: e.target.value })
+                    }
+                    rows={6}
+                    placeholder="Rewrite this draft to sound more concise..."
+                    required
+                    disabled={isPending}
+                  />
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
+                    <Label htmlFor="tags">Tags</Label>
                     <Input
-                      id="name"
-                      value={formData.name}
+                      id="tags"
+                      value={formData.tags}
                       onChange={e =>
-                        setFormData({ ...formData, name: e.target.value })
+                        setFormData({ ...formData, tags: e.target.value })
                       }
-                      placeholder="Default System Prompt"
-                      required
+                      placeholder="writing, english"
                       disabled={isPending}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Comma-separated. Used for filtering.
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="type">Type</Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={value =>
-                        setFormData({
-                          ...formData,
-                          type: value as PromptType
-                        })
+                    <Label htmlFor="providers">Providers</Label>
+                    <Input
+                      id="providers"
+                      value={formData.providers}
+                      onChange={e =>
+                        setFormData({ ...formData, providers: e.target.value })
                       }
-                      disabled={isPending || !!editingPrompt}
-                    >
-                      <SelectTrigger id="type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PROMPT_TYPES.map(type => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="capability">Capability</Label>
-                    <Select
-                      value={formData.capability}
-                      onValueChange={value =>
-                        setFormData({
-                          ...formData,
-                          capability: value as PromptFormData['capability']
-                        })
-                      }
+                      placeholder="openai, anthropic"
                       disabled={isPending}
-                    >
-                      <SelectTrigger id="capability">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CAPABILITIES.map(capability => (
-                          <SelectItem
-                            key={capability.value}
-                            value={capability.value}
-                          >
-                            {capability.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Comma-separated labels (display only).
+                    </p>
                   </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Providers</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {PROVIDERS.map(provider => (
-                      <label
-                        key={provider.value}
-                        className="flex cursor-pointer items-center gap-1.5"
-                      >
-                        <Checkbox
-                          checked={formData.providers.includes(provider.value)}
-                          onCheckedChange={() => toggleProvider(provider.value)}
-                          disabled={isPending}
-                        />
-                        <span className="text-sm">{provider.label}</span>
-                      </label>
-                    ))}
+                  <Label>Models</Label>
+                  <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2.5">
+                    {models?.length ? (
+                      models.map(model => (
+                        <label
+                          key={model.id}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={formData.models.includes(model.modelId)}
+                            onCheckedChange={() => toggleModel(model.modelId)}
+                            disabled={isPending}
+                          />
+                          <span>{model.name}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No models.
+                      </p>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Leave empty for all providers
+                    Target models — used for filtering.
                   </p>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Image</Label>
                   <div className="flex items-start gap-4">
@@ -407,13 +380,9 @@ export default function PromptsPage() {
                             try {
                               const res = await fetch(
                                 '/api/files/upload?type=prompts',
-                                {
-                                  method: 'POST',
-                                  body: formDataUpload
-                                }
+                                { method: 'POST', body: formDataUpload }
                               );
                               const data = await res.json();
-
                               if (res.ok && data.url) {
                                 setFormData({ ...formData, image: data.url });
                               } else {
@@ -435,40 +404,49 @@ export default function PromptsPage() {
                     Max 5MB. Supports JPEG, PNG, GIF, WebP.
                   </p>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="content">Content</Label>
-                  <Textarea
-                    id="content"
-                    value={formData.content}
-                    onChange={e =>
-                      setFormData({ ...formData, content: e.target.value })
+                  <Label htmlFor="visibility">Visibility</Label>
+                  <Select
+                    value={formData.visibility}
+                    onValueChange={value =>
+                      setFormData({
+                        ...formData,
+                        visibility: value as Visibility
+                      })
                     }
-                    placeholder="You are a helpful assistant..."
-                    rows={8}
-                    required
                     disabled={isPending}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Variables: {'{provider}'}, {'{modelId}'}, {'{date}'}
-                  </p>
+                  >
+                    <SelectTrigger id="visibility">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">
+                        Public — visible to all users
+                      </SelectItem>
+                      <SelectItem value="private">
+                        Private — only the owner
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    setIsOpen(false);
+                    resetForm();
+                  }}
                   disabled={isPending}
                 >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isPending} className="gap-2">
                   {isPending && <Loader2 className="size-4 animate-spin" />}
-                  {isPending
-                    ? 'Saving...'
-                    : editingPrompt
-                      ? 'Save Changes'
-                      : 'Create'}
+                  {editingPrompt ? 'Save Changes' : 'Create'}
                 </Button>
               </div>
             </form>
@@ -476,16 +454,17 @@ export default function PromptsPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <table className="w-full">
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full min-w-[820px]">
           <thead>
             <tr className="border-b bg-muted/50">
               <th className="w-20 p-3 text-left text-sm font-medium">Image</th>
               <th className="p-3 text-left text-sm font-medium">Name</th>
-              <th className="p-3 text-left text-sm font-medium">Providers</th>
-              <th className="w-28 p-3 text-left text-sm font-medium">Type</th>
-              <th className="w-28 p-3 text-left text-sm font-medium">
-                Capability
+              <th className="p-3 text-left text-sm font-medium">Owner</th>
+              <th className="p-3 text-left text-sm font-medium">Tags</th>
+              <th className="p-3 text-left text-sm font-medium">Models</th>
+              <th className="w-24 p-3 text-left text-sm font-medium">
+                Visibility
               </th>
               <th className="w-24 p-3 text-right text-sm font-medium">
                 Actions
@@ -493,7 +472,7 @@ export default function PromptsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredPrompts?.map(prompt => (
+            {filteredPrompts.map(prompt => (
               <tr
                 key={prompt.id}
                 className="border-b transition-colors hover:bg-muted/30"
@@ -510,36 +489,31 @@ export default function PromptsPage() {
                   )}
                 </td>
                 <td className="p-3">{prompt.name}</td>
+                <td className="p-3 text-sm text-muted-foreground">
+                  {prompt.user?.name || prompt.user?.email || '—'}
+                </td>
                 <td className="p-3">
-                  {prompt.providers?.length ? (
-                    <div className="flex flex-wrap gap-1">
-                      {prompt.providers.map(provider => (
-                        <span
-                          key={provider}
-                          className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                        >
-                          {provider}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  <LabelBadges
+                    values={prompt.tags}
+                    className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                  />
+                </td>
+                <td className="p-3">
+                  <LabelBadges
+                    values={prompt.models?.map(modelName)}
+                    className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                  />
                 </td>
                 <td className="p-3">
                   <span className="rounded bg-muted px-2 py-1 text-xs">
-                    {prompt.type}
+                    {prompt.visibility}
                   </span>
-                </td>
-                <td className="p-3">
-                  {prompt.capability ? (
-                    <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                      {prompt.capability}
-                    </span>
-                  ) : null}
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEdit(prompt)}
@@ -552,6 +526,7 @@ export default function PromptsPage() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => setDeletePrompt(prompt)}
@@ -564,13 +539,16 @@ export default function PromptsPage() {
                 </td>
               </tr>
             ))}
-            {(!filteredPrompts || filteredPrompts.length === 0) && (
+
+            {filteredPrompts.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="p-6 text-center text-muted-foreground"
                 >
-                  No prompts configured. Add your first prompt to get started.
+                  {prompts?.length
+                    ? 'No prompts match the current filter.'
+                    : 'No prompts yet. Add the first one.'}
                 </td>
               </tr>
             )}
@@ -580,30 +558,36 @@ export default function PromptsPage() {
 
       <AlertDialog
         open={!!deletePrompt}
-        onOpenChange={open => !open && setDeletePrompt(null)}
+        onOpenChange={open => {
+          if (!open && !adminDeleteMutation.isPending) setDeletePrompt(null);
+        }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Prompt</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this prompt? This action cannot be
-              undone.
+              {deletePrompt
+                ? `Delete "${deletePrompt.name}"?`
+                : 'Delete this prompt?'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={adminDeleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
+              disabled={adminDeleteMutation.isPending}
               onClick={event => {
                 event.preventDefault();
                 if (deletePrompt) {
                   adminDeleteMutation.mutate({ id: deletePrompt.id });
                 }
               }}
-              disabled={isDeleting}
-              variant="destructive"
-              className="gap-2"
             >
-              {isDeleting && <Loader2 className="size-4 animate-spin" />}
+              {adminDeleteMutation.isPending && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

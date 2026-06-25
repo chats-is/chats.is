@@ -80,6 +80,7 @@ export const pricingRouter = createTRPCRouter({
         audioInput: priceNumberSchema,
         audioOutput: priceNumberSchema,
         audioCharacters: priceNumberSchema,
+        audioSeconds: priceNumberSchema,
         source: sourceSchema.default('manual')
       })
     )
@@ -107,14 +108,16 @@ export const pricingRouter = createTRPCRouter({
         );
       }
 
-      // Audio is the same either/or: per-character (classic TTS) OR per-token.
-      if (
-        cap === 'audio' &&
-        input.audioCharacters != null &&
-        (input.audioInput != null || input.audioOutput != null)
-      ) {
+      // Audio is one-of-three: per-character (classic TTS), per-token, or
+      // per-second (STT).
+      const audioStyles = [
+        input.audioCharacters != null,
+        input.audioInput != null || input.audioOutput != null,
+        input.audioSeconds != null
+      ].filter(Boolean).length;
+      if (cap === 'audio' && audioStyles > 1) {
         throw new Error(
-          'Audio pricing must be either Per 1M characters OR token-based (Audio input / output), not both.'
+          'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio input / output), or Per second.'
         );
       }
 
@@ -131,7 +134,10 @@ export const pricingRouter = createTRPCRouter({
 
       const missing = pricingMissingFields(
         cap,
-        input as unknown as PricingRecord
+        input as unknown as PricingRecord,
+        cap === 'audio'
+          ? { transcription: !!model.supportsTranscription }
+          : undefined
       );
       if (missing.length > 0) {
         throw new Error(
@@ -158,6 +164,7 @@ export const pricingRouter = createTRPCRouter({
         audioInput: input.audioInput,
         audioOutput: input.audioOutput,
         audioCharacters: input.audioCharacters,
+        audioSeconds: input.audioSeconds,
         source: input.source,
         updatedAt: now
       };

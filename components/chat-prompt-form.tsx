@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { UseChatHelpers } from '@ai-sdk/react';
 import { ArrowUp, Loader2, Square } from 'lucide-react';
@@ -9,6 +10,7 @@ import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { Button } from '@/components/ui/button';
 import { AttachmentsButton } from '@/components/attachments-button';
 import { AttachmentsPreview } from '@/components/attachments-preview';
+import { MediaToolsMenu } from '@/components/media-tools-menu';
 import { ModelMenu, ModelOptions } from '@/components/model-menu';
 import { PromptPicker } from '@/components/prompt-picker';
 
@@ -46,8 +48,25 @@ export function ChatPromptForm({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
-  const { chatModels } = useSystemSettings();
+  const { chatModels, sttModels, defaults } = useSystemSettings();
   const noModels = !chatModels || chatModels.length === 0;
+
+  const { preferences } = usePreferences();
+
+  // Attachments: images need a vision-capable chat model; audio needs an STT
+  // model the server can actually resolve (user selection or system default) —
+  // otherwise the upload would be accepted but never transcribable.
+  const canAttachImages = !!modelOptions.supportsVision;
+  const sttModelId = preferences.sttModelId || defaults.sttModelId || '';
+  const canAttachAudio =
+    !!sttModels?.length && sttModels.some(m => m.modelId === sttModelId);
+  const showAttachments = canAttachImages || canAttachAudio;
+  const attachmentAccept = [
+    canAttachImages && '.jpg,.jpeg,.png,.gif,.webp',
+    canAttachAudio && '.mp3,.wav,.m4a,.ogg,.flac'
+  ]
+    .filter(Boolean)
+    .join(',');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -67,7 +86,7 @@ export function ChatPromptForm({
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="w-full">
-      {modelOptions.supportsVision && (
+      {showAttachments && (
         <AttachmentsPreview
           disabled={status === 'submitted' || status === 'streaming'}
           uploadQueue={uploadQueue}
@@ -116,26 +135,29 @@ export function ChatPromptForm({
           />
         </div>
         <div className="mt-5 flex items-center justify-between space-x-2">
-          {/* Model Menu with integrated Think button */}
-          <ModelMenu
-            models={chatModels}
-            status={status}
-            modelId={modelId}
-            onModelChange={onModelChange}
-            onOptionsChange={handleOptionsChange}
-          />
+          {/* Model Menu with integrated Think button + media model picker */}
+          <div className="flex items-center space-x-2">
+            <ModelMenu
+              models={chatModels}
+              status={status}
+              modelId={modelId}
+              onModelChange={onModelChange}
+              onOptionsChange={handleOptionsChange}
+            />
+            <MediaToolsMenu status={status} />
+          </div>
           <div className="flex items-center space-x-2">
             <PromptPicker
-              capability="chat"
               currentValue={input}
               onInsert={setInput}
               disabled={
                 noModels || status === 'submitted' || status === 'streaming'
               }
             />
-            {modelOptions.supportsVision && (
+            {showAttachments && (
               <AttachmentsButton
                 disabled={status === 'submitted' || status === 'streaming'}
+                accept={attachmentAccept}
                 uploadQueue={uploadQueue}
                 setUploadQueue={setUploadQueue}
                 attachments={attachments}

@@ -61,7 +61,7 @@ export default async function ConsolePage() {
             <CardContent>
               <div className="text-2xl font-bold">{promptStats.total}</div>
               <p className="text-xs text-muted-foreground">
-                {promptStats.system} system / {promptStats.user} user
+                {promptStats.public} public / {promptStats.private} private
               </p>
             </CardContent>
           </Card>

@@ -25,6 +25,19 @@ const nextConfig: NextConfig = {
       }
     ]
   },
+  async redirects() {
+    // Legacy standalone media pages were folded into the unified chat view.
+    return [
+      ...['image', 'video', 'audio'].flatMap(kind => [
+        { source: `/${kind}`, destination: '/', permanent: false },
+        {
+          source: `/${kind}/:id`,
+          destination: '/chat/:id',
+          permanent: false
+        }
+      ])
+    ];
+  },
   async headers() {
     // The artifact preview iframe executes untrusted, model-generated React in
     // a sandboxed iframe (allow-scripts, no allow-same-origin) — i.e. an opaque

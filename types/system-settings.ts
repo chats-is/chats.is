@@ -5,6 +5,7 @@ export interface SystemDefaults {
   imageModelId: string | null;
   videoModelId: string | null;
   ttsModelId: string | null;
+  sttModelId: string | null;
   speechModelId: string | null;
   speechVoice: string | null;
 }
@@ -18,5 +19,6 @@ export interface SystemSettings {
   imageModels: Model[];
   videoModels: Model[];
   ttsModels: Model[];
+  sttModels: Model[];
   defaults: SystemDefaults;
 }

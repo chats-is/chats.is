@@ -1,6 +1,7 @@
 import type { ProviderType } from './provider';
 
-// Model capability type
+// Model capability type ('audio' covers both TTS and STT models;
+// `supportsTranscription` distinguishes the direction)
 export type ModelCapability = 'chat' | 'image' | 'video' | 'audio';
 
 // UI options for different model types
@@ -66,9 +67,15 @@ export type Model = {
   aliases?: string[] | null;
   supportsVision?: boolean | null;
   supportsReasoning?: boolean | null;
+  /** Image models: supports image editing (input images). */
+  supportsEdit?: boolean | null;
+  /** Audio models: STT (speech→text); unset means TTS. */
+  supportsTranscription?: boolean | null;
   isEnabled: boolean;
   uiOptions?: ModelUIOptions | null;
   apiParams?: ModelAPIParams | null;
+  /** Inline system prompt for chat models (replaces the old prompt-record FK). */
+  systemPrompt?: string | null;
   displayOrder: number;
   /** @deprecated single-provider link; prefer `providers` (priority-ordered). */
   provider?: ModelProvider | null;

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { generateUUID } from '@/lib/utils';
 import { adminProcedure, createTRPCRouter } from '@/server/api/trpc';
-import { modelProviders, models, prompts } from '@/server/db/schema';
+import { modelProviders, models } from '@/server/db/schema';
 
 const capabilitySchema = z.enum(['chat', 'image', 'video', 'audio']);
 
@@ -33,7 +33,6 @@ export const modelRouter = createTRPCRouter({
         ],
         with: {
           provider: true,
-          systemPrompt: true,
           modelProviders: {
             with: { provider: true },
             orderBy: (mp, { asc }) => [asc(mp.priority)]
@@ -63,6 +62,8 @@ export const modelRouter = createTRPCRouter({
         aliases: z.array(z.string()).optional(),
         supportsVision: z.boolean().default(false),
         supportsReasoning: z.boolean().default(false),
+        supportsEdit: z.boolean().default(false),
+        supportsTranscription: z.boolean().default(false),
         isEnabled: z.boolean().default(true),
         uiOptions: z
           .object({
@@ -91,7 +92,7 @@ export const modelRouter = createTRPCRouter({
           })
           .strict()
           .optional(),
-        systemPromptId: z.string().optional(),
+        systemPrompt: z.string().nullable().optional(),
         displayOrder: z.number().int().default(0)
       })
     )
@@ -128,19 +129,6 @@ export const modelRouter = createTRPCRouter({
         );
       }
 
-      // Validate system prompt is of type 'system'
-      if (input.systemPromptId) {
-        const prompt = await ctx.db.query.prompts.findFirst({
-          where: and(
-            eq(prompts.id, input.systemPromptId),
-            eq(prompts.type, 'system')
-          )
-        });
-        if (!prompt) {
-          throw new Error('System prompt must be of type "system"');
-        }
-      }
-
       const id = generateUUID();
       await ctx.db.transaction(async tx => {
         await tx.insert(models).values({
@@ -154,10 +142,12 @@ export const modelRouter = createTRPCRouter({
           aliases: input.aliases,
           supportsVision: input.supportsVision,
           supportsReasoning: input.supportsReasoning,
+          supportsEdit: input.supportsEdit,
+          supportsTranscription: input.supportsTranscription,
           isEnabled: input.isEnabled,
           uiOptions: input.uiOptions,
           apiParams: input.apiParams,
-          systemPromptId: input.systemPromptId,
+          systemPrompt: input.systemPrompt,
           displayOrder: input.displayOrder
         });
         await tx.insert(modelProviders).values(
@@ -194,6 +184,8 @@ export const modelRouter = createTRPCRouter({
         aliases: z.array(z.string()).optional(),
         supportsVision: z.boolean().optional(),
         supportsReasoning: z.boolean().optional(),
+        supportsEdit: z.boolean().optional(),
+        supportsTranscription: z.boolean().optional(),
         isEnabled: z.boolean().optional(),
         uiOptions: z
           .object({
@@ -224,7 +216,7 @@ export const modelRouter = createTRPCRouter({
           .strict()
           .nullable()
           .optional(),
-        systemPromptId: z.string().nullable().optional(),
+        systemPrompt: z.string().nullable().optional(),
         displayOrder: z.number().int().optional()
       })
     )
@@ -235,19 +227,6 @@ export const modelRouter = createTRPCRouter({
       // usage / quota / settings and the model_providers FK, none of which
       // cascade on rename. Ignore any attempt to change it on update.
       delete sanitizedUpdates.modelId;
-
-      // Validate system prompt is of type 'system'
-      if (updates.systemPromptId) {
-        const prompt = await ctx.db.query.prompts.findFirst({
-          where: and(
-            eq(prompts.id, updates.systemPromptId),
-            eq(prompts.type, 'system')
-          )
-        });
-        if (!prompt) {
-          throw new Error('System prompt must be of type "system"');
-        }
-      }
 
       const existingModel = await ctx.db.query.models.findFirst({
         where: eq(models.id, id)

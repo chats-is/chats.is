@@ -35,6 +35,7 @@ export type PriceSnapshot = {
   audioInputPrice: string | null;
   audioOutputPrice: string | null;
   audioCharactersPrice: string | null;
+  audioSecondsPrice: string | null;
 };
 
 /** Recognized external pricing data sources. */

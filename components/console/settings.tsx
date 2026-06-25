@@ -56,6 +56,11 @@ const DEFAULT_SETTINGS = [
     description: 'Default model for voice page'
   },
   {
+    key: 'default.stt.modelId',
+    label: 'Default Transcription Model',
+    description: 'Default model for speech-to-text (chat transcribe tool)'
+  },
+  {
     key: 'speech.enabled',
     label: 'Enable Speech',
     description: 'Enable or disable speech synthesis'
@@ -81,11 +86,6 @@ const DEFAULT_SETTINGS = [
     description: 'Model used for generating chat titles'
   },
   {
-    key: 'title.systemPrompt',
-    label: 'Title Generation Prompt',
-    description: 'Prompt used for generating titles'
-  },
-  {
     key: 'default.quotaId',
     label: 'Default Quota',
     description: 'Quota id used for users without an assigned plan'
@@ -96,7 +96,6 @@ export default function SettingsPage() {
   const utils = api.useUtils();
   const { data: settings, isLoading } = api.settings.list.useQuery();
   const { data: models } = api.model.list.useQuery();
-  const { data: prompts } = api.prompt.adminList.useQuery({ type: 'system' });
   const { data: quotaOptions } = api.quota.listForSelect.useQuery();
 
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -148,12 +147,11 @@ export default function SettingsPage() {
     m => m.capability === 'video' && m.isEnabled
   );
   const speechModels = models?.filter(
-    m => m.capability === 'audio' && m.isEnabled
+    m => m.capability === 'audio' && m.isEnabled && !m.supportsTranscription
   );
-  const systemPrompts = prompts?.filter(
-    p => !p.capability || p.capability === 'chat'
+  const transcriptionModels = models?.filter(
+    m => m.capability === 'audio' && m.isEnabled && m.supportsTranscription
   );
-
   // Get available voices for speech reading model
   const speechVoices = useMemo(() => {
     const selectedModel = speechModels?.find(
@@ -355,6 +353,39 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Default Transcription Model</Label>
+                <Select
+                  disabled={
+                    !transcriptionModels?.length || bulkUpdateMutation.isPending
+                  }
+                  value={
+                    !transcriptionModels?.length
+                      ? undefined
+                      : formData['default.stt.modelId'] || ''
+                  }
+                  onValueChange={value =>
+                    handleChange('default.stt.modelId', value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        !transcriptionModels?.length
+                          ? 'No available models'
+                          : 'Select model'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transcriptionModels?.map(m => (
+                      <SelectItem key={m.id} value={m.modelId}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -488,39 +519,6 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Title Generation Prompt</Label>
-                <Select
-                  disabled={
-                    !systemPrompts?.length || bulkUpdateMutation.isPending
-                  }
-                  value={
-                    !systemPrompts?.length
-                      ? undefined
-                      : formData['title.systemPrompt'] || ''
-                  }
-                  onValueChange={value =>
-                    handleChange('title.systemPrompt', value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        !systemPrompts?.length
-                          ? 'No available prompts'
-                          : 'Select prompt'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {systemPrompts?.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
           </div>
         </TabsContent>
@@ -576,28 +574,15 @@ export default function SettingsPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Default Chat System Prompt</Label>
-                <Select
+                <Textarea
                   disabled={bulkUpdateMutation.isPending}
-                  value={formData['default.chat.systemPrompt'] || 'none'}
-                  onValueChange={value =>
-                    handleChange(
-                      'default.chat.systemPrompt',
-                      value === 'none' ? '' : value
-                    )
+                  value={formData['default.chat.systemPrompt'] || ''}
+                  onChange={e =>
+                    handleChange('default.chat.systemPrompt', e.target.value)
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select system prompt" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {systemPrompts?.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Fallback system prompt for chat models that don't define their own. Supports {provider}, {modelId}, {date}."
+                  rows={4}
+                />
                 <p className="text-xs text-muted-foreground">
                   The default system prompt used for new chat conversations.
                 </p>

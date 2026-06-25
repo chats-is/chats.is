@@ -11,10 +11,7 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover';
 
-type PromptCapability = 'chat' | 'image' | 'video' | 'audio';
-
 interface PromptPickerProps {
-  capability: PromptCapability;
   currentValue: string;
   onInsert: (value: string) => void;
   disabled?: boolean;
@@ -30,7 +27,6 @@ function prependPrompt(promptContent: string, currentValue: string) {
 }
 
 export function PromptPicker({
-  capability,
   currentValue,
   onInsert,
   disabled = false
@@ -43,7 +39,7 @@ export function PromptPicker({
   useEffect(() => setMounted(true), []);
 
   const { data: prompts, isLoading } = api.prompt.listUsable.useQuery(
-    { capability },
+    undefined,
     {
       refetchOnWindowFocus: false
     }

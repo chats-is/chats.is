@@ -34,7 +34,7 @@ export function MediaPlaceholder({
     return (
       <div
         className={cn(
-          'flex min-w-80 animate-pulse items-center gap-3 rounded-full bg-muted/50 py-2 pr-4 pl-2',
+          'flex w-80 max-w-full media-generating items-center gap-3 rounded-full py-2 pr-4 pl-2',
           className
         )}
       >
@@ -65,11 +65,11 @@ export function MediaPlaceholder({
     <div
       style={{ aspectRatio: ratio }}
       className={cn(
-        'flex w-80 max-w-full animate-pulse items-center justify-center rounded-lg bg-muted',
+        'flex w-80 max-w-full media-generating items-center justify-center rounded-lg',
         className
       )}
     >
-      <Icon className="size-8 text-muted-foreground/50" />
+      <Icon className="size-8 animate-media-breathe text-muted-foreground" />
     </div>
   );
 }

@@ -19,6 +19,8 @@ import {
 
 interface AttachmentsButtonProps {
   disabled?: boolean;
+  /** Accepted file extensions; defaults to images. */
+  accept?: string;
   uploadQueue: string[];
   setUploadQueue: Dispatch<SetStateAction<Array<string>>>;
   attachments: Attachment[];
@@ -27,6 +29,7 @@ interface AttachmentsButtonProps {
 
 export const AttachmentsButton = ({
   disabled,
+  accept = '.jpg,.jpeg,.png,.gif,.webp',
   uploadQueue,
   setUploadQueue,
   attachments,
@@ -95,7 +98,7 @@ export const AttachmentsButton = ({
                 tabIndex={-1}
                 className="hidden"
                 type="file"
-                accept=".jpg,.jpeg,.png,.gif,.webp"
+                accept={accept}
                 onChange={handleFileChange}
               />
               <Paperclip className="size-4" />

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ModelCapability } from '@/types';
 import { CAPABILITIES } from '@/lib/constant';
 import { api } from '@/trpc/react';
 import {
@@ -161,7 +162,6 @@ export default function ModelsPage() {
   const utils = api.useUtils();
   const { data: models, isLoading } = api.model.list.useQuery();
   const { data: providers } = api.provider.list.useQuery();
-  const { data: prompts } = api.prompt.adminList.useQuery({ type: 'system' });
 
   const createMutation = api.model.create.useMutation({
     onSuccess: () => {
@@ -200,13 +200,15 @@ export default function ModelsPage() {
   const [formData, setFormData] = useState({
     name: '',
     modelId: '',
-    capability: 'chat' as const,
+    capability: 'chat' as ModelCapability,
     image: '',
     aliases: '',
     supportsVision: false,
     supportsReasoning: false,
+    supportsEdit: false,
+    supportsTranscription: false,
     isEnabled: true,
-    systemPromptId: '',
+    systemPrompt: '',
     uiOptions: '',
     apiParams: ''
   });
@@ -241,22 +243,22 @@ export default function ModelsPage() {
   "reasoning": false
 }`,
     image: `{
-  "size": "1024x1024",
-  "sizes": ["1024x1024"],
-  "aspectRatio": "16:9",
-  "aspectRatios": ["16:9"]
+  "size": "auto",
+  "sizes": ["auto", "1024x1024"],
+  "aspectRatio": "auto",
+  "aspectRatios": ["auto", "16:9"]
 }`,
     video: `{
   "duration": 6,
   "durations": [4, 6, 8],
-  "resolution": "720p",
-  "resolutions": ["720p"],
-  "aspectRatio": "16:9",
-  "aspectRatios": ["16:9"]
+  "resolution": "auto",
+  "resolutions": ["auto", "720p"],
+  "aspectRatio": "auto",
+  "aspectRatios": ["auto", "16:9"]
 }`,
     audio: `{
-  "voice": "",
-  "voices": []
+  "voice": "auto",
+  "voices": ["auto"]
 }`
   };
 
@@ -289,8 +291,10 @@ export default function ModelsPage() {
       aliases: '',
       supportsVision: false,
       supportsReasoning: false,
+      supportsEdit: false,
+      supportsTranscription: false,
       isEnabled: true,
-      systemPromptId: '',
+      systemPrompt: '',
       uiOptions: '',
       apiParams: ''
     });
@@ -307,8 +311,10 @@ export default function ModelsPage() {
       aliases: model.aliases?.join(', ') || '',
       supportsVision: model.supportsVision || false,
       supportsReasoning: model.supportsReasoning || false,
+      supportsEdit: model.supportsEdit || false,
+      supportsTranscription: model.supportsTranscription || false,
       isEnabled: model.isEnabled,
-      systemPromptId: model.systemPromptId || '',
+      systemPrompt: model.systemPrompt || '',
       uiOptions: model.uiOptions
         ? JSON.stringify(model.uiOptions, null, 2)
         : '',
@@ -349,8 +355,8 @@ export default function ModelsPage() {
       return;
     }
 
-    const systemPromptId =
-      formData.systemPromptId || (editingId ? null : undefined);
+    const systemPrompt =
+      formData.systemPrompt || (editingId ? null : undefined);
     const aliases = formData.aliases
       ? formData.aliases
           .split(',')
@@ -379,7 +385,7 @@ export default function ModelsPage() {
     const data = {
       ...formData,
       aliases,
-      systemPromptId,
+      systemPrompt,
       uiOptions,
       apiParams,
       providers: providersPayload
@@ -595,31 +601,22 @@ export default function ModelsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="systemPromptId">
+                    <Label htmlFor="systemPrompt">
                       System Prompt (optional)
                     </Label>
-                    <Select
-                      value={formData.systemPromptId || 'none'}
-                      onValueChange={value =>
+                    <Textarea
+                      id="systemPrompt"
+                      value={formData.systemPrompt}
+                      onChange={e =>
                         setFormData({
                           ...formData,
-                          systemPromptId: value === 'none' ? '' : value
+                          systemPrompt: e.target.value
                         })
                       }
+                      placeholder="Instructions prepended to every chat with this model. Supports {provider}, {modelId}, {date}."
+                      rows={4}
                       disabled={isPending}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select prompt" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {prompts?.map(p => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -742,6 +739,37 @@ export default function ModelsPage() {
                     />
                     <Label htmlFor="supportsReasoning">Reasoning</Label>
                   </div>
+                  {formData.capability === 'image' && (
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="supportsEdit"
+                        checked={formData.supportsEdit}
+                        onCheckedChange={checked =>
+                          setFormData({ ...formData, supportsEdit: checked })
+                        }
+                        disabled={isPending}
+                      />
+                      <Label htmlFor="supportsEdit">Image editing</Label>
+                    </div>
+                  )}
+                  {formData.capability === 'audio' && (
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="supportsTranscription"
+                        checked={formData.supportsTranscription}
+                        onCheckedChange={checked =>
+                          setFormData({
+                            ...formData,
+                            supportsTranscription: checked
+                          })
+                        }
+                        disabled={isPending}
+                      />
+                      <Label htmlFor="supportsTranscription">
+                        Transcription (STT)
+                      </Label>
+                    </div>
+                  )}
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="isEnabled"

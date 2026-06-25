@@ -1,9 +1,9 @@
-import { UIMessagePart, UITools } from 'ai';
+import { UIMessagePart } from 'ai';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { v4 as uuidv4 } from 'uuid';
 
-import { ChatMessage, CustomUIDataTypes, Result } from '@/types';
+import { ChatMessage, ChatTools, CustomUIDataTypes, Result } from '@/types';
 import { DBMessage } from '@/types/message';
 
 export function cn(...inputs: ClassValue[]) {
@@ -97,11 +97,34 @@ export function getMostRecentUserMessage(messages: ChatMessage[]) {
   return userMessage;
 }
 
+/** Audio models cover both directions; `supportsTranscription` marks STT. */
+export function isSttModel(model: {
+  capability: string;
+  supportsTranscription?: boolean | null;
+}): boolean {
+  return model.capability === 'audio' && !!model.supportsTranscription;
+}
+
+export function isTtsModel(model: {
+  capability: string;
+  supportsTranscription?: boolean | null;
+}): boolean {
+  return model.capability === 'audio' && !model.supportsTranscription;
+}
+
+/** Format seconds as m:ss for media players; 0:00 for unknown durations. */
+export function formatMediaTime(time: number): string {
+  if (!Number.isFinite(time) || time <= 0) return '0:00';
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export function convertToChatMessages(messages: DBMessage[]): ChatMessage[] {
   return messages.map(message => ({
     id: message.id,
     role: message.role as 'user' | 'assistant' | 'system',
-    parts: message.parts as UIMessagePart<CustomUIDataTypes, UITools>[],
+    parts: message.parts as UIMessagePart<CustomUIDataTypes, ChatTools>[],
     metadata: {
       parentId: message.parentId,
       reasonDuration: message.reasonDuration ?? undefined,

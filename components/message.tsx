@@ -8,6 +8,12 @@ import { IconLoading } from '@/components/ui/icons';
 import { DocumentPreview } from '@/components/artifacts/document-preview';
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaLightbox } from '@/components/media-lightbox';
+import {
+  isMediaToolPart,
+  isTranscribeToolPart,
+  MediaToolPart,
+  TranscribeToolPart
+} from '@/components/media-tool-part';
 import { MessageMarkdown } from '@/components/message-markdown';
 import { MessageReasoning } from '@/components/message-reasoning';
 import { ModelIcon } from '@/components/model-icon';
@@ -49,6 +55,9 @@ export function Message({
   );
   const hasReasoningPart = reasoningParts.length > 0;
   const hasFilePart = message.parts.some(part => part.type === 'file');
+  const hasMediaToolPart = message.parts.some(
+    part => isMediaToolPart(part) || isTranscribeToolPart(part)
+  );
   const firstReasoningIndex = message.parts.findIndex(
     part => part.type === 'reasoning'
   );
@@ -88,7 +97,8 @@ export function Message({
     !hasVisibleArtifacts &&
     !hasVisibleReasoningDisplay &&
     !hasVisibleTextContent &&
-    !hasFilePart;
+    !hasFilePart &&
+    !hasMediaToolPart;
 
   // Match each create_artifact tool call (by its position in `parts`) to the
   // artifact it produced, so the card renders inline exactly where the model
@@ -174,6 +184,14 @@ export function Message({
             )}
           >
             {message.parts.map((part, index) => {
+              if (isMediaToolPart(part)) {
+                return <MediaToolPart key={index} part={part} />;
+              }
+
+              if (isTranscribeToolPart(part)) {
+                return <TranscribeToolPart key={index} part={part} />;
+              }
+
               if (part.type === 'tool-create_artifact') {
                 const artifact = partArtifact.get(index);
                 return artifact ? (
@@ -237,7 +255,7 @@ export function Message({
                 // Render audio
                 if (part.mediaType.startsWith('audio/')) {
                   return (
-                    <div key={index} className="my-2 min-w-80">
+                    <div key={index} className="my-2 w-80 max-w-full">
                       <AudioPlayer src={part.url} />
                     </div>
                   );
@@ -278,6 +296,7 @@ export function Message({
               !hasReasoningPart &&
               !hasVisibleTextContent &&
               !hasFilePart &&
+              !hasMediaToolPart &&
               (supportsReasoning ? (
                 <MessageReasoning
                   isLoading={false}
@@ -301,6 +320,7 @@ export function Message({
               !hasVisibleReasoningDisplay &&
               !hasVisibleTextContent &&
               !hasFilePart &&
+              !hasMediaToolPart &&
               hasReasoningPart && (
                 <div className="my-1">
                   <IconLoading className="text-muted-foreground" />

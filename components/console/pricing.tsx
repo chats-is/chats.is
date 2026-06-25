@@ -77,6 +77,7 @@ type EditState = {
   audioInput: string;
   audioOutput: string;
   audioCharacters: string;
+  audioSeconds: string;
 };
 
 const fromNum = (v: string | null | undefined) =>
@@ -120,6 +121,7 @@ function summarizePricing(
         audioInput?: string | null;
         audioOutput?: string | null;
         audioCharacters?: string | null;
+        audioSeconds?: string | null;
       }
     | null
     | undefined
@@ -154,10 +156,12 @@ function summarizePricing(
       break;
     }
     case 'audio': {
-      // Per-character (classic TTS) OR token-based — show whichever is set.
+      // Per-character (TTS), token-based (TTS), or per-second (STT) — show
+      // whichever is set.
       push('Per 1M chars', pricing.audioCharacters, '');
       push('Input', pricing.audioInput, '/1M');
       push('Output', pricing.audioOutput, '/1M');
+      push('Per sec', pricing.audioSeconds, '/s');
       break;
     }
   }
@@ -238,7 +242,8 @@ export default function PricingPage() {
       videoSeconds: fromNum(row.pricing?.videoSeconds),
       audioInput: fromNum(row.pricing?.audioInput),
       audioOutput: fromNum(row.pricing?.audioOutput),
-      audioCharacters: fromNum(row.pricing?.audioCharacters)
+      audioCharacters: fromNum(row.pricing?.audioCharacters),
+      audioSeconds: fromNum(row.pricing?.audioSeconds)
     });
   };
 
@@ -257,6 +262,7 @@ export default function PricingPage() {
       audioInput: edit.audioInput || null,
       audioOutput: edit.audioOutput || null,
       audioCharacters: edit.audioCharacters || null,
+      audioSeconds: edit.audioSeconds || null,
       source: 'manual'
     });
   };
@@ -626,8 +632,8 @@ export default function PricingPage() {
               )}
               {edit.capability === 'audio' && (
                 <>
-                  {/* Two mutually-exclusive billing styles. Typing in one side
-                      disables (and clears) the other. */}
+                  {/* Three mutually-exclusive billing styles. Typing in one
+                      style disables (and clears) the others. */}
                   <Field
                     label="Per 1M characters"
                     value={edit.audioCharacters}
@@ -636,11 +642,16 @@ export default function PricingPage() {
                         ...edit,
                         audioCharacters: v,
                         audioInput: '',
-                        audioOutput: ''
+                        audioOutput: '',
+                        audioSeconds: ''
                       })
                     }
                     placeholder="classic TTS (tts-1, ElevenLabs)"
-                    disabled={!!edit.audioInput || !!edit.audioOutput}
+                    disabled={
+                      !!edit.audioInput ||
+                      !!edit.audioOutput ||
+                      !!edit.audioSeconds
+                    }
                   />
                   <div className="col-span-2 text-xs text-muted-foreground">
                     Or token-based billing (gpt-4o-mini-tts) — set Audio input +
@@ -650,17 +661,50 @@ export default function PricingPage() {
                     label="Audio input / 1M tokens"
                     value={edit.audioInput}
                     onChange={v =>
-                      setEdit({ ...edit, audioInput: v, audioCharacters: '' })
+                      setEdit({
+                        ...edit,
+                        audioInput: v,
+                        audioCharacters: '',
+                        audioSeconds: ''
+                      })
                     }
-                    disabled={!!edit.audioCharacters}
+                    disabled={!!edit.audioCharacters || !!edit.audioSeconds}
                   />
                   <Field
                     label="Audio output / 1M tokens"
                     value={edit.audioOutput}
                     onChange={v =>
-                      setEdit({ ...edit, audioOutput: v, audioCharacters: '' })
+                      setEdit({
+                        ...edit,
+                        audioOutput: v,
+                        audioCharacters: '',
+                        audioSeconds: ''
+                      })
                     }
-                    disabled={!!edit.audioCharacters}
+                    disabled={!!edit.audioCharacters || !!edit.audioSeconds}
+                  />
+                  <div className="col-span-2 text-xs text-muted-foreground">
+                    Or per-second billing for STT models (whisper-1) — set Audio
+                    / second instead:
+                  </div>
+                  <Field
+                    label="Audio / second"
+                    value={edit.audioSeconds}
+                    onChange={v =>
+                      setEdit({
+                        ...edit,
+                        audioSeconds: v,
+                        audioCharacters: '',
+                        audioInput: '',
+                        audioOutput: ''
+                      })
+                    }
+                    placeholder="per second of input audio (whisper-1: 0.0001)"
+                    disabled={
+                      !!edit.audioCharacters ||
+                      !!edit.audioInput ||
+                      !!edit.audioOutput
+                    }
                   />
                 </>
               )}

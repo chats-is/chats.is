@@ -85,7 +85,8 @@ export async function POST(req: Request) {
     userId: session.user.id,
     modelKey: dbModel.modelId,
     modelLabel: dbModel.name,
-    capability: 'audio'
+    capability: 'audio',
+    transcription: false
   });
   if (gate) return gate;
 

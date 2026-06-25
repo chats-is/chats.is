@@ -1,7 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
-  check,
   index,
   integer,
   jsonb,
@@ -36,6 +35,11 @@ export const chats = createTable(
       .default('chat')
       .$type<ChatType>(),
     modelId: varchar('model_id', { length: 255 }).notNull(),
+    // Resumable-stream id of an in-progress generation (a Redis key, not a FK).
+    // Null when nothing is streaming. The chat route's GET handler reads this
+    // to re-attach to the stream after a page refresh. Only set when REDIS_URL
+    // is configured.
+    activeStreamId: varchar('active_stream_id', { length: 255 }),
     userId: varchar('user_id', { length: 255 })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -367,17 +371,22 @@ export const prompts = createTable(
   {
     id: varchar('id', { length: 255 }).notNull().primaryKey(),
     name: varchar('name', { length: 100 }).notNull(),
-    type: varchar('type', { length: 20 }).notNull().$type<'system' | 'user'>(),
-    ownerKind: varchar('owner_kind', { length: 20 }).$type<'admin' | 'user'>(),
+    // Creator of the prompt. Admins are regular users with extra rights, so
+    // ownership is just the creator — there is no separate admin/user owner kind.
     userId: varchar('user_id', { length: 255 }).references(() => users.id, {
       onDelete: 'cascade'
     }),
-    isPublic: boolean('is_public').notNull().default(false),
-    capability: varchar('capability', { length: 32 })
+    // private = only the creator; public = visible to everyone.
+    visibility: varchar('visibility', { length: 20 })
       .notNull()
-      .default('chat')
-      .$type<'chat' | 'image' | 'video' | 'audio'>(),
+      .default('private')
+      .$type<'private' | 'public'>(),
+    // Free-text labels for browsing/filtering.
+    tags: jsonb('tags').$type<string[]>(),
+    // Free-text display labels only (NOT linked to the providers table, not filtered).
     providers: jsonb('providers').$type<string[]>(),
+    // Model ids (from the models table) this prompt targets — used for filtering.
+    models: jsonb('models').$type<string[]>(),
     image: text('image'),
     content: text('content').notNull(),
     displayOrder: integer('display_order').notNull().default(0),
@@ -389,21 +398,8 @@ export const prompts = createTable(
       .defaultNow()
   },
   prompt => [
-    index('prompt_type_idx').on(prompt.type),
-    index('prompt_capability_idx').on(prompt.capability),
-    index('prompt_owner_kind_idx').on(prompt.ownerKind),
     index('prompt_user_id_idx').on(prompt.userId),
-    index('prompt_is_public_idx').on(prompt.isPublic),
-    check(
-      'prompt_owner_access_check',
-      sql`(
-        (${prompt.type} = 'system' and ${prompt.ownerKind} = 'admin' and ${prompt.userId} is not null and ${prompt.isPublic} = false)
-        or
-        (${prompt.type} = 'user' and ${prompt.ownerKind} = 'admin' and ${prompt.userId} is not null and ${prompt.isPublic} = true)
-        or
-        (${prompt.type} = 'user' and ${prompt.ownerKind} = 'user' and ${prompt.userId} is not null)
-      )`
-    )
+    index('prompt_visibility_idx').on(prompt.visibility)
   ]
 );
 
@@ -434,6 +430,10 @@ export const models = createTable(
     aliases: jsonb('aliases').$type<string[]>(),
     supportsVision: boolean('supports_vision').default(false),
     supportsReasoning: boolean('supports_reasoning').default(false),
+    // Image models: supports image editing (input images).
+    supportsEdit: boolean('supports_edit').default(false),
+    // Audio models: this is an STT (speech→text) model; unset means TTS.
+    supportsTranscription: boolean('supports_transcription').default(false),
     isEnabled: boolean('is_enabled').notNull().default(true),
     uiOptions: jsonb('ui_options').$type<{
       size?: string;
@@ -456,10 +456,7 @@ export const models = createTable(
       frequencyPenalty?: number;
       presencePenalty?: number;
     }>(),
-    systemPromptId: varchar('system_prompt_id', { length: 255 }).references(
-      () => prompts.id,
-      { onDelete: 'set null' }
-    ),
+    systemPrompt: text('system_prompt'),
     displayOrder: integer('display_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -482,10 +479,6 @@ export const modelsRelations = relations(models, ({ one, many }) => ({
   provider: one(providers, {
     fields: [models.providerId],
     references: [providers.id]
-  }),
-  systemPrompt: one(prompts, {
-    fields: [models.systemPromptId],
-    references: [prompts.id]
   }),
   pricings: many(modelPricings),
   modelProviders: many(modelProviders)
@@ -663,6 +656,9 @@ export const modelPricings = createTable(
     audioInput: numeric('audio_input', { precision: 20, scale: 10 }),
     audioOutput: numeric('audio_output', { precision: 20, scale: 10 }),
     audioCharacters: numeric('audio_characters', { precision: 20, scale: 10 }),
+    // Transcription (STT) bills per second of input audio — the only
+    // dimension `transcribe()` reliably reports (durationInSeconds).
+    audioSeconds: numeric('audio_seconds', { precision: 20, scale: 10 }),
     source: varchar('source', { length: 50 })
       .notNull()
       .default('manual')
@@ -736,6 +732,9 @@ export const usage = createTable(
     audioInputTokens: integer('audio_input_tokens').notNull().default(0),
     audioOutputTokens: integer('audio_output_tokens').notNull().default(0),
     audioCharacters: integer('audio_characters').notNull().default(0),
+    audioSeconds: numeric('audio_seconds', { precision: 12, scale: 3 })
+      .notNull()
+      .default('0'),
 
     // Price snapshot at compute time (USD per unit; semantics match model_pricing)
     inputPrice: numeric('input_price', { precision: 20, scale: 10 }),
@@ -755,6 +754,10 @@ export const usage = createTable(
       scale: 10
     }),
     audioCharactersPrice: numeric('audio_characters_price', {
+      precision: 20,
+      scale: 10
+    }),
+    audioSecondsPrice: numeric('audio_seconds_price', {
       precision: 20,
       scale: 10
     }),

@@ -1,19 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { PlusCircle } from 'lucide-react';
 
-import { contentTypes } from '@/lib/content-types';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
 interface ChatHeaderProps {
@@ -22,18 +14,12 @@ interface ChatHeaderProps {
 
 export function ChatHeader({ title }: ChatHeaderProps) {
   const { appName } = useSystemSettings();
-  const pathname = usePathname();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
 
-  const handleNewContent = (path: string) => {
-    router.push(path);
+  const handleNewChat = () => {
+    router.push('/');
     router.refresh();
   };
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     const documentTitle = title ? `${title} - ${appName}` : appName;
@@ -50,40 +36,15 @@ export function ChatHeader({ title }: ChatHeaderProps) {
         <span className="truncate">{title}</span>
       </div>
       <div className="flex-1" />
-      {mounted ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="-ml-1 size-7 md:hidden"
-            >
-              <PlusCircle />
-              <span className="sr-only">New content</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {contentTypes.map(({ type, label, icon: Icon, path }) => (
-              <DropdownMenuItem
-                key={type}
-                onSelect={() => handleNewContent(path)}
-                className={cn(
-                  pathname === path && 'bg-accent text-accent-foreground'
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className="size-4" />
-                  <span>{label}</span>
-                </div>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : (
-        <div className="-ml-1 flex size-7 items-center justify-center md:hidden">
-          <PlusCircle className="size-4" />
-        </div>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="-ml-1 size-7 md:hidden"
+        onClick={handleNewChat}
+      >
+        <PlusCircle />
+        <span className="sr-only">New chat</span>
+      </Button>
     </header>
   );
 }
