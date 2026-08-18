@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Model, ProviderConfig } from '@/types';
 import type { FailoverProvider } from '@/lib/provider';
 
-import { generateAndStoreVideo, generateWithSora } from './video-generation';
+import {
+  generateAndStoreVideo,
+  generateWithSora,
+  VideoTimeoutError
+} from './video-generation';
 
 // Shared spies/captures for the mocked SDKs. Hoisted so the vi.mock factories
 // (themselves hoisted) can close over them.
@@ -231,6 +235,27 @@ describe('generateWithSora — polling & errors', () => {
     }
   });
 
+  it('gives up as a VideoTimeoutError once the poll ceiling is reached', async () => {
+    vi.useFakeTimers();
+    try {
+      videosCreate.mockResolvedValue({ id: 'job-1', status: 'in_progress' });
+      videosRetrieve.mockResolvedValue({ id: 'job-1', status: 'in_progress' });
+
+      const pending = generateWithSora('sora-2', 'x', azureProvider());
+      const assertion = expect(pending).rejects.toThrow(VideoTimeoutError);
+      // 30 attempts x 5s. The deadline has to stay well inside the chat route's
+      // 300s budget — at the full budget Vercel kills the function first and
+      // the request 504s before this error can be turned into a tool result.
+      await vi.advanceTimersByTimeAsync(30 * 5000);
+      await assertion;
+
+      expect(videosRetrieve).toHaveBeenCalledTimes(30);
+      expect(videosDownload).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('throws with the provider message when the job fails', async () => {
     videosCreate.mockResolvedValue({ id: 'job-1', status: 'in_progress' });
     videosRetrieve.mockResolvedValue({
@@ -307,6 +332,85 @@ describe('generateAndStoreVideo — routing & failover', () => {
     expect(generateVideoMock).toHaveBeenCalledTimes(1);
     expect(videosCreate).not.toHaveBeenCalled();
     expect(out.videoSeconds).toBe(6); // from the resolveVideoSeconds stub
+  });
+
+  it('does not fail over on our own timeout — a fresh render would not help', async () => {
+    vi.useFakeTimers();
+    try {
+      videosCreate.mockResolvedValue({ id: 'job-1', status: 'in_progress' });
+      videosRetrieve.mockResolvedValue({ id: 'job-1', status: 'in_progress' });
+
+      const pending = generateAndStoreVideo({
+        userId: 'u',
+        prompt: 'p',
+        dbModel: model('sora-2'),
+        candidates: [failover({ id: 'a' }), failover({ id: 'b' })]
+      });
+      const assertion = expect(pending).rejects.toThrow(VideoTimeoutError);
+      await vi.advanceTimersByTimeAsync(30 * 5000);
+      await assertion;
+
+      // Only the first provider was tried: retrying restarts the render from
+      // zero and spends the rest of the request budget on it.
+      expect(videosCreate).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('deadlines the AI SDK path, which polls internally with no ceiling', async () => {
+    vi.useFakeTimers();
+    try {
+      // Mimic a provider render that never finishes: resolve only when the
+      // signal we hand it aborts.
+      generateVideoMock.mockImplementation(
+        ({ abortSignal }: { abortSignal: AbortSignal }) =>
+          new Promise((_, reject) => {
+            abortSignal.addEventListener('abort', () =>
+              reject(new Error('The operation was aborted'))
+            );
+          })
+      );
+
+      const pending = generateAndStoreVideo({
+        userId: 'u',
+        prompt: 'p',
+        dbModel: model('veo-3'),
+        candidates: [failover({ id: 'a', type: 'google' })]
+      });
+      const assertion = expect(pending).rejects.toThrow(VideoTimeoutError);
+      await vi.advanceTimersByTimeAsync(150_000);
+      await assertion;
+
+      expect(uploadMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports a user cancellation as itself, not as a timeout', async () => {
+    const ac = new AbortController();
+    generateVideoMock.mockImplementation(
+      ({ abortSignal }: { abortSignal: AbortSignal }) =>
+        new Promise((_, reject) => {
+          abortSignal.addEventListener('abort', () =>
+            reject(new Error('The operation was aborted'))
+          );
+        })
+    );
+
+    const pending = generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('veo-3'),
+      candidates: [failover({ id: 'a', type: 'google' })],
+      abortSignal: ac.signal
+    });
+    ac.abort();
+
+    // Our deadline never fired, so this must not be dressed up as a timeout —
+    // the user gets "cancelled", not "try a shorter video".
+    await expect(pending).rejects.not.toBeInstanceOf(VideoTimeoutError);
   });
 
   it('fails over to the next provider on a retryable error', async () => {
