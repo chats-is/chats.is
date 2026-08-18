@@ -56,8 +56,10 @@ import {
 import { api } from '@/trpc/server';
 
 // Media tools (video generation especially — Sora polls for up to 5 minutes)
-// can far outlive a plain chat completion.
-export const maxDuration = 800;
+// can far outlive a plain chat completion. 300s is the hard ceiling on Vercel's
+// Hobby plan, so anything larger is silently capped rather than granted; a slow
+// video render can still exhaust the budget and time the whole request out.
+export const maxDuration = 300;
 
 type PostData = {
   id: string;

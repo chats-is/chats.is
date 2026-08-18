@@ -39,7 +39,10 @@ import {
   recordVideoUsage
 } from '@/lib/usage';
 import { isSttModel, isTtsModel } from '@/lib/utils';
-import { generateAndStoreVideo } from '@/lib/video-generation';
+import {
+  generateAndStoreVideo,
+  VideoTimeoutError
+} from '@/lib/video-generation';
 
 export type MediaToolsOptions = {
   image?: { modelId?: string; size?: string; aspectRatio?: string };
@@ -93,6 +96,13 @@ async function resolveWithFallback(
 
 const GENERIC_TOOL_ERROR =
   'Generation failed. Please try again or pick a different model.';
+
+/**
+ * A render we stopped waiting on. Says what actually helps — picking another
+ * model does not, since the deadline is ours and applies to every provider.
+ */
+const VIDEO_TIMEOUT_ERROR =
+  'The video took too long to generate and was stopped. Try a shorter duration or a lower resolution.';
 
 /**
  * Append the model's allowed option values to a tool description so the LLM
@@ -362,7 +372,13 @@ export async function buildMediaTools(args: {
           };
         } catch (err) {
           console.error('[chat-tools] generate_video failed:', err);
-          return { status: 'error', message: GENERIC_TOOL_ERROR };
+          return {
+            status: 'error',
+            message:
+              err instanceof VideoTimeoutError
+                ? VIDEO_TIMEOUT_ERROR
+                : GENERIC_TOOL_ERROR
+          };
         }
       }
     });

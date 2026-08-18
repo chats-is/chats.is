@@ -8,9 +8,55 @@ import { StoredMedia, uploadGeneratedMedia } from '@/lib/media-upload';
 import {
   FailoverProvider,
   getVideoModel,
+  isRetryableProviderError,
   runWithProviderFailover
 } from '@/lib/provider';
 import { resolveVideoSeconds } from '@/lib/video-usage';
+
+/**
+ * Raised when we stop waiting on a render — our own deadline, not a provider
+ * fault. Distinct from a provider error because the two want opposite handling:
+ * failing over to another provider restarts the render from zero and burns the
+ * remaining request budget, and the user's fix is a shorter or smaller video
+ * rather than a different model.
+ */
+export class VideoTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VideoTimeoutError';
+  }
+}
+
+const POLL_INTERVAL_MS = 5000;
+
+/**
+ * How long we wait for a render before giving up, for every video path.
+ *
+ * Deliberately well inside the chat route's 300s budget: if a render is allowed
+ * to run the whole budget, Vercel kills the function first and the request
+ * 504s, which skips onFinish — the assistant message is never persisted and no
+ * usage row is written, while the provider bills for the render anyway. Giving
+ * up early loses slow renders, but the failure becomes a real tool result the
+ * user can act on.
+ */
+const VIDEO_DEADLINE_MS = 150_000;
+
+/** Sora polls on a fixed interval, so its ceiling is the deadline in ticks. */
+const MAX_POLL_ATTEMPTS = VIDEO_DEADLINE_MS / POLL_INTERVAL_MS;
+
+/**
+ * A signal that aborts after `ms`. Built on an explicit timer rather than
+ * `AbortSignal.timeout` so the caller can cancel it once the work finishes,
+ * instead of leaving a live timer behind on every successful generation.
+ */
+function deadlineSignal(ms: number): {
+  signal: AbortSignal;
+  cancel: () => void;
+} {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, cancel: () => clearTimeout(timer) };
+}
 
 export type VideoGenerationResult = {
   buffer: Buffer;
@@ -85,9 +131,9 @@ export async function generateWithSora(
     ...(resolution && { resolution: resolution as any })
   });
 
-  // Poll for completion if not already completed
+  // Poll for completion if not already completed.
   if (video.status !== 'completed') {
-    await pollSoraJob(openai, video.id, 60, abortSignal);
+    await pollSoraJob(openai, video.id, MAX_POLL_ATTEMPTS, abortSignal);
   }
 
   // Download video content using the SDK
@@ -107,7 +153,7 @@ export async function generateWithSora(
 async function pollSoraJob(
   openai: OpenAI,
   jobId: string,
-  maxAttempts = 60,
+  maxAttempts = MAX_POLL_ATTEMPTS,
   abortSignal?: AbortSignal
 ): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -125,10 +171,12 @@ async function pollSoraJob(
     }
 
     // Wait 5 seconds before next poll
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  throw new Error('Sora video generation timed out after 5 minutes');
+  throw new VideoTimeoutError(
+    `Sora video generation timed out after ${(maxAttempts * POLL_INTERVAL_MS) / 1000}s`
+  );
 }
 
 export type VideoGenerationOutput = StoredMedia & {
@@ -189,24 +237,54 @@ export async function generateAndStoreVideo(args: {
           ...provider.apiOptions,
           ...(resolution && { resolution })
         };
-        const { video, providerMetadata } = await generateVideo({
-          model: getVideoModel(provider, modelId),
-          prompt,
-          aspectRatio,
-          duration,
-          abortSignal,
-          ...(Object.keys(providerOpts).length > 0 && {
-            providerOptions: {
-              [provider.type]: providerOpts
-            } as any
-          })
-        });
+        // The AI SDK polls the provider internally with no ceiling of its
+        // own, so the deadline has to be imposed from out here. Kept as its
+        // own signal (rather than only the combined one) so the catch can tell
+        // our deadline apart from the user cancelling the request.
+        const deadline = deadlineSignal(VIDEO_DEADLINE_MS);
+        const signal = abortSignal
+          ? AbortSignal.any([abortSignal, deadline.signal])
+          : deadline.signal;
+
+        let video;
+        let providerMetadata;
+        try {
+          ({ video, providerMetadata } = await generateVideo({
+            model: getVideoModel(provider, modelId),
+            prompt,
+            aspectRatio,
+            duration,
+            abortSignal: signal,
+            ...(Object.keys(providerOpts).length > 0 && {
+              providerOptions: {
+                [provider.type]: providerOpts
+              } as any
+            })
+          }));
+        } catch (err) {
+          if (deadline.signal.aborted && !abortSignal?.aborted) {
+            throw new VideoTimeoutError(
+              `${modelId} video generation timed out after ${VIDEO_DEADLINE_MS / 1000}s`
+            );
+          }
+          throw err;
+        } finally {
+          deadline.cancel();
+        }
+
         videoBuffer = Buffer.from(video.uint8Array);
         videoMediaType = 'video/mp4';
         videoSeconds = resolveVideoSeconds(providerMetadata, duration);
       }
 
       return { videoBuffer, videoMediaType, videoSeconds };
+    },
+    {
+      // Our own deadline is not a provider fault: the default classifier treats
+      // any /timed out/ message as retryable, which would start a fresh render
+      // on the next provider and spend the rest of the request budget on it.
+      shouldRetry: error =>
+        !(error instanceof VideoTimeoutError) && isRetryableProviderError(error)
     }
   );
 
