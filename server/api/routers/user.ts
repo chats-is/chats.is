@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import { eq, like, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -16,7 +17,10 @@ export const userRouter = createTRPCRouter({
       .where(eq(users.id, ctx.session.user.id));
 
     if (!user[0]) {
-      throw new Error('User not found');
+      // Unreachable while protectedProcedure runs on a verified session, but a
+      // bare Error here would surface as a 500 and give the client no reason to
+      // sign out. A missing row means the session is stale, so say so.
+      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Session expired' });
     }
 
     return {

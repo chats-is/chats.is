@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { env } from '@/lib/env';
 import { generateUUID } from '@/lib/utils';
-import { auth } from '@/server/auth';
+import { getVerifiedSession } from '@/server/auth';
 
 const UPLOAD_CONFIG = {
   avatar: {
@@ -63,7 +63,7 @@ const createFileSchema = (type: UploadType) => {
 };
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
+  const session = await getVerifiedSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

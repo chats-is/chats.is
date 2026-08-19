@@ -183,8 +183,27 @@ export const {
       }
       return session;
     },
-    authorized({ auth }) {
-      return !!auth?.user;
+    /**
+     * The middleware gate (see proxy.ts) — the only thing standing in front of
+     * the app's pages, so a stale session has to be rejected here or the user
+     * lands on a rendered page whose every data call 401s, with nothing telling
+     * them to sign in again.
+     *
+     * A signature-valid JWT is not enough: it can outlive the user row it names
+     * (account deleted, or DATABASE_URL repointed). Returning false sends them
+     * to the sign-in page. Only ever runs in the proxy, which Next always
+     * executes on the Node.js runtime, so any driver works here.
+     */
+    async authorized({ auth }) {
+      if (!auth?.user?.id) return false;
+
+      const [account] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, auth.user.id))
+        .limit(1);
+
+      return !!account;
     }
   },
   events: {
@@ -213,3 +232,45 @@ export const {
 const auth = cache(uncachedAuth);
 
 export { auth };
+
+/**
+ * The session, re-checked against the database.
+ *
+ * `auth()` alone cannot answer "is this user still allowed in?". Sessions are
+ * JWTs (`session.strategy = 'jwt'`), so a token is accepted purely on its
+ * signature and expiry — the adapter is consulted at sign-in and never again.
+ * Three consequences, all of which this fixes:
+ *
+ * - A deleted user keeps a working session until the token expires, and their
+ *   writes fail late with a foreign-key error instead of a clean 401.
+ * - `token.admin` is a snapshot taken at sign-in, so demoting an admin does
+ *   not take effect until they sign out. That is a privilege-escalation
+ *   window, not just staleness.
+ * - Repointing DATABASE_URL leaves every existing cookie referring to rows
+ *   that no longer exist.
+ *
+ * Returns null when the user is gone, so callers treat a stale session exactly
+ * like being signed out. `role` is read from the database and overrides the
+ * token's copy. One query per request, deduped by `cache`.
+ *
+ * NOTE: deliberately separate from `auth`, which `proxy.ts` re-exports as the
+ * edge middleware — that binding is called with (request, ctx) and must stay a
+ * plain pass-through.
+ */
+export const getVerifiedSession = cache(async () => {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+
+  const [account] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  if (!account) return null;
+
+  return {
+    ...session,
+    user: { ...session.user, admin: account.role === 'admin' }
+  };
+});

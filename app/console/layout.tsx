@@ -4,7 +4,7 @@ import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
 import { getAppSettings } from '@/lib/queries';
-import { auth } from '@/server/auth';
+import { getVerifiedSession } from '@/server/auth';
 import { api } from '@/trpc/server';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ConsoleHeader } from '@/components/console/header';
@@ -26,7 +26,7 @@ export default async function ConsoleLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await getVerifiedSession();
 
   if (!session?.user) {
     redirect('/');

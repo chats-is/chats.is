@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
 
-import { auth } from '@/server/auth';
+import { getVerifiedSession } from '@/server/auth';
 
 export async function DELETE(req: NextRequest) {
-  const session = await auth();
+  const session = await getVerifiedSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

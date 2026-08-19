@@ -2,7 +2,7 @@ import { type Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { env } from '@/lib/env';
-import { auth } from '@/server/auth';
+import { getVerifiedSession } from '@/server/auth';
 import { LoginForm } from '@/components/login-form';
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
-  const session = await auth();
+  const session = await getVerifiedSession();
   // redirect to home if user is already logged in
   if (session?.user) {
     redirect('/');
