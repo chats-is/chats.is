@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { looksLikeJsx, validatePreviewImports } from '@/lib/artifact';
 import { normalizeCodeLanguage } from '@/lib/code-language';
-import { auth } from '@/server/auth';
+import { getVerifiedSession } from '@/server/auth';
 
 const requestSchema = z.object({
   entryPath: z.string().min(1).max(500),
@@ -193,7 +193,7 @@ const compilePreview = (input: PreviewInput): PreviewResult => {
 };
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getVerifiedSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

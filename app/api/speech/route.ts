@@ -12,7 +12,7 @@ import {
 } from '@/lib/provider';
 import { findModelByModelId, getSpeechSettings } from '@/lib/queries';
 import { recordAudioUsage } from '@/lib/usage';
-import { auth } from '@/server/auth';
+import { getVerifiedSession } from '@/server/auth';
 
 export const maxDuration = 60;
 
@@ -23,7 +23,7 @@ type PostData = {
 };
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getVerifiedSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

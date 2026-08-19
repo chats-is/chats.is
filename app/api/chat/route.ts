@@ -46,7 +46,7 @@ import {
 import { getResumableStreamContext } from '@/lib/resumable-stream';
 import { recordChatUsage } from '@/lib/usage';
 import { convertToChatMessages, formatString, generateUUID } from '@/lib/utils';
-import { auth } from '@/server/auth';
+import { getVerifiedSession } from '@/server/auth';
 import { db } from '@/server/db';
 import {
   artifacts as artifactsTable,
@@ -105,7 +105,7 @@ function describeError(err: unknown): string {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getVerifiedSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -895,7 +895,7 @@ export async function GET(req: Request) {
     return new Response(null, { status: 204 });
   }
 
-  const session = await auth();
+  const session = await getVerifiedSession();
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
