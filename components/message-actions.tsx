@@ -42,6 +42,11 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
 interface MessageActionsProps extends Partial<
   Pick<UseChatHelpers<ChatMessage>, 'status' | 'setMessages'>
@@ -256,19 +261,24 @@ export function MessageActions({
       {!isReadonly && setMessages && reload && (
         <>
           {isLastMessage && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="group/retry h-7 w-auto gap-1 px-1.5 text-muted-foreground"
-              onClick={() => reload(message)}
-              disabled={status !== 'ready' && status !== 'error'}
-            >
-              <RefreshCw className="size-4" />
-              <span className="sr-only">Retry</span>
-              <span className="hidden animate-out text-muted-foreground fade-out group-hover/retry:inline-block group-hover/retry:animate-in group-hover/retry:fade-in">
-                {modelId}
-              </span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground"
+                  onClick={() => reload(message)}
+                  disabled={status !== 'ready' && status !== 'error'}
+                >
+                  <RefreshCw className="size-4" />
+                  <span className="sr-only">Retry</span>
+                </Button>
+              </TooltipTrigger>
+              {/* The model name used to expand inline on hover, which resized
+                  the button and shifted the row next to it. A tooltip keeps the
+                  action bar's geometry fixed. */}
+              <TooltipContent>Retry with {modelId}</TooltipContent>
+            </Tooltip>
           )}
           {!hasFileContent && message.role === 'user' && (
             <>
