@@ -35,7 +35,7 @@ interface ChatPanelProps extends Pick<
   input: string;
   setInput: (value: string) => void;
   onInputChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
-  onSubmit: (attachments?: Attachment[]) => void;
+  onSubmit: (attachments?: Attachment[]) => boolean;
   onModelChange: (modelId: string) => void;
   onOptionsChange: (options: ModelOptions) => void;
   onSelectArtifact: (artifactId: string) => void;

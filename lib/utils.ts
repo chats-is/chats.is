@@ -98,6 +98,22 @@ export function getMostRecentUserMessage(messages: ChatMessage[]) {
 }
 
 /** Audio models cover both directions; `supportsTranscription` marks STT. */
+/**
+ * Does `modelId` name this model?
+ *
+ * A model answers to its `modelId` and to any admin-configured alias — aliases
+ * exist so ids stored on older chats keep resolving. The server does this in
+ * `findModelByModelId`, so anything client-side deciding whether a model is
+ * "selected" has to match, or the two disagree about the same chat.
+ */
+export function modelMatchesId(
+  model: { modelId: string; aliases?: string[] | null },
+  modelId: string | null | undefined
+): boolean {
+  if (!modelId) return false;
+  return model.modelId === modelId || !!model.aliases?.includes(modelId);
+}
+
 export function isSttModel(model: {
   capability: string;
   supportsTranscription?: boolean | null;
