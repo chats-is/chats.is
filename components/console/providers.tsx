@@ -548,7 +548,11 @@ export default function ProvidersPage() {
                         required={!editingId}
                         disabled={isPending}
                         readOnly={isMaskedVertexCredential}
-                        className="font-mono"
+                        // Credentials are one unbroken token (a key, or JSON
+                        // wrapping a base64 blob). Without break-all there is no
+                        // wrap opportunity, and the shared Textarea's
+                        // field-sizing-content then grows it past the dialog.
+                        className="font-mono break-all"
                         rows={6}
                       />
                     </>
@@ -584,7 +588,7 @@ export default function ProvidersPage() {
                         placeholder={apiKeyPlaceholder}
                         required={!editingId}
                         disabled={isPending}
-                        className="font-mono"
+                        className="font-mono break-all"
                         rows={requiresJsonApiKey ? 6 : 2}
                       />
                       {apiKeyHelpText ? (
@@ -668,7 +672,7 @@ export default function ProvidersPage() {
                     }
                     placeholder="{}"
                     disabled={isPending}
-                    className="font-mono"
+                    className="font-mono break-all"
                     rows={3}
                   />
                 </div>

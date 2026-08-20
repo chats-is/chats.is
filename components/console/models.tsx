@@ -678,7 +678,7 @@ export default function ModelsPage() {
                         setFormData({ ...formData, uiOptions: e.target.value })
                       }
                       placeholder={uiOptionsPlaceholder}
-                      className="font-mono"
+                      className="font-mono break-all"
                       rows={3}
                       disabled={isPending}
                     />
@@ -710,7 +710,7 @@ export default function ModelsPage() {
                         setFormData({ ...formData, apiParams: e.target.value })
                       }
                       placeholder={apiParamsPlaceholder}
-                      className="font-mono"
+                      className="font-mono break-all"
                       rows={3}
                       disabled={isPending}
                     />
