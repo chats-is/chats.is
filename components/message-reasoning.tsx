@@ -113,7 +113,7 @@ export function MessageReasoning({
       <Button
         variant="link"
         size="sm"
-        className="-ml-1 flex items-center gap-1 px-0 text-sm font-normal text-muted-foreground shadow-none hover:text-accent-foreground hover:no-underline disabled:opacity-100"
+        className="-ml-1 flex items-center gap-1 px-0 text-sm font-normal text-muted-foreground shadow-none hover:text-accent-foreground hover:no-underline disabled:opacity-100 has-[>svg]:px-0"
         onClick={() => {
           setIsExpanded(!isExpanded);
         }}
