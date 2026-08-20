@@ -646,7 +646,7 @@ export async function POST(req: Request) {
           });
 
         // Streaming failover is limited by design: once tokens reach the client
-        // a provider can't be swapped without duplicating output, and AI SDK v6
+        // a provider can't be swapped without duplicating output, and the AI SDK
         // exposes no "connection established" signal before the stream is
         // consumed (awaiting `res.response` would consume the whole stream and
         // block until generation finishes, breaking streaming). So here we only
