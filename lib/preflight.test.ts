@@ -20,7 +20,7 @@ vi.mock('@/lib/pricing', () => {
     constructor(modelLabel: string) {
       super(`Model ${modelLabel} is not configured for billing.`);
       this.name = 'PricingMissingError';
-      this.userMessage = `${modelLabel} has no pricing configured. Set a price (or 0) in the Pricing console before using this model.`;
+      this.userMessage = `${modelLabel} has no pricing yet. Set it under Console → Pricing (0 is fine) to enable the model.`;
     }
   }
   return { PricingMissingError, requirePricing: vi.fn() };
@@ -77,7 +77,7 @@ describe('preflightCheck', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.status).toBe(403);
-      expect(result.message).toMatch(/no pricing configured/i);
+      expect(result.message).toMatch(/no pricing yet/i);
     }
   });
 
