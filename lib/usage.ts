@@ -36,7 +36,7 @@ export async function recordChatUsage(
     const noTokens =
       (u.inputTokens ?? 0) === 0 &&
       (u.outputTokens ?? 0) === 0 &&
-      (u.cachedInputTokens ?? 0) === 0 &&
+      (u.cacheReadTokens ?? 0) === 0 &&
       (u.cacheWriteTokens ?? 0) === 0 &&
       (u.reasoningTokens ?? 0) === 0;
     if (noTokens) {
@@ -60,7 +60,7 @@ export async function recordChatUsage(
       capability: 'chat',
       inputTokens: input.usage.inputTokens ?? 0,
       outputTokens: input.usage.outputTokens ?? 0,
-      cacheReadTokens: input.usage.cachedInputTokens ?? 0,
+      cacheReadTokens: input.usage.cacheReadTokens ?? 0,
       cacheWriteTokens: input.usage.cacheWriteTokens ?? 0,
       reasoningTokens: input.usage.reasoningTokens ?? 0,
       cost: cost.toString(),

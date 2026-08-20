@@ -227,7 +227,7 @@ export function calculateChatCost(
   // Disjoint buckets (see normalizeChatUsage): bill each at its own rate.
   const inputTokens = usage.inputTokens ?? 0;
   const outputTokens = usage.outputTokens ?? 0;
-  const cacheReadTokens = usage.cachedInputTokens ?? 0;
+  const cacheReadTokens = usage.cacheReadTokens ?? 0;
   const cacheWriteTokens = usage.cacheWriteTokens ?? 0;
   const reasoningTokens = usage.reasoningTokens ?? 0;
 

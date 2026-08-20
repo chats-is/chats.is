@@ -18,13 +18,13 @@ describe('normalizeChatUsage', () => {
     expect(out).toEqual({
       inputTokens: 1_000_000,
       outputTokens: 600_000,
-      cachedInputTokens: 2_000_000,
+      cacheReadTokens: 2_000_000,
       cacheWriteTokens: 500_000,
       reasoningTokens: 400_000
     });
     // Buckets reconstruct the provider totals.
     expect(
-      out.inputTokens! + out.cachedInputTokens! + out.cacheWriteTokens!
+      out.inputTokens! + out.cacheReadTokens! + out.cacheWriteTokens!
     ).toBe(3_500_000);
     expect(out.outputTokens! + out.reasoningTokens!).toBe(1_000_000);
   });
@@ -56,7 +56,7 @@ describe('normalizeChatUsage', () => {
     expect(out).toEqual({
       inputTokens: 600_000, // 1M - 400k cacheRead - 0 cacheWrite
       outputTokens: 700_000, // 1M - 300k reasoning
-      cachedInputTokens: 400_000,
+      cacheReadTokens: 400_000,
       cacheWriteTokens: 0,
       reasoningTokens: 300_000
     });
@@ -76,7 +76,7 @@ describe('normalizeChatUsage', () => {
     expect(out).toEqual({
       inputTokens: 1000,
       outputTokens: 500,
-      cachedInputTokens: 0,
+      cacheReadTokens: 0,
       cacheWriteTokens: 0,
       reasoningTokens: 0
     });
@@ -96,7 +96,7 @@ describe('normalizeChatUsage', () => {
     expect(normalizeChatUsage({})).toEqual({
       inputTokens: 0,
       outputTokens: 0,
-      cachedInputTokens: 0,
+      cacheReadTokens: 0,
       cacheWriteTokens: 0,
       reasoningTokens: 0
     });
