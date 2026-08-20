@@ -214,19 +214,33 @@ describe('calculateAudioCost', () => {
 });
 
 describe('PricingMissingError', () => {
-  it('keeps admin detail in .message but exposes a user-safe userMessage', () => {
-    const err = new PricingMissingError(
-      'Veo 3',
-      'missing Per video / Per second'
+  it('names the missing fields in both the log line and the user message', () => {
+    const err = new PricingMissingError('Veo 3', ['Per video', 'Per second']);
+
+    // Log line: keeps the existing "not configured for billing: missing ..."
+    // shape so server logs stay greppable.
+    expect(err.message).toBe(
+      'Model Veo 3 is not configured for billing: missing Per video, Per second.'
     );
-    // Admin/log message: detailed, mentions the misconfiguration.
-    expect(err.message).toContain('Veo 3');
-    expect(err.message).toContain('not configured for billing');
-    // User-facing message: no billing/admin jargon, no "set a price".
+
+    // User message says what is actually wrong and where to fix it — the model
+    // is not "unavailable", it is unpriced, and picking another model is not
+    // the fix.
     expect(err.userMessage).toBe(
-      'Veo 3 is currently unavailable. Please choose a different model.'
+      'Veo 3 has incomplete pricing — Per video, Per second not set. Set it in the Pricing console before using this model.'
     );
-    expect(err.userMessage).not.toMatch(/billing|price|console|configured/i);
+    expect(err.userMessage).not.toMatch(/unavailable|choose a different/i);
+  });
+
+  it('reports a wholly absent pricing row differently from a partial one', () => {
+    const err = new PricingMissingError('GPT-4o');
+
+    expect(err.message).toBe(
+      'Model GPT-4o is not configured for billing. Set a price (or 0) in the Pricing console.'
+    );
+    expect(err.userMessage).toBe(
+      'GPT-4o has no pricing configured. Set a price (or 0) in the Pricing console before using this model.'
+    );
   });
 });
 
