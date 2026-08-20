@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { experimental_transcribe as transcribe } from 'ai';
+import { transcribe } from 'ai';
 
 import { Model } from '@/types';
 import {
