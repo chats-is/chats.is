@@ -2,7 +2,7 @@ import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createAzure } from '@ai-sdk/azure';
 import { createDeepSeek } from '@ai-sdk/deepseek';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createGoogle } from '@ai-sdk/google';
 import { createVertex } from '@ai-sdk/google-vertex';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
@@ -90,7 +90,7 @@ function createProviderSDK(config: ProviderConfig): any {
       });
 
     case 'google':
-      return createGoogleGenerativeAI({
+      return createGoogle({
         apiKey: apiKey || undefined,
         baseURL: baseUrl || undefined
       });

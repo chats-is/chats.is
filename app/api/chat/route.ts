@@ -5,10 +5,10 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   generateText,
+  isStepCount,
   JsonToSseTransformStream,
   parsePartialJson,
   smoothStream,
-  stepCountIs,
   streamText,
   tool,
   UI_MESSAGE_STREAM_HEADERS
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
       if (titlePrompt && titleModelId && titleProvider) {
         const { text } = await generateText({
           model: getLanguageModel(titleProvider, titleModelId),
-          system: titlePrompt,
+          instructions: titlePrompt,
           prompt: JSON.stringify(userMessage)
         });
 
@@ -588,7 +588,7 @@ export async function POST(req: Request) {
         const buildStream = (failoverProvider: FailoverProvider) =>
           streamText({
             model: getLanguageModel(failoverProvider, modelId),
-            system: [
+            instructions: [
               systemMessage,
               ArtifactSystemPrompt,
               mediaTools.systemPrompt
@@ -608,7 +608,7 @@ export async function POST(req: Request) {
             maxOutputTokens: dbModel.apiParams?.maxOutputTokens,
             frequencyPenalty: dbModel.apiParams?.frequencyPenalty,
             presencePenalty: dbModel.apiParams?.presencePenalty,
-            stopWhen: stepCountIs(5),
+            stopWhen: isStepCount(5),
             experimental_transform: smoothStream({ chunking: 'word' }),
             onChunk: ({ chunk }) => {
               if (chunk.type === 'tool-call') {
@@ -620,12 +620,12 @@ export async function POST(req: Request) {
                 console.log('Reasoning: ', chunk.text);
               }
             },
-            onStepFinish: ({ warnings }) => {
+            onStepEnd: ({ warnings }) => {
               if (warnings) {
                 console.log('Warnings: ', warnings);
               }
             },
-            onFinish: async ({ usage }) => {
+            onEnd: async ({ usage }) => {
               if (!usage) {
                 // Provider didn't report usage — request runs free. Should not
                 // happen with major providers; surface so it's visible in logs.
@@ -646,7 +646,7 @@ export async function POST(req: Request) {
           });
 
         // Streaming failover is limited by design: once tokens reach the client
-        // a provider can't be swapped without duplicating output, and AI SDK v6
+        // a provider can't be swapped without duplicating output, and the AI SDK
         // exposes no "connection established" signal before the stream is
         // consumed (awaiting `res.response` would consume the whole stream and
         // block until generation finishes, breaking streaming). So here we only
@@ -735,7 +735,7 @@ export async function POST(req: Request) {
         );
       },
       generateId: generateUUID,
-      onFinish: async ({ responseMessage }) => {
+      onEnd: async ({ responseMessage }) => {
         const finishedAt = new Date();
         if (reasonStartedAt) {
           reasonDuration += Math.max(

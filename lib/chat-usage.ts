@@ -2,7 +2,13 @@ import type { ChatUsage } from '@/types';
 
 /**
  * The subset of the AI SDK's `LanguageModelUsage` (the `usage` object passed to
- * `onFinish`) that we bill from.
+ * `onEnd`) that we bill from.
+ *
+ * Since AI SDK 7 that object is the usage of *every* step in the turn, not just
+ * the last one — v6's `onFinish` handed over `StepResult.usage`, the final
+ * step's, and put the aggregate in a separate `totalUsage`. A tool-using turn
+ * therefore bills more than it did before, which is the correct amount: the
+ * earlier steps' tokens were always spent, just never charged.
  *
  * The SDK already decomposes usage into disjoint buckets under `*TokenDetails`
  * (verified against the official spec, vercel/ai #9921 — "the sum of all values

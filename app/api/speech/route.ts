@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import {
-  experimental_generateSpeech as generateSpeech,
-  NoSpeechGeneratedError
-} from 'ai';
+import { generateSpeech, NoSpeechGeneratedError } from 'ai';
 
 import { preflightGate } from '@/lib/preflight';
 import {

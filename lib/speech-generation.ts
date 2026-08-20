@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { experimental_generateSpeech as generateSpeech } from 'ai';
+import { generateSpeech } from 'ai';
 
 import { Model } from '@/types';
 import { resolveAutoOption } from '@/lib/media-options';

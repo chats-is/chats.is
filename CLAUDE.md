@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Tech stack
 
 - **Framework**: Next.js 16 (App Router, RSC, Turbopack), React 19, TypeScript (strict).
-- **AI**: Vercel AI SDK v6 (`ai`, `@ai-sdk/*`) across OpenAI / Azure / Google / Vertex / Anthropic / Bedrock / xAI / DeepSeek.
+- **AI**: Vercel AI SDK v7 (`ai`, `@ai-sdk/*`) across OpenAI / Azure / Google / Vertex / Anthropic / Bedrock / xAI / DeepSeek. v7 is ESM-only and needs Node 22+ (pinned in `engines`).
 - **API layer**: tRPC v11 + TanStack React Query; `superjson` transformer.
 - **Database**: Postgres via Neon serverless driver, Drizzle ORM + drizzle-kit migrations.
 - **Auth**: NextAuth v5 (beta) with Drizzle adapter, JWT sessions; Resend for email-code login.
@@ -41,7 +41,7 @@ Tests are **Node-environment unit tests** (vitest.config.ts), currently all in `
 ## Architecture
 
 ### Request → response is split by modality
-- **Chat is streaming.** `app/api/chat/route.ts` (~800 lines, the heart of the app) uses Vercel AI SDK v6: `streamText` wrapped in `createUIMessageStream` → `createUIMessageStreamResponse`. It also defines the `create_artifact` tool inline and streams artifact deltas as custom data parts.
+- **Chat is streaming.** `app/api/chat/route.ts` (~940 lines, the heart of the app) uses Vercel AI SDK v7: `streamText` wrapped in `createUIMessageStream` → `createUIMessageStreamResponse`. It also defines the `create_artifact` tool inline and streams artifact deltas as custom data parts.
 - **Image / video / audio are non-streaming and happen inside the chat request.** They are no longer standalone routes: `lib/chat-tools.ts` registers `generate_image` / `edit_image` / `generate_video` / `text_to_speech` / `transcribe_audio` as AI SDK tools on the chat stream. Each follows one shape: generate → upload bytes to **Vercel Blob** (`@vercel/blob` `put`) → return a `MediaToolOutput` that `components/media-tool-part.tsx` renders inline. The old `/image`, `/video`, `/audio` pages redirect to `/chat` (see `next.config.ts`). Speech (TTS playback of a message) is the one surviving standalone route, `app/api/speech/route.ts`.
 
 Every generation path follows the same lifecycle: `auth()` → look up model/provider → **`preflightGate()`** / `preflightCheck()` (pricing exists + model allowed + quota not exceeded; returns 403/429 or a structured tool error) → generate → persist message(s) → **`recordXUsage()`**. Quota is checked *before* generation and consumed *after* (next request sees the new balance).
