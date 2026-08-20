@@ -3,6 +3,11 @@ import type { NextConfig } from 'next';
 import '@/lib/env';
 
 const nextConfig: NextConfig = {
+  // The dev tools indicator defaults to bottom-left, where it sits on top of
+  // the sidebar's footer controls.
+  devIndicators: {
+    position: 'bottom-right'
+  },
   images: {
     remotePatterns: [
       {
