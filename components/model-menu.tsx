@@ -11,7 +11,7 @@ import {
   ImageSizeLabels,
   VideoResolutionLabels
 } from '@/lib/constant';
-import { cn } from '@/lib/utils';
+import { cn, modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -96,10 +96,7 @@ export function ModelMenu({
 
   // Find selected model from database models
   const selectedModel = useMemo(
-    () =>
-      models?.find(
-        m => m.modelId === modelId || (m.aliases && m.aliases.includes(modelId))
-      ),
+    () => models?.find(m => modelMatchesId(m, modelId)),
     [models, modelId]
   );
 

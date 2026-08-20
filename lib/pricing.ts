@@ -50,20 +50,28 @@ export const getPricingByModelKey = cache(
 
 export class PricingMissingError extends Error {
   /**
-   * Friendly message safe to show end users. The model is simply unavailable
-   * from their point of view — no billing/admin jargon, no "set a price"
-   * instruction (only an admin can act on that). The detailed `.message` is
-   * for server logs so an admin can discover and fix the misconfiguration.
+   * Message shown to whoever made the request. It names the actual cause —
+   * pricing is not set — rather than calling the model "unavailable", which
+   * sent people off to pick a different model when the fix is a one-time
+   * configuration. Providers, models and pricing are all admin-managed in this
+   * product, so pointing at the Pricing console is the actionable answer.
+   *
+   * `.message` stays the log line: same facts, phrased for the server log.
    */
   public userMessage: string;
 
-  constructor(modelLabel: string, detail?: string) {
+  constructor(modelLabel: string, missingFields?: string[]) {
+    const detail = missingFields?.length
+      ? `missing ${missingFields.join(', ')}`
+      : undefined;
     const suffix = detail
       ? `: ${detail}.`
       : '. Set a price (or 0) in the Pricing console.';
     super(`Model ${modelLabel} is not configured for billing${suffix}`);
     this.name = 'PricingMissingError';
-    this.userMessage = `${modelLabel} is currently unavailable. Please choose a different model.`;
+    this.userMessage = missingFields?.length
+      ? `${modelLabel} has incomplete pricing — ${missingFields.join(', ')} not set. Set it in the Pricing console before using this model.`
+      : `${modelLabel} has no pricing configured. Set a price (or 0) in the Pricing console before using this model.`;
   }
 }
 
@@ -141,7 +149,7 @@ export async function requirePricing(
   if (!pricing) throw new PricingMissingError(modelLabel);
   const missing = pricingMissingFields(capability, pricing, opts);
   if (missing.length > 0) {
-    throw new PricingMissingError(modelLabel, `missing ${missing.join(', ')}`);
+    throw new PricingMissingError(modelLabel, missing);
   }
   return pricing;
 }

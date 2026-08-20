@@ -1,0 +1,230 @@
+'use client';
+
+import { useMemo } from 'react';
+
+import { api } from '@/trpc/react';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+
+import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared';
+
+const KEYS = [
+  'default.chat.modelId',
+  'default.image.modelId',
+  'default.video.modelId',
+  'default.tts.modelId',
+  'default.stt.modelId',
+  'speech.enabled',
+  'default.speech.modelId',
+  'default.speech.voice',
+  'title.modelId'
+] as const;
+
+type ModelOption = { id: string; modelId: string; name: string };
+
+/** One "pick a default model" select — the same shape repeated nine times. */
+function ModelSelect({
+  label,
+  options,
+  value,
+  onChange,
+  disabled
+}: {
+  label: string;
+  options: ModelOption[] | undefined;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const isEmpty = !options?.length;
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select
+        disabled={isEmpty || disabled}
+        // Undefined (not '') so the placeholder shows rather than a blank value.
+        value={isEmpty ? undefined : value || ''}
+        onValueChange={onChange}
+      >
+        <SelectTrigger>
+          <SelectValue
+            placeholder={isEmpty ? 'No available models' : 'Select model'}
+          />
+        </SelectTrigger>
+        <SelectContent>
+          {options?.map(option => (
+            <SelectItem key={option.id} value={option.modelId}>
+              {option.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+export function ModelsSettings() {
+  const { formData, handleChange, save, hasChanges, isLoading, isSaving } =
+    useSettingsForm(KEYS);
+  const { data: models } = api.model.list.useQuery();
+
+  const chatModels = models?.filter(
+    m => m.capability === 'chat' && m.isEnabled
+  );
+  const imageModels = models?.filter(
+    m => m.capability === 'image' && m.isEnabled
+  );
+  const videoModels = models?.filter(
+    m => m.capability === 'video' && m.isEnabled
+  );
+  const speechModels = models?.filter(
+    m => m.capability === 'audio' && m.isEnabled && !m.supportsTranscription
+  );
+  const transcriptionModels = models?.filter(
+    m => m.capability === 'audio' && m.isEnabled && m.supportsTranscription
+  );
+
+  const speechEnabled = formData['speech.enabled'] === 'true';
+  const speechVoices = useMemo(() => {
+    const selected = speechModels?.find(
+      m => m.modelId === formData['default.speech.modelId']
+    );
+    return (selected?.uiOptions?.voices as string[]) || [];
+  }, [speechModels, formData['default.speech.modelId']]);
+
+  if (isLoading) return <SettingsLoading />;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border p-4">
+        <h2 className="mb-4 text-lg font-semibold">Default Models</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <ModelSelect
+            label="Default Chat Model"
+            options={chatModels}
+            value={formData['default.chat.modelId']}
+            onChange={value => handleChange('default.chat.modelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default Image Model"
+            options={imageModels}
+            value={formData['default.image.modelId']}
+            onChange={value => handleChange('default.image.modelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default Video Model"
+            options={videoModels}
+            value={formData['default.video.modelId']}
+            onChange={value => handleChange('default.video.modelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default TTS Model"
+            options={speechModels}
+            value={formData['default.tts.modelId']}
+            onChange={value => handleChange('default.tts.modelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default Transcription Model"
+            options={transcriptionModels}
+            value={formData['default.stt.modelId']}
+            onChange={value => handleChange('default.stt.modelId', value)}
+            disabled={isSaving}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-4">
+        <h2 className="mb-2 text-lg font-semibold">Text-to-Speech Reading</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Default settings for reading messages aloud.
+        </p>
+        <div className="mb-4 space-y-2">
+          <Label>Enable Speech</Label>
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={speechEnabled}
+              onCheckedChange={checked =>
+                handleChange('speech.enabled', String(checked))
+              }
+              disabled={isSaving}
+            />
+            <Label className="font-normal text-muted-foreground">
+              {speechEnabled ? 'Enabled' : 'Disabled'}
+            </Label>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <ModelSelect
+            label="Default Speech Model"
+            options={speechModels}
+            value={formData['default.speech.modelId']}
+            onChange={value => handleChange('default.speech.modelId', value)}
+            disabled={!speechEnabled || isSaving}
+          />
+          <div className="space-y-2">
+            <Label>Default Speech Voice</Label>
+            <Select
+              disabled={!speechEnabled || !speechVoices.length || isSaving}
+              value={
+                !speechVoices.length
+                  ? undefined
+                  : formData['default.speech.voice'] || ''
+              }
+              onValueChange={value =>
+                handleChange('default.speech.voice', value)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    !speechVoices.length
+                      ? 'No available voices'
+                      : 'Select voice'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {speechVoices.map(voice => (
+                  <SelectItem key={voice} value={voice}>
+                    {voice.charAt(0).toUpperCase() + voice.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-4">
+        <h2 className="mb-4 text-lg font-semibold">Title Generation</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <ModelSelect
+            label="Title Generation Model"
+            options={chatModels}
+            value={formData['title.modelId']}
+            onChange={value => handleChange('title.modelId', value)}
+            disabled={isSaving}
+          />
+        </div>
+      </div>
+
+      <SettingsSaveBar
+        hasChanges={hasChanges}
+        isSaving={isSaving}
+        onSave={save}
+      />
+    </div>
+  );
+}

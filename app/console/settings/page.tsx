@@ -1,11 +1,7 @@
-import { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 
-import Settings from '@/components/console/settings';
-
-export const metadata: Metadata = {
-  title: 'Settings'
-};
-
+// The settings sections are pages behind a nav; /console/settings itself is
+// just the entry point.
 export default function SettingsPage() {
-  return <Settings />;
+  redirect('/console/settings/general');
 }

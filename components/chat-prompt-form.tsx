@@ -6,6 +6,7 @@ import { ArrowUp, Loader2, Square } from 'lucide-react';
 import Textarea from 'react-textarea-autosize';
 
 import { Attachment, ChatMessage } from '@/types';
+import { modelMatchesId } from '@/lib/utils';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { Button } from '@/components/ui/button';
 import { AttachmentsButton } from '@/components/attachments-button';
@@ -25,7 +26,8 @@ export interface ChatPromptFormProps extends Pick<
   input: string;
   setInput: (value: string) => void;
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onSubmit: (attachments?: Attachment[]) => void;
+  /** Returns false when the message was refused (no resolvable model). */
+  onSubmit: (attachments?: Attachment[]) => boolean;
   /** Callback when model changes */
   onModelChange: (model: string) => void;
   /** Callback when model options change (like reasoning toggle) */
@@ -49,7 +51,28 @@ export function ChatPromptForm({
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
   const { chatModels, sttModels, defaults } = useSystemSettings();
+
+  // Two distinct dead ends, both of which make a submission fail:
+  //   - no chat model is configured at all;
+  //   - one exists but none is selected. `preferences.chatModelId` falls back
+  //     to '' when the admin has not set `default.chatModelId`, and a stale
+  //     preference can also name a model that no longer resolves. Either way
+  //     the request would reach /api/chat with an empty or unknown modelId and
+  //     come back as an opaque 400/403. Alias-aware, since that is how the
+  //     server resolves a modelId.
   const noModels = !chatModels || chatModels.length === 0;
+  const noModelSelected =
+    !noModels && !chatModels.some(model => modelMatchesId(model, modelId));
+  const cannotSend = noModels || noModelSelected;
+
+  // Say which dead end it is: with models available the user can fix it right
+  // here from the model menu, so the input should point at it rather than just
+  // going inert.
+  const placeholder = noModels
+    ? 'No models available.'
+    : noModelSelected
+      ? 'Select a model to start.'
+      : 'Send a message.';
 
   const { preferences } = usePreferences();
 
@@ -68,9 +91,12 @@ export function ChatPromptForm({
     .filter(Boolean)
     .join(',');
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    onSubmit(attachments);
+    // Clear only once the message is actually on its way — onSubmit refuses
+    // when no model resolves, and wiping the draft anyway would throw away
+    // what the user typed along with any uploaded attachments.
+    if (!onSubmit(attachments)) return;
     setInput('');
     setAttachments([]);
   };
@@ -101,13 +127,13 @@ export function ChatPromptForm({
             required
             tabIndex={0}
             spellCheck={false}
-            placeholder="Send a message."
+            placeholder={placeholder}
             className="flex-1 resize-none bg-transparent p-1 focus-within:outline-hidden"
             rows={1}
             minRows={1}
             maxRows={8}
             disabled={
-              noModels || status === 'submitted' || status === 'streaming'
+              cannotSend || status === 'submitted' || status === 'streaming'
             }
             value={input}
             onChange={onInputChange}
@@ -151,7 +177,7 @@ export function ChatPromptForm({
               currentValue={input}
               onInsert={setInput}
               disabled={
-                noModels || status === 'submitted' || status === 'streaming'
+                cannotSend || status === 'submitted' || status === 'streaming'
               }
             />
             {showAttachments && (
@@ -180,7 +206,7 @@ export function ChatPromptForm({
                 size="icon"
                 className="size-9 rounded-full shadow-none"
                 disabled={
-                  noModels ||
+                  cannotSend ||
                   input?.trim() === '' ||
                   status === 'submitted' ||
                   uploadQueue.length > 0

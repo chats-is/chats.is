@@ -10,7 +10,11 @@ import { toast } from 'sonner';
 
 import { Artifact, Attachment, ChatMessage, CustomUIDataTypes } from '@/types';
 import { takePendingPrompt } from '@/lib/pending-prompt';
-import { generateUUID, getMostRecentUserMessage } from '@/lib/utils';
+import {
+  generateUUID,
+  getMostRecentUserMessage,
+  modelMatchesId
+} from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
 import { api } from '@/trpc/react';
 import {
@@ -352,7 +356,15 @@ export function ChatUI({
 
   const handleSubmit = useCallback(
     (attachments?: Attachment[]) => {
-      if (!input.trim()) return;
+      if (!input.trim()) return false;
+      // Last line of defence behind the form's own disabled state: an empty or
+      // unresolvable model would only earn a 400 from /api/chat. Alias-aware,
+      // because that is how the server resolves it — matching on modelId alone
+      // would reject a chat stored under an older id.
+      if (!chatModels?.some(model => modelMatchesId(model, currentModelId))) {
+        toast.error('Select a model before sending.');
+        return false;
+      }
       updateDisplayModelOptimistically();
       sendMessage({
         text: input,
@@ -363,8 +375,15 @@ export function ChatUI({
           url: attachment.url
         }))
       });
+      return true;
     },
-    [input, sendMessage, updateDisplayModelOptimistically]
+    [
+      input,
+      chatModels,
+      currentModelId,
+      sendMessage,
+      updateDisplayModelOptimistically
+    ]
   );
 
   const handleArtifactSelect = useCallback(
