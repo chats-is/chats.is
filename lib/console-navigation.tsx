@@ -6,7 +6,7 @@ import {
   Gauge,
   LayoutGrid,
   Settings,
-  Type,
+  Sparkles,
   Users,
   Zap
 } from 'lucide-react';
@@ -31,7 +31,7 @@ export const ConsoleNavigation = {
     {
       title: 'Prompts',
       url: '/console/prompts',
-      icon: Type
+      icon: Sparkles
     },
     {
       title: 'Pricing',

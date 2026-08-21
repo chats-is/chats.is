@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { BarChart3, Link2, Settings, Type, Volume2 } from 'lucide-react';
+import { BarChart3, Link2, Settings, Sparkles, Volume2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -34,7 +34,7 @@ const SETTINGS_NAV_ITEMS = [
   },
   {
     href: '/settings/prompts',
-    icon: Type,
+    icon: Sparkles,
     label: 'Prompts',
     value: 'prompts'
   }

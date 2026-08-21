@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Type } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 
 import { api } from '@/trpc/react';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,7 @@ export function PromptPicker({
         className="size-9 rounded-full text-muted-foreground shadow-none"
         disabled
       >
-        <Type className="size-4" />
+        <Sparkles className="size-4" />
         <span className="sr-only">Open prompts</span>
       </Button>
     );
@@ -75,7 +75,7 @@ export function PromptPicker({
           className="size-9 rounded-full text-muted-foreground shadow-none"
           disabled={disabled}
         >
-          <Type className="size-4" />
+          <Sparkles className="size-4" />
           <span className="sr-only">Open prompts</span>
         </Button>
       </PopoverTrigger>
