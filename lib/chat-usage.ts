@@ -74,7 +74,7 @@ export function normalizeChatUsage(raw: RawChatUsage): ChatUsage {
   return {
     inputTokens: plainInput,
     outputTokens: textOutput,
-    cachedInputTokens: cacheReadTokens,
+    cacheReadTokens: cacheReadTokens,
     cacheWriteTokens,
     reasoningTokens
   };

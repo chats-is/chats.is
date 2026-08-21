@@ -61,7 +61,7 @@ describe('calculateChatCost', () => {
     const { cost } = calculateChatCost(
       {
         inputTokens: 1_000_000,
-        cachedInputTokens: 2_000_000,
+        cacheReadTokens: 2_000_000,
         cacheWriteTokens: 500_000,
         outputTokens: 0
       },

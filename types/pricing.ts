@@ -9,11 +9,17 @@ export type PricingRecord = typeof modelPricings.$inferSelect;
  *  subtracts the cached/reasoning sub-counts from their totals at the SDK
  *  boundary, so each field is billed independently with no double-counting:
  *    inputTokens  = plain (uncached) input
- *    outputTokens = text output (reasoning excluded) */
+ *    outputTokens = text output (reasoning excluded)
+ *
+ *  Field names match the `usage` table's columns, so the mapping in
+ *  `recordChatUsage` is one-to-one. They deliberately do NOT mirror the SDK's:
+ *  `RawChatUsage` (lib/chat-usage.ts) is the type that models what the SDK
+ *  hands over, and keeping the two vocabularies apart is what makes it obvious
+ *  which side of the boundary a given field belongs to. */
 export type ChatUsage = {
   inputTokens?: number;
   outputTokens?: number;
-  cachedInputTokens?: number;
+  cacheReadTokens?: number;
   cacheWriteTokens?: number;
   reasoningTokens?: number;
 };
