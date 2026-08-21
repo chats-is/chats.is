@@ -261,8 +261,13 @@ export async function POST(req: Request) {
         // needs that ref to put the selector back.
         writer.write({ type: 'data-error', data });
         // The chat may have just been created; the client watches for this to
-        // put the id in the URL and refresh the sidebar.
-        writer.write({ type: 'data-chat', data: { title } });
+        // put the id in the URL and refresh the sidebar. Transient for the same
+        // reason as the normal path — a signal, not content.
+        writer.write({
+          type: 'data-chat',
+          data: { title },
+          transient: true
+        } as Parameters<typeof writer.write>[0]);
       },
       generateId: () => errorMessageId,
       onEnd: async ({ responseMessage }) => {
@@ -327,28 +332,30 @@ export async function POST(req: Request) {
 
     const stream = createUIMessageStream<ChatMessage>({
       execute: async ({ writer }) => {
-        // Artifact stream parts are forwarded to the client for the live
-        // canvas/preview animation (via onData → handleStreamPart) but marked
-        // transient so they are NOT accumulated into message.parts — thousands
-        // of delta parts per artifact would bloat the saved message and jank
-        // streaming as content grows. The artifact itself is persisted to the
-        // artifacts table, so nothing is lost.
-        const emitArtifactStreamPart = (
-          part: Parameters<typeof writer.write>[0]
-        ) =>
+        /**
+         * Write a part the client reacts to but the message should not keep.
+         *
+         * Transient parts still reach `onData`, they are just not accumulated
+         * into `message.parts`. Used for anything that is a signal rather than
+         * content: the artifact deltas driving the live canvas (thousands per
+         * artifact, and the artifact itself is persisted to its own table), the
+         * chat title (already a column on the chat row), and the assistant
+         * message id (which the message would otherwise carry inside itself).
+         */
+        const emitTransient = (part: Parameters<typeof writer.write>[0]) =>
           writer.write({
             ...part,
             transient: true
           } as Parameters<typeof writer.write>[0]);
 
         const emitArtifactDelta = (artifact: Artifact) => {
-          emitArtifactStreamPart({ type: 'data-id', data: artifact.id });
+          emitTransient({ type: 'data-id', data: artifact.id });
           const kind = artifactKindFromType(artifact.type);
-          emitArtifactStreamPart({
+          emitTransient({
             type: 'data-title',
             data: { id: artifact.id, title: artifact.title }
           });
-          emitArtifactStreamPart({
+          emitTransient({
             type: 'data-kind',
             data: {
               id: artifact.id,
@@ -356,12 +363,12 @@ export async function POST(req: Request) {
               artifactType: artifact.type
             }
           });
-          emitArtifactStreamPart({
+          emitTransient({
             type: 'data-clear',
             data: { id: artifact.id }
           });
           if (['code', 'json', 'html'].includes(artifact.type)) {
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-codeDelta',
               data: {
                 id: artifact.id,
@@ -373,14 +380,14 @@ export async function POST(req: Request) {
                 artifactType: artifact.type
               }
             });
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-finish',
               data: { id: artifact.id }
             });
             return;
           }
           if (artifact.type === 'image' && artifact.fileUrl) {
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-imageDelta',
               data: {
                 id: artifact.id,
@@ -390,14 +397,14 @@ export async function POST(req: Request) {
                 artifactType: artifact.type
               }
             });
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-finish',
               data: { id: artifact.id }
             });
             return;
           }
           if (artifact.type === 'file' && artifact.fileUrl) {
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-fileDelta',
               data: {
                 id: artifact.id,
@@ -410,13 +417,13 @@ export async function POST(req: Request) {
                 artifactType: artifact.type
               }
             });
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-finish',
               data: { id: artifact.id }
             });
             return;
           }
-          emitArtifactStreamPart({
+          emitTransient({
             type: 'data-textDelta',
             data: {
               id: artifact.id,
@@ -427,7 +434,7 @@ export async function POST(req: Request) {
               artifactType: artifact.type
             }
           });
-          emitArtifactStreamPart({
+          emitTransient({
             type: 'data-finish',
             data: { id: artifact.id }
           });
@@ -488,12 +495,12 @@ export async function POST(req: Request) {
           const kind = artifactKindFromType(artifactType);
 
           if (!state.started) {
-            emitArtifactStreamPart({ type: 'data-id', data: state.artifactId });
-            emitArtifactStreamPart({
+            emitTransient({ type: 'data-id', data: state.artifactId });
+            emitTransient({
               type: 'data-title',
               data: { id: state.artifactId, title }
             });
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-kind',
               data: {
                 id: state.artifactId,
@@ -501,7 +508,7 @@ export async function POST(req: Request) {
                 artifactType
               }
             });
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-clear',
               data: { id: state.artifactId }
             });
@@ -511,14 +518,14 @@ export async function POST(req: Request) {
             state.lastType = artifactType;
           } else {
             if (title !== state.lastTitle) {
-              emitArtifactStreamPart({
+              emitTransient({
                 type: 'data-title',
                 data: { id: state.artifactId, title }
               });
               state.lastTitle = title;
             }
             if (kind !== state.lastKind || artifactType !== state.lastType) {
-              emitArtifactStreamPart({
+              emitTransient({
                 type: 'data-kind',
                 data: {
                   id: state.artifactId,
@@ -539,7 +546,7 @@ export async function POST(req: Request) {
                 ? nextContent.slice(state.lastContent.length)
                 : nextContent;
 
-              emitArtifactStreamPart({
+              emitTransient({
                 type:
                   kind === 'code' || kind === 'sheet'
                     ? 'data-codeDelta'
@@ -571,7 +578,7 @@ export async function POST(req: Request) {
             input.fileUrl &&
             input.fileUrl !== state.lastUrl
           ) {
-            emitArtifactStreamPart({
+            emitTransient({
               type: 'data-imageDelta',
               data: {
                 id: state.artifactId,
@@ -598,7 +605,7 @@ export async function POST(req: Request) {
                 nextMimeType !== state.lastMimeType ||
                 nextSize !== state.lastSize)
             ) {
-              emitArtifactStreamPart({
+              emitTransient({
                 type: 'data-fileDelta',
                 data: {
                   id: state.artifactId,
@@ -660,12 +667,12 @@ export async function POST(req: Request) {
               if (!streamState?.started) {
                 emitArtifactDelta(artifact);
               } else {
-                emitArtifactStreamPart({
+                emitTransient({
                   type: 'data-finish',
                   data: { id: artifact.id }
                 });
               }
-              emitArtifactStreamPart({
+              emitTransient({
                 type: 'data-artifact',
                 data: { artifact }
               });
@@ -678,8 +685,12 @@ export async function POST(req: Request) {
           })
         };
 
-        writer.write({ type: 'data-chat', data: { title } });
-        writer.write({ type: 'data-messageId', data: assistantMessageId });
+        // Transient: both are signals for the client (title/URL/sidebar, and
+        // associating artifacts with this message), not content. Accumulating
+        // them would store the title on every assistant message — the chat row
+        // already has it — and the message's own id inside its own parts.
+        emitTransient({ type: 'data-chat', data: { title } });
+        emitTransient({ type: 'data-messageId', data: assistantMessageId });
 
         // Media the chat model can't consume (audio/video always, images on
         // non-vision models) becomes text markers carrying the URL, so the
