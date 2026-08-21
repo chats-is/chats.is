@@ -268,15 +268,19 @@ export async function POST(req: Request) {
       onEnd: async ({ responseMessage }) => {
         if (!responseMessage) return;
         try {
+          // createdAt is left to the database. The user's message was stored
+          // with the database's clock, and a refusal lands milliseconds later —
+          // close enough that any skew between that clock and this process's
+          // puts the refusal *before* the message it answers, and the thread
+          // renders in that order on reload. The normal path passes its own
+          // timestamp and gets away with it only because a model takes seconds.
           await db.insert(messagesTable).values({
             id: responseMessage.id || errorMessageId,
             parentId: responseMessage.metadata?.parentId ?? userMessage.id,
             role: 'assistant',
             parts: responseMessage.parts,
             chatId: id,
-            userId: session.user.id,
-            createdAt: responseMessage.metadata?.createdAt ?? refusedAt,
-            updatedAt: responseMessage.metadata?.updatedAt ?? refusedAt
+            userId: session.user.id
           });
         } catch (err) {
           // The client has already rendered the refusal; throwing here would
