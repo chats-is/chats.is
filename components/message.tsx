@@ -14,6 +14,7 @@ import {
   MediaToolPart,
   TranscribeToolPart
 } from '@/components/media-tool-part';
+import { MessageError } from '@/components/message-error';
 import { MessageMarkdown } from '@/components/message-markdown';
 import { MessageReasoning } from '@/components/message-reasoning';
 import { ModelIcon } from '@/components/model-icon';
@@ -190,6 +191,11 @@ export function Message({
 
               if (isTranscribeToolPart(part)) {
                 return <TranscribeToolPart key={index} part={part} />;
+              }
+
+              // A refused turn: the server persisted this instead of replying.
+              if (part.type === 'data-error') {
+                return <MessageError key={index} message={part.data.message} />;
               }
 
               if (part.type === 'tool-create_artifact') {

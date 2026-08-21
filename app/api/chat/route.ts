@@ -17,6 +17,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import {
+  ChatErrorKind,
   ChatMessage,
   createArtifactInputSchema,
   MessageMetadata,
@@ -31,7 +32,7 @@ import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { buildMediaTools, MediaToolsOptions } from '@/lib/chat-tools';
 import { normalizeChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
-import { preflightGate } from '@/lib/preflight';
+import { preflightCheck } from '@/lib/preflight';
 import {
   AllProvidersFailedError,
   bindingsToFailoverProviders,
@@ -123,24 +124,34 @@ export async function POST(req: Request) {
   // Fetch model from database to validate
   const dbModel = await findModelByModelId(modelId, 'chat');
   const candidates = bindingsToFailoverProviders(dbModel?.providers ?? []);
+
+  // A refusal is not returned as an HTTP error: it is persisted as the
+  // assistant turn, so the user still sees why when they come back to the
+  // conversation. Decided up front, but acted on after the user's message is
+  // stored — the refusal has to attach to something.
+  let refusal: { kind: ChatErrorKind; message: string } | null = null;
+
   if (!dbModel || candidates.length === 0) {
     console.error(`[chat] model unavailable: ${modelId}`);
-    return NextResponse.json(
-      {
-        error:
-          'This model is currently unavailable. Please choose a different model.'
-      },
-      { status: 403 }
-    );
+    refusal = {
+      kind: 'model-unavailable',
+      message:
+        'This model is currently unavailable. Please choose a different model.'
+    };
+  } else {
+    const gate = await preflightCheck({
+      userId: session.user.id,
+      modelKey: dbModel.modelId,
+      modelLabel: dbModel.name,
+      capability: 'chat'
+    });
+    if (!gate.ok) {
+      // Keep the cause greppable in the logs now that the status code no
+      // longer carries it.
+      console.warn(`[chat] refused (${gate.kind}): ${gate.message}`);
+      refusal = { kind: gate.kind, message: gate.message };
+    }
   }
-
-  const gate = await preflightGate({
-    userId: session.user.id,
-    modelKey: dbModel.modelId,
-    modelLabel: dbModel.name,
-    capability: 'chat'
-  });
-  if (gate) return gate;
 
   let title = 'Untitled';
   // No type filter: continuing a legacy media chat reuses its row.
@@ -156,8 +167,10 @@ export async function POST(req: Request) {
         provider: titleProvider
       } = await getTitleSettings();
 
-      // Only generate title if all settings are configured
-      if (titlePrompt && titleModelId && titleProvider) {
+      // Only generate title if all settings are configured. Skipped for a
+      // refused turn: titling spends a model call on a reply that will never
+      // happen, and a quota refusal in particular must not cost anything.
+      if (!refusal && titlePrompt && titleModelId && titleProvider) {
         const { text } = await generateText({
           model: getLanguageModel(titleProvider, titleModelId),
           instructions: titlePrompt,
@@ -186,6 +199,44 @@ export async function POST(req: Request) {
         messages: [userMessage]
       });
     }
+  }
+
+  // The user's message is stored, so the refusal now has a turn to attach to.
+  // Sent as a normal (200) message stream rather than a 4xx: useChat treats a
+  // non-2xx as a transport failure and never reads the body, so a refusal
+  // delivered that way could not become part of the conversation. The cause is
+  // logged above to keep it visible where the status code used to carry it.
+  // `!dbModel` is one of the conditions that sets `refusal`; testing it again
+  // here is what narrows dbModel for everything below.
+  if (refusal || !dbModel) {
+    const data = refusal ?? {
+      kind: 'model-unavailable' as const,
+      message:
+        'This model is currently unavailable. Please choose a different model.'
+    };
+    const errorMessageId = generateUUID();
+    const refusalStream = createUIMessageStream<ChatMessage>({
+      execute: ({ writer }) => {
+        writer.write({ type: 'data-error', data });
+      },
+      generateId: () => errorMessageId,
+      onEnd: async ({ responseMessage }) => {
+        if (!responseMessage) return;
+        const now = new Date();
+        await db.insert(messagesTable).values({
+          id: responseMessage.id || errorMessageId,
+          parentId: userMessage.id,
+          role: 'assistant',
+          parts: responseMessage.parts,
+          chatId: id,
+          userId: session.user.id,
+          createdAt: now,
+          updatedAt: now
+        });
+      }
+    });
+
+    return createUIMessageStreamResponse({ stream: refusalStream });
   }
 
   try {

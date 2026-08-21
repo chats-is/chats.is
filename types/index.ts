@@ -2,7 +2,7 @@ import { type Session } from 'next-auth';
 
 export { messageSchema } from './message';
 export type { MessageMetadata, ChatMessage } from './message';
-export type { CustomUIDataTypes, Usage } from './ui-data';
+export type { ChatErrorKind, CustomUIDataTypes, Usage } from './ui-data';
 export { attachmentSchema } from './attachment';
 export type { Attachment } from './attachment';
 

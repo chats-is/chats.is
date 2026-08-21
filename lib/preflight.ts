@@ -2,6 +2,7 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 
+import type { ChatErrorKind } from '@/types';
 import { PricingMissingError, requirePricing } from '@/lib/pricing';
 import {
   assertModelAccess,
@@ -12,7 +13,9 @@ import {
 
 export type PreflightResult =
   | { ok: true }
-  | { ok: false; status: 403 | 429; message: string };
+  /** `kind` travels with the message so callers can persist the cause, not just
+   *  the prose — see CustomUIDataTypes['error']. */
+  | { ok: false; status: 403 | 429; message: string; kind: ChatErrorKind };
 
 /**
  * Run the standard pre-flight gates for any generation:
@@ -48,16 +51,26 @@ export async function preflightCheck(args: {
       // misconfiguration is discoverable; the user only sees a generic
       // "unavailable, pick another model" message.
       console.error(`[preflight] ${err.message}`);
-      return { ok: false, status: 403, message: err.userMessage };
+      return {
+        ok: false,
+        status: 403,
+        message: err.userMessage,
+        kind: 'pricing'
+      };
     }
     if (err instanceof ModelAccessDeniedError) {
-      return { ok: false, status: 403, message: err.message };
+      return {
+        ok: false,
+        status: 403,
+        message: err.message,
+        kind: 'model-access'
+      };
     }
     if (err instanceof QuotaExceededError) {
       // Plain message only — the live UsageLimitAlert (powered by
       // `quota.me`) already shows the user the remaining-% gauge + countdown
       // when they're exhausted, so the 429 doesn't need structured detail.
-      return { ok: false, status: 429, message: err.message };
+      return { ok: false, status: 429, message: err.message, kind: 'quota' };
     }
     throw err;
   }
