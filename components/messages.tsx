@@ -7,6 +7,10 @@ import { Artifact, ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { Message } from '@/components/message';
 import { MessageActions } from '@/components/message-actions';
+import {
+  chatRequestErrorMessage,
+  MessageError
+} from '@/components/message-error';
 import { MessageLoading } from '@/components/message-loading';
 
 export interface MessagesProps
@@ -27,6 +31,13 @@ export interface MessagesProps
   className?: string;
   artifacts?: Artifact[];
   onSelectArtifact?: (id: string) => void;
+  /**
+   * A request the server refused, or that failed in flight. Rendered at the end
+   * of the thread rather than as a toast: it belongs next to the message it
+   * answers, and a toast for "you are over your quota" is gone before the user
+   * can act on it.
+   */
+  error?: Error;
   /** Describes the media being generated, to show a shaped loading placeholder. */
 }
 
@@ -43,7 +54,8 @@ export function Messages({
   supportsReasoning,
   className,
   artifacts,
-  onSelectArtifact
+  onSelectArtifact,
+  error
 }: MessagesProps) {
   if (!messages.length) {
     return null;
@@ -180,6 +192,8 @@ export function Messages({
         displayItems[displayItems.length - 1]?.message.role !== 'assistant' && (
           <MessageLoading image={currentImage || image} />
         )}
+
+      {error && <MessageError message={chatRequestErrorMessage(error)} />}
     </div>
   );
 }

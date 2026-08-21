@@ -104,18 +104,23 @@ export type TextToSpeechInput = z.infer<typeof textToSpeechInputSchema>;
 export type TranscribeAudioInput = z.infer<typeof transcribeAudioInputSchema>;
 
 /**
- * Media tools return a structured result instead of throwing: an error output
- * keeps the tool part in `output-available` state so the model can relay the
- * failure conversationally without breaking the stream.
+ * The failure half of every media tool result, and the shape anything else that
+ * reports a failure inside the thread renders through (see MessageError).
+ *
+ * Tools return this instead of throwing: it keeps the tool part in
+ * `output-available` state, so the stream is not broken and the message
+ * persists a record of what went wrong.
  */
+export type ToolErrorOutput = { status: 'error'; message: string };
+
 export type MediaToolOutput =
   | { status: 'done'; url: string; mediaType: string; filename: string }
-  | { status: 'error'; message: string };
+  | ToolErrorOutput;
 
 /** Transcription returns text, not a media file. */
 export type TranscribeToolOutput =
   | { status: 'done'; text: string; durationInSeconds?: number }
-  | { status: 'error'; message: string };
+  | ToolErrorOutput;
 
 export const mediaToolNames = [
   'generate_image',

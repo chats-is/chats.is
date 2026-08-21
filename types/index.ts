@@ -41,6 +41,7 @@ export type {
   CreateArtifactInput,
   MediaToolName,
   MediaToolOutput,
+  ToolErrorOutput,
   TranscribeToolOutput
 } from './chat-tools';
 export type {
