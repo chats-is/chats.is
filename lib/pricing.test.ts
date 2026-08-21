@@ -227,7 +227,7 @@ describe('PricingMissingError', () => {
     // is not "unavailable", it is unpriced, and picking another model is not
     // the fix.
     expect(err.userMessage).toBe(
-      'Veo 3 has incomplete pricing — Per video, Per second not set. Set it in the Pricing console before using this model.'
+      'Veo 3 is missing pricing for Per video, Per second. Fill it in under Console → Pricing.'
     );
     expect(err.userMessage).not.toMatch(/unavailable|choose a different/i);
   });
@@ -239,7 +239,7 @@ describe('PricingMissingError', () => {
       'Model GPT-4o is not configured for billing. Set a price (or 0) in the Pricing console.'
     );
     expect(err.userMessage).toBe(
-      'GPT-4o has no pricing configured. Set a price (or 0) in the Pricing console before using this model.'
+      'GPT-4o has no pricing yet. Set it under Console → Pricing (0 is fine) to enable the model.'
     );
   });
 });

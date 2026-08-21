@@ -70,8 +70,8 @@ export class PricingMissingError extends Error {
     super(`Model ${modelLabel} is not configured for billing${suffix}`);
     this.name = 'PricingMissingError';
     this.userMessage = missingFields?.length
-      ? `${modelLabel} has incomplete pricing — ${missingFields.join(', ')} not set. Set it in the Pricing console before using this model.`
-      : `${modelLabel} has no pricing configured. Set a price (or 0) in the Pricing console before using this model.`;
+      ? `${modelLabel} is missing pricing for ${missingFields.join(', ')}. Fill it in under Console → Pricing.`
+      : `${modelLabel} has no pricing yet. Set it under Console → Pricing (0 is fine) to enable the model.`;
   }
 }
 

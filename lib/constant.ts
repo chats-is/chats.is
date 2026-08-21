@@ -139,7 +139,7 @@ export function buildMediaToolsSystemPrompt(
     '',
     "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields and the defaults apply.",
     '',
-    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. If the tool returns an error, briefly relay it to the user instead of retrying repeatedly.'
+    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. If the tool returns an error, the chat already displays it to the user — do NOT repeat, paraphrase or explain it, and do NOT retry. Either say nothing about the failure or acknowledge it in a few words, never restating the reason in your own wording.'
   ].join('\n');
 }
 
