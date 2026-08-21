@@ -9,7 +9,7 @@ import {
   Captions,
   Clapperboard,
   Image as ImageIcon,
-  Sparkles
+  WandSparkles
 } from 'lucide-react';
 
 import { ChatMessage } from '@/types';
@@ -108,7 +108,7 @@ export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
               disabled={status === 'submitted' || status === 'streaming'}
               className="size-9 rounded-full text-muted-foreground shadow-none"
             >
-              <Sparkles className="size-4" />
+              <WandSparkles className="size-4" />
               <span className="sr-only">Media generation models</span>
             </Button>
           </PopoverTrigger>

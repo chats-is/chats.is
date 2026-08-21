@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { Cpu, Settings, Type, Users, Zap } from 'lucide-react';
+import { Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
 
 import { api } from '@/trpc/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,7 +56,7 @@ export default async function ConsolePage() {
           <Card className="transition-colors hover:bg-accent">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Prompts</CardTitle>
-              <Type className="size-4 text-muted-foreground" />
+              <Sparkles className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{promptStats.total}</div>

@@ -1,7 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TextQuote } from 'lucide-react';
+import {
+  Sparkles
+} from 'lucide-react';
 
 import { setPendingPrompt } from '@/lib/pending-prompt';
 import { api, type RouterOutputs } from '@/trpc/react';
@@ -85,7 +87,7 @@ export function PromptsView() {
             </div>
           ) : (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
-              <TextQuote className="size-12 opacity-50" />
+              <Sparkles className="size-12 opacity-50" />
               <p className="text-sm">
                 Prompts you and your team create will appear here.
               </p>

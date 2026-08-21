@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, Gauge, Settings, Type } from 'lucide-react';
+import { Boxes, Gauge, Settings, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
 const CONSOLE_SETTINGS_NAV_ITEMS = [
   { href: '/console/settings/general', icon: Settings, label: 'General' },
   { href: '/console/settings/models', icon: Boxes, label: 'Models' },
-  { href: '/console/settings/prompts', icon: Type, label: 'Prompts' },
+  { href: '/console/settings/prompts', icon: Sparkles, label: 'Prompts' },
   { href: '/console/settings/quota', icon: Gauge, label: 'Quota' }
 ] as const;
 
