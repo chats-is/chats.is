@@ -36,6 +36,8 @@ interface ChatPanelProps extends Pick<
   setInput: (value: string) => void;
   onInputChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (attachments?: Attachment[]) => boolean;
+  /** A refused or failed request, rendered at the end of the thread. */
+  error?: Error;
   onModelChange: (modelId: string) => void;
   onOptionsChange: (options: ModelOptions) => void;
   onSelectArtifact: (artifactId: string) => void;
@@ -59,6 +61,7 @@ export function ChatPanel({
   setInput,
   onInputChange,
   onSubmit,
+  error,
   onModelChange,
   onOptionsChange,
   onSelectArtifact,
@@ -81,6 +84,7 @@ export function ChatPanel({
             supportsReasoning={supportsReasoning}
             artifacts={artifacts}
             onSelectArtifact={onSelectArtifact}
+            error={error}
           />
         </ScrollToBottom>
       </div>

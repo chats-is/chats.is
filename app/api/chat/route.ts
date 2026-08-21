@@ -17,6 +17,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import {
+  ChatErrorKind,
   ChatMessage,
   createArtifactInputSchema,
   MessageMetadata,
@@ -31,7 +32,7 @@ import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { buildMediaTools, MediaToolsOptions } from '@/lib/chat-tools';
 import { normalizeChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
-import { preflightGate } from '@/lib/preflight';
+import { preflightCheck } from '@/lib/preflight';
 import {
   AllProvidersFailedError,
   bindingsToFailoverProviders,
@@ -123,24 +124,34 @@ export async function POST(req: Request) {
   // Fetch model from database to validate
   const dbModel = await findModelByModelId(modelId, 'chat');
   const candidates = bindingsToFailoverProviders(dbModel?.providers ?? []);
+
+  // A refusal is not returned as an HTTP error: it is persisted as the
+  // assistant turn, so the user still sees why when they come back to the
+  // conversation. Decided up front, but acted on after the user's message is
+  // stored — the refusal has to attach to something.
+  let refusal: { kind: ChatErrorKind; message: string } | null = null;
+
   if (!dbModel || candidates.length === 0) {
     console.error(`[chat] model unavailable: ${modelId}`);
-    return NextResponse.json(
-      {
-        error:
-          'This model is currently unavailable. Please choose a different model.'
-      },
-      { status: 403 }
-    );
+    refusal = {
+      kind: 'model-unavailable',
+      message:
+        'This model is currently unavailable. Please choose a different model.'
+    };
+  } else {
+    const gate = await preflightCheck({
+      userId: session.user.id,
+      modelKey: dbModel.modelId,
+      modelLabel: dbModel.name,
+      capability: 'chat'
+    });
+    if (!gate.ok) {
+      // Keep the cause greppable in the logs now that the status code no
+      // longer carries it.
+      console.warn(`[chat] refused (${gate.kind}): ${gate.message}`);
+      refusal = { kind: gate.kind, message: gate.message };
+    }
   }
-
-  const gate = await preflightGate({
-    userId: session.user.id,
-    modelKey: dbModel.modelId,
-    modelLabel: dbModel.name,
-    capability: 'chat'
-  });
-  if (gate) return gate;
 
   let title = 'Untitled';
   // No type filter: continuing a legacy media chat reuses its row.
@@ -148,7 +159,15 @@ export async function POST(req: Request) {
     id,
     includeMessages: false
   });
-  if (!chat) {
+  const UNTITLED = 'Untitled';
+
+  /**
+   * Title from the first user message. Skipped for a refused turn — it calls a
+   * model, and spending on a reply that will never happen is wrong in general
+   * and self-defeating for a quota refusal.
+   */
+  const generateTitle = async () => {
+    if (refusal) return UNTITLED;
     try {
       const {
         prompt: titlePrompt,
@@ -156,19 +175,22 @@ export async function POST(req: Request) {
         provider: titleProvider
       } = await getTitleSettings();
 
-      // Only generate title if all settings are configured
-      if (titlePrompt && titleModelId && titleProvider) {
-        const { text } = await generateText({
-          model: getLanguageModel(titleProvider, titleModelId),
-          instructions: titlePrompt,
-          prompt: JSON.stringify(userMessage)
-        });
+      if (!titlePrompt || !titleModelId || !titleProvider) return UNTITLED;
 
-        title = text ?? title;
-      }
+      const { text } = await generateText({
+        model: getLanguageModel(titleProvider, titleModelId),
+        instructions: titlePrompt,
+        prompt: JSON.stringify(userMessage)
+      });
+      return text || UNTITLED;
     } catch (err: any) {
       console.error(`Generate title error:`, err.message);
+      return UNTITLED;
     }
+  };
+
+  if (!chat) {
+    title = await generateTitle();
 
     await api.chat.create({
       id,
@@ -178,6 +200,18 @@ export async function POST(req: Request) {
     });
   } else {
     title = chat.title;
+
+    // A refusal on the very first message creates the chat still named
+    // "Untitled", and titling only ever ran for a chat that did not exist yet
+    // — so without this the name would stick for the life of the chat.
+    if (title === UNTITLED) {
+      const generated = await generateTitle();
+      if (generated !== UNTITLED) {
+        title = generated;
+        await api.chat.update({ id, title });
+      }
+    }
+
     if (parentMessageId && parentMessageId === userMessage.id) {
       await api.message.delete({ parentId: parentMessageId });
     } else {
@@ -186,6 +220,77 @@ export async function POST(req: Request) {
         messages: [userMessage]
       });
     }
+  }
+
+  // The user's message is stored, so the refusal now has a turn to attach to.
+  // Sent as a normal (200) message stream rather than a 4xx: useChat treats a
+  // non-2xx as a transport failure and never reads the body, so a refusal
+  // delivered that way could not become part of the conversation. The cause is
+  // logged above to keep it visible where the status code used to carry it.
+  // `!dbModel` is one of the conditions that sets `refusal`; testing it again
+  // here is what narrows dbModel for everything below.
+  if (refusal || !dbModel) {
+    const data = refusal ?? {
+      kind: 'model-unavailable' as const,
+      message:
+        'This model is currently unavailable. Please choose a different model.'
+    };
+    const errorMessageId = generateUUID();
+    const refusedAt = new Date();
+    const refusalMetadata: MessageMetadata = {
+      parentId: userMessage.id,
+      createdAt: refusedAt,
+      updatedAt: refusedAt
+    };
+
+    const refusalStream = createUIMessageStream<ChatMessage>({
+      execute: ({ writer }) => {
+        // `start` carries the id and metadata, exactly as the normal path does
+        // through toUIMessageStream. Without it the client invents its own id
+        // and leaves metadata undefined, so the message it holds no longer
+        // matches the stored row — and Retry, which reads
+        // `metadata.parentId`, would re-send the user message as if it were
+        // new and collide with the row already stored under that id.
+        writer.write({
+          type: 'start',
+          messageId: errorMessageId,
+          messageMetadata: refusalMetadata
+        });
+        // Before data-chat: the client's data-chat handler clears the
+        // optimistic-model ref as a success signal, and the refusal handler
+        // needs that ref to put the selector back.
+        writer.write({ type: 'data-error', data });
+        // The chat may have just been created; the client watches for this to
+        // put the id in the URL and refresh the sidebar.
+        writer.write({ type: 'data-chat', data: { title } });
+      },
+      generateId: () => errorMessageId,
+      onEnd: async ({ responseMessage }) => {
+        if (!responseMessage) return;
+        try {
+          // createdAt is left to the database. The user's message was stored
+          // with the database's clock, and a refusal lands milliseconds later —
+          // close enough that any skew between that clock and this process's
+          // puts the refusal *before* the message it answers, and the thread
+          // renders in that order on reload. The normal path passes its own
+          // timestamp and gets away with it only because a model takes seconds.
+          await db.insert(messagesTable).values({
+            id: responseMessage.id || errorMessageId,
+            parentId: responseMessage.metadata?.parentId ?? userMessage.id,
+            role: 'assistant',
+            parts: responseMessage.parts,
+            chatId: id,
+            userId: session.user.id
+          });
+        } catch (err) {
+          // The client has already rendered the refusal; throwing here would
+          // error a response it has finished reading.
+          console.error('[chat] failed to persist refusal:', err);
+        }
+      }
+    });
+
+    return createUIMessageStreamResponse({ stream: refusalStream });
   }
 
   try {

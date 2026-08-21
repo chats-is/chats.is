@@ -1,7 +1,7 @@
 'use client';
 
 import { usePreferences } from '@/contexts/preferences-context';
-import { Captions, CircleAlert, Loader2 } from 'lucide-react';
+import { Captions, Loader2 } from 'lucide-react';
 
 import {
   ChatMessage,
@@ -13,6 +13,7 @@ import {
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaLightbox } from '@/components/media-lightbox';
 import { MediaPlaceholder } from '@/components/media-placeholder';
+import { MessageError } from '@/components/message-error';
 import { VideoPlayer } from '@/components/video-player';
 
 export type MediaToolUIPart = Extract<
@@ -52,7 +53,7 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
   }
 
   if (part.state === 'output-error') {
-    return <MediaToolError message={part.errorText} />;
+    return <MessageError message={part.errorText} />;
   }
 
   if (part.state !== 'output-available' || !part.output) {
@@ -61,7 +62,7 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
 
   const output = part.output as TranscribeToolOutput;
   if (output.status === 'error') {
-    return <MediaToolError message={output.message} />;
+    return <MessageError message={output.message} />;
   }
 
   return (
@@ -71,15 +72,6 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
         Transcript
       </div>
       <p className="text-sm whitespace-pre-wrap">{output.text}</p>
-    </div>
-  );
-}
-
-function MediaToolError({ message }: { message?: string }) {
-  return (
-    <div className="my-2 flex w-fit items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-      <CircleAlert className="size-4 shrink-0" />
-      <span>{message || 'Generation failed.'}</span>
     </div>
   );
 }
@@ -123,7 +115,7 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
   }
 
   if (part.state === 'output-error') {
-    return <MediaToolError message={part.errorText} />;
+    return <MessageError message={part.errorText} />;
   }
 
   if (part.state !== 'output-available' || !part.output) {
@@ -132,7 +124,7 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
 
   const output = part.output as MediaToolOutput;
   if (output.status === 'error') {
-    return <MediaToolError message={output.message} />;
+    return <MessageError message={output.message} />;
   }
 
   if (output.mediaType.startsWith('image/')) {

@@ -190,62 +190,80 @@ export function ChatUI({
   const utils = api.useUtils();
   const prevStatusRef = useRef<string | null>(null);
 
-  const { status, messages, stop, regenerate, setMessages, sendMessage } =
-    useChat<ChatMessage>({
-      id,
-      messages: initialMessages,
-      experimental_throttle: 100,
-      generateId: generateUUID,
-      // Re-attach to an in-progress generation after a page refresh. Server
-      // resume is a no-op when REDIS_URL is unset, so this stays safe.
-      resume: true,
-      transport: new DefaultChatTransport({
-        api: '/api/chat',
-        prepareSendMessagesRequest({ messages, body }) {
-          const userMessage = getMostRecentUserMessage(messages);
-          return {
-            body: {
-              id,
-              userMessage,
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              ...chatRequestBodyRef.current,
-              ...body
-            }
-          };
-        },
-        // Resume hits the same route as a GET; pass the chat id as a query
-        // param so the handler knows which stream to re-attach to.
-        prepareReconnectToStreamRequest({ id, api }) {
-          return { api: `${api}?chatId=${id}` };
-        }
-      }),
-      onData: dataPart => {
-        if (dataPart.type === 'data-chat' && dataPart.data) {
-          const chatData = dataPart.data as CustomUIDataTypes['chat'];
-          if (chatData.title) {
-            if (!title) {
-              window.history.replaceState({}, '', `/chat/${id}`);
-              refreshChats();
-            }
-            setTitle(chatData.title);
+  const {
+    status,
+    messages,
+    stop,
+    regenerate,
+    setMessages,
+    sendMessage,
+    error
+  } = useChat<ChatMessage>({
+    id,
+    messages: initialMessages,
+    experimental_throttle: 100,
+    generateId: generateUUID,
+    // Re-attach to an in-progress generation after a page refresh. Server
+    // resume is a no-op when REDIS_URL is unset, so this stays safe.
+    resume: true,
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+      prepareSendMessagesRequest({ messages, body }) {
+        const userMessage = getMostRecentUserMessage(messages);
+        return {
+          body: {
+            id,
+            userMessage,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            ...chatRequestBodyRef.current,
+            ...body
           }
-          // Clear previous model ref on success
-          previousModelRef.current = null;
-        }
-        handleStreamPart(dataPart, id);
+        };
       },
-      onError: error => {
-        toast.error('An error occurred.', {
-          description: error.message
-        });
-        // Revert displayModel on error
+      // Resume hits the same route as a GET; pass the chat id as a query
+      // param so the handler knows which stream to re-attach to.
+      prepareReconnectToStreamRequest({ id, api }) {
+        return { api: `${api}?chatId=${id}` };
+      }
+    }),
+    onData: dataPart => {
+      // A refused turn arrives as a normal 200 stream, so onError never runs.
+      // Undo the optimistic model switch here instead — the request was often
+      // refused *because* of the model that was just picked, and leaving the
+      // selector on it says the opposite.
+      if (dataPart.type === 'data-error') {
         if (previousModelRef.current) {
           setDisplayModelId(previousModelRef.current);
           previousModelRef.current = null;
         }
-        void artifactsQuery.refetch();
       }
-    });
+
+      if (dataPart.type === 'data-chat' && dataPart.data) {
+        const chatData = dataPart.data as CustomUIDataTypes['chat'];
+        if (chatData.title) {
+          if (!title) {
+            window.history.replaceState({}, '', `/chat/${id}`);
+            refreshChats();
+          }
+          setTitle(chatData.title);
+        }
+        // Clear previous model ref on success
+        previousModelRef.current = null;
+      }
+      handleStreamPart(dataPart, id);
+    },
+    onError: () => {
+      // Not toasted: `error` is rendered in the thread by <Messages>, where it
+      // sits next to the message it answers and does not disappear. Showing
+      // both would repeat one failure twice.
+      // Revert displayModel on error
+      if (previousModelRef.current) {
+        setDisplayModelId(previousModelRef.current);
+        previousModelRef.current = null;
+      }
+      void artifactsQuery.refetch();
+    }
+  });
 
   useEffect(() => {
     streamStatusRef.current = status;
@@ -462,6 +480,7 @@ export function ChatUI({
               onOptionsChange={handleOptionsChange}
               onSelectArtifact={handleArtifactSelect}
               onReload={handleReload}
+              error={error}
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
@@ -504,6 +523,7 @@ export function ChatUI({
             onOptionsChange={handleOptionsChange}
             onSelectArtifact={handleArtifactSelect}
             onReload={handleReload}
+            error={error}
           />
           <ArtifactsPanel
             open={isPanelOpen}
