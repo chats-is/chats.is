@@ -227,6 +227,17 @@ export function ChatUI({
       }
     }),
     onData: dataPart => {
+      // A refused turn arrives as a normal 200 stream, so onError never runs.
+      // Undo the optimistic model switch here instead — the request was often
+      // refused *because* of the model that was just picked, and leaving the
+      // selector on it says the opposite.
+      if (dataPart.type === 'data-error') {
+        if (previousModelRef.current) {
+          setDisplayModelId(previousModelRef.current);
+          previousModelRef.current = null;
+        }
+      }
+
       if (dataPart.type === 'data-chat' && dataPart.data) {
         const chatData = dataPart.data as CustomUIDataTypes['chat'];
         if (chatData.title) {

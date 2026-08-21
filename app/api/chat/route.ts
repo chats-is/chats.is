@@ -159,7 +159,15 @@ export async function POST(req: Request) {
     id,
     includeMessages: false
   });
-  if (!chat) {
+  const UNTITLED = 'Untitled';
+
+  /**
+   * Title from the first user message. Skipped for a refused turn — it calls a
+   * model, and spending on a reply that will never happen is wrong in general
+   * and self-defeating for a quota refusal.
+   */
+  const generateTitle = async () => {
+    if (refusal) return UNTITLED;
     try {
       const {
         prompt: titlePrompt,
@@ -167,21 +175,22 @@ export async function POST(req: Request) {
         provider: titleProvider
       } = await getTitleSettings();
 
-      // Only generate title if all settings are configured. Skipped for a
-      // refused turn: titling spends a model call on a reply that will never
-      // happen, and a quota refusal in particular must not cost anything.
-      if (!refusal && titlePrompt && titleModelId && titleProvider) {
-        const { text } = await generateText({
-          model: getLanguageModel(titleProvider, titleModelId),
-          instructions: titlePrompt,
-          prompt: JSON.stringify(userMessage)
-        });
+      if (!titlePrompt || !titleModelId || !titleProvider) return UNTITLED;
 
-        title = text ?? title;
-      }
+      const { text } = await generateText({
+        model: getLanguageModel(titleProvider, titleModelId),
+        instructions: titlePrompt,
+        prompt: JSON.stringify(userMessage)
+      });
+      return text || UNTITLED;
     } catch (err: any) {
       console.error(`Generate title error:`, err.message);
+      return UNTITLED;
     }
+  };
+
+  if (!chat) {
+    title = await generateTitle();
 
     await api.chat.create({
       id,
@@ -191,6 +200,18 @@ export async function POST(req: Request) {
     });
   } else {
     title = chat.title;
+
+    // A refusal on the very first message creates the chat still named
+    // "Untitled", and titling only ever ran for a chat that did not exist yet
+    // — so without this the name would stick for the life of the chat.
+    if (title === UNTITLED) {
+      const generated = await generateTitle();
+      if (generated !== UNTITLED) {
+        title = generated;
+        await api.chat.update({ id, title });
+      }
+    }
+
     if (parentMessageId && parentMessageId === userMessage.id) {
       await api.message.delete({ parentId: parentMessageId });
     } else {
@@ -215,24 +236,53 @@ export async function POST(req: Request) {
         'This model is currently unavailable. Please choose a different model.'
     };
     const errorMessageId = generateUUID();
+    const refusedAt = new Date();
+    const refusalMetadata: MessageMetadata = {
+      parentId: userMessage.id,
+      createdAt: refusedAt,
+      updatedAt: refusedAt
+    };
+
     const refusalStream = createUIMessageStream<ChatMessage>({
       execute: ({ writer }) => {
+        // `start` carries the id and metadata, exactly as the normal path does
+        // through toUIMessageStream. Without it the client invents its own id
+        // and leaves metadata undefined, so the message it holds no longer
+        // matches the stored row — and Retry, which reads
+        // `metadata.parentId`, would re-send the user message as if it were
+        // new and collide with the row already stored under that id.
+        writer.write({
+          type: 'start',
+          messageId: errorMessageId,
+          messageMetadata: refusalMetadata
+        });
+        // Before data-chat: the client's data-chat handler clears the
+        // optimistic-model ref as a success signal, and the refusal handler
+        // needs that ref to put the selector back.
         writer.write({ type: 'data-error', data });
+        // The chat may have just been created; the client watches for this to
+        // put the id in the URL and refresh the sidebar.
+        writer.write({ type: 'data-chat', data: { title } });
       },
       generateId: () => errorMessageId,
       onEnd: async ({ responseMessage }) => {
         if (!responseMessage) return;
-        const now = new Date();
-        await db.insert(messagesTable).values({
-          id: responseMessage.id || errorMessageId,
-          parentId: userMessage.id,
-          role: 'assistant',
-          parts: responseMessage.parts,
-          chatId: id,
-          userId: session.user.id,
-          createdAt: now,
-          updatedAt: now
-        });
+        try {
+          await db.insert(messagesTable).values({
+            id: responseMessage.id || errorMessageId,
+            parentId: responseMessage.metadata?.parentId ?? userMessage.id,
+            role: 'assistant',
+            parts: responseMessage.parts,
+            chatId: id,
+            userId: session.user.id,
+            createdAt: responseMessage.metadata?.createdAt ?? refusedAt,
+            updatedAt: responseMessage.metadata?.updatedAt ?? refusedAt
+          });
+        } catch (err) {
+          // The client has already rendered the refusal; throwing here would
+          // error a response it has finished reading.
+          console.error('[chat] failed to persist refusal:', err);
+        }
       }
     });
 
