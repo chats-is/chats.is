@@ -78,6 +78,12 @@ export function Messages({
         return getReasoningText(message).length > 0;
       }
 
+      // A refused turn's only part. Without this the message is dropped as
+      // empty and the refusal is stored but never seen.
+      if (part.type === 'data-error') {
+        return true;
+      }
+
       return part.type === 'file';
     });
   };
