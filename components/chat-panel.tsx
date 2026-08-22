@@ -91,7 +91,10 @@ export function ChatPanel({
       </div>
       <div
         className={cn('mx-auto w-full max-w-4xl bg-background px-4 pb-4', {
-          'mb-60 flex h-full flex-col items-center justify-center': noChat
+          // Anchored from the top rather than centred: the prompt suggestions
+          // below are optional and variable in height, and centring would let
+          // them shove the greeting and the composer up the page.
+          'flex h-full flex-col items-center pt-[max(3rem,14vh)]': noChat
         })}
       >
         {noChat && (
