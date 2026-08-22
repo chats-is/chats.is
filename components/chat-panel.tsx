@@ -14,6 +14,7 @@ import {
 } from '@/components/chat-prompt-form';
 import { EmptyScreen } from '@/components/empty-screen';
 import { Messages } from '@/components/messages';
+import { PromptSuggestions } from '@/components/prompt-suggestions';
 import { UsageLimitAlert } from '@/components/usage-limit-alert';
 
 const ScrollToBottom = dynamic(() => import('@/components/scroll-to-bottom'), {
@@ -111,6 +112,15 @@ export function ChatPanel({
           onModelChange={onModelChange}
           onOptionsChange={onOptionsChange}
         />
+        {/* Only on a new chat: a prompt seeds the first message, so once the
+            conversation has started it is no longer what the user needs. */}
+        {noChat && (
+          <PromptSuggestions
+            currentValue={input}
+            onInsert={setInput}
+            disabled={status === 'submitted' || status === 'streaming'}
+          />
+        )}
       </div>
     </div>
   );

@@ -13,7 +13,6 @@ import { AttachmentsButton } from '@/components/attachments-button';
 import { AttachmentsPreview } from '@/components/attachments-preview';
 import { MediaToolsMenu } from '@/components/media-tools-menu';
 import { ModelMenu, ModelOptions } from '@/components/model-menu';
-import { PromptPicker } from '@/components/prompt-picker';
 
 export type { ModelOptions };
 
@@ -173,13 +172,6 @@ export function ChatPromptForm({
             <MediaToolsMenu status={status} />
           </div>
           <div className="flex items-center space-x-2">
-            <PromptPicker
-              currentValue={input}
-              onInsert={setInput}
-              disabled={
-                cannotSend || status === 'submitted' || status === 'streaming'
-              }
-            />
             {showAttachments && (
               <AttachmentsButton
                 disabled={status === 'submitted' || status === 'streaming'}
