@@ -71,7 +71,13 @@ export function ChatPanel({
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       <ChatHeader title={title} />
-      <div className="min-h-0 w-full flex-1 overflow-hidden">
+      <div
+        className={cn('min-h-0 w-full flex-1 overflow-hidden', {
+          // Nothing to show — `noChat` means a ready status and zero messages —
+          // and a flexing empty region would push the composer down the page.
+          hidden: noChat
+        })}
+      >
         <ScrollToBottom status={status} messages={messages}>
           <Messages
             modelId={modelId}
@@ -94,7 +100,13 @@ export function ChatPanel({
           // Anchored from the top rather than centred: the prompt suggestions
           // below are optional and variable in height, and centring would let
           // them shove the greeting and the composer up the page.
-          'flex h-full flex-col items-center pt-[max(3rem,14vh)]': noChat
+          //
+          // It also takes over as the scroll region under the fixed header, the
+          // way the thread does in a conversation — the greeting, the composer
+          // and the suggestions scroll together when the window is too short to
+          // hold them, rather than being clipped by the ancestor.
+          'flex min-h-0 flex-1 flex-col items-center overflow-y-auto pt-[max(3rem,14vh)]':
+            noChat
         })}
       >
         {noChat && (
