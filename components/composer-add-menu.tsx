@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 
 import { Attachment, MediaKind } from '@/types';
 import { uploadFile } from '@/lib/api';
+import { modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -118,7 +119,15 @@ export function ComposerAddMenu({
         AUDIO_TYPES.some(ext => file.name.toLowerCase().endsWith(ext))
       );
       if (hasAudio && sttModels?.length) {
-        if (!sttModelId) {
+        // Validity, not emptiness: a preference persisted in localStorage (or a
+        // stale admin default) can name a model that has since been deleted or
+        // is no longer an STT model, and the server would then register no
+        // transcribe_audio tool at all — the upload would simply never be
+        // transcribed. Alias-aware, since that is how the server resolves it.
+        const resolves = sttModels.some(model =>
+          modelMatchesId(model, sttModelId)
+        );
+        if (!resolves) {
           setPreference('sttModelId', sttModels[0].modelId);
         }
         onSelectMedia('stt');
