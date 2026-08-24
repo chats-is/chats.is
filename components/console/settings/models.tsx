@@ -50,8 +50,13 @@ function ModelSelect({
       <Label>{label}</Label>
       <Select
         disabled={isEmpty || disabled}
-        // Undefined (not '') so the placeholder shows rather than a blank value.
-        value={isEmpty ? undefined : value || ''}
+        // Undefined (not '') so the placeholder shows rather than a blank
+        // value — including when the saved id names a model that has since
+        // been deleted or disabled, which Radix would otherwise render as an
+        // empty trigger with no hint that anything is set.
+        value={
+          options?.some(option => option.modelId === value) ? value : undefined
+        }
         onValueChange={onChange}
       >
         <SelectTrigger>
@@ -178,9 +183,9 @@ export function ModelsSettings() {
             <Select
               disabled={!speechEnabled || !speechVoices.length || isSaving}
               value={
-                !speechVoices.length
-                  ? undefined
-                  : formData['default.speech.voice'] || ''
+                speechVoices.includes(formData['default.speech.voice'] ?? '')
+                  ? formData['default.speech.voice']
+                  : undefined
               }
               onValueChange={value =>
                 handleChange('default.speech.voice', value)
