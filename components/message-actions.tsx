@@ -70,8 +70,10 @@ export function MessageActions({
   const { ttsModels, speechEnabled } = useSystemSettings();
   const isSpeechAvailable = (ttsModels?.length ?? 0) > 0 && speechEnabled;
   const { preferences } = usePreferences();
-  const speechModel = preferences.speechModelId;
-  const speechVoice = preferences.speechVoice;
+  // The same text-to-speech selection the chat tool uses: reading a message
+  // aloud and generating speech in a reply are one setting, not two.
+  const speechModel = preferences.audioModelId;
+  const speechVoice = preferences.audioVoice;
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const [draftContent, setDraftContent] = React.useState('');
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -164,9 +166,16 @@ export function MessageActions({
   };
 
   const onRead = async () => {
-    if (isSpeechAvailable && speechModel && speechVoice) {
+    // A voice is optional: unset means the user never picked one, and the
+    // model's own default speaks. Requiring one here made the button do
+    // nothing at all, silently, for anyone who had not been into the settings.
+    if (isSpeechAvailable && speechModel) {
       setIsLoadingAudio(true);
-      const result = await createSpeech(speechModel, speechVoice, textParts);
+      const result = await createSpeech(
+        speechModel,
+        speechVoice || undefined,
+        textParts
+      );
       setIsLoadingAudio(false);
 
       if (result && 'error' in result) {

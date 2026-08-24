@@ -2,7 +2,8 @@ import { Attachment, Result } from '@/types';
 
 export const createSpeech = async (
   modelId: string,
-  voice: string,
+  /** Omitted when the user has picked none — the model's own default applies. */
+  voice: string | undefined,
   text: string
 ) => {
   const res = await fetch('/api/speech', {

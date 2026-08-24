@@ -118,17 +118,17 @@ export const getDefaultQuotaId = cache(async (): Promise<string | null> => {
   return values['default.quotaId'];
 });
 
+/**
+ * Reading a message aloud runs on the same text-to-speech model the chat tool
+ * uses — one selection, not two. `speech.enabled` stays its own switch: the
+ * button can be turned off without touching how speech is generated.
+ */
 export const getSpeechSettings = cache(async () => {
-  const values = await getSettings([
-    'speech.enabled',
-    'default.speech.modelId',
-    'default.speech.voice'
-  ]);
+  const values = await getSettings(['speech.enabled', 'default.tts.modelId']);
 
   return {
     speechEnabled: values['speech.enabled'] === 'true',
-    defaultModel: values['default.speech.modelId'],
-    defaultVoice: values['default.speech.voice'] || undefined
+    defaultModel: values['default.tts.modelId']
   };
 });
 
@@ -265,9 +265,7 @@ export async function getSystemSettings() {
       'default.image.editModelId',
       'default.video.modelId',
       'default.tts.modelId',
-      'default.stt.modelId',
-      'default.speech.modelId',
-      'default.speech.voice'
+      'default.stt.modelId'
     ])
   ]);
 
@@ -291,9 +289,7 @@ export async function getSystemSettings() {
       imageEditModelId: values['default.image.editModelId'],
       videoModelId: values['default.video.modelId'],
       ttsModelId: values['default.tts.modelId'],
-      sttModelId: values['default.stt.modelId'],
-      speechModelId: values['default.speech.modelId'],
-      speechVoice: values['default.speech.voice']
+      sttModelId: values['default.stt.modelId']
     }
   };
 }

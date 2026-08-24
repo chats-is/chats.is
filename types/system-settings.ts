@@ -7,8 +7,6 @@ export interface SystemDefaults {
   videoModelId: string | null;
   ttsModelId: string | null;
   sttModelId: string | null;
-  speechModelId: string | null;
-  speechVoice: string | null;
 }
 
 export interface SystemSettings {

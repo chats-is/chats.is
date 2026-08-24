@@ -32,9 +32,6 @@ export interface Preferences {
   audioVoice: string;
   // Transcription (STT)
   sttModelId: string;
-  // Speech (read aloud)
-  speechModelId: string;
-  speechVoice: string;
 }
 
 interface PreferencesContextValue {
@@ -117,12 +114,7 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       audioModelId: systemDefault(defaults.ttsModelId, ttsModels),
       audioVoice: '',
       // Transcription (STT)
-      sttModelId: systemDefault(defaults.sttModelId, sttModels),
-      // Speech (read aloud)
-      // No hardcoded fallback: 'tts-1' names a model this deployment may not
-      // have, and read-aloud is better off unset than pointed at a stranger.
-      speechModelId: systemDefault(defaults.speechModelId, ttsModels),
-      speechVoice: defaults.speechVoice ?? ''
+      sttModelId: systemDefault(defaults.sttModelId, sttModels)
     };
 
     const stored = getStoredPreferences();
@@ -144,7 +136,6 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
         ['imageEditModelId', editModels],
         ['videoModelId', videoModels],
         ['audioModelId', ttsModels],
-        ['speechModelId', ttsModels],
         ['sttModelId', sttModels]
       ];
       for (const [key, models] of modelKeys) {

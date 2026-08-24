@@ -37,8 +37,7 @@ export async function POST(req: Request) {
   }
 
   // Get speech settings
-  const { speechEnabled, defaultModel, defaultVoice } =
-    await getSpeechSettings();
+  const { speechEnabled, defaultModel } = await getSpeechSettings();
   if (!speechEnabled) {
     return NextResponse.json(
       { error: 'Speech is not enabled' },
@@ -46,9 +45,10 @@ export async function POST(req: Request) {
     );
   }
 
-  // Use default values if not provided
+  // Fall back to the admin's text-to-speech model; an unset voice lets the
+  // provider use the model's own.
   const modelId = requestModelId || defaultModel;
-  const voice = requestVoice || defaultVoice;
+  const voice = requestVoice || undefined;
 
   if (!modelId) {
     console.error('[speech] no model configured (no request model / default)');

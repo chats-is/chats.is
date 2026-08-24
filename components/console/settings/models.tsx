@@ -1,7 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
-
 import { api } from '@/trpc/react';
 import { Label } from '@/components/ui/label';
 import {
@@ -23,8 +21,6 @@ const KEYS = [
   'default.tts.modelId',
   'default.stt.modelId',
   'speech.enabled',
-  'default.speech.modelId',
-  'default.speech.voice',
   'title.modelId'
 ] as const;
 
@@ -102,13 +98,6 @@ export function ModelsSettings() {
   );
 
   const speechEnabled = formData['speech.enabled'] === 'true';
-  const speechVoices = useMemo(() => {
-    const selected = speechModels?.find(
-      m => m.modelId === formData['default.speech.modelId']
-    );
-    return (selected?.uiOptions?.voices as string[]) || [];
-  }, [speechModels, formData['default.speech.modelId']]);
-
   if (isLoading) return <SettingsLoading />;
 
   return (
@@ -164,9 +153,11 @@ export function ModelsSettings() {
       <div className="rounded-lg border p-4">
         <h2 className="mb-2 text-lg font-semibold">Text-to-Speech Reading</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          Default settings for reading messages aloud.
+          Whether messages can be read aloud. Which model and voice does it is
+          the Default TTS Model above — reading a message aloud and generating
+          speech in a reply are the same job.
         </p>
-        <div className="mb-4 space-y-2">
+        <div className="space-y-2">
           <Label>Enable Speech</Label>
           <div className="flex items-center space-x-2">
             <Switch
@@ -179,46 +170,6 @@ export function ModelsSettings() {
             <Label className="font-normal text-muted-foreground">
               {speechEnabled ? 'Enabled' : 'Disabled'}
             </Label>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <ModelSelect
-            label="Default Speech Model"
-            options={speechModels}
-            value={formData['default.speech.modelId']}
-            onChange={value => handleChange('default.speech.modelId', value)}
-            disabled={!speechEnabled || isSaving}
-          />
-          <div className="space-y-2">
-            <Label>Default Speech Voice</Label>
-            <Select
-              disabled={!speechEnabled || !speechVoices.length || isSaving}
-              value={
-                speechVoices.includes(formData['default.speech.voice'] ?? '')
-                  ? formData['default.speech.voice']
-                  : undefined
-              }
-              onValueChange={value =>
-                handleChange('default.speech.voice', value)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    !speechVoices.length
-                      ? 'No available voices'
-                      : 'Select voice'
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {speechVoices.map(voice => (
-                  <SelectItem key={voice} value={voice}>
-                    {voice.charAt(0).toUpperCase() + voice.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </div>

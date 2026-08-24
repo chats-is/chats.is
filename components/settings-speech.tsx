@@ -15,11 +15,13 @@ import {
 import { ModelIcon } from '@/components/model-icon';
 
 export const SettingsSpeech = () => {
-  const { ttsModels, defaults } = useSystemSettings();
+  const { ttsModels } = useSystemSettings();
   const { preferences, setPreference } = usePreferences();
 
-  const speechModel = preferences.speechModelId;
-  const speechVoice = preferences.speechVoice;
+  // The same selection the chat's text-to-speech tool uses — reading a message
+  // aloud and generating speech in a reply are one setting, not two.
+  const speechModel = preferences.audioModelId;
+  const speechVoice = preferences.audioVoice;
 
   const selectedModel = useMemo(
     () => ttsModels?.find(m => m.modelId === speechModel),
@@ -33,36 +35,28 @@ export const SettingsSpeech = () => {
   }, [selectedModel]);
 
   // Reset the voice when the selected model cannot speak it, preferring the
-  // admin's default and then the model's own before falling back to the first
-  // — the same order the server's `pickVoice` uses.
+  // model's own default before the first available — the order the server's
+  // `pickVoice` uses.
   useEffect(() => {
     if (availableVoices.length === 0 || availableVoices.includes(speechVoice)) {
       return;
     }
 
     const modelVoice = selectedModel?.uiOptions?.voice;
-    const next =
-      defaults.speechVoice && availableVoices.includes(defaults.speechVoice)
-        ? defaults.speechVoice
-        : modelVoice && availableVoices.includes(modelVoice)
-          ? modelVoice
-          : availableVoices[0];
-
-    setPreference('speechVoice', next);
-  }, [
-    availableVoices,
-    speechVoice,
-    selectedModel,
-    defaults.speechVoice,
-    setPreference
-  ]);
+    setPreference(
+      'audioVoice',
+      modelVoice && availableVoices.includes(modelVoice)
+        ? modelVoice
+        : availableVoices[0]
+    );
+  }, [availableVoices, speechVoice, selectedModel, setPreference]);
 
   const handleModelChange = (value: string) => {
-    setPreference('speechModelId', value);
+    setPreference('audioModelId', value);
   };
 
   const handleVoiceChange = (value: string) => {
-    setPreference('speechVoice', value);
+    setPreference('audioVoice', value);
   };
 
   return (
