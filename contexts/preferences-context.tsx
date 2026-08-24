@@ -22,7 +22,7 @@ export interface Preferences {
   videoModelId: string;
   videoAspectRatio: string;
   videoResolution: string;
-  videoDuration: number;
+  videoDuration?: number;
   // Audio (TTS)
   audioModelId: string;
   audioVoice: string;
@@ -67,21 +67,23 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       // Chat
       chatModelId: defaults.chatModelId ?? '',
       chatReasoning: true,
+      // Generation options are left empty until the user picks one. A
+      // hardcoded seed is indistinguishable from a choice the user made, and
+      // both `ModelMenu` and the server's `pickOption` prefer a selection over
+      // the model's own `uiOptions` default — so a seeded value that happened
+      // to appear in a model's allowed list silently overrode the default the
+      // admin configured for that model.
       // Image
       imageModelId: defaults.imageModelId ?? '',
-      imageSize: '1024x1024',
-      imageAspectRatio: '16:9',
+      imageSize: '',
+      imageAspectRatio: '',
       // Video
       videoModelId: defaults.videoModelId ?? '',
-      videoAspectRatio: '16:9',
-      videoResolution: '720p',
-      videoDuration: 6,
+      videoAspectRatio: '',
+      videoResolution: '',
+      videoDuration: undefined,
       // Audio (TTS)
       audioModelId: defaults.ttsModelId ?? '',
-      // Empty until the user picks one. A hardcoded seed here reads as a
-      // choice the user never made: `ModelMenu` prefers the stored preference
-      // over the model's own `uiOptions.voice`, so seeding a real voice name
-      // shadowed whatever default the admin configured for the model.
       audioVoice: '',
       // Transcription (STT)
       sttModelId: defaults.sttModelId ?? '',

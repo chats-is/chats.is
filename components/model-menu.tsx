@@ -200,14 +200,14 @@ export function ModelMenu({
       availableDurations.length > 0 &&
       (duration === undefined || !availableDurations.includes(duration))
     ) {
-      const nextDuration = availableDurations.includes(
-        preferences.videoDuration
-      )
-        ? preferences.videoDuration
-        : defaultDuration !== undefined &&
-            availableDurations.includes(defaultDuration)
-          ? defaultDuration
-          : availableDurations[0];
+      const preferred = preferences.videoDuration;
+      const nextDuration =
+        preferred !== undefined && availableDurations.includes(preferred)
+          ? preferred
+          : defaultDuration !== undefined &&
+              availableDurations.includes(defaultDuration)
+            ? defaultDuration
+            : availableDurations[0];
       if (nextDuration !== duration) {
         onOptionsChange?.({ duration: nextDuration });
       }
