@@ -29,6 +29,7 @@ import {
   type ArtifactKind
 } from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
+import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
 import { buildMediaTools, MediaToolsOptions } from '@/lib/chat-tools';
 import { normalizeChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
@@ -160,8 +161,6 @@ export async function POST(req: Request) {
     includeMessages: false
   });
   const UNTITLED = 'Untitled';
-  /** `chat.title` is varchar(255); the router enforces the same bound. */
-  const TITLE_MAX = 255;
 
   /**
    * Title from the first user message. Skipped for a refused turn — it calls a
@@ -179,20 +178,19 @@ export async function POST(req: Request) {
 
       if (!titlePrompt || !titleModelId || !titleProvider) return UNTITLED;
 
+      // Only what the user wrote, with attachments named rather than linked —
+      // `titleInputFromMessage` explains what the raw message did to a model
+      // whose one job is to name the conversation.
+      const input = titleInputFromMessage(userMessage);
+      if (!input) return UNTITLED;
+
       const { text } = await generateText({
         model: getLanguageModel(titleProvider, titleModelId),
         instructions: titlePrompt,
-        prompt: JSON.stringify(userMessage)
+        prompt: input
       });
 
-      // Whatever the model returns has to fit `chat.title` (varchar 255, and
-      // the router validates the same bound). It usually answers with a short
-      // phrase, but not always: given a message it cannot read — an audio
-      // attachment, say — it tends to apologise at paragraph length instead,
-      // and an over-long title made `chat.create` throw, which failed the
-      // whole request and cost the user the reply they were waiting for.
-      const clean = text.replace(/\s+/g, ' ').trim().slice(0, TITLE_MAX);
-      return clean || UNTITLED;
+      return sanitizeTitle(text) || UNTITLED;
     } catch (err: any) {
       console.error(`Generate title error:`, err.message);
       return UNTITLED;
