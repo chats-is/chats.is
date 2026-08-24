@@ -15,7 +15,7 @@ import {
 import { ModelIcon } from '@/components/model-icon';
 
 export const SettingsSpeech = () => {
-  const { ttsModels } = useSystemSettings();
+  const { ttsModels, defaults } = useSystemSettings();
   const { preferences, setPreference } = usePreferences();
 
   const speechModel = preferences.speechModelId;
@@ -32,13 +32,30 @@ export const SettingsSpeech = () => {
     return voices || [];
   }, [selectedModel]);
 
-  // Reset voice if current voice is not available in new model
+  // Reset the voice when the selected model cannot speak it, preferring the
+  // admin's default and then the model's own before falling back to the first
+  // — the same order the server's `pickVoice` uses.
   useEffect(() => {
-    if (availableVoices.length > 0 && !availableVoices.includes(speechVoice)) {
-      const defaultVoice = availableVoices[0];
-      setPreference('speechVoice', defaultVoice);
+    if (availableVoices.length === 0 || availableVoices.includes(speechVoice)) {
+      return;
     }
-  }, [availableVoices, speechVoice, setPreference]);
+
+    const modelVoice = selectedModel?.uiOptions?.voice;
+    const next =
+      defaults.speechVoice && availableVoices.includes(defaults.speechVoice)
+        ? defaults.speechVoice
+        : modelVoice && availableVoices.includes(modelVoice)
+          ? modelVoice
+          : availableVoices[0];
+
+    setPreference('speechVoice', next);
+  }, [
+    availableVoices,
+    speechVoice,
+    selectedModel,
+    defaults.speechVoice,
+    setPreference
+  ]);
 
   const handleModelChange = (value: string) => {
     setPreference('speechModelId', value);
@@ -54,14 +71,18 @@ export const SettingsSpeech = () => {
         <UiLabel>Model</UiLabel>
         <Select onValueChange={handleModelChange} value={speechModel}>
           <SelectTrigger className="w-auto rounded-full">
+            {/* Children override the placeholder whenever a value is set, so
+                an id that resolves to nothing would render an empty pill. */}
             <SelectValue placeholder="Select a model">
-              <div className="flex items-center">
-                <ModelIcon
-                  image={selectedModel?.image || selectedModel?.provider?.image}
-                  className="mr-2 size-4"
-                />
-                <span>{selectedModel?.name}</span>
-              </div>
+              {selectedModel && (
+                <div className="flex items-center">
+                  <ModelIcon
+                    image={selectedModel.image || selectedModel.provider?.image}
+                    className="mr-2 size-4"
+                  />
+                  <span>{selectedModel.name}</span>
+                </div>
+              )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>

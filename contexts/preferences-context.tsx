@@ -73,9 +73,25 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
   } = useSystemSettings();
 
   const [preferences, setPreferences] = useState<Preferences>(() => {
+    // A model id is only usable if it is still among the models the server
+    // offers — alias-aware, the way the server resolves one. Deleting or
+    // disabling a model leaves its id behind in two places: the admin's system
+    // default, and every browser that stored it as a preference. Neither is a
+    // value a selector can display, so both are treated as unset and the
+    // control shows its placeholder rather than an empty pill.
+    const resolves = (id: unknown, models: Model[] | undefined) =>
+      typeof id === 'string' &&
+      !!id &&
+      !!models?.some(model => modelMatchesId(model, id));
+
+    const systemDefault = (
+      id: string | null | undefined,
+      models: Model[] | undefined
+    ) => (resolves(id, models) ? (id as string) : '');
+
     const defaultPrefs: Preferences = {
       // Chat
-      chatModelId: defaults.chatModelId ?? '',
+      chatModelId: systemDefault(defaults.chatModelId, chatModels),
       chatReasoning: true,
       // Generation options are left empty until the user picks one. A
       // hardcoded seed is indistinguishable from a choice the user made, and
@@ -84,22 +100,24 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       // to appear in a model's allowed list silently overrode the default the
       // admin configured for that model.
       // Image
-      imageModelId: defaults.imageModelId ?? '',
+      imageModelId: systemDefault(defaults.imageModelId, imageModels),
       imageSize: '',
       imageAspectRatio: '',
       // Video
-      videoModelId: defaults.videoModelId ?? '',
+      videoModelId: systemDefault(defaults.videoModelId, videoModels),
       videoAspectRatio: '',
       videoResolution: '',
       videoDuration: undefined,
       // Audio (TTS)
-      audioModelId: defaults.ttsModelId ?? '',
+      audioModelId: systemDefault(defaults.ttsModelId, ttsModels),
       audioVoice: '',
       // Transcription (STT)
-      sttModelId: defaults.sttModelId ?? '',
+      sttModelId: systemDefault(defaults.sttModelId, sttModels),
       // Speech (read aloud)
-      speechModelId: defaults.speechModelId ?? 'tts-1',
-      speechVoice: defaults.speechVoice ?? 'alloy'
+      // No hardcoded fallback: 'tts-1' names a model this deployment may not
+      // have, and read-aloud is better off unset than pointed at a stranger.
+      speechModelId: systemDefault(defaults.speechModelId, ttsModels),
+      speechVoice: defaults.speechVoice ?? ''
     };
 
     const stored = getStoredPreferences();
@@ -113,15 +131,8 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
         )
       );
 
-      // Drop stored model ids that no longer resolve. A model the admin has
-      // since deleted or disabled is still sitting in localStorage, and it is
-      // not a value any selector can display — the control renders blank and
-      // the request carries an id the server cannot look up. Falling back to
-      // the system default is what an unset preference already does.
-      const resolves = (id: unknown, models: Model[] | undefined) =>
-        typeof id === 'string' &&
-        !!models?.some(model => modelMatchesId(model, id));
-
+      // Same for stored ids: dropping one falls back to the system default,
+      // exactly as it does for a user who never chose.
       const modelKeys: Array<[keyof Preferences, Model[] | undefined]> = [
         ['chatModelId', chatModels],
         ['imageModelId', imageModels],
