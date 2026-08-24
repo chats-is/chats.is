@@ -78,7 +78,11 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       videoDuration: 6,
       // Audio (TTS)
       audioModelId: defaults.ttsModelId ?? '',
-      audioVoice: 'alloy',
+      // Empty until the user picks one. A hardcoded seed here reads as a
+      // choice the user never made: `ModelMenu` prefers the stored preference
+      // over the model's own `uiOptions.voice`, so seeding a real voice name
+      // shadowed whatever default the admin configured for the model.
+      audioVoice: '',
       // Transcription (STT)
       sttModelId: defaults.sttModelId ?? '',
       // Speech (read aloud)
