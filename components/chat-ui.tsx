@@ -121,6 +121,9 @@ export function ChatUI({
               aspectRatio: preferences.imageAspectRatio
             }
           : undefined,
+        imageEdit: preferences.imageEditModelId
+          ? { modelId: preferences.imageEditModelId }
+          : undefined,
         video: preferences.videoModelId
           ? {
               modelId: preferences.videoModelId,
@@ -147,6 +150,7 @@ export function ChatUI({
       preferences.imageModelId,
       preferences.imageSize,
       preferences.imageAspectRatio,
+      preferences.imageEditModelId,
       preferences.videoModelId,
       preferences.videoAspectRatio,
       preferences.videoResolution,

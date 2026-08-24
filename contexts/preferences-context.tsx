@@ -19,6 +19,7 @@ export interface Preferences {
   chatReasoning: boolean;
   // Image
   imageModelId: string;
+  imageEditModelId: string;
   imageSize: string;
   imageAspectRatio: string;
   // Video
@@ -89,6 +90,8 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       models: Model[] | undefined
     ) => (resolves(id, models) ? (id as string) : '');
 
+    const editModels = imageModels?.filter(model => model.supportsEdit);
+
     const defaultPrefs: Preferences = {
       // Chat
       chatModelId: systemDefault(defaults.chatModelId, chatModels),
@@ -101,6 +104,8 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       // admin configured for that model.
       // Image
       imageModelId: systemDefault(defaults.imageModelId, imageModels),
+      // Its own choice: only some image models can edit one.
+      imageEditModelId: systemDefault(defaults.imageEditModelId, editModels),
       imageSize: '',
       imageAspectRatio: '',
       // Video
@@ -136,6 +141,7 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       const modelKeys: Array<[keyof Preferences, Model[] | undefined]> = [
         ['chatModelId', chatModels],
         ['imageModelId', imageModels],
+        ['imageEditModelId', editModels],
         ['videoModelId', videoModels],
         ['audioModelId', ttsModels],
         ['speechModelId', ttsModels],

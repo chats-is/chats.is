@@ -9,6 +9,7 @@ import {
   Captions,
   Clapperboard,
   Image as ImageIcon,
+  Pencil,
   Settings2
 } from 'lucide-react';
 
@@ -105,6 +106,9 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   );
 
   const hasImageModels = !!imageModels?.length;
+  // Editing is a per-model capability, and few models have it — so which model
+  // edits is its own choice rather than a consequence of the generator.
+  const editModels = imageModels?.filter(model => model.supportsEdit) ?? [];
   const hasVideoModels = !!videoModels?.length;
   const hasTtsModels = !!ttsModels?.length;
   const hasSttModels = !!sttModels?.length;
@@ -153,6 +157,22 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               aspectRatio={preferences.imageAspectRatio}
               onModelChange={modelId => setPreference('imageModelId', modelId)}
               onOptionsChange={handleImageOptionsChange}
+            />
+          </div>
+        )}
+        {editModels.length > 0 && (
+          <div className="space-y-2">
+            <SectionLabel icon={<Pencil className="size-3.5" />}>
+              Image editing
+            </SectionLabel>
+            <ModelMenu
+              capability="image"
+              models={editModels}
+              status={status}
+              modelId={preferences.imageEditModelId}
+              onModelChange={modelId =>
+                setPreference('imageEditModelId', modelId)
+              }
             />
           </div>
         )}

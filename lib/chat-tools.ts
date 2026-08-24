@@ -46,6 +46,8 @@ import {
 
 export type MediaToolsOptions = {
   image?: { modelId?: string; size?: string; aspectRatio?: string };
+  /** Editing an existing image is its own model choice — few can do it. */
+  imageEdit?: { modelId?: string };
   video?: {
     modelId?: string;
     aspectRatio?: string;
@@ -138,11 +140,17 @@ export async function buildMediaTools(args: {
     args;
 
   const defaults = await getMediaDefaultModelIds();
-  const [image, video, audio, stt] = await Promise.all([
+  const [image, imageEdit, video, audio, stt] = await Promise.all([
     resolveWithFallback(
       mediaOptions?.image?.modelId,
       defaults.imageModelId,
       'image'
+    ),
+    resolveWithFallback(
+      mediaOptions?.imageEdit?.modelId,
+      defaults.imageEditModelId,
+      'image',
+      model => !!model.supportsEdit
     ),
     resolveWithFallback(
       mediaOptions?.video?.modelId,
@@ -223,14 +231,18 @@ export async function buildMediaTools(args: {
   };
 
   if (image) {
-    const { dbModel, candidates } = image;
+    const { dbModel } = image;
 
+    // Generating and editing may run on different models, so the work takes
+    // the model it runs on rather than closing over the generator's.
     const runImage = async (
+      on: ResolvedMediaModel,
       prompt: string,
       requested: { aspectRatio?: string; size?: string },
       inputImages: Array<{ data: Uint8Array; mediaType: string }> | undefined,
       abortSignal: AbortSignal | undefined
     ): Promise<MediaToolOutput> => {
+      const { dbModel, candidates } = on;
       const blocked = await gate(dbModel, 'image');
       if (blocked) return blocked;
 
@@ -286,6 +298,7 @@ export async function buildMediaTools(args: {
       inputSchema: generateImageInputSchema,
       execute: (input, { abortSignal }) =>
         runImage(
+          image,
           input.prompt,
           { aspectRatio: input.aspectRatio, size: input.size },
           undefined,
@@ -294,20 +307,24 @@ export async function buildMediaTools(args: {
     });
     registered.push('generate_image');
 
-    // Registered whichever image model is selected, and refusing in the tool
-    // when that model cannot edit. Leaving it out instead left the chat model
-    // with an editing request and no way to serve it, so it improvised — one
-    // such request came back as a hand-written SVG of what had been asked for,
-    // the user's own image untouched and nothing said about it.
+    // The editor is its own selection, falling back to the generator when that
+    // one can edit too. Registered either way and refusing inside the tool when
+    // there is no editor: leaving it out left the chat model with an editing
+    // request and no way to serve it, so it improvised — one such request came
+    // back as a hand-written SVG of what had been asked for, the user's own
+    // image untouched and nothing said about the substitution.
+    const editor = imageEdit ?? (dbModel.supportsEdit ? image : null);
+
     tools.edit_image = tool({
       description:
         'Edit an existing image from this conversation based on a text instruction.',
       inputSchema: editImageInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
-        if (!dbModel.supportsEdit) {
+        if (!editor) {
           return {
             status: 'error',
-            message: `${dbModel.name} cannot edit images. Pick one that can under Advanced → Image.`
+            message:
+              'No image model that can edit is selected. Pick one under Advanced → Image editing.'
           };
         }
 
@@ -319,7 +336,7 @@ export async function buildMediaTools(args: {
         if ('error' in media) {
           return { status: 'error', message: media.error };
         }
-        return runImage(input.prompt, {}, [media], abortSignal);
+        return runImage(editor, input.prompt, {}, [media], abortSignal);
       }
     });
     registered.push('edit_image');

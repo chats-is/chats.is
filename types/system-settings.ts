@@ -3,6 +3,7 @@ import { Model } from './model';
 export interface SystemDefaults {
   chatModelId: string | null;
   imageModelId: string | null;
+  imageEditModelId: string | null;
   videoModelId: string | null;
   ttsModelId: string | null;
   sttModelId: string | null;

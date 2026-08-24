@@ -18,6 +18,7 @@ import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared';
 const KEYS = [
   'default.chat.modelId',
   'default.image.modelId',
+  'default.image.editModelId',
   'default.video.modelId',
   'default.tts.modelId',
   'default.stt.modelId',
@@ -87,6 +88,9 @@ export function ModelsSettings() {
   const imageModels = models?.filter(
     m => m.capability === 'image' && m.isEnabled
   );
+  // Editing is a per-model capability; offering a model that lacks it as the
+  // default editor would configure a tool that always refuses.
+  const imageEditModels = imageModels?.filter(m => m.supportsEdit);
   const videoModels = models?.filter(
     m => m.capability === 'video' && m.isEnabled
   );
@@ -124,6 +128,13 @@ export function ModelsSettings() {
             options={imageModels}
             value={formData['default.image.modelId']}
             onChange={value => handleChange('default.image.modelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default Image Edit Model"
+            options={imageEditModels}
+            value={formData['default.image.editModelId']}
+            onChange={value => handleChange('default.image.editModelId', value)}
             disabled={isSaving}
           />
           <ModelSelect

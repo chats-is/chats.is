@@ -136,6 +136,7 @@ export const getSpeechSettings = cache(async () => {
 export const getMediaDefaultModelIds = cache(async () => {
   const values = await getSettings([
     'default.image.modelId',
+    'default.image.editModelId',
     'default.video.modelId',
     'default.tts.modelId',
     'default.stt.modelId'
@@ -143,6 +144,7 @@ export const getMediaDefaultModelIds = cache(async () => {
 
   return {
     imageModelId: values['default.image.modelId'],
+    imageEditModelId: values['default.image.editModelId'],
     videoModelId: values['default.video.modelId'],
     ttsModelId: values['default.tts.modelId'],
     sttModelId: values['default.stt.modelId']
@@ -260,6 +262,7 @@ export async function getSystemSettings() {
       'speech.enabled',
       'default.chat.modelId',
       'default.image.modelId',
+      'default.image.editModelId',
       'default.video.modelId',
       'default.tts.modelId',
       'default.stt.modelId',
@@ -285,6 +288,7 @@ export async function getSystemSettings() {
     defaults: {
       chatModelId: values['default.chat.modelId'],
       imageModelId: values['default.image.modelId'],
+      imageEditModelId: values['default.image.editModelId'],
       videoModelId: values['default.video.modelId'],
       ttsModelId: values['default.tts.modelId'],
       sttModelId: values['default.stt.modelId'],
