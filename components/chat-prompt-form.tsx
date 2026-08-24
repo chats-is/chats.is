@@ -4,14 +4,14 @@ import { UseChatHelpers } from '@ai-sdk/react';
 import { ArrowUp, Loader2, Square } from 'lucide-react';
 import Textarea from 'react-textarea-autosize';
 
-import { Attachment, ChatMessage, MediaKind } from '@/types';
+import { Attachment, ChatMessage } from '@/types';
 import { modelMatchesId } from '@/lib/utils';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { Button } from '@/components/ui/button';
 import { AttachmentsPreview } from '@/components/attachments-preview';
-import { ComposerAddMenu } from '@/components/composer-add-menu';
-import { MediaOptionsBar } from '@/components/media-options-bar';
+import { MediaSettingsMenu } from '@/components/media-settings-menu';
 import { ModelMenu, ModelOptions } from '@/components/model-menu';
+import { UploadButton } from '@/components/upload-button';
 
 export type { ModelOptions };
 
@@ -47,8 +47,6 @@ export function ChatPromptForm({
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
-  // Which kind the `+` menu last added, and so whose options the toolbar shows.
-  const [activeMedia, setActiveMedia] = useState<MediaKind | null>(null);
 
   const { chatModels, sttModels } = useSystemSettings();
 
@@ -151,16 +149,15 @@ export function ChatPromptForm({
           />
         </div>
         <div className="mt-5 flex items-center justify-between space-x-2">
-          {/* Everything added to the message, then the chat model itself. */}
+          {/* Upload, the chat model, and how it should make media. */}
           <div className="flex items-center space-x-2">
-            <ComposerAddMenu
+            <UploadButton
               disabled={status === 'submitted' || status === 'streaming'}
               canAttachImages={canAttachImages}
               uploadQueue={uploadQueue}
               setUploadQueue={setUploadQueue}
               attachments={attachments}
               setAttachments={setAttachments}
-              onSelectMedia={setActiveMedia}
             />
             <ModelMenu
               models={chatModels}
@@ -169,13 +166,7 @@ export function ChatPromptForm({
               onModelChange={onModelChange}
               onOptionsChange={handleOptionsChange}
             />
-            {activeMedia && (
-              <MediaOptionsBar
-                kind={activeMedia}
-                status={status}
-                onDismiss={() => setActiveMedia(null)}
-              />
-            )}
+            <MediaSettingsMenu status={status} />
           </div>
           <div className="flex items-center space-x-2">
             {status === 'streaming' ? (

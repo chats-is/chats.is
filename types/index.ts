@@ -12,7 +12,6 @@ export type { Chat, ChatType } from './chat';
 export type { SystemSettings, SystemDefaults } from './system-settings';
 export type {
   Model,
-  MediaKind,
   ModelCapability,
   ModelUIOptions,
   ModelAPIParams,

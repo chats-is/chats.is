@@ -307,7 +307,7 @@ export async function buildMediaTools(args: {
         if (!dbModel.supportsEdit) {
           return {
             status: 'error',
-            message: `${dbModel.name} cannot edit images. Pick a model that can under + → Edit image.`
+            message: `${dbModel.name} cannot edit images. Pick one that can under Advanced → Image.`
           };
         }
 
