@@ -8,6 +8,9 @@ import {
   useState
 } from 'react';
 
+import { Model } from '@/types';
+import { modelMatchesId } from '@/lib/utils';
+
 import { useSystemSettings } from './system-settings-context';
 
 export interface Preferences {
@@ -60,7 +63,14 @@ interface PreferencesProviderProps {
 }
 
 export function PreferencesProvider({ children }: PreferencesProviderProps) {
-  const { defaults } = useSystemSettings();
+  const {
+    defaults,
+    chatModels,
+    imageModels,
+    videoModels,
+    ttsModels,
+    sttModels
+  } = useSystemSettings();
 
   const [preferences, setPreferences] = useState<Preferences>(() => {
     const defaultPrefs: Preferences = {
@@ -102,6 +112,30 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
           ([, value]) => value !== '' && value !== null && value !== undefined
         )
       );
+
+      // Drop stored model ids that no longer resolve. A model the admin has
+      // since deleted or disabled is still sitting in localStorage, and it is
+      // not a value any selector can display — the control renders blank and
+      // the request carries an id the server cannot look up. Falling back to
+      // the system default is what an unset preference already does.
+      const resolves = (id: unknown, models: Model[] | undefined) =>
+        typeof id === 'string' &&
+        !!models?.some(model => modelMatchesId(model, id));
+
+      const modelKeys: Array<[keyof Preferences, Model[] | undefined]> = [
+        ['chatModelId', chatModels],
+        ['imageModelId', imageModels],
+        ['videoModelId', videoModels],
+        ['audioModelId', ttsModels],
+        ['speechModelId', ttsModels],
+        ['sttModelId', sttModels]
+      ];
+      for (const [key, models] of modelKeys) {
+        if (key in sanitized && !resolves(sanitized[key], models)) {
+          delete sanitized[key];
+        }
+      }
+
       return { ...defaultPrefs, ...sanitized };
     }
 
