@@ -8,10 +8,10 @@ import { Attachment, ChatMessage } from '@/types';
 import { modelMatchesId } from '@/lib/utils';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { Button } from '@/components/ui/button';
+import { AddFilesMenu } from '@/components/add-files-menu';
 import { AttachmentsPreview } from '@/components/attachments-preview';
 import { MediaSettingsMenu } from '@/components/media-settings-menu';
 import { ModelMenu, ModelOptions } from '@/components/model-menu';
-import { UploadButton } from '@/components/upload-button';
 
 export type { ModelOptions };
 
@@ -151,7 +151,7 @@ export function ChatPromptForm({
         <div className="mt-5 flex items-center justify-between space-x-2">
           {/* Upload, the chat model, and how it should make media. */}
           <div className="flex items-center space-x-2">
-            <UploadButton
+            <AddFilesMenu
               disabled={status === 'submitted' || status === 'streaming'}
               canAttachImages={canAttachImages}
               uploadQueue={uploadQueue}

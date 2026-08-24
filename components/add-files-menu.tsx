@@ -11,13 +11,19 @@ import {
 } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Paperclip, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Attachment } from '@/types';
 import { uploadFile } from '@/lib/api';
 import { modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
@@ -29,7 +35,7 @@ const IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 const AUDIO_TYPES = ['.mp3', '.wav', '.m4a', '.ogg', '.flac'];
 const MAX_ATTACHMENTS = 5;
 
-interface UploadButtonProps {
+interface AddFilesMenuProps {
   disabled?: boolean;
   /** Vision-capable chat model selected. */
   canAttachImages: boolean;
@@ -40,24 +46,22 @@ interface UploadButtonProps {
 }
 
 /**
- * The composer's `+` — the one thing a user adds to a message by hand.
+ * The composer's `+` — what a user adds to a message by hand.
  *
- * It opens the file dialog directly rather than a menu of one item. Which
- * media models generate what is not a choice made per message: the chat model
- * picks the tool from what was asked, and the models it uses are configured
- * once, in the settings beside the model picker.
- *
- * Accepted types follow what this setup can do with a file: images need a
- * vision-capable chat model, audio an STT model to transcribe it.
+ * Which media models generate what is not a choice made per message: the chat
+ * model picks the tool from what was asked, and the models it uses are
+ * configured once, in the settings beside the model picker. So this menu is
+ * about files, and the accepted types follow what this setup can do with one:
+ * images need a vision-capable chat model, audio an STT model to transcribe it.
  */
-export function UploadButton({
+export function AddFilesMenu({
   disabled,
   canAttachImages,
   uploadQueue,
   setUploadQueue,
   attachments,
   setAttachments
-}: UploadButtonProps) {
+}: AddFilesMenuProps) {
   // Same hydration guard the other controls in this form use.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -156,28 +160,41 @@ export function UploadButton({
         disabled={disabled || uploading}
         onChange={handleFileChange}
       />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={disabled || uploading}
-            className="size-9 rounded-full text-muted-foreground shadow-none"
-            onClick={() => fileInputRef.current?.click()}
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled || uploading}
+                className="size-9 rounded-full text-muted-foreground shadow-none"
+              >
+                {uploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+                <span className="sr-only">Add to this message</span>
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Add to this message</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuItem
+            onSelect={() =>
+              // The menu closes itself on select, which steals the click if the
+              // dialog opens in the same frame.
+              requestAnimationFrame(() => fileInputRef.current?.click())
+            }
           >
-            {uploading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Plus className="size-4" />
-            )}
-            <span className="sr-only">Upload attachment</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          Upload attachment · up to {MAX_ATTACHMENTS} files, 5MB each
-        </TooltipContent>
-      </Tooltip>
+            <Paperclip className="size-4" />
+            Add files or photos
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 }
