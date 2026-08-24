@@ -79,6 +79,24 @@ export function MediaOptionsBar({
 
   const menu = (() => {
     switch (kind) {
+      case 'image-edit': {
+        // The same image model preference, narrowed to the models that can
+        // edit — a selection that cannot leaves the server with no edit_image
+        // tool to register.
+        const editModels = imageModels?.filter(model => model.supportsEdit);
+        return editModels?.length ? (
+          <ModelMenu
+            capability="image"
+            models={editModels}
+            status={status}
+            modelId={preferences.imageModelId}
+            size={preferences.imageSize}
+            aspectRatio={preferences.imageAspectRatio}
+            onModelChange={modelId => setPreference('imageModelId', modelId)}
+            onOptionsChange={handleImageOptionsChange}
+          />
+        ) : null;
+      }
       case 'image':
         return imageModels?.length ? (
           <ModelMenu

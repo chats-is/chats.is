@@ -294,25 +294,35 @@ export async function buildMediaTools(args: {
     });
     registered.push('generate_image');
 
-    if (dbModel.supportsEdit) {
-      tools.edit_image = tool({
-        description:
-          'Edit an existing image from this conversation based on a text instruction.',
-        inputSchema: editImageInputSchema,
-        execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
-          const media = await fetchKnownMedia(
-            input.imageUrl,
-            'image/',
-            abortSignal
-          );
-          if ('error' in media) {
-            return { status: 'error', message: media.error };
-          }
-          return runImage(input.prompt, {}, [media], abortSignal);
+    // Registered whichever image model is selected, and refusing in the tool
+    // when that model cannot edit. Leaving it out instead left the chat model
+    // with an editing request and no way to serve it, so it improvised — one
+    // such request came back as a hand-written SVG of what had been asked for,
+    // the user's own image untouched and nothing said about it.
+    tools.edit_image = tool({
+      description:
+        'Edit an existing image from this conversation based on a text instruction.',
+      inputSchema: editImageInputSchema,
+      execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
+        if (!dbModel.supportsEdit) {
+          return {
+            status: 'error',
+            message: `${dbModel.name} cannot edit images. Pick a model that can under + → Edit image.`
+          };
         }
-      });
-      registered.push('edit_image');
-    }
+
+        const media = await fetchKnownMedia(
+          input.imageUrl,
+          'image/',
+          abortSignal
+        );
+        if ('error' in media) {
+          return { status: 'error', message: media.error };
+        }
+        return runImage(input.prompt, {}, [media], abortSignal);
+      }
+    });
+    registered.push('edit_image');
   }
 
   if (video) {

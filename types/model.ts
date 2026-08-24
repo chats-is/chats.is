@@ -7,7 +7,9 @@ export type ModelCapability = 'chat' | 'image' | 'video' | 'audio';
 // What the composer's `+` menu added to the message, and therefore whose model
 // and options the toolbar should be showing. 'audio' is text→speech and 'stt'
 // is speech→text — one capability, two directions, two different selections.
-export type MediaKind = 'image' | 'video' | 'audio' | 'stt';
+// 'image-edit' is the image capability again, narrowed to the models that can
+// edit one; both write the same image model preference.
+export type MediaKind = 'image' | 'image-edit' | 'video' | 'audio' | 'stt';
 
 // UI options for different model types
 export type ModelUIOptions = {

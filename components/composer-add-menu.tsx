@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Paperclip,
+  Pencil,
   Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -170,6 +171,8 @@ export function ComposerAddMenu({
   const pick = () => requestAnimationFrame(() => fileInputRef.current?.click());
 
   const hasImageModels = !!imageModels?.length;
+  // Editing is a capability of the individual model, not of the modality.
+  const editModels = imageModels?.filter(model => model.supportsEdit) ?? [];
   const hasVideoModels = !!videoModels?.length;
   const hasTtsModels = !!ttsModels?.length;
 
@@ -238,6 +241,23 @@ export function ComposerAddMenu({
             <DropdownMenuItem onSelect={() => onSelectMedia('image')}>
               <ImageIcon className="size-4" />
               Create image
+            </DropdownMenuItem>
+          )}
+          {editModels.length > 0 && (
+            <DropdownMenuItem
+              onSelect={() => {
+                // The toolbar lists only models that can edit, so make sure the
+                // selection is one of them — otherwise the server registers no
+                // edit_image tool and the chat model improvises something else.
+                const current = preferences.imageModelId;
+                if (!editModels.some(model => modelMatchesId(model, current))) {
+                  setPreference('imageModelId', editModels[0].modelId);
+                }
+                onSelectMedia('image-edit');
+              }}
+            >
+              <Pencil className="size-4" />
+              Edit image
             </DropdownMenuItem>
           )}
           {hasVideoModels && (
