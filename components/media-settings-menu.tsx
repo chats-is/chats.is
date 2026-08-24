@@ -55,7 +55,9 @@ function SectionLabel({
  * tool from what was asked, so nothing here decides whether an image gets
  * made — only what makes it. That is why these live behind a settings control
  * next to the model picker instead of inside the `+`, which is for what the
- * user adds to the message by hand.
+ * user adds to the message by hand. Icon-only, like the `+` beside it: the
+ * toolbar sits under the text the user is writing and should not compete with
+ * it for the eye.
  *
  * Selections persist as preferences and ride along in the chat request body as
  * `mediaOptions`; an unset one falls back to the admin's default.
@@ -118,7 +120,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   }
 
   if (!mounted) {
-    return <Skeleton className="h-9 w-24 rounded-full" />;
+    return <Skeleton className="size-9 rounded-full" />;
   }
 
   return (
@@ -129,11 +131,12 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             <Button
               type="button"
               variant="outline"
+              size="icon"
               disabled={status === 'submitted' || status === 'streaming'}
-              className="h-9 rounded-full px-3 font-normal text-muted-foreground shadow-none hover:text-muted-foreground"
+              className="size-9 rounded-full text-muted-foreground shadow-none"
             >
               <Settings2 className="size-4" />
-              Advanced
+              <span className="sr-only">Media generation settings</span>
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
