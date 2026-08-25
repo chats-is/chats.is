@@ -18,6 +18,7 @@ const KEYS = [
   'default.image.modelId',
   'default.image.editModelId',
   'default.video.modelId',
+  'default.video.imageModelId',
   'default.tts.modelId',
   'default.stt.modelId',
   'speech.enabled',
@@ -90,6 +91,7 @@ export function ModelsSettings() {
   const videoModels = models?.filter(
     m => m.capability === 'video' && m.isEnabled
   );
+  const videoImageModels = videoModels?.filter(m => m.supportsEdit);
   const speechModels = models?.filter(
     m => m.capability === 'audio' && m.isEnabled && !m.supportsTranscription
   );
@@ -131,6 +133,15 @@ export function ModelsSettings() {
             options={videoModels}
             value={formData['default.video.modelId']}
             onChange={value => handleChange('default.video.modelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default Image-to-Video Model"
+            options={videoImageModels}
+            value={formData['default.video.imageModelId']}
+            onChange={value =>
+              handleChange('default.video.imageModelId', value)
+            }
             disabled={isSaving}
           />
           <ModelSelect

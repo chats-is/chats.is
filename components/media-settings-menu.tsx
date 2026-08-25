@@ -9,6 +9,7 @@ import {
   Captions,
   Clapperboard,
   Image as ImageIcon,
+  ImagePlay,
   Pencil,
   Settings2
 } from 'lucide-react';
@@ -112,6 +113,8 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   // edits is its own choice rather than a consequence of the generator.
   const editModels = imageModels?.filter(model => model.supportsEdit) ?? [];
   const hasVideoModels = !!videoModels?.length;
+  // Taking an image as the opening frame is a per-model capability too.
+  const animateModels = videoModels?.filter(model => model.supportsEdit) ?? [];
   const hasTtsModels = !!ttsModels?.length;
   const hasSttModels = !!sttModels?.length;
 
@@ -193,6 +196,26 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               resolution={preferences.videoResolution}
               duration={preferences.videoDuration}
               onModelChange={modelId => setPreference('videoModelId', modelId)}
+              onOptionsChange={handleVideoOptionsChange}
+            />
+          </div>
+        )}
+        {animateModels.length > 0 && (
+          <div className="space-y-2">
+            <SectionLabel icon={<ImagePlay className="size-3.5" />}>
+              Video from image
+            </SectionLabel>
+            <ModelMenu
+              capability="video"
+              models={animateModels}
+              status={status}
+              modelId={preferences.videoImageModelId}
+              aspectRatio={preferences.videoAspectRatio}
+              resolution={preferences.videoResolution}
+              duration={preferences.videoDuration}
+              onModelChange={modelId =>
+                setPreference('videoImageModelId', modelId)
+              }
               onOptionsChange={handleVideoOptionsChange}
             />
           </div>

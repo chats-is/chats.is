@@ -54,6 +54,8 @@ export type MediaToolsOptions = {
     resolution?: string;
     duration?: number;
   };
+  /** Animating an image is its own model choice — few video models take one. */
+  videoImage?: { modelId?: string };
   audio?: { modelId?: string; voice?: string };
   stt?: { modelId?: string };
 };
@@ -140,7 +142,7 @@ export async function buildMediaTools(args: {
     args;
 
   const defaults = await getMediaDefaultModelIds();
-  const [image, imageEdit, video, audio, stt] = await Promise.all([
+  const [image, imageEdit, video, videoImage, audio, stt] = await Promise.all([
     resolveWithFallback(
       mediaOptions?.image?.modelId,
       defaults.imageModelId,
@@ -156,6 +158,12 @@ export async function buildMediaTools(args: {
       mediaOptions?.video?.modelId,
       defaults.videoModelId,
       'video'
+    ),
+    resolveWithFallback(
+      mediaOptions?.videoImage?.modelId,
+      defaults.videoImageModelId,
+      'video',
+      model => !!model.supportsEdit
     ),
     resolveWithFallback(
       mediaOptions?.audio?.modelId,
@@ -343,11 +351,11 @@ export async function buildMediaTools(args: {
   }
 
   if (video) {
-    const { dbModel, candidates } = video;
+    const { dbModel } = video;
 
     tools.generate_video = tool({
       description:
-        (dbModel.supportsEdit
+        (videoImage || dbModel.supportsEdit
           ? 'Generate a short video from a text description, optionally animating an image from this conversation.'
           : 'Generate a short video from a text description.') +
         optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
@@ -355,18 +363,20 @@ export async function buildMediaTools(args: {
         optionsHint('durations (seconds)', dbModel.uiOptions?.durations),
       inputSchema: generateVideoInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
-        const blocked = await gate(dbModel, 'video');
-        if (blocked) return blocked;
-
-        // An image makes this image-to-video, which not every video model can
-        // do — refusing here beats letting the provider drop the picture and
-        // return something generated from the words alone.
+        // An image makes this image-to-video, which is its own model choice —
+        // the animator when one is selected, else this model if it takes an
+        // image too. Neither means the platform has none configured for it,
+        // which is worth saying rather than generating from the words alone
+        // and letting the user wonder where their picture went.
+        let on = video;
         let inputImage;
         if (input.imageUrl) {
-          if (!dbModel.supportsEdit) {
+          const animator = videoImage ?? (dbModel.supportsEdit ? video : null);
+          if (!animator) {
             return {
               status: 'error',
-              message: `${dbModel.name} cannot animate an image. Pick a video model that can under Advanced → Video.`
+              message:
+                'No video model that can animate an image is selected. Pick one under Advanced → Video from image.'
             };
           }
           const media = await fetchKnownMedia(
@@ -377,30 +387,37 @@ export async function buildMediaTools(args: {
           if ('error' in media) {
             return { status: 'error', message: media.error };
           }
+          on = animator;
           inputImage = media;
         }
+
+        // Gated on the model that will actually run, not the one selected for
+        // text-to-video: pricing, the quota whitelist and the spend window are
+        // all per model.
+        const blocked = await gate(on.dbModel, 'video');
+        if (blocked) return blocked;
 
         try {
           const result = await generateAndStoreVideo({
             userId,
             prompt: input.prompt,
-            dbModel,
-            candidates,
+            dbModel: on.dbModel,
+            candidates: on.candidates,
             inputImage,
             aspectRatio: pickAspectRatio(
               input.aspectRatio,
               mediaOptions?.video?.aspectRatio,
-              dbModel.uiOptions
+              on.dbModel.uiOptions
             ),
             resolution: pickResolution(
               input.resolution,
               mediaOptions?.video?.resolution,
-              dbModel.uiOptions
+              on.dbModel.uiOptions
             ),
             duration: pickDuration(
               input.duration,
               mediaOptions?.video?.duration,
-              dbModel.uiOptions
+              on.dbModel.uiOptions
             ),
             abortSignal
           });
@@ -409,7 +426,7 @@ export async function buildMediaTools(args: {
             userId,
             chatId,
             messageId: assistantMessageId,
-            modelId: dbModel.modelId,
+            modelId: on.dbModel.modelId,
             providerId: result.provider.id,
             videoCount: 1,
             videoSeconds: result.videoSeconds
