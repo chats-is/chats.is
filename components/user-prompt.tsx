@@ -4,7 +4,9 @@ import { useMemo, useRef, useState } from 'react';
 import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { uploadFile } from '@/lib/api';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { api, RouterOutputs } from '@/trpc/react';
 import {
   AlertDialog,
@@ -120,6 +122,8 @@ export const UserPrompt = () => {
   const { copyToClipboard } = useCopyToClipboard();
   const utils = api.useUtils();
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useCurrentUser();
+
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -267,25 +271,25 @@ export const UserPrompt = () => {
       return;
     }
 
-    const uploadData = new FormData();
-    uploadData.append('file', file);
+    if (!user?.id) {
+      toast.error('Please sign in again to upload');
+      return;
+    }
+
     setIsUploadingImage(true);
 
     try {
-      const response = await fetch('/api/files/upload?type=prompts', {
-        method: 'POST',
-        body: uploadData
+      const result = await uploadFile(file, {
+        userId: user.id,
+        type: 'prompts'
       });
-      const result = await response.json();
 
-      if (!response.ok || !result.url) {
+      if ('error' in result) {
         toast.error(result.error || 'Upload failed');
         return;
       }
 
       setFormData(current => ({ ...current, image: result.url }));
-    } catch {
-      toast.error('Upload failed');
     } finally {
       setIsUploadingImage(false);
       e.target.value = '';

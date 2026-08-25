@@ -26,10 +26,15 @@ export async function uploadGeneratedMedia(args: {
   // Join with '/' rather than path.join: this is a blob storage key, not a
   // filesystem path. Two reasons it matters — path.join would emit backslashes
   // on Windows and corrupt the key, and @vercel/nft reads a path.join() call as
-  // a filesystem access. Since env.UPLOAD_PATH is only known at runtime, the
+  // a filesystem access. Since the upload path is only known at runtime, the
   // tracer cannot resolve it and falls back to bundling the whole project root
   // into every function that reaches this file (.git and .env included).
-  const pathname = [env.UPLOAD_PATH, args.kind, args.userId, filename]
+  const pathname = [
+    env.NEXT_PUBLIC_UPLOAD_PATH,
+    args.kind,
+    args.userId,
+    filename
+  ]
     .filter(Boolean)
     .join('/');
   const data = await put(pathname, args.buffer, {

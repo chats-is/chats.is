@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { Attachment } from '@/types';
 import { uploadFile } from '@/lib/api';
 import { modelMatchesId } from '@/lib/utils';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -69,6 +70,9 @@ export function AddFilesMenu({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sttModels, videoModels, defaults } = useSystemSettings();
+  // The upload goes straight to blob storage under this user's own path, which
+  // the token route checks against the session before it signs anything.
+  const { user } = useCurrentUser();
   const { preferences, setPreference } = usePreferences();
 
   const uploading = uploadQueue.length > 0;
@@ -87,6 +91,11 @@ export function AddFilesMenu({
 
       if (attachments.length + files.length > MAX_ATTACHMENTS) {
         toast.error(`Maximum of ${MAX_ATTACHMENTS} files allowed for upload`);
+        return;
+      }
+
+      if (!user?.id) {
+        toast.error('Please sign in again to upload');
         return;
       }
 
@@ -110,7 +119,7 @@ export function AddFilesMenu({
       try {
         const uploaded = await Promise.all(
           files.map(async file => {
-            const result = await uploadFile(file);
+            const result = await uploadFile(file, { userId: user!.id });
             if (result && 'error' in result) {
               toast.error(result.error);
               return;
@@ -132,6 +141,7 @@ export function AddFilesMenu({
       attachments,
       setAttachments,
       setUploadQueue,
+      user?.id,
       sttModels,
       sttModelId,
       setPreference

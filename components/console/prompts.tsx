@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { uploadFile } from '@/lib/api';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { api, RouterOutputs } from '@/trpc/react';
 import {
   AlertDialog,
@@ -92,6 +94,8 @@ const LabelBadges = ({
 };
 
 export default function PromptsPage() {
+  const { user } = useCurrentUser();
+
   const [isOpen, setIsOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null);
   const [deletePrompt, setDeletePrompt] = useState<AdminPrompt | null>(null);
@@ -374,23 +378,20 @@ export default function PromptsPage() {
                             const file = e.target.files?.[0];
                             if (!file) return;
 
-                            const formDataUpload = new FormData();
-                            formDataUpload.append('file', file);
-
-                            try {
-                              const res = await fetch(
-                                '/api/files/upload?type=prompts',
-                                { method: 'POST', body: formDataUpload }
-                              );
-                              const data = await res.json();
-                              if (res.ok && data.url) {
-                                setFormData({ ...formData, image: data.url });
-                              } else {
-                                toast.error(data.error || 'Upload failed');
-                              }
-                            } catch {
-                              toast.error('Upload failed');
+                            if (!user?.id) {
+                              toast.error('Please sign in again to upload');
+                              return;
                             }
+
+                            const result = await uploadFile(file, {
+                              userId: user.id,
+                              type: 'prompts'
+                            });
+                            if ('error' in result) {
+                              toast.error(result.error || 'Upload failed');
+                              return;
+                            }
+                            setFormData({ ...formData, image: result.url });
                           }}
                         />
                         <Plus className="size-6 text-muted-foreground" />
