@@ -430,7 +430,8 @@ export const models = createTable(
     aliases: jsonb('aliases').$type<string[]>(),
     supportsVision: boolean('supports_vision').default(false),
     supportsReasoning: boolean('supports_reasoning').default(false),
-    // Image models: supports image editing (input images).
+    // Takes existing media as input: an image model that can edit an image,
+    // a video model that can animate one.
     supportsEdit: boolean('supports_edit').default(false),
     // Audio models: this is an STT (speech→text) model; unset means TTS.
     supportsTranscription: boolean('supports_transcription').default(false),

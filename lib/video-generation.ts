@@ -197,9 +197,19 @@ export async function generateAndStoreVideo(args: {
   aspectRatio?: `${number}:${number}`;
   resolution?: string;
   duration?: number;
+  /** Animate this image instead of generating from the text alone. */
+  inputImage?: { data: Uint8Array; mediaType: string };
   abortSignal?: AbortSignal;
 }): Promise<VideoGenerationOutput> {
-  const { userId, prompt, dbModel, candidates, duration, abortSignal } = args;
+  const {
+    userId,
+    prompt,
+    dbModel,
+    candidates,
+    duration,
+    inputImage,
+    abortSignal
+  } = args;
   // 'auto' (admin-configurable option) means: let the provider decide.
   const aspectRatio = resolveAutoOption(args.aspectRatio);
   const resolution = resolveAutoOption(args.resolution);
@@ -218,6 +228,13 @@ export async function generateAndStoreVideo(args: {
       // video only through its OpenAI-compatible API (no AI SDK support
       // either), so it always takes this path regardless of deployment name.
       if (modelId.includes('sora') || provider.type === 'azure') {
+        if (inputImage) {
+          // The custom Sora path sends a prompt and nothing else, so an image
+          // here would be dropped without a word — say so instead.
+          throw new Error(
+            `${dbModel.name} cannot animate an image; it generates from text only.`
+          );
+        }
         const soraResult = await generateWithSora(
           modelId,
           prompt,
@@ -251,7 +268,11 @@ export async function generateAndStoreVideo(args: {
         try {
           ({ video, providerMetadata } = await generateVideo({
             model: getVideoModel(provider, modelId),
-            prompt,
+            // An image turns this into image-to-video: the picture is the
+            // opening frame and the text says what happens from there.
+            prompt: inputImage
+              ? { image: inputImage.data, text: prompt }
+              : prompt,
             aspectRatio,
             duration,
             abortSignal: signal,

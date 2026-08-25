@@ -739,7 +739,8 @@ export default function ModelsPage() {
                     />
                     <Label htmlFor="supportsReasoning">Reasoning</Label>
                   </div>
-                  {formData.capability === 'image' && (
+                  {(formData.capability === 'image' ||
+                    formData.capability === 'video') && (
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="supportsEdit"
@@ -749,7 +750,11 @@ export default function ModelsPage() {
                         }
                         disabled={isPending}
                       />
-                      <Label htmlFor="supportsEdit">Image editing</Label>
+                      <Label htmlFor="supportsEdit">
+                        {formData.capability === 'video'
+                          ? 'Image to video'
+                          : 'Image editing'}
+                      </Label>
                     </div>
                   )}
                   {formData.capability === 'audio' && (

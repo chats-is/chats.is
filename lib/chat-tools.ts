@@ -347,7 +347,9 @@ export async function buildMediaTools(args: {
 
     tools.generate_video = tool({
       description:
-        'Generate a short video from a text description.' +
+        (dbModel.supportsEdit
+          ? 'Generate a short video from a text description, optionally animating an image from this conversation.'
+          : 'Generate a short video from a text description.') +
         optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
         optionsHint('resolutions', dbModel.uiOptions?.resolutions) +
         optionsHint('durations (seconds)', dbModel.uiOptions?.durations),
@@ -356,12 +358,35 @@ export async function buildMediaTools(args: {
         const blocked = await gate(dbModel, 'video');
         if (blocked) return blocked;
 
+        // An image makes this image-to-video, which not every video model can
+        // do — refusing here beats letting the provider drop the picture and
+        // return something generated from the words alone.
+        let inputImage;
+        if (input.imageUrl) {
+          if (!dbModel.supportsEdit) {
+            return {
+              status: 'error',
+              message: `${dbModel.name} cannot animate an image. Pick a video model that can under Advanced → Video.`
+            };
+          }
+          const media = await fetchKnownMedia(
+            input.imageUrl,
+            'image/',
+            abortSignal
+          );
+          if ('error' in media) {
+            return { status: 'error', message: media.error };
+          }
+          inputImage = media;
+        }
+
         try {
           const result = await generateAndStoreVideo({
             userId,
             prompt: input.prompt,
             dbModel,
             candidates,
+            inputImage,
             aspectRatio: pickAspectRatio(
               input.aspectRatio,
               mediaOptions?.video?.aspectRatio,

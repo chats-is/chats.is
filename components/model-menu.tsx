@@ -407,7 +407,9 @@ export function ModelMenu({
                                   </span>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  Can edit an existing image
+                                  {m.capability === 'video'
+                                    ? 'Can animate an existing image'
+                                    : 'Can edit an existing image'}
                                 </TooltipContent>
                               </Tooltip>
                             )}
