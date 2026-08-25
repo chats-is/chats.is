@@ -433,6 +433,9 @@ export const models = createTable(
     // Takes existing media as input: an image model that can edit an image,
     // a video model that can animate one.
     supportsEdit: boolean('supports_edit').default(false),
+    // Video models: can edit an existing video, which is a separate capability
+    // from taking an image as the opening frame.
+    supportsVideoEdit: boolean('supports_video_edit').default(false),
     // Audio models: this is an STT (speech→text) model; unset means TTS.
     supportsTranscription: boolean('supports_transcription').default(false),
     isEnabled: boolean('is_enabled').notNull().default(true),

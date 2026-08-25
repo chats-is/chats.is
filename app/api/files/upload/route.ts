@@ -28,7 +28,11 @@ const UPLOAD_CONFIG = {
       'audio/x-m4a',
       'audio/ogg',
       'audio/webm',
-      'audio/flac'
+      'audio/flac',
+      // Video attachments feed the chat edit_video tool.
+      'video/mp4',
+      'video/quicktime',
+      'video/webm'
     ],
     folder: 'attachments',
     useUUID: false

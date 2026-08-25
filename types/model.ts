@@ -69,6 +69,7 @@ export type Model = {
   supportsReasoning?: boolean | null;
   /** Image models: supports image editing (input images). */
   supportsEdit?: boolean | null;
+  supportsVideoEdit?: boolean | null;
   /** Audio models: STT (speech→text); unset means TTS. */
   supportsTranscription?: boolean | null;
   isEnabled: boolean;

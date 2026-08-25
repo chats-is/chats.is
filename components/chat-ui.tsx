@@ -135,6 +135,9 @@ export function ChatUI({
         videoImage: preferences.videoImageModelId
           ? { modelId: preferences.videoImageModelId }
           : undefined,
+        videoEdit: preferences.videoEditModelId
+          ? { modelId: preferences.videoEditModelId }
+          : undefined,
         audio: preferences.audioModelId
           ? {
               modelId: preferences.audioModelId,
@@ -159,6 +162,7 @@ export function ChatUI({
       preferences.videoResolution,
       preferences.videoDuration,
       preferences.videoImageModelId,
+      preferences.videoEditModelId,
       preferences.audioModelId,
       preferences.audioVoice,
       preferences.sttModelId

@@ -139,6 +139,7 @@ export const getMediaDefaultModelIds = cache(async () => {
     'default.image.editModelId',
     'default.video.modelId',
     'default.video.imageModelId',
+    'default.video.editModelId',
     'default.tts.modelId',
     'default.stt.modelId'
   ]);
@@ -148,6 +149,7 @@ export const getMediaDefaultModelIds = cache(async () => {
     imageEditModelId: values['default.image.editModelId'],
     videoModelId: values['default.video.modelId'],
     videoImageModelId: values['default.video.imageModelId'],
+    videoEditModelId: values['default.video.editModelId'],
     ttsModelId: values['default.tts.modelId'],
     sttModelId: values['default.stt.modelId']
   };
@@ -267,6 +269,8 @@ export async function getSystemSettings() {
       'default.image.editModelId',
       'default.video.modelId',
       'default.video.imageModelId',
+      'default.video.editModelId',
+      'default.video.editModelId',
       'default.tts.modelId',
       'default.stt.modelId'
     ])
@@ -292,6 +296,7 @@ export async function getSystemSettings() {
       imageEditModelId: values['default.image.editModelId'],
       videoModelId: values['default.video.modelId'],
       videoImageModelId: values['default.video.imageModelId'],
+      videoEditModelId: values['default.video.editModelId'],
       ttsModelId: values['default.tts.modelId'],
       sttModelId: values['default.stt.modelId']
     }

@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   ImagePlay,
   Pencil,
+  Scissors,
   Settings2
 } from 'lucide-react';
 
@@ -115,6 +116,10 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   const hasVideoModels = !!videoModels?.length;
   // Taking an image as the opening frame is a per-model capability too.
   const animateModels = videoModels?.filter(model => model.supportsEdit) ?? [];
+  // Editing a video is separate again — a model that animates an image cannot
+  // necessarily change one that already exists.
+  const videoEditModels =
+    videoModels?.filter(model => model.supportsVideoEdit) ?? [];
   const hasTtsModels = !!ttsModels?.length;
   const hasSttModels = !!sttModels?.length;
 
@@ -217,6 +222,22 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
                 setPreference('videoImageModelId', modelId)
               }
               onOptionsChange={handleVideoOptionsChange}
+            />
+          </div>
+        )}
+        {videoEditModels.length > 0 && (
+          <div className="space-y-2">
+            <SectionLabel icon={<Scissors className="size-3.5" />}>
+              Video editing
+            </SectionLabel>
+            <ModelMenu
+              capability="video"
+              models={videoEditModels}
+              status={status}
+              modelId={preferences.videoEditModelId}
+              onModelChange={modelId =>
+                setPreference('videoEditModelId', modelId)
+              }
             />
           </div>
         )}

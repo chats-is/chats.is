@@ -33,6 +33,7 @@ import {
 
 const IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 const AUDIO_TYPES = ['.mp3', '.wav', '.m4a', '.ogg', '.flac'];
+const VIDEO_TYPES = ['.mp4', '.mov', '.webm'];
 const MAX_ATTACHMENTS = 5;
 
 interface AddFilesMenuProps {
@@ -67,12 +68,14 @@ export function AddFilesMenu({
   useEffect(() => setMounted(true), []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { sttModels, defaults } = useSystemSettings();
+  const { sttModels, videoModels, defaults } = useSystemSettings();
   const { preferences, setPreference } = usePreferences();
 
   const uploading = uploadQueue.length > 0;
   const sttModelId = preferences.sttModelId || defaults.sttModelId || '';
   const hasSttModels = !!sttModels?.length;
+  // A video is only worth taking when something can act on it.
+  const canEditVideo = !!videoModels?.some(model => model.supportsVideoEdit);
 
   const handleFileChange = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
@@ -137,7 +140,8 @@ export function AddFilesMenu({
 
   const accept = [
     ...(canAttachImages ? IMAGE_TYPES : []),
-    ...(hasSttModels ? AUDIO_TYPES : [])
+    ...(hasSttModels ? AUDIO_TYPES : []),
+    ...(canEditVideo ? VIDEO_TYPES : [])
   ].join(',');
 
   if (!accept) {

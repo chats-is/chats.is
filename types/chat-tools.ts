@@ -51,6 +51,18 @@ export const editImageInputSchema = z.object({
     )
 });
 
+export const editVideoInputSchema = z.object({
+  videoUrl: z
+    .string()
+    .describe(
+      'URL of the video from this conversation to edit — a user upload or one generated earlier'
+    ),
+  prompt: z
+    .string()
+    .min(1)
+    .describe('What to change in the video, in natural language')
+});
+
 export const generateVideoInputSchema = z.object({
   prompt: z
     .string()
@@ -60,7 +72,7 @@ export const generateVideoInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'URL of an image from this conversation to animate — a user upload or an image generated earlier. Omit to generate from the text alone.'
+      'URL of an image from this conversation to animate — a user upload or an image generated earlier. Must be an image: to change an existing video, use edit_video instead. Omit to generate from the text alone.'
     ),
   aspectRatio: z
     .string()

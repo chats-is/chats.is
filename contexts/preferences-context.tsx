@@ -25,6 +25,7 @@ export interface Preferences {
   // Video
   videoModelId: string;
   videoImageModelId: string;
+  videoEditModelId: string;
   videoAspectRatio: string;
   videoResolution: string;
   videoDuration?: number;
@@ -90,6 +91,9 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
 
     const editModels = imageModels?.filter(model => model.supportsEdit);
     const animateModels = videoModels?.filter(model => model.supportsEdit);
+    const videoEditModels = videoModels?.filter(
+      model => model.supportsVideoEdit
+    );
 
     const defaultPrefs: Preferences = {
       // Chat
@@ -113,6 +117,10 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       videoImageModelId: systemDefault(
         defaults.videoImageModelId,
         animateModels
+      ),
+      videoEditModelId: systemDefault(
+        defaults.videoEditModelId,
+        videoEditModels
       ),
       videoAspectRatio: '',
       videoResolution: '',
@@ -143,6 +151,7 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
         ['imageEditModelId', editModels],
         ['videoModelId', videoModels],
         ['videoImageModelId', animateModels],
+        ['videoEditModelId', videoEditModels],
         ['audioModelId', ttsModels],
         ['sttModelId', sttModels]
       ];

@@ -127,6 +127,13 @@
       "when": 1780639725747,
       "tag": "0017_squashed_media_resume",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1780639725748,
+      "tag": "0018_video_editing",
+      "breakpoints": true
     }
   ]
 }

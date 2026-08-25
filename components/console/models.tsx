@@ -206,6 +206,7 @@ export default function ModelsPage() {
     supportsVision: false,
     supportsReasoning: false,
     supportsEdit: false,
+    supportsVideoEdit: false,
     supportsTranscription: false,
     isEnabled: true,
     systemPrompt: '',
@@ -292,6 +293,7 @@ export default function ModelsPage() {
       supportsVision: false,
       supportsReasoning: false,
       supportsEdit: false,
+      supportsVideoEdit: false,
       supportsTranscription: false,
       isEnabled: true,
       systemPrompt: '',
@@ -312,6 +314,7 @@ export default function ModelsPage() {
       supportsVision: model.supportsVision || false,
       supportsReasoning: model.supportsReasoning || false,
       supportsEdit: model.supportsEdit || false,
+      supportsVideoEdit: model.supportsVideoEdit || false,
       supportsTranscription: model.supportsTranscription || false,
       isEnabled: model.isEnabled,
       systemPrompt: model.systemPrompt || '',
@@ -755,6 +758,22 @@ export default function ModelsPage() {
                           ? 'Image to video'
                           : 'Image editing'}
                       </Label>
+                    </div>
+                  )}
+                  {formData.capability === 'video' && (
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="supportsVideoEdit"
+                        checked={formData.supportsVideoEdit}
+                        onCheckedChange={checked =>
+                          setFormData({
+                            ...formData,
+                            supportsVideoEdit: checked
+                          })
+                        }
+                        disabled={isPending}
+                      />
+                      <Label htmlFor="supportsVideoEdit">Video editing</Label>
                     </div>
                   )}
                   {formData.capability === 'audio' && (

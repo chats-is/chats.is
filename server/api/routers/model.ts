@@ -63,6 +63,7 @@ export const modelRouter = createTRPCRouter({
         supportsVision: z.boolean().default(false),
         supportsReasoning: z.boolean().default(false),
         supportsEdit: z.boolean().default(false),
+        supportsVideoEdit: z.boolean().default(false),
         supportsTranscription: z.boolean().default(false),
         isEnabled: z.boolean().default(true),
         uiOptions: z
@@ -143,6 +144,7 @@ export const modelRouter = createTRPCRouter({
           supportsVision: input.supportsVision,
           supportsReasoning: input.supportsReasoning,
           supportsEdit: input.supportsEdit,
+          supportsVideoEdit: input.supportsVideoEdit,
           supportsTranscription: input.supportsTranscription,
           isEnabled: input.isEnabled,
           uiOptions: input.uiOptions,
@@ -185,6 +187,7 @@ export const modelRouter = createTRPCRouter({
         supportsVision: z.boolean().optional(),
         supportsReasoning: z.boolean().optional(),
         supportsEdit: z.boolean().optional(),
+        supportsVideoEdit: z.boolean().optional(),
         supportsTranscription: z.boolean().optional(),
         isEnabled: z.boolean().optional(),
         uiOptions: z

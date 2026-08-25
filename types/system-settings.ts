@@ -6,6 +6,7 @@ export interface SystemDefaults {
   imageEditModelId: string | null;
   videoModelId: string | null;
   videoImageModelId: string | null;
+  videoEditModelId: string | null;
   ttsModelId: string | null;
   sttModelId: string | null;
 }
