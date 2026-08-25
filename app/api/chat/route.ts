@@ -72,6 +72,19 @@ type PostData = {
   mediaOptions?: MediaToolsOptions;
 };
 
+/**
+ * What the user is shown when a generation fails: the provider's own words
+ * where there are any. Both the inner `toUIMessageStream` and the outer
+ * `createUIMessageStream` need it — whichever sees the failure first writes
+ * the message part, and a default on either one swallows the reason.
+ */
+function streamErrorMessage(error: unknown): string {
+  if (error == null) return 'Unknown error';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  return JSON.stringify(error);
+}
+
 // Verbose error serializer — resumable-stream / node-redis failures often
 // surface as empty `Error` objects under Next's ignore-listed stack redaction,
 // so dig out name/code/cause/aggregate to make the real reason visible.
@@ -809,6 +822,11 @@ export async function POST(req: Request) {
             originalMessages: chatMessages,
             generateMessageId: () => assistantMessageId,
             sendReasoning: isReasoning,
+            // Without this the inner stream uses the SDK's default, which
+            // reports every failure as "An error occurred." — the outer
+            // handler never sees it, so the reason is lost before it can be
+            // shown or written to the message.
+            onError: streamErrorMessage,
             messageMetadata: ({ part }) => {
               if (part.type === 'start') {
                 const now = new Date();
@@ -938,21 +956,7 @@ export async function POST(req: Request) {
           }
         }
       },
-      onError: error => {
-        if (error == null) {
-          return 'Unknown error';
-        }
-
-        if (typeof error === 'string') {
-          return error;
-        }
-
-        if (error instanceof Error) {
-          return error.message;
-        }
-
-        return JSON.stringify(error);
-      }
+      onError: streamErrorMessage
     });
 
     // When Redis is configured, wrap the stream as a resumable one so a page
