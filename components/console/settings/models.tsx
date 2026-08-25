@@ -88,11 +88,11 @@ export function ModelsSettings() {
   );
   // Editing is a per-model capability; offering a model that lacks it as the
   // default editor would configure a tool that always refuses.
-  const imageEditModels = imageModels?.filter(m => m.supportsEdit);
+  const imageEditModels = imageModels?.filter(m => m.supportsImageEdit);
   const videoModels = models?.filter(
     m => m.capability === 'video' && m.isEnabled
   );
-  const videoImageModels = videoModels?.filter(m => m.supportsEdit);
+  const videoImageModels = videoModels?.filter(m => m.supportsImageToVideo);
   const videoEditModels = videoModels?.filter(m => m.supportsVideoEdit);
   const speechModels = models?.filter(
     m => m.capability === 'audio' && m.isEnabled && !m.supportsTranscription

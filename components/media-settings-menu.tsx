@@ -112,10 +112,12 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   const hasImageModels = !!imageModels?.length;
   // Editing is a per-model capability, and few models have it — so which model
   // edits is its own choice rather than a consequence of the generator.
-  const editModels = imageModels?.filter(model => model.supportsEdit) ?? [];
+  const editModels =
+    imageModels?.filter(model => model.supportsImageEdit) ?? [];
   const hasVideoModels = !!videoModels?.length;
   // Taking an image as the opening frame is a per-model capability too.
-  const animateModels = videoModels?.filter(model => model.supportsEdit) ?? [];
+  const animateModels =
+    videoModels?.filter(model => model.supportsImageToVideo) ?? [];
   // Editing a video is separate again — a model that animates an image cannot
   // necessarily change one that already exists.
   const videoEditModels =

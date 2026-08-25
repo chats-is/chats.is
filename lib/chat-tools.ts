@@ -127,7 +127,7 @@ function optionsHint(
  * Build the media generation tools for a chat request. Each tool is only
  * registered when its media model resolves (user selection from the request
  * body, falling back to the admin-configured system default); `edit_image`
- * additionally requires the image model's `supportsEdit` flag.
+ * additionally requires the image model's `supportsImageEdit` flag.
  *
  * Each call re-runs `preflightCheck` against its own media model and returns
  * a structured `{ status: 'error' }` output on any failure so the chat model
@@ -156,7 +156,7 @@ export async function buildMediaTools(args: {
         mediaOptions?.imageEdit?.modelId,
         defaults.imageEditModelId,
         'image',
-        model => !!model.supportsEdit
+        model => !!model.supportsImageEdit
       ),
       resolveWithFallback(
         mediaOptions?.video?.modelId,
@@ -167,7 +167,7 @@ export async function buildMediaTools(args: {
         mediaOptions?.videoImage?.modelId,
         defaults.videoImageModelId,
         'video',
-        model => !!model.supportsEdit
+        model => !!model.supportsImageToVideo
       ),
       resolveWithFallback(
         mediaOptions?.videoEdit?.modelId,
@@ -331,7 +331,7 @@ export async function buildMediaTools(args: {
     // request and no way to serve it, so it improvised — one such request came
     // back as a hand-written SVG of what had been asked for, the user's own
     // image untouched and nothing said about the substitution.
-    const editor = imageEdit ?? (dbModel.supportsEdit ? image : null);
+    const editor = imageEdit ?? (dbModel.supportsImageEdit ? image : null);
 
     tools.edit_image = tool({
       description:
@@ -365,7 +365,7 @@ export async function buildMediaTools(args: {
 
     tools.generate_video = tool({
       description:
-        (videoImage || dbModel.supportsEdit
+        (videoImage || dbModel.supportsImageToVideo
           ? 'Generate a short video from a text description, optionally animating an image from this conversation.'
           : 'Generate a short video from a text description.') +
         optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
@@ -381,7 +381,8 @@ export async function buildMediaTools(args: {
         let on = video;
         let inputImage;
         if (input.imageUrl) {
-          const animator = videoImage ?? (dbModel.supportsEdit ? video : null);
+          const animator =
+            videoImage ?? (dbModel.supportsImageToVideo ? video : null);
           if (!animator) {
             return {
               status: 'error',

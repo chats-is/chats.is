@@ -89,8 +89,10 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       models: Model[] | undefined
     ) => (resolves(id, models) ? (id as string) : '');
 
-    const editModels = imageModels?.filter(model => model.supportsEdit);
-    const animateModels = videoModels?.filter(model => model.supportsEdit);
+    const editModels = imageModels?.filter(model => model.supportsImageEdit);
+    const animateModels = videoModels?.filter(
+      model => model.supportsImageToVideo
+    );
     const videoEditModels = videoModels?.filter(
       model => model.supportsVideoEdit
     );

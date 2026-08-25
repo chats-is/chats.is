@@ -430,9 +430,10 @@ export const models = createTable(
     aliases: jsonb('aliases').$type<string[]>(),
     supportsVision: boolean('supports_vision').default(false),
     supportsReasoning: boolean('supports_reasoning').default(false),
-    // Takes existing media as input: an image model that can edit an image,
-    // a video model that can animate one.
-    supportsEdit: boolean('supports_edit').default(false),
+    // Image models: can edit an existing image.
+    supportsImageEdit: boolean('supports_image_edit').default(false),
+    // Video models: can take an image as the opening frame.
+    supportsImageToVideo: boolean('supports_image_to_video').default(false),
     // Video models: can edit an existing video, which is a separate capability
     // from taking an image as the opening frame.
     supportsVideoEdit: boolean('supports_video_edit').default(false),

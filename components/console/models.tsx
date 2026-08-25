@@ -205,7 +205,8 @@ export default function ModelsPage() {
     aliases: '',
     supportsVision: false,
     supportsReasoning: false,
-    supportsEdit: false,
+    supportsImageEdit: false,
+    supportsImageToVideo: false,
     supportsVideoEdit: false,
     supportsTranscription: false,
     isEnabled: true,
@@ -292,7 +293,8 @@ export default function ModelsPage() {
       aliases: '',
       supportsVision: false,
       supportsReasoning: false,
-      supportsEdit: false,
+      supportsImageEdit: false,
+      supportsImageToVideo: false,
       supportsVideoEdit: false,
       supportsTranscription: false,
       isEnabled: true,
@@ -313,7 +315,8 @@ export default function ModelsPage() {
       aliases: model.aliases?.join(', ') || '',
       supportsVision: model.supportsVision || false,
       supportsReasoning: model.supportsReasoning || false,
-      supportsEdit: model.supportsEdit || false,
+      supportsImageEdit: model.supportsImageEdit || false,
+      supportsImageToVideo: model.supportsImageToVideo || false,
       supportsVideoEdit: model.supportsVideoEdit || false,
       supportsTranscription: model.supportsTranscription || false,
       isEnabled: model.isEnabled,
@@ -742,21 +745,37 @@ export default function ModelsPage() {
                     />
                     <Label htmlFor="supportsReasoning">Reasoning</Label>
                   </div>
-                  {(formData.capability === 'image' ||
-                    formData.capability === 'video') && (
+                  {formData.capability === 'image' && (
                     <div className="flex items-center space-x-2">
                       <Switch
-                        id="supportsEdit"
-                        checked={formData.supportsEdit}
+                        id="supportsImageEdit"
+                        checked={formData.supportsImageEdit}
                         onCheckedChange={checked =>
-                          setFormData({ ...formData, supportsEdit: checked })
+                          setFormData({
+                            ...formData,
+                            supportsImageEdit: checked
+                          })
                         }
                         disabled={isPending}
                       />
-                      <Label htmlFor="supportsEdit">
-                        {formData.capability === 'video'
-                          ? 'Image to video'
-                          : 'Image editing'}
+                      <Label htmlFor="supportsImageEdit">Image editing</Label>
+                    </div>
+                  )}
+                  {formData.capability === 'video' && (
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="supportsImageToVideo"
+                        checked={formData.supportsImageToVideo}
+                        onCheckedChange={checked =>
+                          setFormData({
+                            ...formData,
+                            supportsImageToVideo: checked
+                          })
+                        }
+                        disabled={isPending}
+                      />
+                      <Label htmlFor="supportsImageToVideo">
+                        Image to video
                       </Label>
                     </div>
                   )}
