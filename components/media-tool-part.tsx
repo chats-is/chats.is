@@ -86,7 +86,7 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
 
   const toolName = part.type.slice('tool-'.length) as MediaToolName;
   const placeholderType =
-    toolName === 'generate_video'
+    toolName === 'generate_video' || toolName === 'edit_video'
       ? 'video'
       : toolName === 'text_to_speech'
         ? 'audio'

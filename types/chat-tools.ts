@@ -118,6 +118,7 @@ export const transcribeAudioInputSchema = z.object({
 export type GenerateImageInput = z.infer<typeof generateImageInputSchema>;
 export type EditImageInput = z.infer<typeof editImageInputSchema>;
 export type GenerateVideoInput = z.infer<typeof generateVideoInputSchema>;
+export type EditVideoInput = z.infer<typeof editVideoInputSchema>;
 export type TextToSpeechInput = z.infer<typeof textToSpeechInputSchema>;
 export type TranscribeAudioInput = z.infer<typeof transcribeAudioInputSchema>;
 
@@ -144,6 +145,7 @@ export const mediaToolNames = [
   'generate_image',
   'edit_image',
   'generate_video',
+  'edit_video',
   'text_to_speech'
 ] as const;
 
@@ -155,6 +157,7 @@ export type ChatTools = {
   generate_image: { input: GenerateImageInput; output: MediaToolOutput };
   edit_image: { input: EditImageInput; output: MediaToolOutput };
   generate_video: { input: GenerateVideoInput; output: MediaToolOutput };
+  edit_video: { input: EditVideoInput; output: MediaToolOutput };
   text_to_speech: { input: TextToSpeechInput; output: MediaToolOutput };
   transcribe_audio: {
     input: TranscribeAudioInput;

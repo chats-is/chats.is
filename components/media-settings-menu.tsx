@@ -212,18 +212,19 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             <SectionLabel icon={<ImagePlay className="size-3.5" />}>
               Video from image
             </SectionLabel>
+            {/* Model only: the options belong to the Video section above.
+                Two menus writing one set of preferences would let picking an
+                animator rewrite the generator's aspect ratio — and, when the
+                two models allow different values, leave the pair rewriting it
+                past each other for as long as this popover is open. */}
             <ModelMenu
               capability="video"
               models={animateModels}
               status={status}
               modelId={preferences.videoImageModelId}
-              aspectRatio={preferences.videoAspectRatio}
-              resolution={preferences.videoResolution}
-              duration={preferences.videoDuration}
               onModelChange={modelId =>
                 setPreference('videoImageModelId', modelId)
               }
-              onOptionsChange={handleVideoOptionsChange}
             />
           </div>
         )}

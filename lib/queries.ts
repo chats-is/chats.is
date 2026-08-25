@@ -270,7 +270,6 @@ export async function getSystemSettings() {
       'default.video.modelId',
       'default.video.imageModelId',
       'default.video.editModelId',
-      'default.video.editModelId',
       'default.tts.modelId',
       'default.stt.modelId'
     ])

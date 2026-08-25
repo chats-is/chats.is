@@ -248,9 +248,7 @@ export async function buildMediaTools(args: {
     return pre.ok ? null : { status: 'error', message: pre.message };
   };
 
-  if (image) {
-    const { dbModel } = image;
-
+  if (image || imageEdit) {
     // Generating and editing may run on different models, so the work takes
     // the model it runs on rather than closing over the generator's.
     const runImage = async (
@@ -308,22 +306,27 @@ export async function buildMediaTools(args: {
       }
     };
 
-    tools.generate_image = tool({
-      description:
-        'Generate a new image from a text description.' +
-        optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
-        optionsHint('sizes', dbModel.uiOptions?.sizes),
-      inputSchema: generateImageInputSchema,
-      execute: (input, { abortSignal }) =>
-        runImage(
-          image,
-          input.prompt,
-          { aspectRatio: input.aspectRatio, size: input.size },
-          undefined,
-          abortSignal
-        )
-    });
-    registered.push('generate_image');
+    // Generating needs a generator; editing has its own model and can be the
+    // only one configured, which is why this block is entered for either.
+    if (image) {
+      const { dbModel } = image;
+      tools.generate_image = tool({
+        description:
+          'Generate a new image from a text description.' +
+          optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
+          optionsHint('sizes', dbModel.uiOptions?.sizes),
+        inputSchema: generateImageInputSchema,
+        execute: (input, { abortSignal }) =>
+          runImage(
+            image,
+            input.prompt,
+            { aspectRatio: input.aspectRatio, size: input.size },
+            undefined,
+            abortSignal
+          )
+      });
+      registered.push('generate_image');
+    }
 
     // The editor is its own selection, falling back to the generator when that
     // one can edit too. Registered either way and refusing inside the tool when
@@ -331,7 +334,8 @@ export async function buildMediaTools(args: {
     // request and no way to serve it, so it improvised — one such request came
     // back as a hand-written SVG of what had been asked for, the user's own
     // image untouched and nothing said about the substitution.
-    const editor = imageEdit ?? (dbModel.supportsImageEdit ? image : null);
+    const editor =
+      imageEdit ?? (image?.dbModel.supportsImageEdit ? image : null);
 
     tools.edit_image = tool({
       description:
@@ -483,6 +487,29 @@ export async function buildMediaTools(args: {
           return {
             status: 'error',
             message: 'That video is not part of this conversation.'
+          };
+        }
+
+        // And that it is a video: an image URL from the same conversation
+        // passes the checks above and would come back as an opaque provider
+        // failure. A HEAD keeps this to a header read — the provider fetches
+        // the file itself.
+        try {
+          const head = await fetch(input.videoUrl, {
+            method: 'HEAD',
+            signal: abortSignal
+          });
+          if (!head.headers.get('content-type')?.startsWith('video/')) {
+            return {
+              status: 'error',
+              message: 'That file is not a video.'
+            };
+          }
+        } catch (err) {
+          console.error('[chat-tools] video head request failed:', err);
+          return {
+            status: 'error',
+            message: 'Could not load the referenced video. Please try again.'
           };
         }
 

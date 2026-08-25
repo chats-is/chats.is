@@ -18,13 +18,16 @@ const SETTING_DESCRIPTIONS: Record<string, string> = {
   'app.description': 'Product description for SEO',
   'default.chat.modelId': 'Default model for chat',
   'default.image.modelId': 'Default model for image generation',
+  'default.image.editModelId': 'Default model for editing an existing image',
   'default.video.modelId': 'Default model for video generation',
-  'default.tts.modelId': 'Default model for voice page',
+  'default.video.imageModelId':
+    'Default model for turning an image into a video',
+  'default.video.editModelId': 'Default model for editing an existing video',
+  'default.tts.modelId':
+    'Default model for text-to-speech, including reading messages aloud',
   'default.stt.modelId':
     'Default model for speech-to-text (chat transcribe tool)',
-  'speech.enabled': 'Enable or disable speech synthesis',
-  'default.speech.modelId': 'Default model for reading messages',
-  'default.speech.voice': 'Default voice for reading messages',
+  'speech.enabled': 'Enable or disable reading messages aloud',
   'default.chat.systemPrompt': 'Default system prompt for chat',
   'title.modelId': 'Model used for generating chat titles',
   'default.quotaId': 'Quota id used for users without an assigned plan'

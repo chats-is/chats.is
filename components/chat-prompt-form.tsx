@@ -48,7 +48,7 @@ export function ChatPromptForm({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
-  const { chatModels, sttModels } = useSystemSettings();
+  const { chatModels, sttModels, videoModels } = useSystemSettings();
 
   // Two distinct dead ends, both of which make a submission fail:
   //   - no chat model is configured at all;
@@ -77,7 +77,10 @@ export function ChatPromptForm({
   // user picks that row, so existence is enough here.
   const canAttachImages = !!modelOptions.supportsVision;
   const canAttachAudio = !!sttModels?.length;
-  const showAttachments = canAttachImages || canAttachAudio;
+  // Video too, or a model that can only edit video would take an attachment
+  // the user then has no thumbnail, progress or remove button for.
+  const canAttachVideo = !!videoModels?.some(model => model.supportsVideoEdit);
+  const showAttachments = canAttachImages || canAttachAudio || canAttachVideo;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
