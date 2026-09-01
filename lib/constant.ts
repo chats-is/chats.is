@@ -144,7 +144,7 @@ export function buildMediaToolsSystemPrompt(
     '',
     "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields and the defaults apply.",
     '',
-    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the model, or mention settings pages. Do not retry the tool on your own.'
+    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. A transcript is not displayed, so write it out yourself — quote what was said, then answer whatever was asked about it. If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the model, or mention settings pages. Do not retry the tool on your own.'
   ].join('\n');
 }
 

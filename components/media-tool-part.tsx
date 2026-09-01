@@ -1,14 +1,13 @@
 'use client';
 
 import { usePreferences } from '@/contexts/preferences-context';
-import { Captions, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import {
   ChatMessage,
   MediaToolName,
   mediaToolNames,
-  MediaToolOutput,
-  TranscribeToolOutput
+  MediaToolOutput
 } from '@/types';
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaLightbox } from '@/components/media-lightbox';
@@ -38,8 +37,11 @@ export function isTranscribeToolPart(
 }
 
 /**
- * Renders a transcribe_audio tool call: a working chip while transcribing,
- * the transcript as a quoted block once done, or an error chip.
+ * Renders a transcribe_audio tool call: a chip while it works, and nothing
+ * afterwards. The transcript is the answer to what was asked, so the model
+ * writes it into its reply rather than the UI printing it above — otherwise
+ * the same words appear twice, once in a card and once in the sentence that
+ * discusses them.
  */
 export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
   if (part.state === 'input-streaming' || part.state === 'input-available') {
@@ -63,18 +65,7 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
     return null;
   }
 
-  const output = part.output as TranscribeToolOutput;
-  if (output.status === 'error') return null;
-
-  return (
-    <div className="my-2 rounded-lg border bg-muted/30 px-3 py-2">
-      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        <Captions className="size-3.5" />
-        Transcript
-      </div>
-      <p className="text-sm whitespace-pre-wrap">{output.text}</p>
-    </div>
-  );
+  return null;
 }
 
 /**
