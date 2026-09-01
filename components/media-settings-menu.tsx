@@ -9,7 +9,10 @@ import {
   Captions,
   Clapperboard,
   Image as ImageIcon,
-  WandSparkles
+  ImagePlay,
+  Pencil,
+  Scissors,
+  Settings2
 } from 'lucide-react';
 
 import { ChatMessage } from '@/types';
@@ -27,19 +30,42 @@ import {
 } from '@/components/ui/tooltip';
 import { ModelMenu, ModelOptions } from '@/components/model-menu';
 
-export interface MediaToolsMenuProps extends Pick<
+export interface MediaSettingsMenuProps extends Pick<
   UseChatHelpers<ChatMessage>,
   'status'
 > {}
 
+function SectionLabel({
+  icon,
+  children
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      {icon}
+      {children}
+    </div>
+  );
+}
+
 /**
- * Compact popover next to the chat model picker for choosing which media
- * models the chat media tools (generate_image / edit_image / generate_video /
- * text_to_speech) use, plus their generation options. Selections persist as
- * preferences and ride along in the chat request body as `mediaOptions`.
+ * Which model generates each kind of media, and with what options.
+ *
+ * Configured once rather than chosen per message: the chat model picks the
+ * tool from what was asked, so nothing here decides whether an image gets
+ * made — only what makes it. That is why these live behind a settings control
+ * next to the model picker instead of inside the `+`, which is for what the
+ * user adds to the message by hand. Icon-only, like the `+` beside it: the
+ * toolbar sits under the text the user is writing and should not compete with
+ * it for the eye.
+ *
+ * Selections persist as preferences and ride along in the chat request body as
+ * `mediaOptions`; an unset one falls back to the admin's default.
  */
-export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
-  // Prevent hydration mismatch with Radix Popover
+export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
+  // Prevent hydration mismatch with the Radix popover.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -84,7 +110,18 @@ export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
   );
 
   const hasImageModels = !!imageModels?.length;
+  // Editing is a per-model capability, and few models have it — so which model
+  // edits is its own choice rather than a consequence of the generator.
+  const editModels =
+    imageModels?.filter(model => model.supportsImageEdit) ?? [];
   const hasVideoModels = !!videoModels?.length;
+  // Taking an image as the opening frame is a per-model capability too.
+  const animateModels =
+    videoModels?.filter(model => model.supportsImageToVideo) ?? [];
+  // Editing a video is separate again — a model that animates an image cannot
+  // necessarily change one that already exists.
+  const videoEditModels =
+    videoModels?.filter(model => model.supportsVideoEdit) ?? [];
   const hasTtsModels = !!ttsModels?.length;
   const hasSttModels = !!sttModels?.length;
 
@@ -108,12 +145,12 @@ export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
               disabled={status === 'submitted' || status === 'streaming'}
               className="size-9 rounded-full text-muted-foreground shadow-none"
             >
-              <WandSparkles className="size-4" />
-              <span className="sr-only">Media generation models</span>
+              <Settings2 className="size-4" />
+              <span className="sr-only">Media generation settings</span>
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent>Media generation models</TooltipContent>
+        <TooltipContent>Media generation settings</TooltipContent>
       </Tooltip>
       <PopoverContent
         align="start"
@@ -121,10 +158,9 @@ export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
       >
         {hasImageModels && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <ImageIcon className="size-3.5" />
+            <SectionLabel icon={<ImageIcon className="size-3.5" />}>
               Image
-            </div>
+            </SectionLabel>
             <ModelMenu
               capability="image"
               models={imageModels}
@@ -137,12 +173,27 @@ export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
             />
           </div>
         )}
+        {editModels.length > 0 && (
+          <div className="space-y-2">
+            <SectionLabel icon={<Pencil className="size-3.5" />}>
+              Image editing
+            </SectionLabel>
+            <ModelMenu
+              capability="image"
+              models={editModels}
+              status={status}
+              modelId={preferences.imageEditModelId}
+              onModelChange={modelId =>
+                setPreference('imageEditModelId', modelId)
+              }
+            />
+          </div>
+        )}
         {hasVideoModels && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Clapperboard className="size-3.5" />
+            <SectionLabel icon={<Clapperboard className="size-3.5" />}>
               Video
-            </div>
+            </SectionLabel>
             <ModelMenu
               capability="video"
               models={videoModels}
@@ -156,12 +207,48 @@ export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
             />
           </div>
         )}
+        {animateModels.length > 0 && (
+          <div className="space-y-2">
+            <SectionLabel icon={<ImagePlay className="size-3.5" />}>
+              Video from image
+            </SectionLabel>
+            {/* Model only: the options belong to the Video section above.
+                Two menus writing one set of preferences would let picking an
+                animator rewrite the generator's aspect ratio — and, when the
+                two models allow different values, leave the pair rewriting it
+                past each other for as long as this popover is open. */}
+            <ModelMenu
+              capability="video"
+              models={animateModels}
+              status={status}
+              modelId={preferences.videoImageModelId}
+              onModelChange={modelId =>
+                setPreference('videoImageModelId', modelId)
+              }
+            />
+          </div>
+        )}
+        {videoEditModels.length > 0 && (
+          <div className="space-y-2">
+            <SectionLabel icon={<Scissors className="size-3.5" />}>
+              Video editing
+            </SectionLabel>
+            <ModelMenu
+              capability="video"
+              models={videoEditModels}
+              status={status}
+              modelId={preferences.videoEditModelId}
+              onModelChange={modelId =>
+                setPreference('videoEditModelId', modelId)
+              }
+            />
+          </div>
+        )}
         {hasTtsModels && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <AudioLines className="size-3.5" />
+            <SectionLabel icon={<AudioLines className="size-3.5" />}>
               Text → Speech
-            </div>
+            </SectionLabel>
             <ModelMenu
               capability="audio"
               models={ttsModels}
@@ -175,10 +262,9 @@ export function MediaToolsMenu({ status }: MediaToolsMenuProps) {
         )}
         {hasSttModels && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Captions className="size-3.5" />
+            <SectionLabel icon={<Captions className="size-3.5" />}>
               Speech → Text
-            </div>
+            </SectionLabel>
             <ModelMenu
               capability="audio"
               models={sttModels}

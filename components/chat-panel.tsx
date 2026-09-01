@@ -14,6 +14,7 @@ import {
 } from '@/components/chat-prompt-form';
 import { EmptyScreen } from '@/components/empty-screen';
 import { Messages } from '@/components/messages';
+import { PromptSuggestions } from '@/components/prompt-suggestions';
 import { UsageLimitAlert } from '@/components/usage-limit-alert';
 
 const ScrollToBottom = dynamic(() => import('@/components/scroll-to-bottom'), {
@@ -70,7 +71,13 @@ export function ChatPanel({
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       <ChatHeader title={title} />
-      <div className="min-h-0 w-full flex-1 overflow-hidden">
+      <div
+        className={cn('min-h-0 w-full flex-1 overflow-hidden', {
+          // Nothing to show — `noChat` means a ready status and zero messages —
+          // and a flexing empty region would push the composer down the page.
+          hidden: noChat
+        })}
+      >
         <ScrollToBottom status={status} messages={messages}>
           <Messages
             modelId={modelId}
@@ -90,7 +97,16 @@ export function ChatPanel({
       </div>
       <div
         className={cn('mx-auto w-full max-w-4xl bg-background px-4 pb-4', {
-          'mb-60 flex h-full flex-col items-center justify-center': noChat
+          // Anchored from the top rather than centred: the prompt suggestions
+          // below are optional and variable in height, and centring would let
+          // them shove the greeting and the composer up the page.
+          //
+          // It also takes over as the scroll region under the fixed header, the
+          // way the thread does in a conversation — the greeting, the composer
+          // and the suggestions scroll together when the window is too short to
+          // hold them, rather than being clipped by the ancestor.
+          'flex min-h-0 flex-1 flex-col items-center overflow-y-auto pt-[max(3rem,14vh)]':
+            noChat
         })}
       >
         {noChat && (
@@ -111,6 +127,15 @@ export function ChatPanel({
           onModelChange={onModelChange}
           onOptionsChange={onOptionsChange}
         />
+        {/* Only on a new chat: a prompt seeds the first message, so once the
+            conversation has started it is no longer what the user needs. */}
+        {noChat && (
+          <PromptSuggestions
+            currentValue={input}
+            onInsert={setInput}
+            disabled={status === 'submitted' || status === 'streaming'}
+          />
+        )}
       </div>
     </div>
   );

@@ -20,13 +20,20 @@ export function isTrustedMediaUrl(url: string): boolean {
 }
 
 /**
- * Replace file parts the chat model can't consume with a text marker carrying
- * the URL, before the conversation is converted to model messages:
- *   - audio/video: no chat provider accepts them as message content
- *   - images: only when the model lacks vision support
- * The marker keeps the model aware of the attachment so it can reference it
- * via the media tools (transcribe_audio / edit_image). Persistence is
- * unaffected — this only shapes what the model sees.
+ * Shape the conversation so the chat model can both consume its attachments
+ * and refer to them, before it is converted to model messages:
+ *   - audio/video become a text marker carrying the URL: no chat provider
+ *     accepts them as message content;
+ *   - an image the model cannot see becomes the same kind of marker;
+ *   - an image it can see keeps its file part and gains the marker alongside.
+ *
+ * That last case is why the marker is not merely a fallback. A vision model
+ * receives the image as content, which shows it the picture but never its URL
+ * — and `edit_image` takes a URL. Without the marker the better model was the
+ * one that could not edit an upload: it saw the image and then asked the user
+ * to attach it again.
+ *
+ * Persistence is unaffected — this only shapes what the model sees.
  */
 export function maskUnsupportedFileParts(
   messages: ChatMessage[],
@@ -34,28 +41,22 @@ export function maskUnsupportedFileParts(
 ): ChatMessage[] {
   return messages.map(message => ({
     ...message,
-    parts: (message.parts ?? []).map(part => {
-      if (part.type !== 'file') return part;
+    parts: (message.parts ?? []).flatMap((part): ChatMessage['parts'] => {
+      if (part.type !== 'file') return [part];
       const mediaType = part.mediaType ?? '';
-      if (mediaType.startsWith('audio/')) {
-        return {
-          type: 'text' as const,
-          text: `[Audio file attached: ${part.url}]`
-        };
+      const marker = (label: string) => ({
+        type: 'text' as const,
+        text: `[${label} file attached: ${part.url}]`
+      });
+
+      if (mediaType.startsWith('audio/')) return [marker('Audio')];
+      if (mediaType.startsWith('video/')) return [marker('Video')];
+      if (mediaType.startsWith('image/')) {
+        return options.supportsVision
+          ? [part, marker('Image')]
+          : [marker('Image')];
       }
-      if (mediaType.startsWith('video/')) {
-        return {
-          type: 'text' as const,
-          text: `[Video file attached: ${part.url}]`
-        };
-      }
-      if (mediaType.startsWith('image/') && !options.supportsVision) {
-        return {
-          type: 'text' as const,
-          text: `[Image file attached: ${part.url}]`
-        };
-      }
-      return part;
+      return [part];
     })
   }));
 }

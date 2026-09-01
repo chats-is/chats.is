@@ -18,8 +18,10 @@ export const SettingsSpeech = () => {
   const { ttsModels } = useSystemSettings();
   const { preferences, setPreference } = usePreferences();
 
-  const speechModel = preferences.speechModelId;
-  const speechVoice = preferences.speechVoice;
+  // The same selection the chat's text-to-speech tool uses — reading a message
+  // aloud and generating speech in a reply are one setting, not two.
+  const speechModel = preferences.audioModelId;
+  const speechVoice = preferences.audioVoice;
 
   const selectedModel = useMemo(
     () => ttsModels?.find(m => m.modelId === speechModel),
@@ -32,20 +34,29 @@ export const SettingsSpeech = () => {
     return voices || [];
   }, [selectedModel]);
 
-  // Reset voice if current voice is not available in new model
+  // Reset the voice when the selected model cannot speak it, preferring the
+  // model's own default before the first available — the order the server's
+  // `pickVoice` uses.
   useEffect(() => {
-    if (availableVoices.length > 0 && !availableVoices.includes(speechVoice)) {
-      const defaultVoice = availableVoices[0];
-      setPreference('speechVoice', defaultVoice);
+    if (availableVoices.length === 0 || availableVoices.includes(speechVoice)) {
+      return;
     }
-  }, [availableVoices, speechVoice, setPreference]);
+
+    const modelVoice = selectedModel?.uiOptions?.voice;
+    setPreference(
+      'audioVoice',
+      modelVoice && availableVoices.includes(modelVoice)
+        ? modelVoice
+        : availableVoices[0]
+    );
+  }, [availableVoices, speechVoice, selectedModel, setPreference]);
 
   const handleModelChange = (value: string) => {
-    setPreference('speechModelId', value);
+    setPreference('audioModelId', value);
   };
 
   const handleVoiceChange = (value: string) => {
-    setPreference('speechVoice', value);
+    setPreference('audioVoice', value);
   };
 
   return (
@@ -54,14 +65,18 @@ export const SettingsSpeech = () => {
         <UiLabel>Model</UiLabel>
         <Select onValueChange={handleModelChange} value={speechModel}>
           <SelectTrigger className="w-auto rounded-full">
+            {/* Children override the placeholder whenever a value is set, so
+                an id that resolves to nothing would render an empty pill. */}
             <SelectValue placeholder="Select a model">
-              <div className="flex items-center">
-                <ModelIcon
-                  image={selectedModel?.image || selectedModel?.provider?.image}
-                  className="mr-2 size-4"
-                />
-                <span>{selectedModel?.name}</span>
-              </div>
+              {selectedModel && (
+                <div className="flex items-center">
+                  <ModelIcon
+                    image={selectedModel.image || selectedModel.provider?.image}
+                    className="mr-2 size-4"
+                  />
+                  <span>{selectedModel.name}</span>
+                </div>
+              )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>

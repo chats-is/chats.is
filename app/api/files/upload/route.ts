@@ -1,131 +1,87 @@
-import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
-import { z } from 'zod';
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 
 import { env } from '@/lib/env';
-import { generateUUID } from '@/lib/utils';
+import {
+  isUploadType,
+  maxSizeForPathname,
+  UPLOAD_CONFIG
+} from '@/lib/upload-config';
 import { getVerifiedSession } from '@/server/auth';
 
-const UPLOAD_CONFIG = {
-  avatar: {
-    maxSize: 5 * 1024 * 1024,
-    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    folder: 'avatars',
-    useUUID: true
-  },
-  attachment: {
-    maxSize: 5 * 1024 * 1024,
-    allowedTypes: [
-      'image/jpeg',
-      'image/png',
-      // Audio attachments feed the chat transcribe_audio (STT) tool.
-      'audio/mpeg',
-      'audio/mp3',
-      'audio/wav',
-      'audio/x-wav',
-      'audio/mp4',
-      'audio/x-m4a',
-      'audio/ogg',
-      'audio/webm',
-      'audio/flac'
-    ],
-    folder: 'attachments',
-    useUUID: false
-  },
-  prompts: {
-    maxSize: 5 * 1024 * 1024,
-    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    folder: 'prompts',
-    useUUID: true
-  }
-} as const;
-
-type UploadType = keyof typeof UPLOAD_CONFIG;
-
-const createFileSchema = (type: UploadType) => {
-  const uploadConfig = UPLOAD_CONFIG[type];
-  return z.object({
-    file: z
-      .instanceof(Blob)
-      .refine(file => file.size <= uploadConfig.maxSize, {
-        message: `File size should be less than ${uploadConfig.maxSize / (1024 * 1024)}MB`
-      })
-      .refine(
-        file =>
-          (uploadConfig.allowedTypes as readonly string[]).includes('*') ||
-          (uploadConfig.allowedTypes as readonly string[]).includes(file.type),
-        {
-          message: `File type should be ${uploadConfig.allowedTypes.map(t => t.split('/')[1]?.toUpperCase()).join(', ')}`
-        }
-      )
-  });
-};
-
+/**
+ * Signs a token for one upload, which the browser then sends straight to blob
+ * storage — and receives the completion callback afterwards. No file passes
+ * through here: a Vercel function cannot receive more than 4.5 MB of request
+ * body on any plan, and video does not fit. Nothing here touches the bytes: a Vercel function cannot receive
+ * more than 4.5 MB of request body on any plan, and video does not fit.
+ *
+ * The token is the only thing standing between the store and the internet, so
+ * everything is decided here, before it is signed:
+ *
+ *   - the session, without which no token is issued at all;
+ *   - the path, which must be the one this user's uploads live under — the
+ *     browser proposes it and could propose anyone's, so it is compared
+ *     against the session rather than trusted;
+ *   - the content types and the size ceiling, which blob storage enforces.
+ *
+ * A random suffix is added on top: two uploads of the same name cannot
+ * collide, and no path can be guessed from another user's.
+ */
 export async function POST(req: NextRequest) {
-  const session = await getVerifiedSession();
-
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const type = req.nextUrl.searchParams.get('type') as UploadType | null;
-
-  if (!type || !UPLOAD_CONFIG[type]) {
-    const validTypes = Object.keys(UPLOAD_CONFIG).join(', ');
-    return NextResponse.json(
-      { error: `Invalid upload type. Valid types: ${validTypes}` },
-      { status: 400 }
-    );
-  }
-
-  const uploadConfig = UPLOAD_CONFIG[type];
-  const formData = await req.formData();
-  const file = formData.get('file') as Blob;
-
-  if (!file) {
-    return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
-  }
-
-  const FileSchema = createFileSchema(type);
-  const validatedFile = FileSchema.safeParse({ file });
-
-  if (!validatedFile.success) {
-    const errorMessage =
-      validatedFile.error.issues[0]?.message || 'Invalid file';
-    return NextResponse.json({ error: errorMessage }, { status: 400 });
-  }
-
-  const fileBuffer = await file.arrayBuffer();
-
-  let filename: string;
-  if (uploadConfig.useUUID) {
-    const ext = file.type.split('/')[1] || 'png';
-    filename = `${generateUUID()}.${ext}`;
-  } else {
-    filename = path.basename((formData.get('file') as File).name);
-  }
+  const body = (await req.json()) as HandleUploadBody;
 
   try {
-    const pathname = path.join(
-      env.UPLOAD_PATH,
-      uploadConfig.folder,
-      session.user.id,
-      filename
-    );
-    const data = await put(pathname, fileBuffer, {
-      access: 'public',
-      contentType: file.type,
-      addRandomSuffix: false
+    const result = await handleUpload({
+      body,
+      request: req,
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        const session = await getVerifiedSession();
+        if (!session?.user) {
+          throw new Error('Unauthorized');
+        }
+
+        const type = clientPayload ?? '';
+        if (!isUploadType(type)) {
+          throw new Error('Invalid upload type');
+        }
+
+        const prefix = [
+          env.NEXT_PUBLIC_UPLOAD_PATH,
+          UPLOAD_CONFIG[type].folder,
+          session.user.id
+        ]
+          .filter(Boolean)
+          .join('/');
+        const filename = pathname.slice(prefix.length + 1);
+        if (
+          !pathname.startsWith(`${prefix}/`) ||
+          !filename ||
+          filename.includes('/')
+        ) {
+          throw new Error('Invalid upload path');
+        }
+
+        return {
+          allowedContentTypes: [...UPLOAD_CONFIG[type].allowedTypes],
+          maximumSizeInBytes: maxSizeForPathname(type, pathname),
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ userId: session.user.id, type })
+        };
+      },
+      // Blob calls this when the upload lands. Nothing depends on it: the
+      // browser carries the returned URL into the message it is attached to,
+      // which is also why uploads work in local development, where Blob cannot
+      // reach localhost to call back at all.
+      onUploadCompleted: async () => {}
     });
 
-    return NextResponse.json({
-      url: data.url,
-      name: data.pathname,
-      contentType: data.contentType
-    });
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    console.error('[upload] token request failed:', error);
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 400 }
+    );
   }
 }

@@ -121,6 +121,9 @@ export function ChatUI({
               aspectRatio: preferences.imageAspectRatio
             }
           : undefined,
+        imageEdit: preferences.imageEditModelId
+          ? { modelId: preferences.imageEditModelId }
+          : undefined,
         video: preferences.videoModelId
           ? {
               modelId: preferences.videoModelId,
@@ -128,6 +131,12 @@ export function ChatUI({
               resolution: preferences.videoResolution,
               duration: preferences.videoDuration
             }
+          : undefined,
+        videoImage: preferences.videoImageModelId
+          ? { modelId: preferences.videoImageModelId }
+          : undefined,
+        videoEdit: preferences.videoEditModelId
+          ? { modelId: preferences.videoEditModelId }
           : undefined,
         audio: preferences.audioModelId
           ? {
@@ -147,10 +156,13 @@ export function ChatUI({
       preferences.imageModelId,
       preferences.imageSize,
       preferences.imageAspectRatio,
+      preferences.imageEditModelId,
       preferences.videoModelId,
       preferences.videoAspectRatio,
       preferences.videoResolution,
       preferences.videoDuration,
+      preferences.videoImageModelId,
+      preferences.videoEditModelId,
       preferences.audioModelId,
       preferences.audioVoice,
       preferences.sttModelId

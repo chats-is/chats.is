@@ -35,7 +35,15 @@ export function QuotaSettings() {
             <Label>Default Quota</Label>
             <Select
               disabled={isEmpty || isSaving}
-              value={isEmpty ? undefined : formData['default.quotaId'] || ''}
+              // Undefined when the saved id no longer names a quota, so the
+              // placeholder shows instead of a blank trigger.
+              value={
+                quotaOptions?.some(
+                  quota => quota.id === formData['default.quotaId']
+                )
+                  ? formData['default.quotaId']
+                  : undefined
+              }
               onValueChange={value => handleChange('default.quotaId', value)}
             >
               <SelectTrigger>

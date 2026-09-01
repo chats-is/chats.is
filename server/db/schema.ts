@@ -430,8 +430,13 @@ export const models = createTable(
     aliases: jsonb('aliases').$type<string[]>(),
     supportsVision: boolean('supports_vision').default(false),
     supportsReasoning: boolean('supports_reasoning').default(false),
-    // Image models: supports image editing (input images).
-    supportsEdit: boolean('supports_edit').default(false),
+    // Image models: can edit an existing image.
+    supportsImageEdit: boolean('supports_image_edit').default(false),
+    // Video models: can take an image as the opening frame.
+    supportsImageToVideo: boolean('supports_image_to_video').default(false),
+    // Video models: can edit an existing video, which is a separate capability
+    // from taking an image as the opening frame.
+    supportsVideoEdit: boolean('supports_video_edit').default(false),
     // Audio models: this is an STT (speech→text) model; unset means TTS.
     supportsTranscription: boolean('supports_transcription').default(false),
     isEnabled: boolean('is_enabled').notNull().default(true),

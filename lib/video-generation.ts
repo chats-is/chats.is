@@ -197,9 +197,22 @@ export async function generateAndStoreVideo(args: {
   aspectRatio?: `${number}:${number}`;
   resolution?: string;
   duration?: number;
+  /** Animate this image instead of generating from the text alone. */
+  inputImage?: { data: Uint8Array; mediaType: string };
+  /** Edit this video instead of generating a new one. */
+  inputVideoUrl?: string;
   abortSignal?: AbortSignal;
 }): Promise<VideoGenerationOutput> {
-  const { userId, prompt, dbModel, candidates, duration, abortSignal } = args;
+  const {
+    userId,
+    prompt,
+    dbModel,
+    candidates,
+    duration,
+    inputImage,
+    inputVideoUrl,
+    abortSignal
+  } = args;
   // 'auto' (admin-configurable option) means: let the provider decide.
   const aspectRatio = resolveAutoOption(args.aspectRatio);
   const resolution = resolveAutoOption(args.resolution);
@@ -218,6 +231,18 @@ export async function generateAndStoreVideo(args: {
       // video only through its OpenAI-compatible API (no AI SDK support
       // either), so it always takes this path regardless of deployment name.
       if (modelId.includes('sora') || provider.type === 'azure') {
+        if (inputVideoUrl) {
+          throw new Error(
+            `${dbModel.name} cannot edit a video; it generates from text only.`
+          );
+        }
+        if (inputImage) {
+          // The custom Sora path sends a prompt and nothing else, so an image
+          // here would be dropped without a word — say so instead.
+          throw new Error(
+            `${dbModel.name} cannot animate an image; it generates from text only.`
+          );
+        }
         const soraResult = await generateWithSora(
           modelId,
           prompt,
@@ -233,9 +258,23 @@ export async function generateAndStoreVideo(args: {
         // request actually used (4/8/12s), not the raw client input.
         videoSeconds = soraResult.seconds;
       } else {
+        // Editing a video is provider-specific: the AI SDK has no standard
+        // parameter for it, and xAI takes the source as a URL in its own
+        // namespace (which also makes it infer the edit mode). Refusing on
+        // other providers beats sending the prompt alone and returning a new
+        // video the user did not ask for.
+        if (inputVideoUrl && provider.type !== 'xai') {
+          throw new Error(
+            `${dbModel.name} cannot edit a video through ${provider.type}.`
+          );
+        }
+
         const providerOpts = {
           ...provider.apiOptions,
-          ...(resolution && { resolution })
+          // Duration, aspect ratio and resolution are inherited from the source
+          // when editing, so the provider ignores them — don't send one.
+          ...(resolution && !inputVideoUrl && { resolution }),
+          ...(inputVideoUrl && { videoUrl: inputVideoUrl })
         };
         // The AI SDK polls the provider internally with no ceiling of its
         // own, so the deadline has to be imposed from out here. Kept as its
@@ -251,9 +290,12 @@ export async function generateAndStoreVideo(args: {
         try {
           ({ video, providerMetadata } = await generateVideo({
             model: getVideoModel(provider, modelId),
-            prompt,
-            aspectRatio,
-            duration,
+            // An image turns this into image-to-video: the picture is the
+            // opening frame and the text says what happens from there.
+            prompt: inputImage
+              ? { image: inputImage.data, text: prompt }
+              : prompt,
+            ...(inputVideoUrl ? {} : { aspectRatio, duration }),
             abortSignal: signal,
             ...(Object.keys(providerOpts).length > 0 && {
               providerOptions: {

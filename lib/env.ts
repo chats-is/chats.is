@@ -46,7 +46,6 @@ export const env = createEnv({
     BLOB_READ_WRITE_TOKEN: z.string().min(1),
 
     // Upload Path
-    UPLOAD_PATH: z.string().default('uploads'),
 
     // Resumable chat streams (optional). When unset, resume is disabled and
     // chat falls back to one-shot streaming. Use an Upstash Redis `rediss://`
@@ -57,9 +56,15 @@ export const env = createEnv({
     UMAMI_SCRIPT_URL: z.string().optional(),
     UMAMI_WEBSITE_ID: z.string().optional()
   },
-  client: {},
+  client: {
+    // The browser builds the path it uploads to, and the server checks that
+    // path against the session before signing a token for it. Public because
+    // it is already the first segment of every blob URL the app serves.
+    NEXT_PUBLIC_UPLOAD_PATH: z.string().default('uploads')
+  },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_UPLOAD_PATH: process.env.NEXT_PUBLIC_UPLOAD_PATH,
     PORT: process.env.PORT,
     VERCEL_URL: process.env.VERCEL_URL,
 
@@ -89,7 +94,6 @@ export const env = createEnv({
     BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
 
     // Upload Path
-    UPLOAD_PATH: process.env.UPLOAD_PATH,
 
     // Resumable chat streams
     REDIS_URL: process.env.REDIS_URL,

@@ -57,7 +57,10 @@ export const SettingsProfile = () => {
     setIsUploading(true);
 
     try {
-      const result = await uploadFile(file, 'avatar');
+      const result = await uploadFile(file, {
+        userId: user!.id,
+        type: 'avatar'
+      });
 
       if ('error' in result) {
         toast.error(result.error || 'Failed to upload avatar');

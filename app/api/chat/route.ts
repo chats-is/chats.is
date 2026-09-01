@@ -29,6 +29,7 @@ import {
   type ArtifactKind
 } from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
+import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
 import { buildMediaTools, MediaToolsOptions } from '@/lib/chat-tools';
 import { normalizeChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
@@ -70,6 +71,19 @@ type PostData = {
   isReasoning?: boolean;
   mediaOptions?: MediaToolsOptions;
 };
+
+/**
+ * What the user is shown when a generation fails: the provider's own words
+ * where there are any. Both the inner `toUIMessageStream` and the outer
+ * `createUIMessageStream` need it — whichever sees the failure first writes
+ * the message part, and a default on either one swallows the reason.
+ */
+function streamErrorMessage(error: unknown): string {
+  if (error == null) return 'Unknown error';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  return JSON.stringify(error);
+}
 
 // Verbose error serializer — resumable-stream / node-redis failures often
 // surface as empty `Error` objects under Next's ignore-listed stack redaction,
@@ -177,12 +191,19 @@ export async function POST(req: Request) {
 
       if (!titlePrompt || !titleModelId || !titleProvider) return UNTITLED;
 
+      // Only what the user wrote, with attachments named rather than linked —
+      // `titleInputFromMessage` explains what the raw message did to a model
+      // whose one job is to name the conversation.
+      const input = titleInputFromMessage(userMessage);
+      if (!input) return UNTITLED;
+
       const { text } = await generateText({
         model: getLanguageModel(titleProvider, titleModelId),
         instructions: titlePrompt,
-        prompt: JSON.stringify(userMessage)
+        prompt: input
       });
-      return text || UNTITLED;
+
+      return sanitizeTitle(text) || UNTITLED;
     } catch (err: any) {
       console.error(`Generate title error:`, err.message);
       return UNTITLED;
@@ -801,6 +822,11 @@ export async function POST(req: Request) {
             originalMessages: chatMessages,
             generateMessageId: () => assistantMessageId,
             sendReasoning: isReasoning,
+            // Without this the inner stream uses the SDK's default, which
+            // reports every failure as "An error occurred." — the outer
+            // handler never sees it, so the reason is lost before it can be
+            // shown or written to the message.
+            onError: streamErrorMessage,
             messageMetadata: ({ part }) => {
               if (part.type === 'start') {
                 const now = new Date();
@@ -930,21 +956,7 @@ export async function POST(req: Request) {
           }
         }
       },
-      onError: error => {
-        if (error == null) {
-          return 'Unknown error';
-        }
-
-        if (typeof error === 'string') {
-          return error;
-        }
-
-        if (error instanceof Error) {
-          return error.message;
-        }
-
-        return JSON.stringify(error);
-      }
+      onError: streamErrorMessage
     });
 
     // When Redis is configured, wrap the stream as a resumable one so a page

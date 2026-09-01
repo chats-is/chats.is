@@ -114,7 +114,10 @@ export const BedrockModels: Record<string, string> = {
 };
 
 /** Media tool names plus transcription (separate output shape, same prompt). */
-export type ChatMediaToolName = MediaToolName | 'transcribe_audio';
+export type ChatMediaToolName =
+  | MediaToolName
+  | 'transcribe_audio'
+  | 'edit_video';
 
 const MediaToolDescriptions: Record<ChatMediaToolName, string> = {
   generate_image:
@@ -122,7 +125,9 @@ const MediaToolDescriptions: Record<ChatMediaToolName, string> = {
   edit_image:
     "- edit_image: modify an existing image from this conversation (a user upload or a previously generated image). Pass that image's URL as `imageUrl` and describe the change in `prompt`.",
   generate_video:
-    '- generate_video: create a short video from a text description.',
+    '- generate_video: create a short video from a text description, or animate an image from this conversation by passing its URL as `imageUrl`.',
+  edit_video:
+    "- edit_video: modify an existing video from this conversation (a user upload or a previously generated one) — use this whenever the user asks to change a video that already exists, never generate_video. Pass that video's URL as `videoUrl` and describe the change in `prompt`. Length, aspect ratio and resolution are inherited from the source.",
   text_to_speech:
     '- text_to_speech: convert text to spoken audio (e.g. "read this aloud", "say this"). Pass the exact final text to speak — write it out first if it needs composing.',
   transcribe_audio:

@@ -1,7 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
-
 import { api } from '@/trpc/react';
 import { Label } from '@/components/ui/label';
 import {
@@ -18,12 +16,13 @@ import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared';
 const KEYS = [
   'default.chat.modelId',
   'default.image.modelId',
+  'default.image.editModelId',
   'default.video.modelId',
+  'default.video.imageModelId',
+  'default.video.editModelId',
   'default.tts.modelId',
   'default.stt.modelId',
   'speech.enabled',
-  'default.speech.modelId',
-  'default.speech.voice',
   'title.modelId'
 ] as const;
 
@@ -50,8 +49,13 @@ function ModelSelect({
       <Label>{label}</Label>
       <Select
         disabled={isEmpty || disabled}
-        // Undefined (not '') so the placeholder shows rather than a blank value.
-        value={isEmpty ? undefined : value || ''}
+        // Undefined (not '') so the placeholder shows rather than a blank
+        // value — including when the saved id names a model that has since
+        // been deleted or disabled, which Radix would otherwise render as an
+        // empty trigger with no hint that anything is set.
+        value={
+          options?.some(option => option.modelId === value) ? value : undefined
+        }
         onValueChange={onChange}
       >
         <SelectTrigger>
@@ -82,9 +86,14 @@ export function ModelsSettings() {
   const imageModels = models?.filter(
     m => m.capability === 'image' && m.isEnabled
   );
+  // Editing is a per-model capability; offering a model that lacks it as the
+  // default editor would configure a tool that always refuses.
+  const imageEditModels = imageModels?.filter(m => m.supportsImageEdit);
   const videoModels = models?.filter(
     m => m.capability === 'video' && m.isEnabled
   );
+  const videoImageModels = videoModels?.filter(m => m.supportsImageToVideo);
+  const videoEditModels = videoModels?.filter(m => m.supportsVideoEdit);
   const speechModels = models?.filter(
     m => m.capability === 'audio' && m.isEnabled && !m.supportsTranscription
   );
@@ -93,13 +102,6 @@ export function ModelsSettings() {
   );
 
   const speechEnabled = formData['speech.enabled'] === 'true';
-  const speechVoices = useMemo(() => {
-    const selected = speechModels?.find(
-      m => m.modelId === formData['default.speech.modelId']
-    );
-    return (selected?.uiOptions?.voices as string[]) || [];
-  }, [speechModels, formData['default.speech.modelId']]);
-
   if (isLoading) return <SettingsLoading />;
 
   return (
@@ -122,10 +124,33 @@ export function ModelsSettings() {
             disabled={isSaving}
           />
           <ModelSelect
+            label="Default Image Edit Model"
+            options={imageEditModels}
+            value={formData['default.image.editModelId']}
+            onChange={value => handleChange('default.image.editModelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
             label="Default Video Model"
             options={videoModels}
             value={formData['default.video.modelId']}
             onChange={value => handleChange('default.video.modelId', value)}
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default Image-to-Video Model"
+            options={videoImageModels}
+            value={formData['default.video.imageModelId']}
+            onChange={value =>
+              handleChange('default.video.imageModelId', value)
+            }
+            disabled={isSaving}
+          />
+          <ModelSelect
+            label="Default Video Edit Model"
+            options={videoEditModels}
+            value={formData['default.video.editModelId']}
+            onChange={value => handleChange('default.video.editModelId', value)}
             disabled={isSaving}
           />
           <ModelSelect
@@ -148,9 +173,11 @@ export function ModelsSettings() {
       <div className="rounded-lg border p-4">
         <h2 className="mb-2 text-lg font-semibold">Text-to-Speech Reading</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          Default settings for reading messages aloud.
+          Whether messages can be read aloud. Which model and voice does it is
+          the Default TTS Model above — reading a message aloud and generating
+          speech in a reply are the same job.
         </p>
-        <div className="mb-4 space-y-2">
+        <div className="space-y-2">
           <Label>Enable Speech</Label>
           <div className="flex items-center space-x-2">
             <Switch
@@ -163,46 +190,6 @@ export function ModelsSettings() {
             <Label className="font-normal text-muted-foreground">
               {speechEnabled ? 'Enabled' : 'Disabled'}
             </Label>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <ModelSelect
-            label="Default Speech Model"
-            options={speechModels}
-            value={formData['default.speech.modelId']}
-            onChange={value => handleChange('default.speech.modelId', value)}
-            disabled={!speechEnabled || isSaving}
-          />
-          <div className="space-y-2">
-            <Label>Default Speech Voice</Label>
-            <Select
-              disabled={!speechEnabled || !speechVoices.length || isSaving}
-              value={
-                !speechVoices.length
-                  ? undefined
-                  : formData['default.speech.voice'] || ''
-              }
-              onValueChange={value =>
-                handleChange('default.speech.voice', value)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    !speechVoices.length
-                      ? 'No available voices'
-                      : 'Select voice'
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {speechVoices.map(voice => (
-                  <SelectItem key={voice} value={voice}>
-                    {voice.charAt(0).toUpperCase() + voice.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </div>

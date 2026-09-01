@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { UseChatHelpers } from '@ai-sdk/react';
 import { ArrowUp, Loader2, Square } from 'lucide-react';
@@ -9,11 +8,10 @@ import { Attachment, ChatMessage } from '@/types';
 import { modelMatchesId } from '@/lib/utils';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { Button } from '@/components/ui/button';
-import { AttachmentsButton } from '@/components/attachments-button';
+import { AddFilesMenu } from '@/components/add-files-menu';
 import { AttachmentsPreview } from '@/components/attachments-preview';
-import { MediaToolsMenu } from '@/components/media-tools-menu';
+import { MediaSettingsMenu } from '@/components/media-settings-menu';
 import { ModelMenu, ModelOptions } from '@/components/model-menu';
-import { PromptPicker } from '@/components/prompt-picker';
 
 export type { ModelOptions };
 
@@ -50,7 +48,7 @@ export function ChatPromptForm({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
-  const { chatModels, sttModels, defaults } = useSystemSettings();
+  const { chatModels, sttModels, videoModels } = useSystemSettings();
 
   // Two distinct dead ends, both of which make a submission fail:
   //   - no chat model is configured at all;
@@ -74,22 +72,15 @@ export function ChatPromptForm({
       ? 'Select a model to start.'
       : 'Send a message.';
 
-  const { preferences } = usePreferences();
-
-  // Attachments: images need a vision-capable chat model; audio needs an STT
-  // model the server can actually resolve (user selection or system default) —
-  // otherwise the upload would be accepted but never transcribable.
+  // Attachments: images need a vision-capable chat model, audio needs an STT
+  // model to transcribe it. The `+` menu settles *which* STT model when the
+  // user picks that row, so existence is enough here.
   const canAttachImages = !!modelOptions.supportsVision;
-  const sttModelId = preferences.sttModelId || defaults.sttModelId || '';
-  const canAttachAudio =
-    !!sttModels?.length && sttModels.some(m => m.modelId === sttModelId);
-  const showAttachments = canAttachImages || canAttachAudio;
-  const attachmentAccept = [
-    canAttachImages && '.jpg,.jpeg,.png,.gif,.webp',
-    canAttachAudio && '.mp3,.wav,.m4a,.ogg,.flac'
-  ]
-    .filter(Boolean)
-    .join(',');
+  const canAttachAudio = !!sttModels?.length;
+  // Video too, or a model that can only edit video would take an attachment
+  // the user then has no thumbnail, progress or remove button for.
+  const canAttachVideo = !!videoModels?.some(model => model.supportsVideoEdit);
+  const showAttachments = canAttachImages || canAttachAudio || canAttachVideo;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -161,8 +152,16 @@ export function ChatPromptForm({
           />
         </div>
         <div className="mt-5 flex items-center justify-between space-x-2">
-          {/* Model Menu with integrated Think button + media model picker */}
+          {/* Upload, the chat model, and how it should make media. */}
           <div className="flex items-center space-x-2">
+            <AddFilesMenu
+              disabled={status === 'submitted' || status === 'streaming'}
+              canAttachImages={canAttachImages}
+              uploadQueue={uploadQueue}
+              setUploadQueue={setUploadQueue}
+              attachments={attachments}
+              setAttachments={setAttachments}
+            />
             <ModelMenu
               models={chatModels}
               status={status}
@@ -170,26 +169,9 @@ export function ChatPromptForm({
               onModelChange={onModelChange}
               onOptionsChange={handleOptionsChange}
             />
-            <MediaToolsMenu status={status} />
+            <MediaSettingsMenu status={status} />
           </div>
           <div className="flex items-center space-x-2">
-            <PromptPicker
-              currentValue={input}
-              onInsert={setInput}
-              disabled={
-                cannotSend || status === 'submitted' || status === 'streaming'
-              }
-            />
-            {showAttachments && (
-              <AttachmentsButton
-                disabled={status === 'submitted' || status === 'streaming'}
-                accept={attachmentAccept}
-                uploadQueue={uploadQueue}
-                setUploadQueue={setUploadQueue}
-                attachments={attachments}
-                setAttachments={setAttachments}
-              />
-            )}
             {status === 'streaming' ? (
               <Button
                 type="button"

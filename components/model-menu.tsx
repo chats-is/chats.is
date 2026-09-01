@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { UseChatHelpers } from '@ai-sdk/react';
-import { Eye, Lightbulb } from 'lucide-react';
+import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react';
 
 import { ChatMessage, Model, ModelCapability } from '@/types';
 import {
@@ -200,14 +200,14 @@ export function ModelMenu({
       availableDurations.length > 0 &&
       (duration === undefined || !availableDurations.includes(duration))
     ) {
-      const nextDuration = availableDurations.includes(
-        preferences.videoDuration
-      )
-        ? preferences.videoDuration
-        : defaultDuration !== undefined &&
-            availableDurations.includes(defaultDuration)
-          ? defaultDuration
-          : availableDurations[0];
+      const preferred = preferences.videoDuration;
+      const nextDuration =
+        preferred !== undefined && availableDurations.includes(preferred)
+          ? preferred
+          : defaultDuration !== undefined &&
+              availableDurations.includes(defaultDuration)
+            ? defaultDuration
+            : availableDurations[0];
       if (nextDuration !== duration) {
         onOptionsChange?.({ duration: nextDuration });
       }
@@ -395,8 +395,39 @@ export function ModelMenu({
                             {m.modelId}
                           </span>
                         </span>
-                        {(m.supportsReasoning || m.supportsVision) && (
+                        {(m.supportsReasoning ||
+                          m.supportsVision ||
+                          m.supportsImageEdit ||
+                          m.supportsImageToVideo ||
+                          m.supportsVideoEdit) && (
                           <span className="ml-auto flex items-center gap-1 pt-0.5 pl-3">
+                            {(m.supportsImageEdit ||
+                              m.supportsImageToVideo) && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="rounded bg-emerald-100 p-0.5 dark:bg-emerald-900/30">
+                                    <Pencil className="size-3 text-emerald-600 dark:text-emerald-400" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {m.supportsImageToVideo
+                                    ? 'Can animate an existing image'
+                                    : 'Can edit an existing image'}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            {m.supportsVideoEdit && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="rounded bg-violet-100 p-0.5 dark:bg-violet-900/30">
+                                    <Scissors className="size-3 text-violet-600 dark:text-violet-400" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Can edit an existing video
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                             {m.supportsVision && (
                               <Tooltip>
                                 <TooltipTrigger asChild>

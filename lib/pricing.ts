@@ -119,14 +119,9 @@ export function pricingMissingFields(
         return set(p.audioSeconds) ? [] : ['Per second'];
       }
       if (opts?.transcription === false) {
-        return set(p.audioCharacters) || set(p.audioInput) || set(p.audioOutput)
-          ? []
-          : ['Per 1M characters, or Audio input / Audio output'];
+        return set(p.audioCharacters) ? [] : ['Per 1M characters'];
       }
-      return set(p.audioCharacters) ||
-        set(p.audioInput) ||
-        set(p.audioOutput) ||
-        set(p.audioSeconds)
+      return set(p.audioCharacters) || set(p.audioSeconds)
         ? []
         : ['Per 1M characters, Audio input / Audio output, or Per second'];
     }
@@ -329,49 +324,25 @@ export function calculateVideoCost(
 }
 
 /**
- * Cost for an audio call. Two mutually-exclusive billing styles, character-rate
- * wins (mirrors the per-image vs token-based split in calculateImageCost):
- *   - per-character (classic TTS: tts-1, Google, Azure, Polly, ElevenLabs):
- *       characters × audioCharacters
- *   - per-token (gpt-4o-mini-tts, gpt-audio, omni):
- *       inputTokens × audioInput + outputTokens × audioOutput
- * A model only ever configures one. Checking per-character first avoids
- * double-charging if both happen to be set (misconfig / dirty sync).
+ * Cost for a speech (TTS) call: characters × the per-1M-character rate.
+ *
+ * Characters are what speech generation measures — `generateSpeech` returns
+ * no usage, so no provider's token counts reach us. A token rate was once
+ * accepted here and always multiplied by zero.
  */
 export function calculateAudioCost(
-  args: {
-    audioCharacters?: number;
-    audioInputTokens?: number;
-    audioOutputTokens?: number;
-  },
+  args: { audioCharacters?: number },
   pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
   if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perChar = toNum(pricing.audioCharacters);
-  if (perChar > 0) {
-    return {
-      cost: roundCost(((args.audioCharacters ?? 0) * perChar) / 1_000_000),
-      snapshot: {
-        ...EMPTY_SNAPSHOT,
-        audioCharactersPrice: numToStr(pricing.audioCharacters)
-      }
-    };
-  }
-
-  const audioIn = toNum(pricing.audioInput);
-  const audioOut = toNum(pricing.audioOutput);
-  const inTok = args.audioInputTokens ?? 0;
-  const outTok = args.audioOutputTokens ?? 0;
-  const cost = roundCost(
-    (inTok * audioIn) / 1_000_000 + (outTok * audioOut) / 1_000_000
-  );
   return {
-    cost,
+    cost: roundCost(
+      ((args.audioCharacters ?? 0) * toNum(pricing.audioCharacters)) / 1_000_000
+    ),
     snapshot: {
       ...EMPTY_SNAPSHOT,
-      audioInputPrice: numToStr(pricing.audioInput),
-      audioOutputPrice: numToStr(pricing.audioOutput)
+      audioCharactersPrice: numToStr(pricing.audioCharacters)
     }
   };
 }

@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useCallback, useTransition } from 'react';
-import { AudioLines, XCircle } from 'lucide-react';
+import { AudioLines, Clapperboard, XCircle } from 'lucide-react';
 
 import { Attachment } from '@/types';
 import { deleteFile } from '@/lib/api';
@@ -50,6 +50,15 @@ export const AttachmentsPreview = ({
                   className="flex size-full items-center justify-center rounded-md bg-background"
                 >
                   <AudioLines className="size-5 text-muted-foreground" />
+                </div>
+              ) : attachment.contentType?.startsWith('video/') ? (
+                // A poster frame would need the file decoded; the icon says
+                // what was attached, which is what an <img> could not.
+                <div
+                  title={attachment.name}
+                  className="flex size-full items-center justify-center rounded-md bg-background"
+                >
+                  <Clapperboard className="size-5 text-muted-foreground" />
                 </div>
               ) : (
                 <img
