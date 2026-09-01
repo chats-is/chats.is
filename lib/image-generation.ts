@@ -111,29 +111,8 @@ export async function generateAndStoreImage(args: {
           ? (size as `${number}x${number}`)
           : undefined;
 
-        // Not every provider package parses `usage` out of the image response
-        // — @ai-sdk/openai does, @ai-sdk/xai does not — so read the body as it
-        // arrives and keep any token counts in it. Billing by token only works
-        // where the API reports tokens, and this is what stops a provider that
-        // does report them from being billed as zero because its package
-        // dropped the field. (xAI reports a price rather than tokens, which is
-        // not used: what a generation costs is the operator's to configure.)
-        let rawUsage: Record<string, unknown> | undefined;
-        const capturingFetch: typeof fetch = async (input, init) => {
-          const response = await fetch(input, init);
-          try {
-            const body = (await response.clone().json()) as {
-              usage?: Record<string, unknown>;
-            };
-            rawUsage = body?.usage;
-          } catch {
-            // Not JSON, or already consumed — nothing to read.
-          }
-          return response;
-        };
-
         const { image, usage } = await generateImage({
-          model: getImageModel(provider, modelId, capturingFetch),
+          model: getImageModel(provider, modelId),
           prompt: inputImages?.length
             ? { text: prompt, images: inputImages.map(image => image.data) }
             : prompt,
@@ -150,25 +129,8 @@ export async function generateAndStoreImage(args: {
 
         imageBase64 = image.base64;
         imageMediaType = image.mediaType;
-
-        // Both spellings appear in the wild: OpenAI's images API answers with
-        // input_tokens/output_tokens, the chat-shaped ones with prompt/completion.
-        const num = (value: unknown) =>
-          typeof value === 'number' ? value : undefined;
-        inputTokens =
-          usage?.inputTokens ??
-          num(rawUsage?.input_tokens) ??
-          num(rawUsage?.prompt_tokens);
-        outputTokens =
-          usage?.outputTokens ??
-          num(rawUsage?.output_tokens) ??
-          num(rawUsage?.completion_tokens);
-
-        if (usage?.inputTokens == null && inputTokens != null) {
-          console.log(
-            `[image] token usage recovered from the ${provider.type} response`
-          );
-        }
+        inputTokens = usage?.inputTokens;
+        outputTokens = usage?.outputTokens;
       }
 
       return { imageBase64, imageMediaType, inputTokens, outputTokens };
