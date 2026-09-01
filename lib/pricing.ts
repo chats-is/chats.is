@@ -103,10 +103,11 @@ export function pricingMissingFields(
       return m;
     }
     case 'image':
-      // Per-image OR token-based pricing satisfies an image model.
-      return set(p.image) || (set(p.input) && set(p.output))
-        ? []
-        : ['Image, or Input + Output'];
+      // Per image is required even when token rates are set: tokens are only
+      // billed when the provider reports them, and not every image API does.
+      // Without this a token-priced model whose provider reports none would
+      // pass the gate and then bill nothing.
+      return set(p.image) ? [] : ['Image'];
     case 'video':
       return set(p.video) || set(p.videoSeconds)
         ? []
@@ -119,14 +120,11 @@ export function pricingMissingFields(
         return set(p.audioSeconds) ? [] : ['Per second'];
       }
       if (opts?.transcription === false) {
-        return set(p.audioCharacters) || set(p.audioInput) || set(p.audioOutput)
-          ? []
-          : ['Per 1M characters, or Audio input / Audio output'];
+        // Per 1M characters for the same reason images need a per-image rate:
+        // it is the dimension speech generation always reports.
+        return set(p.audioCharacters) ? [] : ['Per 1M characters'];
       }
-      return set(p.audioCharacters) ||
-        set(p.audioInput) ||
-        set(p.audioOutput) ||
-        set(p.audioSeconds)
+      return set(p.audioCharacters) || set(p.audioSeconds)
         ? []
         : ['Per 1M characters, Audio input / Audio output, or Per second'];
     }
@@ -264,35 +262,32 @@ export function calculateImageCost(
 ): { cost: number; snapshot: PriceSnapshot } {
   if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perImage = toNum(pricing.image);
-
-  // Two mutually-exclusive billing styles, image-price wins:
-  //   - per-image  (DALL-E / imagen): imageCount × image
-  //   - per-token  (gpt-image-1 ...): inputTokens × input + outputTokens × output
-  // A model only ever configures one. Checking per-image first avoids
-  // double-charging if both happen to be set (misconfig / dirty sync).
-  if (perImage > 0) {
-    return {
-      cost: roundCost(args.imageCount * perImage),
-      snapshot: { ...EMPTY_SNAPSHOT, imagePrice: numToStr(pricing.image) }
-    };
-  }
-
+  // Tokens when the provider reported them and they are priced — OpenAI's
+  // image API returns them, xAI's does not. Otherwise per image, which is
+  // always measurable, which is why it is the dimension the gate requires.
   const inputRate = toNum(pricing.input);
   const outputRate = toNum(pricing.output);
   const inputTokens = args.inputTokens ?? 0;
   const outputTokens = args.outputTokens ?? 0;
-  const cost = roundCost(
-    (inputTokens * inputRate) / 1_000_000 +
-      (outputTokens * outputRate) / 1_000_000
-  );
+  const hasTokens = inputTokens > 0 || outputTokens > 0;
+
+  if (hasTokens && (inputRate > 0 || outputRate > 0)) {
+    return {
+      cost: roundCost(
+        (inputTokens * inputRate) / 1_000_000 +
+          (outputTokens * outputRate) / 1_000_000
+      ),
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        inputPrice: numToStr(pricing.input),
+        outputPrice: numToStr(pricing.output)
+      }
+    };
+  }
+
   return {
-    cost,
-    snapshot: {
-      ...EMPTY_SNAPSHOT,
-      inputPrice: numToStr(pricing.input),
-      outputPrice: numToStr(pricing.output)
-    }
+    cost: roundCost(args.imageCount * toNum(pricing.image)),
+    snapshot: { ...EMPTY_SNAPSHOT, imagePrice: numToStr(pricing.image) }
   };
 }
 
@@ -310,21 +305,23 @@ export function calculateVideoCost(
 ): { cost: number; snapshot: PriceSnapshot } {
   if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perVideo = toNum(pricing.video);
-  if (perVideo > 0) {
+  // Seconds when the provider reported a length, otherwise per video. No
+  // video API reports tokens, so there is no token branch here.
+  const perSecond = toNum(pricing.videoSeconds);
+  const seconds = args.videoSeconds ?? 0;
+  if (seconds > 0 && perSecond > 0) {
     return {
-      cost: roundCost((args.videoCount ?? 0) * perVideo),
-      snapshot: { ...EMPTY_SNAPSHOT, videoPrice: numToStr(pricing.video) }
+      cost: roundCost(seconds * perSecond),
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        videoSecondsPrice: numToStr(pricing.videoSeconds)
+      }
     };
   }
 
-  const perSecond = toNum(pricing.videoSeconds);
   return {
-    cost: roundCost((args.videoSeconds ?? 0) * perSecond),
-    snapshot: {
-      ...EMPTY_SNAPSHOT,
-      videoSecondsPrice: numToStr(pricing.videoSeconds)
-    }
+    cost: roundCost((args.videoCount ?? 0) * toNum(pricing.video)),
+    snapshot: { ...EMPTY_SNAPSHOT, videoPrice: numToStr(pricing.video) }
   };
 }
 
@@ -348,30 +345,35 @@ export function calculateAudioCost(
 ): { cost: number; snapshot: PriceSnapshot } {
   if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perChar = toNum(pricing.audioCharacters);
-  if (perChar > 0) {
-    return {
-      cost: roundCost(((args.audioCharacters ?? 0) * perChar) / 1_000_000),
-      snapshot: {
-        ...EMPTY_SNAPSHOT,
-        audioCharactersPrice: numToStr(pricing.audioCharacters)
-      }
-    };
-  }
-
+  // Tokens when the provider reported them and they are priced. No speech API
+  // reports them today (`generateSpeech` has no usage at all), so this is the
+  // branch that waits for one; characters are what actually gets billed, and
+  // what the gate requires.
   const audioIn = toNum(pricing.audioInput);
   const audioOut = toNum(pricing.audioOutput);
   const inTok = args.audioInputTokens ?? 0;
   const outTok = args.audioOutputTokens ?? 0;
-  const cost = roundCost(
-    (inTok * audioIn) / 1_000_000 + (outTok * audioOut) / 1_000_000
-  );
+
+  if ((inTok > 0 || outTok > 0) && (audioIn > 0 || audioOut > 0)) {
+    return {
+      cost: roundCost(
+        (inTok * audioIn) / 1_000_000 + (outTok * audioOut) / 1_000_000
+      ),
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        audioInputPrice: numToStr(pricing.audioInput),
+        audioOutputPrice: numToStr(pricing.audioOutput)
+      }
+    };
+  }
+
   return {
-    cost,
+    cost: roundCost(
+      ((args.audioCharacters ?? 0) * toNum(pricing.audioCharacters)) / 1_000_000
+    ),
     snapshot: {
       ...EMPTY_SNAPSHOT,
-      audioInputPrice: numToStr(pricing.audioInput),
-      audioOutputPrice: numToStr(pricing.audioOutput)
+      audioCharactersPrice: numToStr(pricing.audioCharacters)
     }
   };
 }
