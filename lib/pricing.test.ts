@@ -315,7 +315,7 @@ describe('pricingMissingFields', () => {
       pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
         transcription: false
       })
-    ).toEqual(['Per 1M characters']);
+    ).toEqual(['Per 1M characters, or Audio input + Audio output']);
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
         transcription: false
@@ -336,15 +336,13 @@ describe('pricingMissingFields', () => {
     ).toEqual([]);
   });
 
-  it('image requires a per-image rate, tokens alone are not enough', () => {
-    // Token rates only bill when the provider reports tokens, and not every
-    // image API does — so the always-measurable dimension has to be there.
+  it('image accepts per-image OR input+output', () => {
     expect(pricingMissingFields('image', pricing({ image: '0.04' }))).toEqual(
       []
     );
     expect(
       pricingMissingFields('image', pricing({ input: '5', output: '40' }))
-    ).toEqual(['Image']);
+    ).toEqual([]);
     expect(pricingMissingFields('image', pricing({ input: '5' }))).not.toEqual(
       []
     );

@@ -103,11 +103,14 @@ export function pricingMissingFields(
       return m;
     }
     case 'image':
-      // Per image is required even when token rates are set: tokens are only
-      // billed when the provider reports them, and not every image API does.
-      // Without this a token-priced model whose provider reports none would
-      // pass the gate and then bill nothing.
-      return set(p.image) ? [] : ['Image'];
+      // One style or the other, not both: per image, or per token where the
+      // provider reports tokens (OpenAI's image API does, xAI's does not).
+      // Pricing a model by a dimension its provider never reports bills
+      // nothing — which is a configuration mistake, not a shape the gate can
+      // catch, since what a provider reports is only known once it answers.
+      return set(p.image) || (set(p.input) && set(p.output))
+        ? []
+        : ['Image, or Input + Output'];
     case 'video':
       return set(p.video) || set(p.videoSeconds)
         ? []
@@ -120,11 +123,16 @@ export function pricingMissingFields(
         return set(p.audioSeconds) ? [] : ['Per second'];
       }
       if (opts?.transcription === false) {
-        // Per 1M characters for the same reason images need a per-image rate:
-        // it is the dimension speech generation always reports.
-        return set(p.audioCharacters) ? [] : ['Per 1M characters'];
+        // Same either/or as images: characters, or tokens for a provider that
+        // reports them. None does today.
+        return set(p.audioCharacters) ||
+          (set(p.audioInput) && set(p.audioOutput))
+          ? []
+          : ['Per 1M characters, or Audio input + Audio output'];
       }
-      return set(p.audioCharacters) || set(p.audioSeconds)
+      return set(p.audioCharacters) ||
+        set(p.audioSeconds) ||
+        (set(p.audioInput) && set(p.audioOutput))
         ? []
         : ['Per 1M characters, Audio input / Audio output, or Per second'];
     }
