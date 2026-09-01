@@ -3,6 +3,7 @@ import 'server-only';
 import { transcribe } from 'ai';
 
 import { Model } from '@/types';
+import { audioDurationInSeconds } from '@/lib/media-duration';
 import {
   FailoverProvider,
   getTranscriptionModel,
@@ -22,11 +23,13 @@ export type TranscriptionOutput = {
  */
 export async function transcribeAudio(args: {
   audio: Uint8Array;
+  /** The uploaded file's type, so the duration can be read from the bytes. */
+  mediaType?: string;
   dbModel: Model;
   candidates: FailoverProvider[];
   abortSignal?: AbortSignal;
 }): Promise<TranscriptionOutput> {
-  const { audio, dbModel, candidates, abortSignal } = args;
+  const { audio, mediaType, dbModel, candidates, abortSignal } = args;
   const modelId = dbModel.modelId;
 
   const { result, provider: usedProvider } = await runWithProviderFailover(
@@ -49,5 +52,15 @@ export async function transcribeAudio(args: {
     }
   );
 
-  return { ...result, provider: usedProvider };
+  // Transcription bills per second, and whether a provider reports the length
+  // it processed is up to that provider. The file is in hand either way, so
+  // its own length stands in when none comes back.
+  // Greater than zero, not merely present: a provider that answers 0 has told
+  // us nothing, and billing per second would charge nothing for real work.
+  const durationInSeconds =
+    result.durationInSeconds && result.durationInSeconds > 0
+      ? result.durationInSeconds
+      : await audioDurationInSeconds(audio, mediaType);
+
+  return { ...result, durationInSeconds, provider: usedProvider };
 }

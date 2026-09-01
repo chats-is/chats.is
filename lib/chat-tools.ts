@@ -638,6 +638,7 @@ export async function buildMediaTools(args: {
         try {
           const result = await transcribeAudio({
             audio: media.data,
+            mediaType: media.mediaType,
             dbModel,
             candidates,
             abortSignal
