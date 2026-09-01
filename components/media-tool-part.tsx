@@ -13,7 +13,6 @@ import {
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaLightbox } from '@/components/media-lightbox';
 import { MediaPlaceholder } from '@/components/media-placeholder';
-import { MessageError } from '@/components/message-error';
 import { VideoPlayer } from '@/components/video-player';
 
 export type MediaToolUIPart = Extract<
@@ -52,18 +51,20 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
     );
   }
 
-  if (part.state === 'output-error') {
-    return <MessageError message={part.errorText} />;
-  }
+  // A failed tool renders nothing. The model is told what went wrong and says
+  // so in its reply, which is a sentence the reader still understands a week
+  // later — unlike a chip repeating a provider's wording about a condition
+  // that has since passed. The error stays in the part either way: the model
+  // needs it on the next turn, and it is what a support question is answered
+  // from.
+  if (part.state === 'output-error') return null;
 
   if (part.state !== 'output-available' || !part.output) {
     return null;
   }
 
   const output = part.output as TranscribeToolOutput;
-  if (output.status === 'error') {
-    return <MessageError message={output.message} />;
-  }
+  if (output.status === 'error') return null;
 
   return (
     <div className="my-2 rounded-lg border bg-muted/30 px-3 py-2">
@@ -114,18 +115,14 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
     );
   }
 
-  if (part.state === 'output-error') {
-    return <MessageError message={part.errorText} />;
-  }
+  if (part.state === 'output-error') return null;
 
   if (part.state !== 'output-available' || !part.output) {
     return null;
   }
 
   const output = part.output as MediaToolOutput;
-  if (output.status === 'error') {
-    return <MessageError message={output.message} />;
-  }
+  if (output.status === 'error') return null;
 
   if (output.mediaType.startsWith('image/')) {
     return (

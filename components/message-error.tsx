@@ -35,6 +35,29 @@ export function MessageError({
 }
 
 /**
+ * A turn that produced no answer, as it reads later.
+ *
+ * The live failure is shown in full while it is happening, because that is
+ * when the reason is worth acting on. Re-opening the conversation is a
+ * different moment: the quota has reset, the model has been configured, the
+ * provider is back — so the reason is stale, while "nothing came back here"
+ * stays true. Quiet, and without the wording of a condition that has passed.
+ */
+export function MessageIncomplete({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'my-2 flex w-fit items-center gap-2 text-xs text-muted-foreground',
+        className
+      )}
+    >
+      <CircleAlert className="size-3.5 shrink-0" />
+      <span>No response</span>
+    </div>
+  );
+}
+
+/**
  * Pull the readable part out of a failed chat request.
  *
  * The AI SDK's transport rejects with the raw response body as the message, so
