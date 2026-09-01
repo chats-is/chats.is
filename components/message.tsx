@@ -14,7 +14,7 @@ import {
   MediaToolPart,
   TranscribeToolPart
 } from '@/components/media-tool-part';
-import { MessageError } from '@/components/message-error';
+import { MessageIncomplete } from '@/components/message-error';
 import { MessageMarkdown } from '@/components/message-markdown';
 import { MessageReasoning } from '@/components/message-reasoning';
 import { ModelIcon } from '@/components/model-icon';
@@ -193,9 +193,11 @@ export function Message({
                 return <TranscribeToolPart key={index} part={part} />;
               }
 
-              // A refused turn: the server persisted this instead of replying.
+              // A turn that failed — refused before it began, or cut off part
+              // way. The reason was shown while it happened; what is left in
+              // the thread is that nothing came back.
               if (part.type === 'data-error') {
-                return <MessageError key={index} message={part.data.message} />;
+                return <MessageIncomplete key={index} />;
               }
 
               if (part.type === 'tool-create_artifact') {

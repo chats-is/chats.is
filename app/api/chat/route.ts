@@ -351,6 +351,18 @@ export async function POST(req: Request) {
     const completedArtifacts = new Map<string, Artifact>();
     const completedArtifactOrder: string[] = [];
 
+    // A stream that fails part-way still persists what it had written, and the
+    // SDK's error chunk never becomes a message part — so without this the
+    // answer is stored truncated with nothing to say it was cut off, and the
+    // reader takes the fragment for the whole reply.
+    let streamFailed = false;
+    const recordStreamError = (error: unknown) => {
+      const message = streamErrorMessage(error);
+      streamFailed = true;
+      console.error(`[chat] stream failed for chat=${id}:`, message);
+      return message;
+    };
+
     const stream = createUIMessageStream<ChatMessage>({
       execute: async ({ writer }) => {
         /**
@@ -826,7 +838,7 @@ export async function POST(req: Request) {
             // reports every failure as "An error occurred." — the outer
             // handler never sees it, so the reason is lost before it can be
             // shown or written to the message.
-            onError: streamErrorMessage,
+            onError: recordStreamError,
             messageMetadata: ({ part }) => {
               if (part.type === 'start') {
                 const now = new Date();
@@ -903,6 +915,22 @@ export async function POST(req: Request) {
           return;
         }
 
+        // The marker says the turn was cut short; why it was cut short is in
+        // the log above, not in the thread — a provider's message means
+        // nothing to the person reading this conversation next week.
+        if (streamFailed) {
+          responseMessage.parts = [
+            ...responseMessage.parts,
+            {
+              type: 'data-error',
+              data: {
+                kind: 'incomplete',
+                message: 'This response was interrupted.'
+              }
+            }
+          ];
+        }
+
         const persistedArtifacts = completedArtifactOrder
           .map(artifactId => completedArtifacts.get(artifactId))
           .filter((artifact): artifact is Artifact => Boolean(artifact));
@@ -956,7 +984,7 @@ export async function POST(req: Request) {
           }
         }
       },
-      onError: streamErrorMessage
+      onError: recordStreamError
     });
 
     // When Redis is configured, wrap the stream as a resumable one so a page

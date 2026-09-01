@@ -20,7 +20,9 @@ export type ChatErrorKind =
   /** The user's quota does not list this model. */
   | 'model-access'
   /** The model or its provider no longer resolves. */
-  | 'model-unavailable';
+  | 'model-unavailable'
+  /** The stream failed part-way; whatever had been written is all there is. */
+  | 'incomplete';
 
 export type CustomUIDataTypes = {
   chat: { title: string };
