@@ -9,8 +9,12 @@ interface MessageMarkdownProps {
 }
 
 export function MessageMarkdown({ content }: MessageMarkdownProps) {
+  // Typography draws curly quotes around blockquote paragraphs, which doubles
+  // up whenever the quoted text carries its own — a transcript rendered as
+  // `> "what was said"` came out with two pairs. The indent already says it is
+  // a quotation.
   return (
-    <div className="prose wrap-break-word dark:prose-invert prose-p:leading-relaxed prose-pre:bg-transparent prose-pre:p-0 prose-hr:my-3 [&_li_p]:my-0!">
+    <div className="prose wrap-break-word dark:prose-invert prose-p:leading-relaxed prose-pre:bg-transparent prose-pre:p-0 prose-hr:my-3 [&_blockquote_p:first-of-type]:before:content-none [&_blockquote_p:last-of-type]:after:content-none [&_li_p]:my-0!">
       <MemoizedReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
