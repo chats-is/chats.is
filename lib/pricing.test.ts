@@ -124,24 +124,12 @@ describe('calculateImageCost', () => {
     expect(snapshot.outputPrice).toBe('40');
   });
 
-  it('bills the tokens the provider reported, not both styles', () => {
+  it('per-image wins and does NOT double-charge when both styles set (misconfig)', () => {
     const { cost, snapshot } = calculateImageCost(
       { imageCount: 2, inputTokens: 1_000_000, outputTokens: 1_000_000 },
       pricing({ image: '0.04', input: '5', output: '40' })
     );
-    // Tokens were reported, so they are what is billed: 5 + 40.
-    expect(cost).toBeCloseTo(45, 10);
-    expect(snapshot.inputPrice).toBe('5');
-    expect(snapshot.imagePrice).toBeNull();
-  });
-
-  it('falls back to per image when the provider reports no tokens', () => {
-    // xAI's image API answers with the price it charged rather than a token
-    // count, so a model priced both ways must still bill something.
-    const { cost, snapshot } = calculateImageCost(
-      { imageCount: 2, inputTokens: 0, outputTokens: 0 },
-      pricing({ image: '0.04', input: '5', output: '40' })
-    );
+    // only per-image applies: 2 * 0.04
     expect(cost).toBeCloseTo(0.08, 10);
     expect(snapshot.imagePrice).toBe('0.04');
     expect(snapshot.inputPrice).toBeNull();
@@ -207,7 +195,7 @@ describe('calculateAudioCost', () => {
     expect(snapshot.audioCharactersPrice).toBeNull();
   });
 
-  it('bills the tokens the provider reported, not both styles', () => {
+  it('per-character wins and does NOT also charge tokens when both set (misconfig)', () => {
     const { cost, snapshot } = calculateAudioCost(
       {
         audioCharacters: 500_000,
@@ -216,20 +204,7 @@ describe('calculateAudioCost', () => {
       },
       pricing({ audioCharacters: '15', audioInput: '2', audioOutput: '4' })
     );
-    expect(cost).toBeCloseTo(6, 10); // 2 + 4
-    expect(snapshot.audioInputPrice).toBe('2');
-    expect(snapshot.audioCharactersPrice).toBeNull();
-  });
-
-  it('falls back to characters when no tokens are reported', () => {
-    // Which is every speech API today: `generateSpeech` carries no usage at
-    // all, so characters are all there is to count.
-    const { cost, snapshot } = calculateAudioCost(
-      { audioCharacters: 500_000 },
-      pricing({ audioCharacters: '15', audioInput: '2', audioOutput: '4' })
-    );
-    expect(cost).toBeCloseTo(7.5, 10);
-    expect(snapshot.audioCharactersPrice).toBe('15');
+    expect(cost).toBeCloseTo(7.5, 10); // only per-character applies
     expect(snapshot.audioInputPrice).toBeNull();
   });
 
@@ -315,7 +290,7 @@ describe('pricingMissingFields', () => {
       pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
         transcription: false
       })
-    ).toEqual(['Per 1M characters, or Audio input + Audio output']);
+    ).toEqual(['Per 1M characters, or Audio input / Audio output']);
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
         transcription: false
@@ -359,18 +334,16 @@ describe('pricingMissingFields', () => {
     expect(pricingMissingFields('video', pricing())).not.toEqual([]);
   });
 
-  it('audio with no stated direction takes characters or seconds', () => {
-    // Token rates alone do not qualify: no speech API reports tokens, so a
-    // row carrying only those would pass and then bill nothing.
+  it('audio accepts per-character OR token (input/output)', () => {
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }))
     ).toEqual([]);
+    expect(pricingMissingFields('audio', pricing({ audioInput: '2' }))).toEqual(
+      []
+    );
     expect(
-      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }))
+      pricingMissingFields('audio', pricing({ audioOutput: '4' }))
     ).toEqual([]);
-    expect(
-      pricingMissingFields('audio', pricing({ audioInput: '2' }))
-    ).not.toEqual([]);
     expect(pricingMissingFields('audio', pricing())).not.toEqual([]);
   });
 });
