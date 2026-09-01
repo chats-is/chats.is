@@ -72,27 +72,39 @@ function toBedrockModelId(modelId: string): string {
 /**
  * Create provider SDK instance based on type and config
  */
-function createProviderSDK(config: ProviderConfig): any {
+function createProviderSDK(
+  config: ProviderConfig,
+  /**
+   * Replaces the SDK's own fetch for this client. Used to read fields a
+   * provider package does not surface — token usage on image generations is
+   * in the response body, but only some packages parse it out.
+   */
+  fetchImpl?: typeof fetch
+): any {
   const { type, baseUrl } = config;
   const apiKey = config.apiKey ? decrypt(config.apiKey) : undefined;
+  const fetchOption = fetchImpl ? { fetch: fetchImpl } : {};
 
   switch (type) {
     case 'openai':
       return createOpenAI({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined
+        baseURL: baseUrl || undefined,
+        ...fetchOption
       });
 
     case 'azure':
       return createAzure({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl ? baseUrl + '/openai/deployments' : undefined
+        baseURL: baseUrl ? baseUrl + '/openai/deployments' : undefined,
+        ...fetchOption
       });
 
     case 'google':
       return createGoogle({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined
+        baseURL: baseUrl || undefined,
+        ...fetchOption
       });
 
     case 'vertex': {
@@ -115,7 +127,8 @@ function createProviderSDK(config: ProviderConfig): any {
       }
 
       return createVertex({
-        apiKey: apiKey || undefined
+        apiKey: apiKey || undefined,
+        ...fetchOption
       });
     }
 
@@ -126,26 +139,30 @@ function createProviderSDK(config: ProviderConfig): any {
         region: bedrockKey?.region || undefined,
         accessKeyId: bedrockKey?.accessKeyId || undefined,
         secretAccessKey: bedrockKey?.secretAccessKey || undefined,
-        sessionToken: bedrockKey?.sessionToken || undefined
+        sessionToken: bedrockKey?.sessionToken || undefined,
+        ...fetchOption
       });
     }
 
     case 'anthropic':
       return createAnthropic({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined
+        baseURL: baseUrl || undefined,
+        ...fetchOption
       });
 
     case 'xai':
       return createXai({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined
+        baseURL: baseUrl || undefined,
+        ...fetchOption
       });
 
     case 'deepseek':
       return createDeepSeek({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined
+        baseURL: baseUrl || undefined,
+        ...fetchOption
       });
 
     default:
@@ -175,9 +192,10 @@ export function getLanguageModel(
  */
 export function getImageModel(
   provider: ProviderConfig,
-  modelId: string
+  modelId: string,
+  fetchImpl?: typeof fetch
 ): ImageModel {
-  const sdk = createProviderSDK(provider);
+  const sdk = createProviderSDK(provider, fetchImpl);
   return sdk.image(modelId);
 }
 
