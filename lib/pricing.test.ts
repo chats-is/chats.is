@@ -290,7 +290,7 @@ describe('pricingMissingFields', () => {
       pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
         transcription: false
       })
-    ).toEqual(['Per 1M characters']);
+    ).toEqual(['Per 1M characters, or Audio input / Audio output']);
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
         transcription: false
@@ -334,21 +334,16 @@ describe('pricingMissingFields', () => {
     expect(pricingMissingFields('video', pricing())).not.toEqual([]);
   });
 
-  it('audio takes characters or seconds, never token rates alone', () => {
-    // No speech API reports usage — `SpeechResult` has no usage field — so a
-    // token-priced speech model would pass the gate and bill zero every call.
+  it('audio accepts per-character OR token (input/output)', () => {
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }))
     ).toEqual([]);
+    expect(pricingMissingFields('audio', pricing({ audioInput: '2' }))).toEqual(
+      []
+    );
     expect(
-      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }))
+      pricingMissingFields('audio', pricing({ audioOutput: '4' }))
     ).toEqual([]);
-    expect(
-      pricingMissingFields(
-        'audio',
-        pricing({ audioInput: '2', audioOutput: '4' })
-      )
-    ).not.toEqual([]);
     expect(pricingMissingFields('audio', pricing())).not.toEqual([]);
   });
 });

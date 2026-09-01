@@ -632,11 +632,8 @@ export default function PricingPage() {
               )}
               {edit.capability === 'audio' && (
                 <>
-                  {/* Two mutually-exclusive billing styles: characters for
-                      speech, seconds for transcription. Typing in one clears
-                      the other. Token rates are not offered — no speech API
-                      reports usage, so a token-priced model would bill zero
-                      on every call. */}
+                  {/* Three mutually-exclusive billing styles. Typing in one
+                      style disables (and clears) the others. */}
                   <Field
                     label="Per 1M characters"
                     value={edit.audioCharacters}
@@ -649,8 +646,42 @@ export default function PricingPage() {
                         audioSeconds: ''
                       })
                     }
-                    placeholder="speech (tts-1, gpt-4o-mini-tts, ElevenLabs)"
-                    disabled={!!edit.audioSeconds}
+                    placeholder="classic TTS (tts-1, ElevenLabs)"
+                    disabled={
+                      !!edit.audioInput ||
+                      !!edit.audioOutput ||
+                      !!edit.audioSeconds
+                    }
+                  />
+                  <div className="col-span-2 text-xs text-muted-foreground">
+                    Or token-based billing (gpt-4o-mini-tts) — set Audio input +
+                    output instead of Per 1M characters:
+                  </div>
+                  <Field
+                    label="Audio input / 1M tokens"
+                    value={edit.audioInput}
+                    onChange={v =>
+                      setEdit({
+                        ...edit,
+                        audioInput: v,
+                        audioCharacters: '',
+                        audioSeconds: ''
+                      })
+                    }
+                    disabled={!!edit.audioCharacters || !!edit.audioSeconds}
+                  />
+                  <Field
+                    label="Audio output / 1M tokens"
+                    value={edit.audioOutput}
+                    onChange={v =>
+                      setEdit({
+                        ...edit,
+                        audioOutput: v,
+                        audioCharacters: '',
+                        audioSeconds: ''
+                      })
+                    }
+                    disabled={!!edit.audioCharacters || !!edit.audioSeconds}
                   />
                   <div className="col-span-2 text-xs text-muted-foreground">
                     Or per-second billing for STT models (whisper-1) — set Audio
@@ -663,7 +694,9 @@ export default function PricingPage() {
                       setEdit({
                         ...edit,
                         audioSeconds: v,
-                        audioCharacters: ''
+                        audioCharacters: '',
+                        audioInput: '',
+                        audioOutput: ''
                       })
                     }
                     placeholder="per second of input audio (whisper-1: 0.0001)"

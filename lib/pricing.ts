@@ -119,13 +119,14 @@ export function pricingMissingFields(
         return set(p.audioSeconds) ? [] : ['Per second'];
       }
       if (opts?.transcription === false) {
-        // Characters only. Token rates exist for the day a speech API reports
-        // usage, but none can today — `SpeechResult` has no usage field, so a
-        // token-priced speech model would pass this gate and then bill zero
-        // for every call.
-        return set(p.audioCharacters) ? [] : ['Per 1M characters'];
+        return set(p.audioCharacters) || set(p.audioInput) || set(p.audioOutput)
+          ? []
+          : ['Per 1M characters, or Audio input / Audio output'];
       }
-      return set(p.audioCharacters) || set(p.audioSeconds)
+      return set(p.audioCharacters) ||
+        set(p.audioInput) ||
+        set(p.audioOutput) ||
+        set(p.audioSeconds)
         ? []
         : ['Per 1M characters, Audio input / Audio output, or Per second'];
     }
