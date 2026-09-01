@@ -181,31 +181,19 @@ export async function recordAudioUsage(
     const lookup = await resolveModelByKey(input.modelId, 'audio');
     const pricing = lookup?.pricing ?? null;
 
-    // Char-billed (classic TTS) needs characters; token-billed needs tokens.
-    // If the billed dimension has no quantity, cost would be 0 — surface it.
-    const charBilled =
-      pricing != null && parseNumber(pricing.audioCharacters) != null;
-    const tokenBilled =
+    // Speech bills per character. No quantity means a cost of 0 — surface it.
+    if (
       pricing != null &&
-      !charBilled &&
-      (parseNumber(pricing.audioInput) != null ||
-        parseNumber(pricing.audioOutput) != null);
-    const noChars = (input.audioCharacters ?? 0) === 0;
-    const noTokens =
-      (input.audioInputTokens ?? 0) === 0 &&
-      (input.audioOutputTokens ?? 0) === 0;
-    if ((charBilled && noChars) || (tokenBilled && noTokens)) {
+      parseNumber(pricing.audioCharacters) != null &&
+      (input.audioCharacters ?? 0) === 0
+    ) {
       console.warn(
         `[audio] no billable quantity for model=${input.modelId}; cost will be 0`
       );
     }
 
     const { cost, snapshot } = calculateAudioCost(
-      {
-        audioCharacters: input.audioCharacters,
-        audioInputTokens: input.audioInputTokens,
-        audioOutputTokens: input.audioOutputTokens
-      },
+      { audioCharacters: input.audioCharacters },
       pricing
     );
 

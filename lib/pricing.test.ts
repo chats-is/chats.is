@@ -185,29 +185,6 @@ describe('calculateAudioCost', () => {
     expect(snapshot.audioInputPrice).toBeNull();
   });
 
-  it('per-token mode: input/output tokens × rate per 1M', () => {
-    const { cost, snapshot } = calculateAudioCost(
-      { audioInputTokens: 1_000_000, audioOutputTokens: 1_000_000 },
-      pricing({ audioInput: '2', audioOutput: '4' })
-    );
-    expect(cost).toBe(6);
-    expect(snapshot.audioInputPrice).toBe('2');
-    expect(snapshot.audioCharactersPrice).toBeNull();
-  });
-
-  it('per-character wins and does NOT also charge tokens when both set (misconfig)', () => {
-    const { cost, snapshot } = calculateAudioCost(
-      {
-        audioCharacters: 500_000,
-        audioInputTokens: 1_000_000,
-        audioOutputTokens: 1_000_000
-      },
-      pricing({ audioCharacters: '15', audioInput: '2', audioOutput: '4' })
-    );
-    expect(cost).toBeCloseTo(7.5, 10); // only per-character applies
-    expect(snapshot.audioInputPrice).toBeNull();
-  });
-
   it('returns 0 when pricing is null', () => {
     expect(calculateAudioCost({ audioCharacters: 1000 }, null).cost).toBe(0);
   });
@@ -290,7 +267,7 @@ describe('pricingMissingFields', () => {
       pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
         transcription: false
       })
-    ).toEqual(['Per 1M characters, or Audio input / Audio output']);
+    ).toEqual(['Per 1M characters']);
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
         transcription: false
@@ -334,15 +311,12 @@ describe('pricingMissingFields', () => {
     expect(pricingMissingFields('video', pricing())).not.toEqual([]);
   });
 
-  it('audio accepts per-character OR token (input/output)', () => {
+  it('audio takes characters or seconds', () => {
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }))
     ).toEqual([]);
-    expect(pricingMissingFields('audio', pricing({ audioInput: '2' }))).toEqual(
-      []
-    );
     expect(
-      pricingMissingFields('audio', pricing({ audioOutput: '4' }))
+      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }))
     ).toEqual([]);
     expect(pricingMissingFields('audio', pricing())).not.toEqual([]);
   });
