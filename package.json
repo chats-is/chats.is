@@ -34,7 +34,6 @@
     "@ai-sdk/openai": "^4.0.44",
     "@ai-sdk/react": "^4.0.73",
     "@ai-sdk/xai": "^4.0.41",
-    "@auth/drizzle-adapter": "^1.9.1",
     "@aws-sdk/client-bedrock": "^3.1047.0",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-css": "^6.3.1",
@@ -70,6 +69,7 @@
     "@vercel/analytics": "^1.4.1",
     "@vercel/blob": "^0.27.3",
     "ai": "^7.0.70",
+    "better-auth": "^1.7.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -80,7 +80,6 @@
     "lucide-react": "^0.563.0",
     "music-metadata": "^11.15.0",
     "next": "16.1.6",
-    "next-auth": "5.0.0-beta.32",
     "next-themes": "^0.4.6",
     "openai": "^6.34.0",
     "radix-ui": "^1.4.3",
@@ -106,6 +105,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@better-auth/core": "^1.7.2",
     "@electric-sql/pglite": "^0.4.6",
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.2",

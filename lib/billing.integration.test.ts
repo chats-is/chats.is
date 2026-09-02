@@ -54,7 +54,7 @@ beforeEach(async () => {
   await h.db.delete(schema.providers);
   await h.db.delete(schema.users);
   await h.db.delete(schema.quotas);
-  await h.db.insert(schema.users).values({ id: 'u1', email: 'u1@test.com' });
+  await h.db.insert(schema.users).values({ id: 'u1', name: 'u1', email: 'u1@test.com' });
   await h.db
     .insert(schema.providers)
     .values({ id: 'prov1', name: 'Test', type: 'openai', apiKey: 'sk-test' });

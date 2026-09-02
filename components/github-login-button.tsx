@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
-import { signIn } from 'next-auth/react';
 
+import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { IconGitHub } from '@/components/ui/icons';
 
@@ -24,7 +24,7 @@ export function GitHubLoginButton({
 
   const handleSignIn = () => {
     setIsLoading?.('github');
-    signIn('github', { callbackUrl: '/' });
+    authClient.signIn.social({ provider: 'github', callbackURL: '/' });
   };
 
   return (

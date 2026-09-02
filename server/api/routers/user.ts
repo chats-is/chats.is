@@ -74,7 +74,7 @@ export const userRouter = createTRPCRouter({
         with: {
           accounts: {
             columns: {
-              provider: true
+              providerId: true
             }
           },
           plan: {
@@ -126,8 +126,8 @@ export const userRouter = createTRPCRouter({
       // Get linked accounts
       const linkedAccounts = await ctx.db
         .select({
-          provider: accounts.provider,
-          providerAccountId: accounts.providerAccountId
+          provider: accounts.providerId,
+          providerAccountId: accounts.accountId
         })
         .from(accounts)
         .where(eq(accounts.userId, input.id));
