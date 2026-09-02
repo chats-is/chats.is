@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { ModelCapability } from '@/types'
+import { type ModelCapability } from '@/types'
 import { CAPABILITIES } from '@/lib/constant'
 import { api } from '@/trpc/react'
 import {

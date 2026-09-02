@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { Artifact } from '@/types'
+import { type Artifact } from '@/types'
 import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact'
 import { getArtifactLanguageLabel } from '@/lib/code-language'
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download'

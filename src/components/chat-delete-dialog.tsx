@@ -3,7 +3,7 @@ import { useParams, useRouter } from '@tanstack/react-router'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { Chat } from '@/types'
+import { type Chat } from '@/types'
 import { useChats } from '@/hooks/use-chats'
 import {
   AlertDialog,

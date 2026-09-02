@@ -1,11 +1,11 @@
 import {
-  DynamicToolUIPart,
-  FileUIPart,
-  ReasoningUIPart,
-  SourceDocumentUIPart,
-  SourceUrlUIPart,
-  StepStartUIPart,
-  TextUIPart,
+  type DynamicToolUIPart,
+  type FileUIPart,
+  type ReasoningUIPart,
+  type SourceDocumentUIPart,
+  type SourceUrlUIPart,
+  type StepStartUIPart,
+  type TextUIPart,
 } from 'ai'
 import { z } from 'zod'
 

@@ -1,5 +1,5 @@
-import { UIMessage } from 'ai'
-import { InferSelectModel } from 'drizzle-orm'
+import { type UIMessage } from 'ai'
+import { type InferSelectModel } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { messages } from '@/server/db/schema'

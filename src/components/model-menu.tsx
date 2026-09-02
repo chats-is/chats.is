@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePreferences } from '@/contexts/preferences-context'
-import { UseChatHelpers } from '@ai-sdk/react'
+import { type UseChatHelpers } from '@ai-sdk/react'
 import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react'
 
-import { ChatMessage, Model, ModelCapability } from '@/types'
+import { type ChatMessage, type Model, type ModelCapability } from '@/types'
 import {
   AspectRatioLabels,
   ImageSizeLabels,

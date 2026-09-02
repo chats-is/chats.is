@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useParams } from '@tanstack/react-router'
 import { Image, MessageSquare, Mic, Video } from 'lucide-react'
 
-import { Chat } from '@/types'
+import { type Chat } from '@/types'
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 
 import { SidebarActions } from './sidebar-actions'

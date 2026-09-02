@@ -1,6 +1,6 @@
 import { Download } from 'lucide-react'
 
-import { Artifact } from '@/types'
+import { type Artifact } from '@/types'
 import { downloadArtifact } from '@/lib/download'
 import { cn } from '@/lib/utils'
 import {

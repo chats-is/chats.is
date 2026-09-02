@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 
+import type { JSONValue } from 'ai';
 import type { ChatMessage, ChatType, ProviderType } from '@/types';
 
 /**
@@ -335,7 +336,9 @@ export const providers = createTable(
     apiKey: text('api_key').notNull(),
     baseUrl: varchar('base_url', { length: 500 }),
     isEnabled: boolean('is_enabled').notNull().default(false),
-    apiOptions: jsonb('api_options').$type<Record<string, unknown>>(),
+    // A JSONB column holds JSON, and saying so lets a value read out of it be
+    // proven serializable on its way to the browser.
+    apiOptions: jsonb('api_options').$type<Record<string, JSONValue>>(),
     image: text('image'),
     displayOrder: integer('display_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })

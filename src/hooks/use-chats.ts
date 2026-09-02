@@ -1,4 +1,4 @@
-import { Chat } from '@/types'
+import { type Chat } from '@/types'
 import { api } from '@/trpc/react'
 
 const LIMIT = 25

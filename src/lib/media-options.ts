@@ -1,4 +1,4 @@
-import { ModelUIOptions } from '@/types/model'
+import { type ModelUIOptions } from '@/types/model'
 
 /**
  * 'auto' is a regular option value that admins put in a model's `uiOptions`

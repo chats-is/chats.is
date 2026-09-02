@@ -1,6 +1,6 @@
-import { createContext, ReactNode, useContext } from 'react'
+import { createContext, type ReactNode, useContext } from 'react'
 
-import { SystemSettings } from '@/types'
+import { type SystemSettings } from '@/types'
 
 const SystemSettingsContext = createContext<SystemSettings | null>(null)
 

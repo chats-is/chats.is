@@ -2,11 +2,11 @@ import '@tanstack/react-start/server-only'
 
 import { generateSpeech } from 'ai'
 
-import { Model } from '@/types'
+import { type Model } from '@/types'
 import { resolveAutoOption } from '@/lib/media-options'
-import { StoredMedia, uploadGeneratedMedia } from '@/lib/media-upload'
+import { type StoredMedia, uploadGeneratedMedia } from '@/lib/media-upload'
 import {
-  FailoverProvider,
+  type FailoverProvider,
   getSpeechModel,
   runWithProviderFailover,
 } from '@/lib/provider'

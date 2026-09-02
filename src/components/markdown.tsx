@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import ReactMarkdown, { Options } from 'react-markdown'
+import ReactMarkdown, { type Options } from 'react-markdown'
 
 const MemoizedReactMarkdown = memo(
   (props: Options) => <ReactMarkdown {...props} />,

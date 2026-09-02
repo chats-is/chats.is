@@ -1,4 +1,4 @@
-import { Chat } from './chat'
+import { type Chat } from './chat'
 
 export type SharedLink = {
   id: string

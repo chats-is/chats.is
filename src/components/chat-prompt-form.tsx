@@ -1,17 +1,17 @@
 import { useCallback, useState } from 'react'
 import { useSystemSettings } from '@/contexts/system-settings-context'
-import { UseChatHelpers } from '@ai-sdk/react'
+import { type UseChatHelpers } from '@ai-sdk/react'
 import { ArrowUp, Loader2, Square } from 'lucide-react'
 import Textarea from 'react-textarea-autosize'
 
-import { Attachment, ChatMessage } from '@/types'
+import { type Attachment, type ChatMessage } from '@/types'
 import { modelMatchesId } from '@/lib/utils'
 import { useEnterSubmit } from '@/hooks/use-enter-submit'
 import { Button } from '@/components/ui/button'
 import { AddFilesMenu } from '@/components/add-files-menu'
 import { AttachmentsPreview } from '@/components/attachments-preview'
 import { MediaSettingsMenu } from '@/components/media-settings-menu'
-import { ModelMenu, ModelOptions } from '@/components/model-menu'
+import { ModelMenu, type ModelOptions } from '@/components/model-menu'
 
 export type { ModelOptions }
 

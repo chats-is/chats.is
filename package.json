@@ -69,6 +69,7 @@
     "@tanstack/react-router": "^1.170.32",
     "@tanstack/react-router-devtools": "^1.167.1",
     "@tanstack/react-start": "^1.168.49",
+    "@tanstack/router-core": "^1.171.27",
     "@uiw/codemirror-theme-github": "^4.25.11",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^0.27.3",

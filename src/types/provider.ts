@@ -1,3 +1,5 @@
+import type { JSONValue } from 'ai'
+
 export type ProviderType =
   | 'openai'
   | 'azure'
@@ -12,7 +14,7 @@ export type ProviderConfig = {
   type: ProviderType
   apiKey?: string | null
   baseUrl?: string | null
-  apiOptions?: Record<string, unknown> | null
+  apiOptions?: Record<string, JSONValue> | null
 }
 
 export type VertexAuthMode = 'service_account' | 'api_key'

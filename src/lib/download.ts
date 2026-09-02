@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 
-import { Artifact } from '@/types'
+import { type Artifact } from '@/types'
 
 /** Trigger a browser download for a remote file URL. */
 export function downloadFileFromUrl(url: string, filename?: string) {

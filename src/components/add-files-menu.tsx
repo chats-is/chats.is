@@ -1,7 +1,7 @@
 import {
-  ChangeEvent,
-  Dispatch,
-  SetStateAction,
+  type ChangeEvent,
+  type Dispatch,
+  type SetStateAction,
   useCallback,
   useEffect,
   useRef,
@@ -12,7 +12,7 @@ import { useSystemSettings } from '@/contexts/system-settings-context'
 import { Loader2, Paperclip, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { Attachment } from '@/types'
+import { type Attachment } from '@/types'
 import { uploadFile } from '@/lib/api'
 import { modelMatchesId } from '@/lib/utils'
 import { useCurrentUser } from '@/hooks/use-current-user'

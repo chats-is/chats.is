@@ -13,10 +13,10 @@ import {
 import { GoogleGenAI } from '@google/genai'
 import {
   APICallError,
-  ImageModel,
-  LanguageModel,
-  SpeechModel,
-  TranscriptionModel,
+  type ImageModel,
+  type LanguageModel,
+  type SpeechModel,
+  type TranscriptionModel,
 } from 'ai'
 
 import type {

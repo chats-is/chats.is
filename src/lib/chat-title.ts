@@ -1,4 +1,4 @@
-import { ChatMessage } from '@/types'
+import { type ChatMessage } from '@/types'
 
 /** `chat.title` is varchar(255); the router validates the same bound. */
 export const TITLE_MAX = 255

@@ -1,4 +1,4 @@
-import { User } from '@/types'
+import { type User } from '@/types'
 import { api } from '@/trpc/react'
 
 export function useCurrentUser() {

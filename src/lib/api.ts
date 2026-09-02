@@ -1,6 +1,6 @@
 import { upload } from '@vercel/blob/client'
 
-import { Attachment, Result } from '@/types'
+import { type Attachment, type Result } from '@/types'
 import { env } from '@/lib/env'
 import { UPLOAD_CONFIG, type UploadType } from '@/lib/upload-config'
 import { generateUUID } from '@/lib/utils'

@@ -1,4 +1,4 @@
-import { JSONValue } from 'ai'
+import { type JSONValue } from 'ai'
 import { z } from 'zod'
 
 export const jsonValueSchema: z.ZodType<JSONValue> = z.lazy(() =>

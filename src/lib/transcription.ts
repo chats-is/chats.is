@@ -2,10 +2,10 @@ import '@tanstack/react-start/server-only'
 
 import { transcribe } from 'ai'
 
-import { Model } from '@/types'
+import { type Model } from '@/types'
 import { audioDurationInSeconds } from '@/lib/media-duration'
 import {
-  FailoverProvider,
+  type FailoverProvider,
   getTranscriptionModel,
   runWithProviderFailover,
 } from '@/lib/provider'

@@ -4,9 +4,9 @@ import OpenAI, { AzureOpenAI } from 'openai'
 import type { Model, ProviderConfig } from '@/types'
 import { decrypt } from '@/lib/crypto'
 import { resolveAutoOption } from '@/lib/media-options'
-import { StoredMedia, uploadGeneratedMedia } from '@/lib/media-upload'
+import { type StoredMedia, uploadGeneratedMedia } from '@/lib/media-upload'
 import {
-  FailoverProvider,
+  type FailoverProvider,
   getVideoModel,
   isRetryableProviderError,
   runWithProviderFailover,

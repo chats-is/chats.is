@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ChatMessage } from '@/types'
+import { type ChatMessage } from '@/types'
 
 import { sanitizeTitle, TITLE_MAX, titleInputFromMessage } from './chat-title'
 

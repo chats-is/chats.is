@@ -1,7 +1,7 @@
-import { Dispatch, SetStateAction, useCallback, useTransition } from 'react'
+import { type Dispatch, type SetStateAction, useCallback, useTransition } from 'react'
 import { AudioLines, Clapperboard, XCircle } from 'lucide-react'
 
-import { Attachment } from '@/types'
+import { type Attachment } from '@/types'
 import { deleteFile } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'

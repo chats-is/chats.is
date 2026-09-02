@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { Chat } from '@/types'
+import { type Chat } from '@/types'
 import { useChats } from '@/hooks/use-chats'
 import { Button } from '@/components/ui/button'
 import {

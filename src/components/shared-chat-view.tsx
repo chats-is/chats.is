@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-import { Artifact, ChatMessage } from '@/types'
+import { type Artifact, type ChatMessage } from '@/types'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import {
   ResizableHandle,

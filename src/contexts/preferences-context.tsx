@@ -1,12 +1,12 @@
 import {
   createContext,
-  ReactNode,
+  type ReactNode,
   useCallback,
   useContext,
   useState,
 } from 'react'
 
-import { Model } from '@/types'
+import { type Model } from '@/types'
 import { modelMatchesId } from '@/lib/utils'
 
 import { useSystemSettings } from './system-settings-context'

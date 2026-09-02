@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ThemeProvider, ThemeProviderProps } from 'next-themes'
+import { ThemeProvider, type ThemeProviderProps } from 'next-themes'
 
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'

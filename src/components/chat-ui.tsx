@@ -6,7 +6,7 @@ import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { toast } from 'sonner'
 
-import { Artifact, Attachment, ChatMessage, CustomUIDataTypes } from '@/types'
+import { type Artifact, type Attachment, type ChatMessage, type CustomUIDataTypes } from '@/types'
 import { takePendingPrompt } from '@/lib/pending-prompt'
 import {
   generateUUID,
@@ -23,7 +23,7 @@ import {
 import { useSidebar } from '@/components/ui/sidebar'
 import { ArtifactsPanel } from '@/components/artifacts-panel'
 import { ChatPanel } from '@/components/chat-panel'
-import { ModelOptions } from '@/components/model-menu'
+import { type ModelOptions } from '@/components/model-menu'
 
 interface ChatUIProps {
   id: string

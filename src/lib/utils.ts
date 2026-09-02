@@ -1,10 +1,10 @@
-import { UIMessagePart } from 'ai'
+import { type UIMessagePart } from 'ai'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { v4 as uuidv4 } from 'uuid'
 
-import { ChatMessage, ChatTools, CustomUIDataTypes, Result } from '@/types'
-import { DBMessage } from '@/types/message'
+import { type ChatMessage, type ChatTools, type CustomUIDataTypes, type Result } from '@/types'
+import { type DBMessage } from '@/types/message'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

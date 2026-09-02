@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { usePreferences } from '@/contexts/preferences-context'
 import { useSystemSettings } from '@/contexts/system-settings-context'
-import { UseChatHelpers } from '@ai-sdk/react'
+import { type UseChatHelpers } from '@ai-sdk/react'
 import {
   AudioLines,
   Captions,
@@ -13,7 +13,7 @@ import {
   Settings2,
 } from 'lucide-react'
 
-import { ChatMessage } from '@/types'
+import { type ChatMessage } from '@/types'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -26,7 +26,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { ModelMenu, ModelOptions } from '@/components/model-menu'
+import { ModelMenu, type ModelOptions } from '@/components/model-menu'
 
 export interface MediaSettingsMenuProps extends Pick<
   UseChatHelpers<ChatMessage>,

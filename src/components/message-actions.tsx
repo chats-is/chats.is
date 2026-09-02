@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { usePreferences } from '@/contexts/preferences-context'
 import { useSystemSettings } from '@/contexts/system-settings-context'
-import { UseChatHelpers } from '@ai-sdk/react'
+import { type UseChatHelpers } from '@ai-sdk/react'
 import {
   CheckCircle,
   Copy,
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { ChatMessage } from '@/types'
+import { type ChatMessage } from '@/types'
 import { createSpeech } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'

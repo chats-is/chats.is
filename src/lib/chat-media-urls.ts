@@ -1,4 +1,4 @@
-import { ChatMessage } from '@/types'
+import { type ChatMessage } from '@/types'
 
 /**
  * Hosts the media tools are allowed to fetch from. Everything the app stores

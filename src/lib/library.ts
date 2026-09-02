@@ -1,4 +1,4 @@
-import { ChatMessage, mediaToolNames, MediaToolOutput } from '@/types'
+import { type ChatMessage, mediaToolNames, type MediaToolOutput } from '@/types'
 
 /** A generated media entry surfaced in the Library, extracted from a
  *  persisted assistant message (file part or media tool output). */

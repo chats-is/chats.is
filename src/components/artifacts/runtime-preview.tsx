@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AlertCircle, LoaderCircle } from 'lucide-react'
 
-import { Artifact } from '@/types'
+import { type Artifact } from '@/types'
 import { normalizeCodeLanguage } from '@/lib/code-language'
 import { cn } from '@/lib/utils'
 import { artifactRegistry } from '@/components/artifacts/registry'

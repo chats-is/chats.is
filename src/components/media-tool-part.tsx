@@ -2,10 +2,10 @@ import { usePreferences } from '@/contexts/preferences-context'
 import { Loader2 } from 'lucide-react'
 
 import {
-  ChatMessage,
-  MediaToolName,
+  type ChatMessage,
+  type MediaToolName,
   mediaToolNames,
-  MediaToolOutput,
+  type MediaToolOutput,
 } from '@/types'
 import { AudioPlayer } from '@/components/audio-player'
 import { MediaLightbox } from '@/components/media-lightbox'

@@ -1,7 +1,7 @@
 import * as React from 'react'
-import { UseChatHelpers } from '@ai-sdk/react'
+import { type UseChatHelpers } from '@ai-sdk/react'
 
-import { Artifact, ChatMessage } from '@/types'
+import { type Artifact, type ChatMessage } from '@/types'
 import { cn } from '@/lib/utils'
 import { Message } from '@/components/message'
 import { MessageActions } from '@/components/message-actions'

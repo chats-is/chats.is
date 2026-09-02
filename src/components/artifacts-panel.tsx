@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PanelBottomClose, PanelBottomOpen, X } from 'lucide-react'
 
-import { Artifact } from '@/types'
+import { type Artifact } from '@/types'
 import { cn } from '@/lib/utils'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { Button } from '@/components/ui/button'
