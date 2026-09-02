@@ -1,12 +1,20 @@
-import { type Session } from 'next-auth'
-
 export { messageSchema } from './message'
 export type { MessageMetadata, ChatMessage } from './message'
 export type { ChatErrorKind, CustomUIDataTypes, Usage } from './ui-data'
 export { attachmentSchema } from './attachment'
 export type { Attachment } from './attachment'
 
-export type User = Session['user']
+/**
+ * The signed-in user as the app sees it. Stated here rather than derived from
+ * the auth library, so the shape the app depends on is the app's own.
+ */
+export type User = {
+  id: string
+  admin: boolean
+  name: string
+  email: string
+  image?: string | null
+}
 export { chatTypeSchema } from './chat'
 export type { Chat, ChatType } from './chat'
 export type { SystemSettings, SystemDefaults } from './system-settings'

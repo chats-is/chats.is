@@ -33,6 +33,7 @@
     "@ai-sdk/xai": "^4.0.53",
     "@aws-sdk/client-bedrock": "^3.1124.0",
     "@base-ui/react": "^1.7.0",
+    "@better-auth/drizzle-adapter": "^1.7.2",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-go": "^6.0.1",
@@ -73,6 +74,7 @@
     "@vercel/blob": "^0.27.3",
     "@vercel/functions": "^3.9.5",
     "ai": "^7.0.90",
+    "better-auth": "^1.7.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
@@ -108,6 +110,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@better-auth/core": "^1.7.2",
     "@electric-sql/pglite": "^0.4.6",
     "@tanstack/devtools-vite": "^0.8.5",
     "@tanstack/eslint-config": "latest",

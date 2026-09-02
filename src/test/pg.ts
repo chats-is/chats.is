@@ -13,6 +13,6 @@ import * as schema from '@/server/db/schema';
 export async function makeTestDb() {
   const client = new PGlite();
   const db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: 'server/db/migrations' });
+  await migrate(db, { migrationsFolder: 'src/server/db/migrations' });
   return { db, client };
 }

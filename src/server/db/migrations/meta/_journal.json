@@ -141,6 +141,13 @@
       "when": 1780639725749,
       "tag": "0019_split_media_capabilities",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788337482543,
+      "tag": "0020_better_auth",
+      "breakpoints": true
     }
   ]
 }

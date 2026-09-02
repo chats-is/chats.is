@@ -5,17 +5,15 @@ import {
   integer,
   jsonb,
   numeric,
-  PgColumn,
   pgTableCreator,
-  primaryKey,
   text,
   timestamp,
   uniqueIndex,
   varchar
 } from 'drizzle-orm/pg-core';
-import { type AdapterAccount } from 'next-auth/adapters';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 
-import { ChatMessage, ChatType, type ProviderType } from '@/types';
+import type { ChatMessage, ChatType, ProviderType } from '@/types';
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -196,13 +194,10 @@ export const users = createTable(
   'user',
   {
     id: varchar('id', { length: 255 }).notNull().primaryKey(),
-    name: varchar('name', { length: 255 }),
-    email: varchar('email', { length: 255 }).notNull(),
-    emailVerified: timestamp('email_verified', {
-      mode: 'date',
-      withTimezone: true
-    }).default(sql`CURRENT_TIMESTAMP`),
-    image: varchar('image', { length: 255 }),
+    name: varchar('name', { length: 255 }).notNull(),
+    email: varchar('email', { length: 255 }).notNull().unique(),
+    emailVerified: boolean('email_verified').notNull().default(false),
+    image: text('image'),
     role: varchar('role', { length: 50 }).notNull().default('user'),
     planId: varchar('plan_id', { length: 255 }).references(
       (): PgColumn => plans.id,
@@ -236,29 +231,41 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 export const accounts = createTable(
   'account',
   {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
     userId: varchar('user_id', { length: 255 })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    type: varchar('type', { length: 255 })
-      .$type<AdapterAccount['type']>()
-      .notNull(),
-    provider: varchar('provider', { length: 255 }).notNull(),
-    providerAccountId: varchar('provider_account_id', {
-      length: 255
-    }).notNull(),
-    refresh_token: text('refresh_token'),
-    access_token: text('access_token'),
-    expires_at: integer('expires_at'),
-    token_type: varchar('token_type', { length: 255 }),
-    scope: varchar('scope', { length: 255 }),
-    id_token: text('id_token'),
-    session_state: varchar('session_state', { length: 255 })
+    providerId: varchar('provider_id', { length: 255 }).notNull(),
+    // The identity namespace an account belongs to. OAuth providers without an
+    // issuer of their own get `local:oauth:<providerId>`; credential logins get
+    // `local:credential`. Paired with `accountId` it is what makes two
+    // providers unable to claim the same identity.
+    issuer: varchar('issuer', { length: 255 }).notNull(),
+    accountId: varchar('account_id', { length: 255 }).notNull(),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    idToken: text('id_token'),
+    accessTokenExpiresAt: timestamp('access_token_expires_at', {
+      withTimezone: true
+    }),
+    refreshTokenExpiresAt: timestamp('refresh_token_expires_at', {
+      withTimezone: true
+    }),
+    scope: text('scope'),
+    password: text('password'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
   account => [
-    primaryKey({
-      columns: [account.provider, account.providerAccountId]
-    }),
-    index('account_user_id_idx').on(account.userId)
+    index('account_user_id_idx').on(account.userId),
+    uniqueIndex('account_issuer_account_id_idx').on(
+      account.issuer,
+      account.accountId
+    )
   ]
 );
 
@@ -269,16 +276,23 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 export const sessions = createTable(
   'session',
   {
-    sessionToken: varchar('session_token', { length: 255 })
-      .notNull()
-      .primaryKey(),
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    token: varchar('token', { length: 255 }).notNull().unique(),
     userId: varchar('user_id', { length: 255 })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    expires: timestamp('expires', {
+    expiresAt: timestamp('expires_at', {
       mode: 'date',
       withTimezone: true
-    }).notNull()
+    }).notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
   session => [index('session_user_id_idx').on(session.userId)]
 );
@@ -287,48 +301,31 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] })
 }));
 
-export const verificationTokens = createTable(
-  'verification_token',
-  {
-    identifier: varchar('identifier', { length: 255 }).notNull(),
-    token: varchar('token', { length: 255 }).notNull(),
-    expires: timestamp('expires', {
-      mode: 'date',
-      withTimezone: true
-    }).notNull()
-  },
-  vt => [primaryKey({ columns: [vt.identifier, vt.token] })]
-);
-
-export const emailVerificationCodes = createTable(
-  'email_verification_code',
+/**
+ * One table for every short-lived credential. Replaces `verification_token`
+ * and `email_verification_code`: the emailOTP plugin owns code length, expiry
+ * and the attempt limit, so none of that is hand-rolled any more.
+ */
+export const verifications = createTable(
+  'verification',
   {
     id: varchar('id', { length: 255 }).notNull().primaryKey(),
-    email: varchar('email', { length: 255 }).notNull(),
-    code: varchar('code', { length: 6 }).notNull(),
-    expires: timestamp('expires', {
+    identifier: varchar('identifier', { length: 255 }).notNull(),
+    value: text('value').notNull(),
+    expiresAt: timestamp('expires_at', {
       mode: 'date',
       withTimezone: true
     }).notNull(),
-    attempts: integer('attempts').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
   },
-  evc => [
-    index('evc_email_idx').on(evc.email),
-    index('evc_expires_idx').on(evc.expires)
-  ]
+  v => [index('verification_identifier_idx').on(v.identifier)]
 );
 
-// ============================================================================
-// Admin Console Tables
-// ============================================================================
-
-/**
- * AI Provider - Stores API provider configurations
- * Supported types: openai, azure, google, vertex, anthropic, bedrock, xai, deepseek
- */
 export const providers = createTable(
   'provider',
   {
@@ -382,11 +379,11 @@ export const prompts = createTable(
       .default('private')
       .$type<'private' | 'public'>(),
     // Free-text labels for browsing/filtering.
-    tags: jsonb('tags').$type<string[]>(),
+    tags: jsonb('tags').$type<Array<string>>(),
     // Free-text display labels only (NOT linked to the providers table, not filtered).
-    providers: jsonb('providers').$type<string[]>(),
+    providers: jsonb('providers').$type<Array<string>>(),
     // Model ids (from the models table) this prompt targets — used for filtering.
-    models: jsonb('models').$type<string[]>(),
+    models: jsonb('models').$type<Array<string>>(),
     image: text('image'),
     content: text('content').notNull(),
     displayOrder: integer('display_order').notNull().default(0),
@@ -427,7 +424,7 @@ export const models = createTable(
       .notNull()
       .$type<'chat' | 'image' | 'video' | 'audio'>(),
     image: text('image'),
-    aliases: jsonb('aliases').$type<string[]>(),
+    aliases: jsonb('aliases').$type<Array<string>>(),
     supportsVision: boolean('supports_vision').default(false),
     supportsReasoning: boolean('supports_reasoning').default(false),
     // Image models: can edit an existing image.
@@ -442,15 +439,15 @@ export const models = createTable(
     isEnabled: boolean('is_enabled').notNull().default(true),
     uiOptions: jsonb('ui_options').$type<{
       size?: string;
-      sizes?: string[];
+      sizes?: Array<string>;
       aspectRatio?: string;
-      aspectRatios?: string[];
+      aspectRatios?: Array<string>;
       duration?: number;
-      durations?: number[];
+      durations?: Array<number>;
       resolution?: string;
-      resolutions?: string[];
+      resolutions?: Array<string>;
       voice?: string;
-      voices?: string[];
+      voices?: Array<string>;
       reasoning?: boolean;
     }>(),
     apiParams: jsonb('api_params').$type<{
@@ -577,7 +574,7 @@ export const quotas = createTable('quota', {
   sevenDay: numeric('seven_day', { precision: 20, scale: 10 }),
   isUnlimited: boolean('is_unlimited').notNull().default(false),
   allowedModelIds: jsonb('allowed_model_ids')
-    .$type<string[]>()
+    .$type<Array<string>>()
     .notNull()
     .default(sql`'[]'::jsonb`),
   createdAt: timestamp('created_at', { withTimezone: true })
