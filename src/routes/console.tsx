@@ -5,6 +5,7 @@ import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
 import { requireUser } from '@/server/fn/auth';
 import { getSystemSettingsFn } from '@/server/fn/settings';
+import { userQueries } from '@/server/fn/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ConsoleHeader } from '@/components/console/header';
 import { Sidebar } from '@/components/console/sidebar';
@@ -28,10 +29,15 @@ export const Route = createFileRoute('/console')({
     }
     return { user };
   },
-  loader: async () => ({
-    settings: await getSystemSettingsFn(),
-    appName: await getAppName()
-  }),
+  loader: async ({ context }) => {
+    const [settings, appName] = await Promise.all([
+      getSystemSettingsFn(),
+      getAppName(),
+      // The console header names the signed-in admin on every page.
+      context.queryClient.ensureQueryData(userQueries.me())
+    ]);
+    return { settings, appName };
+  },
   head: ({ loaderData }) => ({
     meta: [{ title: `${loaderData?.appName ?? 'chats.is'} Console` }]
   }),

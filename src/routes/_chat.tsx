@@ -5,6 +5,7 @@ import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
 import { requireUser } from '@/server/fn/auth';
 import { getSystemSettingsFn } from '@/server/fn/settings';
+import { userQueries } from '@/server/fn/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Sidebar } from '@/components/sidebar';
 
@@ -23,7 +24,16 @@ export const Route = createFileRoute('/_chat')({
     }
     return { user };
   },
-  loader: () => getSystemSettingsFn(),
+  // The user menu sits on every page under here, so the signed-in user is
+  // resolved with the rest of this subtree's data rather than fetched again
+  // from the browser once the page has already drawn.
+  loader: async ({ context }) => {
+    const [settings] = await Promise.all([
+      getSystemSettingsFn(),
+      context.queryClient.ensureQueryData(userQueries.me())
+    ]);
+    return settings;
+  },
   component: ChatLayout
 });
 
