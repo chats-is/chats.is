@@ -14,6 +14,12 @@ export const env = createEnv({
         'Invalid port number'
       ),
     VERCEL_URL: z.string().optional(),
+    // The deployment's own stable domain. VERCEL_URL is a different address on
+    // every deploy, so it cannot be what OAuth redirects come back to.
+    VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
+    // Set this when the site is reached at a domain Vercel does not name —
+    // a custom domain, or somewhere else entirely.
+    APP_URL: z.string().url().optional(),
 
     // Database
     DATABASE_URL: z
@@ -67,6 +73,8 @@ export const env = createEnv({
     NEXT_PUBLIC_UPLOAD_PATH: process.env.NEXT_PUBLIC_UPLOAD_PATH,
     PORT: process.env.PORT,
     VERCEL_URL: process.env.VERCEL_URL,
+    VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    APP_URL: process.env.APP_URL,
 
     // Database
     DATABASE_URL: process.env.DATABASE_URL,
