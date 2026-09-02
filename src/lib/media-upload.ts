@@ -30,7 +30,7 @@ export async function uploadGeneratedMedia(args: {
   // tracer cannot resolve it and falls back to bundling the whole project root
   // into every function that reaches this file (.git and .env included).
   const pathname = [
-    env.NEXT_PUBLIC_UPLOAD_PATH,
+    env.VITE_UPLOAD_PATH,
     args.kind,
     args.userId,
     filename,

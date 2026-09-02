@@ -51,7 +51,7 @@ export const uploadFile = async (
     : (file.type.split('/')[1] ?? 'bin')
 
   const pathname = [
-    env.NEXT_PUBLIC_UPLOAD_PATH,
+    env.VITE_UPLOAD_PATH,
     UPLOAD_CONFIG[type].folder,
     options.userId,
     `${generateUUID()}.${ext}`,

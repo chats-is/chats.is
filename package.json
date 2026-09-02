@@ -12,7 +12,14 @@
     "preview": "vite preview",
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
-    "check": "prettier --check ."
+    "check": "prettier --check .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format:write": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.72",
@@ -51,6 +58,7 @@
     "@hookform/resolvers": "^3.10.0",
     "@lobehub/icons": "^5.16.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@t3-oss/env-core": "^0.13.11",
     "@t3-oss/env-nextjs": "^0.13.11",
     "@tailwindcss/browser": "^4.3.3",
     "@tailwindcss/typography": "^0.5.20",
