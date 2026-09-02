@@ -21,25 +21,6 @@ import { accounts, sessions, users, verifications } from './db/schema';
  */
 export const auth = betterAuth({
   secret: env.AUTH_SECRET,
-  // Where OAuth comes back to, so it has to be the address people actually
-  // use. VERCEL_URL is a different host on every deploy and would send the
-  // callback somewhere no OAuth app has been told about — the production
-  // domain is the one that holds still.
-  baseURL:
-    env.APP_URL ??
-    (env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : env.VERCEL_URL
-        ? `https://${env.VERCEL_URL}`
-        : `http://localhost:${env.PORT ?? 3000}`),
-  // A preview deployment is served from its own host, which is not baseURL —
-  // without this it would be refused as a cross-origin request.
-  trustedOrigins: [
-    ...(env.VERCEL_URL ? [`https://${env.VERCEL_URL}`] : []),
-    ...(env.VERCEL_PROJECT_PRODUCTION_URL
-      ? [`https://${env.VERCEL_PROJECT_PRODUCTION_URL}`]
-      : [])
-  ],
   database: drizzleAdapter(db, {
     provider: 'pg',
     // Models resolve by the export name they are given, not the table name,
