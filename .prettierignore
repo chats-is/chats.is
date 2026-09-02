@@ -1,1 +1,3 @@
-server/db/migrations/meta/*.json
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

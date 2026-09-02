@@ -1,2 +1,0 @@
-CREATE INDEX IF NOT EXISTS "chat_userId_createdAt_idx" ON "chat" USING btree ("user_id","created_at");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "chat_userId_type_createdAt_idx" ON "chat" USING btree ("user_id","type","created_at");

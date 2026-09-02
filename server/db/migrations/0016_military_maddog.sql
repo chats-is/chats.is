@@ -1,1 +1,0 @@
-ALTER TABLE "model_provider" DROP COLUMN "provider_model_id";
