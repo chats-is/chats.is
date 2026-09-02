@@ -16,7 +16,9 @@ export default function LobeIcon({
 }) {
   // Direct match (e.g. "Google")
   if (image in LobeIcons) {
-    const Icon = LobeIcons[image as keyof typeof LobeIcons] as React.ElementType;
+    const Icon = LobeIcons[
+      image as keyof typeof LobeIcons
+    ] as React.ElementType;
     return <Icon className={cn('size-5', className)} />;
   }
 

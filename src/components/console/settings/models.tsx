@@ -50,13 +50,13 @@ function ModelSelect({
       <Label>{label}</Label>
       <Select
         disabled={isEmpty || disabled}
-        // Undefined (not '') so the placeholder shows rather than a blank
-        // value — including when the saved id names a model that has since
-        // been deleted or disabled, which Radix would otherwise render as an
-        // empty trigger with no hint that anything is set.
-        value={
-          options?.some(option => option.modelId === value) ? value : undefined
-        }
+        // `null` (not '') so the placeholder shows rather than a blank value —
+        // including when the saved id names a model that has since been
+        // deleted or disabled, which would otherwise render as an empty
+        // trigger with no hint that anything is set. Base UI reads null as
+        // "nothing chosen" and undefined as "this select owns its own value",
+        // so null is also what keeps it controlled from the first render.
+        value={options?.some(option => option.modelId === value) ? value : null}
         onValueChange={onSelect(onChange)}
       >
         <SelectTrigger>

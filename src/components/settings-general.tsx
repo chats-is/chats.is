@@ -40,7 +40,10 @@ export const SettingsGeneral = () => {
         <UiLabel>Theme</UiLabel>
         <Select
           onValueChange={onSelect(value => setTheme(value))}
-          value={mounted ? theme : undefined}
+          // Controlled from the first render: Base UI reads `null` as "nothing
+          // chosen yet", where `undefined` would mean the select owns its own
+          // value — and the theme is not known until this mounts.
+          value={(mounted ? theme : null) ?? null}
         >
           <SelectTrigger className="w-auto rounded-full capitalize">
             <SelectValue placeholder="Select a theme">

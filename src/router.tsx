@@ -1,8 +1,8 @@
 import '@/lib/serializable';
 
-import { QueryClient } from '@tanstack/react-query';
-import { routerWithQueryClient } from '@tanstack/react-router-with-query';
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
+import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
+import { QueryClient } from '@tanstack/react-query';
 
 import { routeTree } from './routeTree.gen';
 
@@ -28,7 +28,11 @@ export function getRouter() {
     defaultPreloadStaleTime: 0
   });
 
-  return routerWithQueryClient(router, queryClient);
+  // Queries a loader resolved on the server travel with the page, so the
+  // components below it read from a warm cache instead of asking again.
+  setupRouterSsrQueryIntegration({ router, queryClient });
+
+  return router;
 }
 
 declare module '@tanstack/react-router' {

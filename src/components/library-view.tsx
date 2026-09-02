@@ -106,7 +106,9 @@ function LibraryLightbox({
 
   return (
     <Dialog>
-      <DialogTrigger render={trigger} />
+      {/* The trigger is whatever the caller hands over — an image, a tile —
+          so it is not a native button and Base UI is told as much. */}
+      <DialogTrigger nativeButton={false} render={trigger} />
       <DialogContent
         showCloseButton={false}
         className="block w-auto max-w-[95vw] border-0 bg-transparent p-0 shadow-none sm:max-w-[90vw]"

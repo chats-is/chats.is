@@ -29,7 +29,9 @@ export function MediaLightbox({
 
   return (
     <Dialog>
-      <DialogTrigger render={trigger} />
+      {/* The trigger is whatever the caller hands over — an image, a tile —
+          so it is not a native button and Base UI is told as much. */}
+      <DialogTrigger nativeButton={false} render={trigger} />
       <DialogContent
         showCloseButton={false}
         className={cn(
