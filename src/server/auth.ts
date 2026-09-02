@@ -20,11 +20,6 @@ import { accounts, sessions, users, verifications } from './db/schema';
  */
 export const auth = betterAuth({
   secret: env.AUTH_SECRET,
-  // Inferring the origin from the request breaks OAuth callbacks behind a
-  // proxy, so it is stated.
-  baseURL: env.VERCEL_URL
-    ? `https://${env.VERCEL_URL}`
-    : `http://localhost:${env.PORT ?? 3000}`,
   database: drizzleAdapter(db, {
     provider: 'pg',
     // Models resolve by the export name they are given, not the table name,
