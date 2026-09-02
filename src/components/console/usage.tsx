@@ -1,43 +1,43 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from '@tanstack/react-router';
-import { RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { RefreshCw } from 'lucide-react'
 
-import { CAPABILITIES } from '@/lib/constant';
-import { formatUsd, reportWindowStart } from '@/lib/utils';
-import { api } from '@/trpc/react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { CAPABILITIES } from '@/lib/constant'
+import { formatUsd, reportWindowStart } from '@/lib/utils'
+import { api } from '@/trpc/react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+  SelectValue,
+} from '@/components/ui/select'
 import {
   DailyStackedChart,
   UsageModule,
-  UsageModuleSkeleton
-} from '@/components/usage-module';
-import { UsageQuantity } from '@/components/usage-quantity';
-import { UsageUnitPrice } from '@/components/usage-unit-price';
+  UsageModuleSkeleton,
+} from '@/components/usage-module'
+import { UsageQuantity } from '@/components/usage-quantity'
+import { UsageUnitPrice } from '@/components/usage-unit-price'
 
 export default function UsagePage() {
-  const utils = api.useUtils();
-  const [days, setDays] = useState(7);
-  const [refreshing, setRefreshing] = useState(false);
-  const from = useMemo(() => reportWindowStart(days), [days]);
-  const { data, isLoading } = api.usage.adminList.useQuery({ from });
+  const utils = api.useUtils()
+  const [days, setDays] = useState(7)
+  const [refreshing, setRefreshing] = useState(false)
+  const from = useMemo(() => reportWindowStart(days), [days])
+  const { data, isLoading } = api.usage.adminList.useQuery({ from })
 
   const handleRefresh = async () => {
-    setRefreshing(true);
+    setRefreshing(true)
     try {
-      await utils.usage.invalidate();
+      await utils.usage.invalidate()
     } finally {
-      setRefreshing(false);
+      setRefreshing(false)
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -47,7 +47,7 @@ export default function UsagePage() {
           <div className="flex items-center gap-2">
             <Select
               value={String(days)}
-              onValueChange={v => setDays(Number(v))}
+              onValueChange={(v) => setDays(Number(v))}
             >
               <SelectTrigger className="w-40">
                 <SelectValue />
@@ -102,24 +102,24 @@ export default function UsagePage() {
         <UsageLog days={days} />
       </section>
     </div>
-  );
+  )
 }
 
 function UsageLog({ days }: { days: number }) {
-  const [userQuery, setUserQuery] = useState('');
-  const [modelId, setModelId] = useState<string>('');
-  const [capability, setCapability] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const [userQuery, setUserQuery] = useState('')
+  const [modelId, setModelId] = useState<string>('')
+  const [capability, setCapability] = useState<string>('')
+  const [page, setPage] = useState(1)
+  const pageSize = 50
 
   // Reset to page 1 when the window changes.
   useEffect(() => {
-    setPage(1);
-  }, [days]);
+    setPage(1)
+  }, [days])
 
-  const from = useMemo(() => reportWindowStart(days), [days]);
+  const from = useMemo(() => reportWindowStart(days), [days])
 
-  const { data: models } = api.model.list.useQuery();
+  const { data: models } = api.model.list.useQuery()
 
   const { data, isLoading } = api.usage.adminLog.useQuery({
     from,
@@ -129,13 +129,13 @@ function UsageLog({ days }: { days: number }) {
       ? (capability as 'chat' | 'image' | 'video' | 'audio')
       : undefined,
     page,
-    pageSize
-  });
+    pageSize,
+  })
 
   const totalPages = useMemo(() => {
-    if (!data) return 1;
-    return Math.max(1, Math.ceil(data.total / pageSize));
-  }, [data]);
+    if (!data) return 1
+    return Math.max(1, Math.ceil(data.total / pageSize))
+  }, [data])
 
   return (
     <Card className="py-0">
@@ -145,17 +145,17 @@ function UsageLog({ days }: { days: number }) {
           <Input
             placeholder="Search user (name or email)..."
             value={userQuery}
-            onChange={e => {
-              setUserQuery(e.target.value);
-              setPage(1);
+            onChange={(e) => {
+              setUserQuery(e.target.value)
+              setPage(1)
             }}
             className="w-64"
           />
           <Select
             value={modelId || '__all__'}
-            onValueChange={v => {
-              setModelId(v === '__all__' ? '' : v);
-              setPage(1);
+            onValueChange={(v) => {
+              setModelId(v === '__all__' ? '' : v)
+              setPage(1)
             }}
           >
             <SelectTrigger className="w-48">
@@ -163,7 +163,7 @@ function UsageLog({ days }: { days: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All models</SelectItem>
-              {models?.map(m => (
+              {models?.map((m) => (
                 <SelectItem key={m.id} value={m.modelId}>
                   {m.modelId}
                 </SelectItem>
@@ -172,9 +172,9 @@ function UsageLog({ days }: { days: number }) {
           </Select>
           <Select
             value={capability || '__all__'}
-            onValueChange={v => {
-              setCapability(v === '__all__' ? '' : v);
-              setPage(1);
+            onValueChange={(v) => {
+              setCapability(v === '__all__' ? '' : v)
+              setPage(1)
             }}
           >
             <SelectTrigger className="w-40">
@@ -182,7 +182,7 @@ function UsageLog({ days }: { days: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All capabilities</SelectItem>
-              {CAPABILITIES.map(c => (
+              {CAPABILITIES.map((c) => (
                 <SelectItem key={c.value} value={c.value}>
                   {c.label}
                 </SelectItem>
@@ -223,14 +223,15 @@ function UsageLog({ days }: { days: number }) {
                   </td>
                 </tr>
               ) : (
-                data?.rows.map(r => (
+                data?.rows.map((r) => (
                   <tr key={r.id} className="border-b last:border-0">
                     <td className="p-2 text-xs text-muted-foreground">
                       {new Date(r.createdAt).toLocaleString()}
                     </td>
                     <td className="p-2 text-sm">
                       <Link
-                        to="/console/users/$userId" params={{ userId: r.userId }}
+                        to="/console/users/$userId"
+                        params={{ userId: r.userId }}
                         className="hover:text-primary"
                       >
                         <div className="font-medium">
@@ -269,14 +270,14 @@ function UsageLog({ days }: { days: number }) {
             <div className="flex gap-2">
               <button
                 disabled={page <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 className="rounded border px-2 py-1 disabled:opacity-40"
               >
                 Prev
               </button>
               <button
                 disabled={page >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 className="rounded border px-2 py-1 disabled:opacity-40"
               >
                 Next
@@ -286,5 +287,5 @@ function UsageLog({ days }: { days: number }) {
         )}
       </CardContent>
     </Card>
-  );
+  )
 }

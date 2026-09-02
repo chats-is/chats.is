@@ -1,6 +1,6 @@
-import '@tanstack/react-start/server-only';
+import '@tanstack/react-start/server-only'
 
-import { tool, ToolSet } from 'ai';
+import { tool, ToolSet } from 'ai'
 
 import {
   ChatMessage,
@@ -12,73 +12,73 @@ import {
   Model,
   textToSpeechInputSchema,
   transcribeAudioInputSchema,
-  TranscribeToolOutput
-} from '@/types';
+  TranscribeToolOutput,
+} from '@/types'
 import {
   collectConversationMediaUrls,
-  isTrustedMediaUrl
-} from '@/lib/chat-media-urls';
-import { buildMediaToolsSystemPrompt, ChatMediaToolName } from '@/lib/constant';
-import { generateAndStoreImage } from '@/lib/image-generation';
+  isTrustedMediaUrl,
+} from '@/lib/chat-media-urls'
+import { buildMediaToolsSystemPrompt, ChatMediaToolName } from '@/lib/constant'
+import { generateAndStoreImage } from '@/lib/image-generation'
 import {
   AUTO_OPTION,
   pickAspectRatio,
   pickDuration,
   pickResolution,
   pickSize,
-  pickVoice
-} from '@/lib/media-options';
-import { preflightCheck } from '@/lib/preflight';
-import { bindingsToFailoverProviders, FailoverProvider } from '@/lib/provider';
-import { findModelByModelId, getMediaDefaultModelIds } from '@/lib/queries';
-import { generateAndStoreSpeech } from '@/lib/speech-generation';
-import { transcribeAudio } from '@/lib/transcription';
+  pickVoice,
+} from '@/lib/media-options'
+import { preflightCheck } from '@/lib/preflight'
+import { bindingsToFailoverProviders, FailoverProvider } from '@/lib/provider'
+import { findModelByModelId, getMediaDefaultModelIds } from '@/lib/queries'
+import { generateAndStoreSpeech } from '@/lib/speech-generation'
+import { transcribeAudio } from '@/lib/transcription'
 import {
   recordAudioUsage,
   recordImageUsage,
   recordTranscriptionUsage,
-  recordVideoUsage
-} from '@/lib/usage';
-import { isSttModel, isTtsModel } from '@/lib/utils';
+  recordVideoUsage,
+} from '@/lib/usage'
+import { isSttModel, isTtsModel } from '@/lib/utils'
 import {
   generateAndStoreVideo,
-  VideoTimeoutError
-} from '@/lib/video-generation';
+  VideoTimeoutError,
+} from '@/lib/video-generation'
 
 export type MediaToolsOptions = {
-  image?: { modelId?: string; size?: string; aspectRatio?: string };
+  image?: { modelId?: string; size?: string; aspectRatio?: string }
   /** Editing an existing image is its own model choice — few can do it. */
-  imageEdit?: { modelId?: string };
+  imageEdit?: { modelId?: string }
   video?: {
-    modelId?: string;
-    aspectRatio?: string;
-    resolution?: string;
-    duration?: number;
-  };
+    modelId?: string
+    aspectRatio?: string
+    resolution?: string
+    duration?: number
+  }
   /** Animating an image is its own model choice — few video models take one. */
-  videoImage?: { modelId?: string };
+  videoImage?: { modelId?: string }
   /** Editing an existing video is again its own model choice. */
-  videoEdit?: { modelId?: string };
-  audio?: { modelId?: string; voice?: string };
-  stt?: { modelId?: string };
-};
+  videoEdit?: { modelId?: string }
+  audio?: { modelId?: string; voice?: string }
+  stt?: { modelId?: string }
+}
 
 type ResolvedMediaModel = {
-  dbModel: Model;
-  candidates: FailoverProvider[];
-};
+  dbModel: Model
+  candidates: FailoverProvider[]
+}
 
 async function resolveMediaModel(
   modelId: string | null | undefined,
   capability: 'image' | 'video' | 'audio',
-  accepts?: (model: Model) => boolean
+  accepts?: (model: Model) => boolean,
 ): Promise<ResolvedMediaModel | null> {
-  if (!modelId) return null;
-  const dbModel = await findModelByModelId(modelId, capability);
-  const candidates = bindingsToFailoverProviders(dbModel?.providers ?? []);
-  if (!dbModel || candidates.length === 0) return null;
-  if (accepts && !accepts(dbModel)) return null;
-  return { dbModel, candidates };
+  if (!modelId) return null
+  const dbModel = await findModelByModelId(modelId, capability)
+  const candidates = bindingsToFailoverProviders(dbModel?.providers ?? [])
+  if (!dbModel || candidates.length === 0) return null
+  if (accepts && !accepts(dbModel)) return null
+  return { dbModel, candidates }
 }
 
 /**
@@ -91,25 +91,25 @@ async function resolveWithFallback(
   selectedId: string | null | undefined,
   defaultId: string | null | undefined,
   capability: 'image' | 'video' | 'audio',
-  accepts?: (model: Model) => boolean
+  accepts?: (model: Model) => boolean,
 ): Promise<ResolvedMediaModel | null> {
-  const selected = await resolveMediaModel(selectedId, capability, accepts);
-  if (selected) return selected;
+  const selected = await resolveMediaModel(selectedId, capability, accepts)
+  if (selected) return selected
   if (defaultId && defaultId !== selectedId) {
-    return resolveMediaModel(defaultId, capability, accepts);
+    return resolveMediaModel(defaultId, capability, accepts)
   }
-  return null;
+  return null
 }
 
 const GENERIC_TOOL_ERROR =
-  'Generation failed. Please try again or pick a different model.';
+  'Generation failed. Please try again or pick a different model.'
 
 /**
  * A render we stopped waiting on. Says what actually helps — picking another
  * model does not, since the deadline is ours and applies to every provider.
  */
 const VIDEO_TIMEOUT_ERROR =
-  'The video took too long to generate and was stopped. Try a shorter duration or a lower resolution.';
+  'The video took too long to generate and was stopped. Try a shorter duration or a lower resolution.'
 
 /**
  * Append the model's allowed option values to a tool description so the LLM
@@ -117,10 +117,10 @@ const VIDEO_TIMEOUT_ERROR =
  */
 function optionsHint(
   label: string,
-  values?: Array<string | number> | null
+  values?: Array<string | number> | null,
 ): string {
-  const listed = values?.filter(value => value !== AUTO_OPTION);
-  return listed?.length ? ` Available ${label}: ${listed.join(', ')}.` : '';
+  const listed = values?.filter((value) => value !== AUTO_OPTION)
+  return listed?.length ? ` Available ${label}: ${listed.join(', ')}.` : ''
 }
 
 /**
@@ -135,64 +135,64 @@ function optionsHint(
  * assistant message after a successful generation.
  */
 export async function buildMediaTools(args: {
-  userId: string;
-  chatId: string;
-  assistantMessageId: string;
-  mediaOptions?: MediaToolsOptions;
-  chatMessages: ChatMessage[];
+  userId: string
+  chatId: string
+  assistantMessageId: string
+  mediaOptions?: MediaToolsOptions
+  chatMessages: ChatMessage[]
 }): Promise<{ tools: ToolSet; systemPrompt: string }> {
   const { userId, chatId, assistantMessageId, mediaOptions, chatMessages } =
-    args;
+    args
 
-  const defaults = await getMediaDefaultModelIds();
+  const defaults = await getMediaDefaultModelIds()
   const [image, imageEdit, video, videoImage, videoEdit, audio, stt] =
     await Promise.all([
       resolveWithFallback(
         mediaOptions?.image?.modelId,
         defaults.imageModelId,
-        'image'
+        'image',
       ),
       resolveWithFallback(
         mediaOptions?.imageEdit?.modelId,
         defaults.imageEditModelId,
         'image',
-        model => !!model.supportsImageEdit
+        (model) => !!model.supportsImageEdit,
       ),
       resolveWithFallback(
         mediaOptions?.video?.modelId,
         defaults.videoModelId,
-        'video'
+        'video',
       ),
       resolveWithFallback(
         mediaOptions?.videoImage?.modelId,
         defaults.videoImageModelId,
         'video',
-        model => !!model.supportsImageToVideo
+        (model) => !!model.supportsImageToVideo,
       ),
       resolveWithFallback(
         mediaOptions?.videoEdit?.modelId,
         defaults.videoEditModelId,
         'video',
-        model => !!model.supportsVideoEdit
+        (model) => !!model.supportsVideoEdit,
       ),
       resolveWithFallback(
         mediaOptions?.audio?.modelId,
         defaults.ttsModelId,
         'audio',
-        isTtsModel
+        isTtsModel,
       ),
       resolveWithFallback(
         mediaOptions?.stt?.modelId,
         defaults.sttModelId,
         'audio',
-        isSttModel
-      )
-    ]);
+        isSttModel,
+      ),
+    ])
 
   // URLs the model may reference: everything already in the conversation,
   // plus outputs generated by tools earlier in this same response (not yet
   // persisted into chatMessages).
-  const knownUrls = collectConversationMediaUrls(chatMessages);
+  const knownUrls = collectConversationMediaUrls(chatMessages)
 
   /**
    * Allow-list + storage-origin check, then fetch the media bytes. The
@@ -203,50 +203,50 @@ export async function buildMediaTools(args: {
   const fetchKnownMedia = async (
     url: string,
     expectedTypePrefix: 'image/' | 'audio/',
-    abortSignal: AbortSignal | undefined
+    abortSignal: AbortSignal | undefined,
   ): Promise<{ data: Uint8Array; mediaType: string } | { error: string }> => {
     if (!knownUrls.has(url) || !isTrustedMediaUrl(url)) {
       return {
-        error: 'The URL must reference a file from this conversation.'
-      };
+        error: 'The URL must reference a file from this conversation.',
+      }
     }
     try {
-      const res = await fetch(url, { signal: abortSignal });
+      const res = await fetch(url, { signal: abortSignal })
       if (!res.ok) {
-        throw new Error(`Failed to fetch media: ${res.status}`);
+        throw new Error(`Failed to fetch media: ${res.status}`)
       }
-      const mediaType = res.headers.get('content-type') ?? '';
+      const mediaType = res.headers.get('content-type') ?? ''
       if (!mediaType.startsWith(expectedTypePrefix)) {
         return {
-          error: `The referenced file is not ${expectedTypePrefix === 'image/' ? 'an image' : 'an audio file'}.`
-        };
+          error: `The referenced file is not ${expectedTypePrefix === 'image/' ? 'an image' : 'an audio file'}.`,
+        }
       }
-      return { data: new Uint8Array(await res.arrayBuffer()), mediaType };
+      return { data: new Uint8Array(await res.arrayBuffer()), mediaType }
     } catch (err) {
-      console.error('[chat-tools] media fetch failed:', err);
+      console.error('[chat-tools] media fetch failed:', err)
       return {
-        error: 'Could not load the referenced file. Please try again.'
-      };
+        error: 'Could not load the referenced file. Please try again.',
+      }
     }
-  };
+  }
 
-  const tools: ToolSet = {};
-  const registered: ChatMediaToolName[] = [];
+  const tools: ToolSet = {}
+  const registered: ChatMediaToolName[] = []
 
   const gate = async (
     dbModel: Model,
     capability: 'image' | 'video' | 'audio',
-    opts?: { transcription?: boolean }
+    opts?: { transcription?: boolean },
   ): Promise<{ status: 'error'; message: string } | null> => {
     const pre = await preflightCheck({
       userId,
       modelKey: dbModel.modelId,
       modelLabel: dbModel.name,
       capability,
-      transcription: opts?.transcription
-    });
-    return pre.ok ? null : { status: 'error', message: pre.message };
-  };
+      transcription: opts?.transcription,
+    })
+    return pre.ok ? null : { status: 'error', message: pre.message }
+  }
 
   if (image || imageEdit) {
     // Generating and editing may run on different models, so the work takes
@@ -256,11 +256,11 @@ export async function buildMediaTools(args: {
       prompt: string,
       requested: { aspectRatio?: string; size?: string },
       inputImages: Array<{ data: Uint8Array; mediaType: string }> | undefined,
-      abortSignal: AbortSignal | undefined
+      abortSignal: AbortSignal | undefined,
     ): Promise<MediaToolOutput> => {
-      const { dbModel, candidates } = on;
-      const blocked = await gate(dbModel, 'image');
-      if (blocked) return blocked;
+      const { dbModel, candidates } = on
+      const blocked = await gate(dbModel, 'image')
+      if (blocked) return blocked
 
       try {
         const result = await generateAndStoreImage({
@@ -271,16 +271,16 @@ export async function buildMediaTools(args: {
           size: pickSize(
             requested.size,
             mediaOptions?.image?.size,
-            dbModel.uiOptions
+            dbModel.uiOptions,
           ),
           aspectRatio: pickAspectRatio(
             requested.aspectRatio,
             mediaOptions?.image?.aspectRatio,
-            dbModel.uiOptions
+            dbModel.uiOptions,
           ),
           inputImages,
-          abortSignal
-        });
+          abortSignal,
+        })
 
         await recordImageUsage({
           userId,
@@ -290,26 +290,26 @@ export async function buildMediaTools(args: {
           providerId: result.provider.id,
           imageCount: 1,
           inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens
-        });
+          outputTokens: result.outputTokens,
+        })
 
-        knownUrls.add(result.url);
+        knownUrls.add(result.url)
         return {
           status: 'done',
           url: result.url,
           mediaType: result.mediaType,
-          filename: result.filename
-        };
+          filename: result.filename,
+        }
       } catch (err) {
-        console.error('[chat-tools] image generation failed:', err);
-        return { status: 'error', message: GENERIC_TOOL_ERROR };
+        console.error('[chat-tools] image generation failed:', err)
+        return { status: 'error', message: GENERIC_TOOL_ERROR }
       }
-    };
+    }
 
     // Generating needs a generator; editing has its own model and can be the
     // only one configured, which is why this block is entered for either.
     if (image) {
-      const { dbModel } = image;
+      const { dbModel } = image
       tools.generate_image = tool({
         description:
           'Generate a new image from a text description.' +
@@ -322,10 +322,10 @@ export async function buildMediaTools(args: {
             input.prompt,
             { aspectRatio: input.aspectRatio, size: input.size },
             undefined,
-            abortSignal
-          )
-      });
-      registered.push('generate_image');
+            abortSignal,
+          ),
+      })
+      registered.push('generate_image')
     }
 
     // The editor is its own selection, falling back to the generator when that
@@ -335,7 +335,7 @@ export async function buildMediaTools(args: {
     // back as a hand-written SVG of what had been asked for, the user's own
     // image untouched and nothing said about the substitution.
     const editor =
-      imageEdit ?? (image?.dbModel.supportsImageEdit ? image : null);
+      imageEdit ?? (image?.dbModel.supportsImageEdit ? image : null)
 
     tools.edit_image = tool({
       description:
@@ -346,26 +346,26 @@ export async function buildMediaTools(args: {
           return {
             status: 'error',
             message:
-              'No image model that can edit is selected. Pick one under Advanced → Image editing.'
-          };
+              'No image model that can edit is selected. Pick one under Advanced → Image editing.',
+          }
         }
 
         const media = await fetchKnownMedia(
           input.imageUrl,
           'image/',
-          abortSignal
-        );
+          abortSignal,
+        )
         if ('error' in media) {
-          return { status: 'error', message: media.error };
+          return { status: 'error', message: media.error }
         }
-        return runImage(editor, input.prompt, {}, [media], abortSignal);
-      }
-    });
-    registered.push('edit_image');
+        return runImage(editor, input.prompt, {}, [media], abortSignal)
+      },
+    })
+    registered.push('edit_image')
   }
 
   if (video) {
-    const { dbModel } = video;
+    const { dbModel } = video
 
     tools.generate_video = tool({
       description:
@@ -382,35 +382,35 @@ export async function buildMediaTools(args: {
         // image too. Neither means the platform has none configured for it,
         // which is worth saying rather than generating from the words alone
         // and letting the user wonder where their picture went.
-        let on = video;
-        let inputImage;
+        let on = video
+        let inputImage
         if (input.imageUrl) {
           const animator =
-            videoImage ?? (dbModel.supportsImageToVideo ? video : null);
+            videoImage ?? (dbModel.supportsImageToVideo ? video : null)
           if (!animator) {
             return {
               status: 'error',
               message:
-                'No video model that can animate an image is selected. Pick one under Advanced → Video from image.'
-            };
+                'No video model that can animate an image is selected. Pick one under Advanced → Video from image.',
+            }
           }
           const media = await fetchKnownMedia(
             input.imageUrl,
             'image/',
-            abortSignal
-          );
+            abortSignal,
+          )
           if ('error' in media) {
-            return { status: 'error', message: media.error };
+            return { status: 'error', message: media.error }
           }
-          on = animator;
-          inputImage = media;
+          on = animator
+          inputImage = media
         }
 
         // Gated on the model that will actually run, not the one selected for
         // text-to-video: pricing, the quota whitelist and the spend window are
         // all per model.
-        const blocked = await gate(on.dbModel, 'video');
-        if (blocked) return blocked;
+        const blocked = await gate(on.dbModel, 'video')
+        if (blocked) return blocked
 
         try {
           const result = await generateAndStoreVideo({
@@ -422,20 +422,20 @@ export async function buildMediaTools(args: {
             aspectRatio: pickAspectRatio(
               input.aspectRatio,
               mediaOptions?.video?.aspectRatio,
-              on.dbModel.uiOptions
+              on.dbModel.uiOptions,
             ),
             resolution: pickResolution(
               input.resolution,
               mediaOptions?.video?.resolution,
-              on.dbModel.uiOptions
+              on.dbModel.uiOptions,
             ),
             duration: pickDuration(
               input.duration,
               mediaOptions?.video?.duration,
-              on.dbModel.uiOptions
+              on.dbModel.uiOptions,
             ),
-            abortSignal
-          });
+            abortSignal,
+          })
 
           await recordVideoUsage({
             userId,
@@ -444,33 +444,33 @@ export async function buildMediaTools(args: {
             modelId: on.dbModel.modelId,
             providerId: result.provider.id,
             videoCount: 1,
-            videoSeconds: result.videoSeconds
-          });
+            videoSeconds: result.videoSeconds,
+          })
 
-          knownUrls.add(result.url);
+          knownUrls.add(result.url)
           return {
             status: 'done',
             url: result.url,
             mediaType: result.mediaType,
-            filename: result.filename
-          };
+            filename: result.filename,
+          }
         } catch (err) {
-          console.error('[chat-tools] generate_video failed:', err);
+          console.error('[chat-tools] generate_video failed:', err)
           return {
             status: 'error',
             message:
               err instanceof VideoTimeoutError
                 ? VIDEO_TIMEOUT_ERROR
-                : GENERIC_TOOL_ERROR
-          };
+                : GENERIC_TOOL_ERROR,
+          }
         }
-      }
-    });
-    registered.push('generate_video');
+      },
+    })
+    registered.push('generate_video')
   }
 
   if (videoEdit) {
-    const { dbModel, candidates } = videoEdit;
+    const { dbModel, candidates } = videoEdit
 
     tools.edit_video = tool({
       description:
@@ -486,8 +486,8 @@ export async function buildMediaTools(args: {
         ) {
           return {
             status: 'error',
-            message: 'That video is not part of this conversation.'
-          };
+            message: 'That video is not part of this conversation.',
+          }
         }
 
         // And that it is a video: an image URL from the same conversation
@@ -497,24 +497,24 @@ export async function buildMediaTools(args: {
         try {
           const head = await fetch(input.videoUrl, {
             method: 'HEAD',
-            signal: abortSignal
-          });
+            signal: abortSignal,
+          })
           if (!head.headers.get('content-type')?.startsWith('video/')) {
             return {
               status: 'error',
-              message: 'That file is not a video.'
-            };
+              message: 'That file is not a video.',
+            }
           }
         } catch (err) {
-          console.error('[chat-tools] video head request failed:', err);
+          console.error('[chat-tools] video head request failed:', err)
           return {
             status: 'error',
-            message: 'Could not load the referenced video. Please try again.'
-          };
+            message: 'Could not load the referenced video. Please try again.',
+          }
         }
 
-        const blocked = await gate(dbModel, 'video');
-        if (blocked) return blocked;
+        const blocked = await gate(dbModel, 'video')
+        if (blocked) return blocked
 
         try {
           const result = await generateAndStoreVideo({
@@ -523,8 +523,8 @@ export async function buildMediaTools(args: {
             dbModel,
             candidates,
             inputVideoUrl: input.videoUrl,
-            abortSignal
-          });
+            abortSignal,
+          })
 
           await recordVideoUsage({
             userId,
@@ -533,33 +533,33 @@ export async function buildMediaTools(args: {
             modelId: dbModel.modelId,
             providerId: result.provider.id,
             videoCount: 1,
-            videoSeconds: result.videoSeconds
-          });
+            videoSeconds: result.videoSeconds,
+          })
 
-          knownUrls.add(result.url);
+          knownUrls.add(result.url)
           return {
             status: 'done',
             url: result.url,
             mediaType: result.mediaType,
-            filename: result.filename
-          };
+            filename: result.filename,
+          }
         } catch (err) {
-          console.error('[chat-tools] edit_video failed:', err);
+          console.error('[chat-tools] edit_video failed:', err)
           return {
             status: 'error',
             message:
               err instanceof VideoTimeoutError
                 ? VIDEO_TIMEOUT_ERROR
-                : GENERIC_TOOL_ERROR
-          };
+                : GENERIC_TOOL_ERROR,
+          }
         }
-      }
-    });
-    registered.push('edit_video');
+      },
+    })
+    registered.push('edit_video')
   }
 
   if (audio) {
-    const { dbModel, candidates } = audio;
+    const { dbModel, candidates } = audio
 
     tools.text_to_speech = tool({
       description:
@@ -567,8 +567,8 @@ export async function buildMediaTools(args: {
         optionsHint('voices', dbModel.uiOptions?.voices),
       inputSchema: textToSpeechInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
-        const blocked = await gate(dbModel, 'audio', { transcription: false });
-        if (blocked) return blocked;
+        const blocked = await gate(dbModel, 'audio', { transcription: false })
+        if (blocked) return blocked
 
         try {
           const result = await generateAndStoreSpeech({
@@ -579,10 +579,10 @@ export async function buildMediaTools(args: {
             voice: pickVoice(
               input.voice,
               mediaOptions?.audio?.voice,
-              dbModel.uiOptions
+              dbModel.uiOptions,
             ),
-            abortSignal
-          });
+            abortSignal,
+          })
 
           await recordAudioUsage({
             userId,
@@ -592,28 +592,28 @@ export async function buildMediaTools(args: {
             providerId: result.provider.id,
             // TTS bills per input character (generateSpeech reports no
             // token usage).
-            audioCharacters: result.characters
-          });
+            audioCharacters: result.characters,
+          })
 
           // Same-response transcribe_audio may reference this output.
-          knownUrls.add(result.url);
+          knownUrls.add(result.url)
           return {
             status: 'done',
             url: result.url,
             mediaType: result.mediaType,
-            filename: result.filename
-          };
+            filename: result.filename,
+          }
         } catch (err) {
-          console.error('[chat-tools] text_to_speech failed:', err);
-          return { status: 'error', message: GENERIC_TOOL_ERROR };
+          console.error('[chat-tools] text_to_speech failed:', err)
+          return { status: 'error', message: GENERIC_TOOL_ERROR }
         }
-      }
-    });
-    registered.push('text_to_speech');
+      },
+    })
+    registered.push('text_to_speech')
   }
 
   if (stt) {
-    const { dbModel, candidates } = stt;
+    const { dbModel, candidates } = stt
 
     tools.transcribe_audio = tool({
       description:
@@ -621,18 +621,18 @@ export async function buildMediaTools(args: {
       inputSchema: transcribeAudioInputSchema,
       execute: async (
         input,
-        { abortSignal }
+        { abortSignal },
       ): Promise<TranscribeToolOutput> => {
-        const blocked = await gate(dbModel, 'audio', { transcription: true });
-        if (blocked) return blocked;
+        const blocked = await gate(dbModel, 'audio', { transcription: true })
+        if (blocked) return blocked
 
         const media = await fetchKnownMedia(
           input.audioUrl,
           'audio/',
-          abortSignal
-        );
+          abortSignal,
+        )
         if ('error' in media) {
-          return { status: 'error', message: media.error };
+          return { status: 'error', message: media.error }
         }
 
         try {
@@ -641,8 +641,8 @@ export async function buildMediaTools(args: {
             mediaType: media.mediaType,
             dbModel,
             candidates,
-            abortSignal
-          });
+            abortSignal,
+          })
 
           await recordTranscriptionUsage({
             userId,
@@ -650,22 +650,22 @@ export async function buildMediaTools(args: {
             messageId: assistantMessageId,
             modelId: dbModel.modelId,
             providerId: result.provider.id,
-            audioSeconds: result.durationInSeconds
-          });
+            audioSeconds: result.durationInSeconds,
+          })
 
           return {
             status: 'done',
             text: result.text,
-            durationInSeconds: result.durationInSeconds
-          };
+            durationInSeconds: result.durationInSeconds,
+          }
         } catch (err) {
-          console.error('[chat-tools] transcribe_audio failed:', err);
-          return { status: 'error', message: GENERIC_TOOL_ERROR };
+          console.error('[chat-tools] transcribe_audio failed:', err)
+          return { status: 'error', message: GENERIC_TOOL_ERROR }
         }
-      }
-    });
-    registered.push('transcribe_audio');
+      },
+    })
+    registered.push('transcribe_audio')
   }
 
-  return { tools, systemPrompt: buildMediaToolsSystemPrompt(registered) };
+  return { tools, systemPrompt: buildMediaToolsSystemPrompt(registered) }
 }

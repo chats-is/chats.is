@@ -1,5 +1,5 @@
-import type { MediaToolName } from '@/types/chat-tools';
-import type { ModelCapability } from '@/types/model';
+import type { MediaToolName } from '@/types/chat-tools'
+import type { ModelCapability } from '@/types/model'
 
 /**
  * Provider types for the console
@@ -12,8 +12,8 @@ export const ProviderTypes = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'bedrock', label: 'AWS Bedrock' },
   { value: 'xai', label: 'xAI' },
-  { value: 'deepseek', label: 'DeepSeek' }
-] as const;
+  { value: 'deepseek', label: 'DeepSeek' },
+] as const
 
 /**
  * Model and prompt capabilities
@@ -22,8 +22,8 @@ export const CAPABILITIES = [
   { value: 'chat', label: 'Chat' },
   { value: 'image', label: 'Image' },
   { value: 'video', label: 'Video' },
-  { value: 'audio', label: 'Audio' }
-] satisfies Array<{ value: ModelCapability; label: string }>;
+  { value: 'audio', label: 'Audio' },
+] satisfies Array<{ value: ModelCapability; label: string }>
 
 /**
  * Image size labels mapping
@@ -40,8 +40,8 @@ export const ImageSizeLabels: Record<string, string> = {
   '1536x1024': 'Landscape (1536x1024)',
   '1024x1536': 'Portrait (1024x1536)',
   '1792x1024': 'Landscape (1792x1024)',
-  '1024x1792': 'Portrait (1024x1792)'
-};
+  '1024x1792': 'Portrait (1024x1792)',
+}
 
 /**
  * Aspect ratio labels mapping
@@ -61,8 +61,8 @@ export const AspectRatioLabels: Record<string, string> = {
   '8:1': 'Ultra Landscape (8:1)',
   '9:16': 'Portrait (9:16)',
   '16:9': 'Landscape (16:9)',
-  '21:9': 'Ultrawide (21:9)'
-};
+  '21:9': 'Ultrawide (21:9)',
+}
 
 /**
  * Video resolution labels mapping
@@ -72,8 +72,8 @@ export const VideoResolutionLabels: Record<string, string> = {
   '480p': '480p (SD)',
   '720p': '720p (HD)',
   '1080p': '1080p (Full HD)',
-  '4k': '4K (Ultra HD)'
-};
+  '4k': '4K (Ultra HD)',
+}
 
 /**
  * Vertex AI model ID mapping (Anthropic model ID -> Vertex AI model ID)
@@ -90,8 +90,8 @@ export const VertexAIModels: Record<string, string> = {
   'claude-sonnet-4-0': 'claude-sonnet-4@20250514',
   'claude-sonnet-4-20250514': 'claude-sonnet-4@20250514',
   'claude-opus-4-0': 'claude-opus-4@20250514',
-  'claude-opus-4-20250514': 'claude-opus-4@20250514'
-};
+  'claude-opus-4-20250514': 'claude-opus-4@20250514',
+}
 
 /**
  * AWS Bedrock model ID mapping (Anthropic model ID -> Bedrock model ID)
@@ -110,14 +110,12 @@ export const BedrockModels: Record<string, string> = {
   'claude-sonnet-4-0': 'anthropic.claude-sonnet-4-20250514-v1:0',
   'claude-sonnet-4-20250514': 'anthropic.claude-sonnet-4-20250514-v1:0',
   'claude-opus-4-0': 'anthropic.claude-opus-4-20250514-v1:0',
-  'claude-opus-4-20250514': 'anthropic.claude-opus-4-20250514-v1:0'
-};
+  'claude-opus-4-20250514': 'anthropic.claude-opus-4-20250514-v1:0',
+}
 
 /** Media tool names plus transcription (separate output shape, same prompt). */
 export type ChatMediaToolName =
-  | MediaToolName
-  | 'transcribe_audio'
-  | 'edit_video';
+  MediaToolName | 'transcribe_audio' | 'edit_video'
 
 const MediaToolDescriptions: Record<ChatMediaToolName, string> = {
   generate_image:
@@ -131,21 +129,21 @@ const MediaToolDescriptions: Record<ChatMediaToolName, string> = {
   text_to_speech:
     '- text_to_speech: convert text to spoken audio (e.g. "read this aloud", "say this"). Pass the exact final text to speak — write it out first if it needs composing.',
   transcribe_audio:
-    "- transcribe_audio: transcribe an audio file from this conversation to text (speech-to-text). Pass that audio's URL as `audioUrl`. Use when the user asks what an audio says or to transcribe/translate it."
-};
+    "- transcribe_audio: transcribe an audio file from this conversation to text (speech-to-text). Pass that audio's URL as `audioUrl`. Use when the user asks what an audio says or to transcribe/translate it.",
+}
 
 export function buildMediaToolsSystemPrompt(
-  tools: ChatMediaToolName[]
+  tools: ChatMediaToolName[],
 ): string {
-  if (tools.length === 0) return '';
+  if (tools.length === 0) return ''
   return [
     'You also have media generation tools:',
-    ...tools.map(name => MediaToolDescriptions[name]),
+    ...tools.map((name) => MediaToolDescriptions[name]),
     '',
     "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields and the defaults apply.",
     '',
-    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. A transcript is not displayed, so write it out yourself — quote what was said, then answer whatever was asked about it. If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the model, or mention settings pages. Do not retry the tool on your own.'
-  ].join('\n');
+    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. A transcript is not displayed, so write it out yourself — quote what was said, then answer whatever was asked about it. If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the model, or mention settings pages. Do not retry the tool on your own.',
+  ].join('\n')
 }
 
 export const ArtifactSystemPrompt = [
@@ -170,5 +168,5 @@ export const ArtifactSystemPrompt = [
   '- Allowed package imports: react, react-dom, react-dom/client, lucide-react, framer-motion, recharts, clsx, class-variance-authority. No Next.js APIs, server code, env vars, remote assets, or any other npm package.',
   '- Styling: Tailwind utility classes work (a Tailwind v4 runtime is bundled into the preview), and inline styles or a <style> tag also work. CSS-file imports do NOT apply at runtime.',
   '',
-  'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.'
-].join('\n');
+  'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.',
+].join('\n')

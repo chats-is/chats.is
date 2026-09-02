@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { usePreferences } from '@/contexts/preferences-context';
-import { UseChatHelpers } from '@ai-sdk/react';
-import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react'
+import { usePreferences } from '@/contexts/preferences-context'
+import { UseChatHelpers } from '@ai-sdk/react'
+import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react'
 
-import { ChatMessage, Model, ModelCapability } from '@/types';
+import { ChatMessage, Model, ModelCapability } from '@/types'
 import {
   AspectRatioLabels,
   ImageSizeLabels,
-  VideoResolutionLabels
-} from '@/lib/constant';
-import { cn, modelMatchesId } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+  VideoResolutionLabels,
+} from '@/lib/constant'
+import { cn, modelMatchesId } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -18,56 +18,56 @@ import {
   SelectItem,
   SelectLabel,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+  SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
-import { ModelIcon } from '@/components/model-icon';
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { ModelIcon } from '@/components/model-icon'
 
 export interface ModelMenuProps extends Pick<
   UseChatHelpers<ChatMessage>,
   'status'
 > {
   /** The capability type for model selection */
-  capability?: ModelCapability;
+  capability?: ModelCapability
   /** Pre-filtered models to display */
-  models: Model[];
+  models: Model[]
   /** Current model value (controlled) */
-  modelId: string;
+  modelId: string
   /** Callback when model changes */
-  onModelChange: (modelId: string) => void;
+  onModelChange: (modelId: string) => void
   /** Callback when model options change (like reasoning, size, aspectRatio, voice) */
-  onOptionsChange?: (options: ModelOptions) => void;
+  onOptionsChange?: (options: ModelOptions) => void
   /** Current size value (for image capability) */
-  size?: string;
+  size?: string
   /** Current aspect ratio value (for image & video capability) */
-  aspectRatio?: string;
+  aspectRatio?: string
   /** Current resolution value (for video capability) */
-  resolution?: string;
+  resolution?: string
   /** Current duration value in seconds (for video capability) */
-  duration?: number;
+  duration?: number
   /** Current voice value (for audio capability) */
-  voice?: string;
+  voice?: string
 }
 
 export interface ModelOptions {
-  isReasoning?: boolean;
-  supportsVision?: boolean;
-  supportsReasoning?: boolean;
+  isReasoning?: boolean
+  supportsVision?: boolean
+  supportsReasoning?: boolean
   /** Size value (for image) */
-  size?: string;
+  size?: string
   /** AspectRatio value (for image & video) */
-  aspectRatio?: string;
+  aspectRatio?: string
   /** Resolution value (for video) */
-  resolution?: string;
+  resolution?: string
   /** Duration value in seconds (for video) */
-  duration?: number;
+  duration?: number
   /** Voice value (for audio) */
-  voice?: string;
+  voice?: string
 }
 
 export function ModelMenu({
@@ -81,78 +81,78 @@ export function ModelMenu({
   aspectRatio,
   resolution,
   duration,
-  voice
+  voice,
 }: ModelMenuProps) {
   // Prevent hydration mismatch with Radix Select
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
-  const { preferences, setPreference } = usePreferences();
+  const { preferences, setPreference } = usePreferences()
 
   // Track isReasoning state from preferences
-  const [isReasoning, setIsReasoning] = useState(preferences.chatReasoning);
+  const [isReasoning, setIsReasoning] = useState(preferences.chatReasoning)
 
   // Find selected model from database models
   const selectedModel = useMemo(
-    () => models?.find(m => modelMatchesId(m, modelId)),
-    [models, modelId]
-  );
+    () => models?.find((m) => modelMatchesId(m, modelId)),
+    [models, modelId],
+  )
 
   // Get available options from selected model
-  const uiOptions = selectedModel?.uiOptions as Record<string, unknown> | null;
+  const uiOptions = selectedModel?.uiOptions as Record<string, unknown> | null
   const defaultSize =
-    typeof uiOptions?.size === 'string' ? (uiOptions.size as string) : '';
+    typeof uiOptions?.size === 'string' ? (uiOptions.size as string) : ''
   const availableSizes = useMemo(
     () => (uiOptions?.sizes as string[]) || [],
-    [uiOptions?.sizes]
-  );
+    [uiOptions?.sizes],
+  )
   const defaultAspectRatio =
     typeof uiOptions?.aspectRatio === 'string'
       ? (uiOptions.aspectRatio as string)
-      : '';
+      : ''
   const availableAspectRatios = useMemo(
     () => (uiOptions?.aspectRatios as string[]) || [],
-    [uiOptions?.aspectRatios]
-  );
+    [uiOptions?.aspectRatios],
+  )
   const defaultDuration = useMemo(() => {
-    const value = uiOptions?.duration;
-    if (typeof value === 'number') return value;
+    const value = uiOptions?.duration
+    if (typeof value === 'number') return value
     if (typeof value === 'string') {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : undefined
     }
-    return undefined;
-  }, [uiOptions?.duration]);
+    return undefined
+  }, [uiOptions?.duration])
   const availableDurations = useMemo(() => {
-    const values = uiOptions?.durations as unknown;
-    if (!Array.isArray(values)) return [];
+    const values = uiOptions?.durations as unknown
+    if (!Array.isArray(values)) return []
     return values
-      .map(v => (typeof v === 'number' ? v : Number(v)))
-      .filter(v => Number.isFinite(v));
-  }, [uiOptions?.durations]);
+      .map((v) => (typeof v === 'number' ? v : Number(v)))
+      .filter((v) => Number.isFinite(v))
+  }, [uiOptions?.durations])
   const defaultResolution =
     typeof uiOptions?.resolution === 'string'
       ? (uiOptions.resolution as string)
-      : '';
+      : ''
   const availableResolutions = useMemo(
     () => (uiOptions?.resolutions as string[]) || [],
-    [uiOptions?.resolutions]
-  );
+    [uiOptions?.resolutions],
+  )
   const defaultVoice =
-    typeof uiOptions?.voice === 'string' ? (uiOptions.voice as string) : '';
+    typeof uiOptions?.voice === 'string' ? (uiOptions.voice as string) : ''
   const availableVoices = useMemo(
     () => (uiOptions?.voices as string[]) || [],
-    [uiOptions?.voices]
-  );
+    [uiOptions?.voices],
+  )
 
   // Notify parent of model capabilities and auto-select options
   useEffect(() => {
-    if (!selectedModel) return;
+    if (!selectedModel) return
 
     // Notify supportsVision on mount and model change
     onOptionsChange?.({
-      supportsVision: selectedModel.supportsVision ?? undefined
-    });
+      supportsVision: selectedModel.supportsVision ?? undefined,
+    })
 
     // Auto-select default size, fallback to the first available option.
     if (
@@ -164,9 +164,9 @@ export function ModelMenu({
         ? preferences.imageSize
         : availableSizes.includes(defaultSize)
           ? defaultSize
-          : availableSizes[0];
+          : availableSizes[0]
       if (nextSize !== size) {
-        onOptionsChange?.({ size: nextSize });
+        onOptionsChange?.({ size: nextSize })
       }
     }
 
@@ -179,16 +179,16 @@ export function ModelMenu({
       const preferenceAspectRatio =
         capability === 'image'
           ? preferences.imageAspectRatio
-          : preferences.videoAspectRatio;
+          : preferences.videoAspectRatio
       const nextAspectRatio = availableAspectRatios.includes(
-        preferenceAspectRatio
+        preferenceAspectRatio,
       )
         ? preferenceAspectRatio
         : availableAspectRatios.includes(defaultAspectRatio)
           ? defaultAspectRatio
-          : availableAspectRatios[0];
+          : availableAspectRatios[0]
       if (nextAspectRatio !== aspectRatio) {
-        onOptionsChange?.({ aspectRatio: nextAspectRatio });
+        onOptionsChange?.({ aspectRatio: nextAspectRatio })
       }
     }
 
@@ -198,16 +198,16 @@ export function ModelMenu({
       availableDurations.length > 0 &&
       (duration === undefined || !availableDurations.includes(duration))
     ) {
-      const preferred = preferences.videoDuration;
+      const preferred = preferences.videoDuration
       const nextDuration =
         preferred !== undefined && availableDurations.includes(preferred)
           ? preferred
           : defaultDuration !== undefined &&
               availableDurations.includes(defaultDuration)
             ? defaultDuration
-            : availableDurations[0];
+            : availableDurations[0]
       if (nextDuration !== duration) {
-        onOptionsChange?.({ duration: nextDuration });
+        onOptionsChange?.({ duration: nextDuration })
       }
     }
 
@@ -218,14 +218,14 @@ export function ModelMenu({
       (!resolution || !availableResolutions.includes(resolution))
     ) {
       const nextResolution = availableResolutions.includes(
-        preferences.videoResolution
+        preferences.videoResolution,
       )
         ? preferences.videoResolution
         : availableResolutions.includes(defaultResolution)
           ? defaultResolution
-          : availableResolutions[0];
+          : availableResolutions[0]
       if (nextResolution !== resolution) {
-        onOptionsChange?.({ resolution: nextResolution });
+        onOptionsChange?.({ resolution: nextResolution })
       }
     }
 
@@ -239,9 +239,9 @@ export function ModelMenu({
         ? preferences.audioVoice
         : availableVoices.includes(defaultVoice)
           ? defaultVoice
-          : availableVoices[0];
+          : availableVoices[0]
       if (nextVoice !== voice) {
-        onOptionsChange?.({ voice: nextVoice });
+        onOptionsChange?.({ voice: nextVoice })
       }
     }
   }, [
@@ -268,8 +268,8 @@ export function ModelMenu({
     preferences.videoDuration,
     preferences.videoResolution,
     preferences.audioVoice,
-    onOptionsChange
-  ]);
+    onOptionsChange,
+  ])
 
   if (!mounted) {
     return (
@@ -278,59 +278,59 @@ export function ModelMenu({
         <Skeleton className="mr-1 h-4 w-20" />
         <Skeleton className="size-4 rounded-full" />
       </div>
-    );
+    )
   }
 
   // Grouped models by provider for display
   const groupedModels = (models ?? [])
-    .filter(m => m.provider)
+    .filter((m) => m.provider)
     .reduce(
       (acc, m) => {
-        const providerKey = m.provider!.id;
+        const providerKey = m.provider!.id
         if (!acc[providerKey]) {
-          acc[providerKey] = [];
+          acc[providerKey] = []
         }
-        acc[providerKey].push(m);
-        return acc;
+        acc[providerKey].push(m)
+        return acc
       },
-      {} as Record<string, Model[]>
-    );
+      {} as Record<string, Model[]>,
+    )
 
   // Handler for model change
   const handleModelChange = (newModel: string) => {
     // Ignore empty values (Radix Select fires empty change during hydration)
-    if (!newModel) return;
+    if (!newModel) return
 
     // Notify parent (parent handles saving to preferences)
-    onModelChange(newModel);
+    onModelChange(newModel)
 
     // Find the new model and notify about its options
-    const newModelData = models?.find(m => m.modelId === newModel);
+    const newModelData = models?.find((m) => m.modelId === newModel)
     if (newModelData) {
-      const supportsReasoning = newModelData.uiOptions?.reasoning;
+      const supportsReasoning = newModelData.uiOptions?.reasoning
       onOptionsChange?.({
         supportsVision: newModelData.supportsVision ?? undefined,
         supportsReasoning: supportsReasoning ?? undefined,
-        isReasoning: supportsReasoning ? isReasoning : undefined
-      });
+        isReasoning: supportsReasoning ? isReasoning : undefined,
+      })
     }
-  };
+  }
 
   // Handler for reasoning toggle (only for chat capability)
   const handleReasoningToggle = () => {
-    if (capability !== 'chat') return;
-    const newValue = !isReasoning;
-    setIsReasoning(newValue);
-    setPreference('chatReasoning', newValue);
+    if (capability !== 'chat') return
+    const newValue = !isReasoning
+    setIsReasoning(newValue)
+    setPreference('chatReasoning', newValue)
     onOptionsChange?.({
       supportsVision: selectedModel?.supportsVision ?? undefined,
       supportsReasoning: selectedModel?.uiOptions?.reasoning ?? undefined,
-      isReasoning: newValue
-    });
-  };
+      isReasoning: newValue,
+    })
+  }
 
   const isDisabled =
-    status === 'submitted' || status === 'streaming' || !models?.length;
+    status === 'submitted' || status === 'streaming' || !models?.length
 
   return (
     <div className="flex items-center space-x-2">
@@ -375,7 +375,7 @@ export function ModelMenu({
                       {providerModels[0]?.provider?.name || 'Unknown'}
                     </span>
                   </SelectLabel>
-                  {providerModels.map(m => (
+                  {providerModels.map((m) => (
                     <SelectItem
                       key={m.modelId}
                       value={m.modelId}
@@ -402,11 +402,13 @@ export function ModelMenu({
                             {(m.supportsImageEdit ||
                               m.supportsImageToVideo) && (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="rounded bg-emerald-100 p-0.5 dark:bg-emerald-900/30">
-                                    <Pencil className="size-3 text-emerald-600 dark:text-emerald-400" />
-                                  </span>
-                                </TooltipTrigger>
+                                <TooltipTrigger
+                                  render={
+                                    <span className="rounded bg-emerald-100 p-0.5 dark:bg-emerald-900/30">
+                                      <Pencil className="size-3 text-emerald-600 dark:text-emerald-400" />
+                                    </span>
+                                  }
+                                />
                                 <TooltipContent>
                                   {m.supportsImageToVideo
                                     ? 'Can animate an existing image'
@@ -416,11 +418,13 @@ export function ModelMenu({
                             )}
                             {m.supportsVideoEdit && (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="rounded bg-violet-100 p-0.5 dark:bg-violet-900/30">
-                                    <Scissors className="size-3 text-violet-600 dark:text-violet-400" />
-                                  </span>
-                                </TooltipTrigger>
+                                <TooltipTrigger
+                                  render={
+                                    <span className="rounded bg-violet-100 p-0.5 dark:bg-violet-900/30">
+                                      <Scissors className="size-3 text-violet-600 dark:text-violet-400" />
+                                    </span>
+                                  }
+                                />
                                 <TooltipContent>
                                   Can edit an existing video
                                 </TooltipContent>
@@ -428,21 +432,25 @@ export function ModelMenu({
                             )}
                             {m.supportsVision && (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="rounded bg-blue-100 p-0.5 dark:bg-blue-900/30">
-                                    <Eye className="size-3 text-blue-600 dark:text-blue-400" />
-                                  </span>
-                                </TooltipTrigger>
+                                <TooltipTrigger
+                                  render={
+                                    <span className="rounded bg-blue-100 p-0.5 dark:bg-blue-900/30">
+                                      <Eye className="size-3 text-blue-600 dark:text-blue-400" />
+                                    </span>
+                                  }
+                                />
                                 <TooltipContent>Supports vision</TooltipContent>
                               </Tooltip>
                             )}
                             {m.supportsReasoning && (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="rounded bg-amber-100 p-0.5 dark:bg-amber-900/30">
-                                    <Lightbulb className="size-3 text-amber-600 dark:text-amber-400" />
-                                  </span>
-                                </TooltipTrigger>
+                                <TooltipTrigger
+                                  render={
+                                    <span className="rounded bg-amber-100 p-0.5 dark:bg-amber-900/30">
+                                      <Lightbulb className="size-3 text-amber-600 dark:text-amber-400" />
+                                    </span>
+                                  }
+                                />
                                 <TooltipContent>
                                   Supports reasoning
                                 </TooltipContent>
@@ -454,7 +462,7 @@ export function ModelMenu({
                     </SelectItem>
                   ))}
                 </SelectGroup>
-              )
+              ),
             )}
         </SelectContent>
       </Select>
@@ -468,8 +476,8 @@ export function ModelMenu({
             'h-9 rounded-full px-3 font-normal text-muted-foreground shadow-none hover:text-muted-foreground',
             {
               'border-muted-foreground/30 bg-muted text-foreground hover:text-foreground':
-                isReasoning
-            }
+                isReasoning,
+            },
           )}
           onClick={handleReasoningToggle}
         >
@@ -487,7 +495,7 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={size || ''}
-          onValueChange={newSize => onOptionsChange?.({ size: newSize })}
+          onValueChange={(newSize) => onOptionsChange?.({ size: newSize })}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
@@ -495,7 +503,7 @@ export function ModelMenu({
             </span>
           </SelectTrigger>
           <SelectContent position="popper">
-            {availableSizes.map(s => (
+            {availableSizes.map((s) => (
               <SelectItem key={s} value={s}>
                 {ImageSizeLabels[s] || s}
               </SelectItem>
@@ -510,7 +518,7 @@ export function ModelMenu({
           <Select
             disabled={isDisabled}
             value={aspectRatio || ''}
-            onValueChange={newRatio =>
+            onValueChange={(newRatio) =>
               onOptionsChange?.({ aspectRatio: newRatio })
             }
           >
@@ -522,7 +530,7 @@ export function ModelMenu({
               </span>
             </SelectTrigger>
             <SelectContent position="popper">
-              {availableAspectRatios.map(r => (
+              {availableAspectRatios.map((r) => (
                 <SelectItem key={r} value={r}>
                   {AspectRatioLabels[r] || r}
                 </SelectItem>
@@ -536,7 +544,7 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={resolution || ''}
-          onValueChange={newResolution =>
+          onValueChange={(newResolution) =>
             onOptionsChange?.({ resolution: newResolution })
           }
         >
@@ -548,7 +556,7 @@ export function ModelMenu({
             </span>
           </SelectTrigger>
           <SelectContent position="popper">
-            {availableResolutions.map(r => (
+            {availableResolutions.map((r) => (
               <SelectItem key={r} value={r}>
                 {VideoResolutionLabels[r] || r}
               </SelectItem>
@@ -562,10 +570,10 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={duration !== undefined ? String(duration) : ''}
-          onValueChange={newDuration => {
-            const parsed = Number(newDuration);
+          onValueChange={(newDuration) => {
+            const parsed = Number(newDuration)
             if (Number.isFinite(parsed)) {
-              onOptionsChange?.({ duration: parsed });
+              onOptionsChange?.({ duration: parsed })
             }
           }}
         >
@@ -575,7 +583,7 @@ export function ModelMenu({
             </span>
           </SelectTrigger>
           <SelectContent position="popper">
-            {availableDurations.map(d => (
+            {availableDurations.map((d) => (
               <SelectItem key={d} value={String(d)}>
                 {`${d}s`}
               </SelectItem>
@@ -589,7 +597,7 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={voice || ''}
-          onValueChange={newVoice => onOptionsChange?.({ voice: newVoice })}
+          onValueChange={(newVoice) => onOptionsChange?.({ voice: newVoice })}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
@@ -597,7 +605,7 @@ export function ModelMenu({
             </span>
           </SelectTrigger>
           <SelectContent position="popper">
-            {availableVoices.map(v => (
+            {availableVoices.map((v) => (
               <SelectItem key={v} value={v}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </SelectItem>
@@ -606,5 +614,5 @@ export function ModelMenu({
         </Select>
       )}
     </div>
-  );
+  )
 }

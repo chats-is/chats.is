@@ -1,9 +1,9 @@
-import * as React from 'react';
-import { useParams, useRouter } from '@tanstack/react-router';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import * as React from 'react'
+import { useParams, useRouter } from '@tanstack/react-router'
+import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { useChats } from '@/hooks/use-chats';
+import { useChats } from '@/hooks/use-chats'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,22 +12,22 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface ClearHistoryDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 export function ClearHistoryDialog({
   open,
-  onOpenChange
+  onOpenChange,
 }: ClearHistoryDialogProps) {
-  const { clearChats } = useChats();
-  const router = useRouter();
-  const params = useParams({ strict: false });
-  const [isPending, startTransition] = React.useTransition();
+  const { clearChats } = useChats()
+  const router = useRouter()
+  const params = useParams({ strict: false })
+  const [isPending, startTransition] = React.useTransition()
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -43,20 +43,20 @@ export function ClearHistoryDialog({
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={isPending}
-            onClick={e => {
-              e.preventDefault();
+            onClick={(e) => {
+              e.preventDefault()
               startTransition(async () => {
                 try {
-                  await clearChats();
-                  toast.success('All chat deleted', { duration: 2000 });
+                  await clearChats()
+                  toast.success('All chat deleted', { duration: 2000 })
                   if (params.chatId) {
-                    router.navigate({ to: '/' });
+                    router.navigate({ to: '/' })
                   }
-                  onOpenChange(false);
+                  onOpenChange(false)
                 } catch (err: any) {
-                  toast.error(err.message);
+                  toast.error(err.message)
                 }
-              });
+              })
             }}
           >
             {isPending ? (
@@ -71,5 +71,5 @@ export function ClearHistoryDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
+  )
 }

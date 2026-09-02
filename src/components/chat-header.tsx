@@ -1,31 +1,31 @@
-import { useEffect } from 'react';
-import { useRouter } from '@tanstack/react-router';
-import { useSystemSettings } from '@/contexts/system-settings-context';
-import { PlusCircle } from 'lucide-react';
+import { useEffect } from 'react'
+import { useRouter } from '@tanstack/react-router'
+import { useSystemSettings } from '@/contexts/system-settings-context'
+import { PlusCircle } from 'lucide-react'
 
-import { Button } from '@/components/ui/button';
-import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 
 interface ChatHeaderProps {
-  title?: string;
+  title?: string
 }
 
 export function ChatHeader({ title }: ChatHeaderProps) {
-  const { appName } = useSystemSettings();
-  const router = useRouter();
+  const { appName } = useSystemSettings()
+  const router = useRouter()
 
   const handleNewChat = () => {
-    router.navigate({ to: '/' });
-    router.invalidate();
-  };
+    router.navigate({ to: '/' })
+    router.invalidate()
+  }
 
   useEffect(() => {
-    const documentTitle = title ? `${title} - ${appName}` : appName;
+    const documentTitle = title ? `${title} - ${appName}` : appName
 
     if (documentTitle !== document.title) {
-      document.title = documentTitle;
+      document.title = documentTitle
     }
-  }, [title, appName]);
+  }, [title, appName])
 
   return (
     <header className="relative flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -44,5 +44,5 @@ export function ChatHeader({ title }: ChatHeaderProps) {
         <span className="sr-only">New chat</span>
       </Button>
     </header>
-  );
+  )
 }

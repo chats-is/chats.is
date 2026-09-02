@@ -1,6 +1,6 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
-import { artifactTypeSchema } from './artifact';
+import { artifactTypeSchema } from './artifact'
 
 // Zod input schemas for the chat tools (create_artifact + media generation).
 // Shared by the server (streamText tool definitions) and the client (tool
@@ -15,10 +15,10 @@ export const createArtifactInputSchema = z.object({
   fileUrl: z.url().optional(),
   fileName: z.string().optional(),
   mimeType: z.string().optional(),
-  size: z.number().int().nonnegative().optional()
-});
+  size: z.number().int().nonnegative().optional(),
+})
 
-export type CreateArtifactInput = z.infer<typeof createArtifactInputSchema>;
+export type CreateArtifactInput = z.infer<typeof createArtifactInputSchema>
 
 export const generateImageInputSchema = z.object({
   prompt: z
@@ -29,15 +29,15 @@ export const generateImageInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Aspect ratio like "16:9" — pick from the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16, square → 1:1); omit otherwise'
+      'Aspect ratio like "16:9" — pick from the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16, square → 1:1); omit otherwise',
     ),
   size: z
     .string()
     .optional()
     .describe(
-      'Image size like "1024x1024" — pick from the available values when the user\'s wording implies one; omit otherwise'
-    )
-});
+      'Image size like "1024x1024" — pick from the available values when the user\'s wording implies one; omit otherwise',
+    ),
+})
 
 export const editImageInputSchema = z.object({
   prompt: z
@@ -47,21 +47,21 @@ export const editImageInputSchema = z.object({
   imageUrl: z
     .url()
     .describe(
-      'URL of an image from this conversation (a user upload or a previously generated image)'
-    )
-});
+      'URL of an image from this conversation (a user upload or a previously generated image)',
+    ),
+})
 
 export const editVideoInputSchema = z.object({
   videoUrl: z
     .string()
     .describe(
-      'URL of the video from this conversation to edit — a user upload or one generated earlier'
+      'URL of the video from this conversation to edit — a user upload or one generated earlier',
     ),
   prompt: z
     .string()
     .min(1)
-    .describe('What to change in the video, in natural language')
-});
+    .describe('What to change in the video, in natural language'),
+})
 
 export const generateVideoInputSchema = z.object({
   prompt: z
@@ -72,27 +72,27 @@ export const generateVideoInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'URL of an image from this conversation to animate — a user upload or an image generated earlier. Must be an image: to change an existing video, use edit_video instead. Omit to generate from the text alone.'
+      'URL of an image from this conversation to animate — a user upload or an image generated earlier. Must be an image: to change an existing video, use edit_video instead. Omit to generate from the text alone.',
     ),
   aspectRatio: z
     .string()
     .optional()
     .describe(
-      'Aspect ratio like "16:9" — pick from the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16); omit otherwise'
+      'Aspect ratio like "16:9" — pick from the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16); omit otherwise',
     ),
   resolution: z
     .string()
     .optional()
     .describe(
-      'Resolution like "1080p" — pick from the available values when the user\'s wording implies one (e.g. 高清); omit otherwise'
+      'Resolution like "1080p" — pick from the available values when the user\'s wording implies one (e.g. 高清); omit otherwise',
     ),
   duration: z
     .number()
     .optional()
     .describe(
-      "Duration in seconds — pick the closest available value when the user's wording implies a length; omit otherwise"
-    )
-});
+      "Duration in seconds — pick the closest available value when the user's wording implies a length; omit otherwise",
+    ),
+})
 
 export const textToSpeechInputSchema = z.object({
   text: z
@@ -103,24 +103,24 @@ export const textToSpeechInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Voice name — pick from the available values when the user's wording implies a voice style; omit otherwise"
-    )
-});
+      "Voice name — pick from the available values when the user's wording implies a voice style; omit otherwise",
+    ),
+})
 
 export const transcribeAudioInputSchema = z.object({
   audioUrl: z
     .url()
     .describe(
-      'URL of an audio file from this conversation (a user upload or previously generated audio)'
-    )
-});
+      'URL of an audio file from this conversation (a user upload or previously generated audio)',
+    ),
+})
 
-export type GenerateImageInput = z.infer<typeof generateImageInputSchema>;
-export type EditImageInput = z.infer<typeof editImageInputSchema>;
-export type GenerateVideoInput = z.infer<typeof generateVideoInputSchema>;
-export type EditVideoInput = z.infer<typeof editVideoInputSchema>;
-export type TextToSpeechInput = z.infer<typeof textToSpeechInputSchema>;
-export type TranscribeAudioInput = z.infer<typeof transcribeAudioInputSchema>;
+export type GenerateImageInput = z.infer<typeof generateImageInputSchema>
+export type EditImageInput = z.infer<typeof editImageInputSchema>
+export type GenerateVideoInput = z.infer<typeof generateVideoInputSchema>
+export type EditVideoInput = z.infer<typeof editVideoInputSchema>
+export type TextToSpeechInput = z.infer<typeof textToSpeechInputSchema>
+export type TranscribeAudioInput = z.infer<typeof transcribeAudioInputSchema>
 
 /**
  * The failure half of every media tool result, and the shape anything else that
@@ -130,37 +130,36 @@ export type TranscribeAudioInput = z.infer<typeof transcribeAudioInputSchema>;
  * `output-available` state, so the stream is not broken and the message
  * persists a record of what went wrong.
  */
-export type ToolErrorOutput = { status: 'error'; message: string };
+export type ToolErrorOutput = { status: 'error'; message: string }
 
 export type MediaToolOutput =
   | { status: 'done'; url: string; mediaType: string; filename: string }
-  | ToolErrorOutput;
+  | ToolErrorOutput
 
 /** Transcription returns text, not a media file. */
 export type TranscribeToolOutput =
-  | { status: 'done'; text: string; durationInSeconds?: number }
-  | ToolErrorOutput;
+  { status: 'done'; text: string; durationInSeconds?: number } | ToolErrorOutput
 
 export const mediaToolNames = [
   'generate_image',
   'edit_image',
   'generate_video',
   'edit_video',
-  'text_to_speech'
-] as const;
+  'text_to_speech',
+] as const
 
-export type MediaToolName = (typeof mediaToolNames)[number];
+export type MediaToolName = (typeof mediaToolNames)[number]
 
 /** Tool map for `UIMessage`'s third generic — narrows `tool-*` part types. */
 export type ChatTools = {
-  create_artifact: { input: CreateArtifactInput; output: { id: string } };
-  generate_image: { input: GenerateImageInput; output: MediaToolOutput };
-  edit_image: { input: EditImageInput; output: MediaToolOutput };
-  generate_video: { input: GenerateVideoInput; output: MediaToolOutput };
-  edit_video: { input: EditVideoInput; output: MediaToolOutput };
-  text_to_speech: { input: TextToSpeechInput; output: MediaToolOutput };
+  create_artifact: { input: CreateArtifactInput; output: { id: string } }
+  generate_image: { input: GenerateImageInput; output: MediaToolOutput }
+  edit_image: { input: EditImageInput; output: MediaToolOutput }
+  generate_video: { input: GenerateVideoInput; output: MediaToolOutput }
+  edit_video: { input: EditVideoInput; output: MediaToolOutput }
+  text_to_speech: { input: TextToSpeechInput; output: MediaToolOutput }
   transcribe_audio: {
-    input: TranscribeAudioInput;
-    output: TranscribeToolOutput;
-  };
-};
+    input: TranscribeAudioInput
+    output: TranscribeToolOutput
+  }
+}

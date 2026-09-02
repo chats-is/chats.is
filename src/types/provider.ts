@@ -6,22 +6,22 @@ export type ProviderType =
   | 'anthropic'
   | 'bedrock'
   | 'xai'
-  | 'deepseek';
+  | 'deepseek'
 
 export type ProviderConfig = {
-  type: ProviderType;
-  apiKey?: string | null;
-  baseUrl?: string | null;
-  apiOptions?: Record<string, unknown> | null;
-};
+  type: ProviderType
+  apiKey?: string | null
+  baseUrl?: string | null
+  apiOptions?: Record<string, unknown> | null
+}
 
-export type VertexAuthMode = 'service_account' | 'api_key';
+export type VertexAuthMode = 'service_account' | 'api_key'
 
 export type VertexServiceAccountKey = {
-  location?: string;
+  location?: string
   credentials?: {
-    project_id?: string;
-    private_key_id?: string;
-    private_key?: string;
-  } & Record<string, unknown>;
-};
+    project_id?: string
+    private_key_id?: string
+    private_key?: string
+  } & Record<string, unknown>
+}

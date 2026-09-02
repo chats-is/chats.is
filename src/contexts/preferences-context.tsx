@@ -3,61 +3,61 @@ import {
   ReactNode,
   useCallback,
   useContext,
-  useState
-} from 'react';
+  useState,
+} from 'react'
 
-import { Model } from '@/types';
-import { modelMatchesId } from '@/lib/utils';
+import { Model } from '@/types'
+import { modelMatchesId } from '@/lib/utils'
 
-import { useSystemSettings } from './system-settings-context';
+import { useSystemSettings } from './system-settings-context'
 
 export interface Preferences {
   // Chat
-  chatModelId: string;
-  chatReasoning: boolean;
+  chatModelId: string
+  chatReasoning: boolean
   // Image
-  imageModelId: string;
-  imageEditModelId: string;
-  imageSize: string;
-  imageAspectRatio: string;
+  imageModelId: string
+  imageEditModelId: string
+  imageSize: string
+  imageAspectRatio: string
   // Video
-  videoModelId: string;
-  videoImageModelId: string;
-  videoEditModelId: string;
-  videoAspectRatio: string;
-  videoResolution: string;
-  videoDuration?: number;
+  videoModelId: string
+  videoImageModelId: string
+  videoEditModelId: string
+  videoAspectRatio: string
+  videoResolution: string
+  videoDuration?: number
   // Audio (TTS)
-  audioModelId: string;
-  audioVoice: string;
+  audioModelId: string
+  audioVoice: string
   // Transcription (STT)
-  sttModelId: string;
+  sttModelId: string
 }
 
 interface PreferencesContextValue {
-  preferences: Preferences;
+  preferences: Preferences
   setPreference: <K extends keyof Preferences>(
     key: K,
-    value: Preferences[K]
-  ) => void;
+    value: Preferences[K],
+  ) => void
 }
 
-const STORAGE_KEY = 'user-preferences';
+const STORAGE_KEY = 'user-preferences'
 
-const PreferencesContext = createContext<PreferencesContextValue | null>(null);
+const PreferencesContext = createContext<PreferencesContextValue | null>(null)
 
 function getStoredPreferences(): Partial<Preferences> | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') return null
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : null;
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? JSON.parse(stored) : null
   } catch {
-    return null;
+    return null
   }
 }
 
 interface PreferencesProviderProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 export function PreferencesProvider({ children }: PreferencesProviderProps) {
@@ -67,8 +67,8 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
     imageModels,
     videoModels,
     ttsModels,
-    sttModels
-  } = useSystemSettings();
+    sttModels,
+  } = useSystemSettings()
 
   const [preferences, setPreferences] = useState<Preferences>(() => {
     // A model id is only usable if it is still among the models the server
@@ -80,20 +80,20 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
     const resolves = (id: unknown, models: Model[] | undefined) =>
       typeof id === 'string' &&
       !!id &&
-      !!models?.some(model => modelMatchesId(model, id));
+      !!models?.some((model) => modelMatchesId(model, id))
 
     const systemDefault = (
       id: string | null | undefined,
-      models: Model[] | undefined
-    ) => (resolves(id, models) ? (id as string) : '');
+      models: Model[] | undefined,
+    ) => (resolves(id, models) ? (id as string) : '')
 
-    const editModels = imageModels?.filter(model => model.supportsImageEdit);
+    const editModels = imageModels?.filter((model) => model.supportsImageEdit)
     const animateModels = videoModels?.filter(
-      model => model.supportsImageToVideo
-    );
+      (model) => model.supportsImageToVideo,
+    )
     const videoEditModels = videoModels?.filter(
-      model => model.supportsVideoEdit
-    );
+      (model) => model.supportsVideoEdit,
+    )
 
     const defaultPrefs: Preferences = {
       // Chat
@@ -116,11 +116,11 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       // Its own choice: only some video models take an image as the first frame.
       videoImageModelId: systemDefault(
         defaults.videoImageModelId,
-        animateModels
+        animateModels,
       ),
       videoEditModelId: systemDefault(
         defaults.videoEditModelId,
-        videoEditModels
+        videoEditModels,
       ),
       videoAspectRatio: '',
       videoResolution: '',
@@ -129,19 +129,19 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       audioModelId: systemDefault(defaults.ttsModelId, ttsModels),
       audioVoice: '',
       // Transcription (STT)
-      sttModelId: systemDefault(defaults.sttModelId, sttModels)
-    };
+      sttModelId: systemDefault(defaults.sttModelId, sttModels),
+    }
 
-    const stored = getStoredPreferences();
+    const stored = getStoredPreferences()
     if (stored) {
       // Drop empty stored values: the whole prefs object is persisted on any
       // write, so a modality the user never picked is saved as '' and would
       // otherwise shadow a system default the admin configures later.
       const sanitized = Object.fromEntries(
         Object.entries(stored).filter(
-          ([, value]) => value !== '' && value !== null && value !== undefined
-        )
-      );
+          ([, value]) => value !== '' && value !== null && value !== undefined,
+        ),
+      )
 
       // Same for stored ids: dropping one falls back to the system default,
       // exactly as it does for a user who never chose.
@@ -153,46 +153,46 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
         ['videoImageModelId', animateModels],
         ['videoEditModelId', videoEditModels],
         ['audioModelId', ttsModels],
-        ['sttModelId', sttModels]
-      ];
+        ['sttModelId', sttModels],
+      ]
       for (const [key, models] of modelKeys) {
         if (key in sanitized && !resolves(sanitized[key], models)) {
-          delete sanitized[key];
+          delete sanitized[key]
         }
       }
 
-      return { ...defaultPrefs, ...sanitized };
+      return { ...defaultPrefs, ...sanitized }
     }
 
-    return defaultPrefs;
-  });
+    return defaultPrefs
+  })
 
   const setPreference = useCallback(
     <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
-      setPreferences(prev => {
-        const newPrefs = { ...prev, [key]: value };
+      setPreferences((prev) => {
+        const newPrefs = { ...prev, [key]: value }
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(newPrefs));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(newPrefs))
         } catch {
           // ignore
         }
-        return newPrefs;
-      });
+        return newPrefs
+      })
     },
-    []
-  );
+    [],
+  )
 
   return (
     <PreferencesContext.Provider value={{ preferences, setPreference }}>
       {children}
     </PreferencesContext.Provider>
-  );
+  )
 }
 
 export function usePreferences() {
-  const context = useContext(PreferencesContext);
+  const context = useContext(PreferencesContext)
   if (!context) {
-    throw new Error('usePreferences must be used within PreferencesProvider');
+    throw new Error('usePreferences must be used within PreferencesProvider')
   }
-  return context;
+  return context
 }

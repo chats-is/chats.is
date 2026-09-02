@@ -1,25 +1,25 @@
-import { api } from '@/trpc/react';
-import { Label } from '@/components/ui/label';
+import { api } from '@/trpc/react'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+  SelectValue,
+} from '@/components/ui/select'
 
-import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared';
+import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared'
 
-const KEYS = ['default.quotaId'] as const;
+const KEYS = ['default.quotaId'] as const
 
 export function QuotaSettings() {
   const { formData, handleChange, save, hasChanges, isLoading, isSaving } =
-    useSettingsForm(KEYS);
-  const { data: quotaOptions } = api.quota.listForSelect.useQuery();
+    useSettingsForm(KEYS)
+  const { data: quotaOptions } = api.quota.listForSelect.useQuery()
 
-  if (isLoading) return <SettingsLoading />;
+  if (isLoading) return <SettingsLoading />
 
-  const isEmpty = !quotaOptions?.length;
+  const isEmpty = !quotaOptions?.length
 
   return (
     <div className="space-y-6">
@@ -37,12 +37,12 @@ export function QuotaSettings() {
               // placeholder shows instead of a blank trigger.
               value={
                 quotaOptions?.some(
-                  quota => quota.id === formData['default.quotaId']
+                  (quota) => quota.id === formData['default.quotaId'],
                 )
                   ? formData['default.quotaId']
                   : undefined
               }
-              onValueChange={value => handleChange('default.quotaId', value)}
+              onValueChange={(value) => handleChange('default.quotaId', value)}
             >
               <SelectTrigger>
                 <SelectValue
@@ -52,7 +52,7 @@ export function QuotaSettings() {
                 />
               </SelectTrigger>
               <SelectContent>
-                {quotaOptions?.map(quota => (
+                {quotaOptions?.map((quota) => (
                   <SelectItem key={quota.id} value={quota.id}>
                     {quota.name}
                     {quota.isUnlimited ? ' (Unlimited)' : ''}
@@ -70,5 +70,5 @@ export function QuotaSettings() {
         onSave={save}
       />
     </div>
-  );
+  )
 }

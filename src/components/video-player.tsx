@@ -1,116 +1,109 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  Maximize,
-  Minimize,
-  Pause,
-  Play,
-  Volume2,
-  VolumeX
-} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react'
+import { Maximize, Minimize, Pause, Play, Volume2, VolumeX } from 'lucide-react'
 
-import { formatMediaTime } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { formatMediaTime } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface VideoPlayerProps {
-  src: string;
+  src: string
 }
 
 export function VideoPlayer({ src }: VideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     const updateTime = () => {
-      const current = video.currentTime;
-      const total = video.duration;
+      const current = video.currentTime
+      const total = video.duration
 
       // If close to end (gap less than 0.1 seconds), set to full duration
       if (total - current < 0.1) {
-        setCurrentTime(total);
+        setCurrentTime(total)
       } else {
-        setCurrentTime(current);
+        setCurrentTime(current)
       }
-    };
+    }
 
-    const updateDuration = () => setDuration(video.duration);
+    const updateDuration = () => setDuration(video.duration)
 
     const handleEnded = () => {
-      setIsPlaying(false);
+      setIsPlaying(false)
       // Ensure progress bar shows 100%
-      setCurrentTime(video.duration);
-    };
+      setCurrentTime(video.duration)
+    }
 
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+      setIsFullscreen(!!document.fullscreenElement)
+    }
 
-    video.addEventListener('timeupdate', updateTime);
-    video.addEventListener('loadedmetadata', updateDuration);
-    video.addEventListener('ended', handleEnded);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    video.addEventListener('timeupdate', updateTime)
+    video.addEventListener('loadedmetadata', updateDuration)
+    video.addEventListener('ended', handleEnded)
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
 
     return () => {
-      video.removeEventListener('timeupdate', updateTime);
-      video.removeEventListener('loadedmetadata', updateDuration);
-      video.removeEventListener('ended', handleEnded);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
+      video.removeEventListener('timeupdate', updateTime)
+      video.removeEventListener('loadedmetadata', updateDuration)
+      video.removeEventListener('ended', handleEnded)
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [])
 
   const togglePlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     if (isPlaying) {
-      video.pause();
+      video.pause()
     } else {
-      video.play();
+      video.play()
     }
-    setIsPlaying(!isPlaying);
-  };
+    setIsPlaying(!isPlaying)
+  }
 
   const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
-    video.muted = !isMuted;
-    setIsMuted(!isMuted);
-  };
+    video.muted = !isMuted
+    setIsMuted(!isMuted)
+  }
 
   const toggleFullscreen = async () => {
-    const container = containerRef.current;
-    if (!container) return;
+    const container = containerRef.current
+    if (!container) return
 
     try {
       if (!document.fullscreenElement) {
-        await container.requestFullscreen();
+        await container.requestFullscreen()
       } else {
-        await document.exitFullscreen();
+        await document.exitFullscreen()
       }
     } catch (err) {
-      console.error('Failed to toggle fullscreen:', err);
+      console.error('Failed to toggle fullscreen:', err)
     }
-  };
+  }
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
-    const newTime = parseFloat(e.target.value);
-    video.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
+    const newTime = parseFloat(e.target.value)
+    video.currentTime = newTime
+    setCurrentTime(newTime)
+  }
 
   // Calculate progress percentage
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
     <div
@@ -199,5 +192,5 @@ export function VideoPlayer({ src }: VideoPlayerProps) {
         </div>
       </div>
     </div>
-  );
+  )
 }

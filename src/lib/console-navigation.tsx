@@ -8,60 +8,60 @@ import {
   Settings,
   Sparkles,
   Users,
-  Zap
-} from 'lucide-react';
+  Zap,
+} from 'lucide-react'
 
 export const ConsoleNavigation = {
   navMain: [
     {
       title: 'Overview',
       url: '/console',
-      icon: LayoutGrid
+      icon: LayoutGrid,
     },
     {
       title: 'Providers',
       url: '/console/providers',
-      icon: Zap
+      icon: Zap,
     },
     {
       title: 'Models',
       url: '/console/models',
-      icon: Cpu
+      icon: Cpu,
     },
     {
       title: 'Prompts',
       url: '/console/prompts',
-      icon: Sparkles
+      icon: Sparkles,
     },
     {
       title: 'Pricing',
       url: '/console/pricing',
-      icon: CircleDollarSign
+      icon: CircleDollarSign,
     },
     {
       title: 'Quotas',
       url: '/console/quotas',
-      icon: Gauge
+      icon: Gauge,
     },
     {
       title: 'Plans',
       url: '/console/plans',
-      icon: CreditCard
+      icon: CreditCard,
     },
     {
       title: 'Usage',
       url: '/console/usage',
-      icon: BarChart3
+      icon: BarChart3,
     },
     {
       title: 'Settings',
       url: '/console/settings',
-      icon: Settings
+      icon: Settings,
     },
     {
       title: 'Users',
       url: '/console/users',
-      icon: Users
-    }
-  ]
-};
+      icon: Users,
+    },
+  ],
+}

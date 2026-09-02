@@ -1,6 +1,6 @@
-import '@tanstack/react-start/server-only';
+import '@tanstack/react-start/server-only'
 
-import { parseBuffer } from 'music-metadata';
+import { parseBuffer } from 'music-metadata'
 
 /**
  * How long a piece of audio runs, read from the file itself.
@@ -15,22 +15,22 @@ import { parseBuffer } from 'music-metadata';
  */
 export async function audioDurationInSeconds(
   data: Uint8Array,
-  mediaType?: string
+  mediaType?: string,
 ): Promise<number | undefined> {
   try {
     const metadata = await parseBuffer(
       data,
       mediaType ? { mimeType: mediaType } : undefined,
-      { duration: true }
-    );
-    const seconds = metadata.format.duration;
+      { duration: true },
+    )
+    const seconds = metadata.format.duration
     return typeof seconds === 'number' &&
       Number.isFinite(seconds) &&
       seconds > 0
       ? seconds
-      : undefined;
+      : undefined
   } catch (err) {
-    console.warn('[media-duration] could not read audio duration:', err);
-    return undefined;
+    console.warn('[media-duration] could not read audio duration:', err)
+    return undefined
   }
 }

@@ -1,6 +1,6 @@
-import React from 'react';
+import React from 'react'
 
-import { ChatHeader } from '@/components/chat-header';
+import { ChatHeader } from '@/components/chat-header'
 
 export function ChatNotFound() {
   return (
@@ -15,5 +15,5 @@ export function ChatNotFound() {
         </div>
       </div>
     </>
-  );
+  )
 }

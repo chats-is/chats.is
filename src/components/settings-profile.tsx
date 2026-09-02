@@ -1,112 +1,112 @@
-import * as React from 'react';
-import { Camera, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import * as React from 'react'
+import { Camera, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { uploadFile } from '@/lib/api';
-import { useCurrentUser } from '@/hooks/use-current-user';
-import { api } from '@/trpc/react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { uploadFile } from '@/lib/api'
+import { useCurrentUser } from '@/hooks/use-current-user'
+import { api } from '@/trpc/react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export const SettingsProfile = () => {
-  const { user, isLoading: isUserLoading, mutate } = useCurrentUser();
-  const [name, setName] = React.useState('');
-  const [isUploading, setIsUploading] = React.useState(false);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { user, isLoading: isUserLoading, mutate } = useCurrentUser()
+  const [name, setName] = React.useState('')
+  const [isUploading, setIsUploading] = React.useState(false)
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     if (user?.name) {
-      setName(user.name);
+      setName(user.name)
     }
-  }, [user?.name]);
+  }, [user?.name])
 
   React.useEffect(() => {
     return () => {
       if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+        URL.revokeObjectURL(previewUrl)
       }
-    };
-  }, [previewUrl]);
+    }
+  }, [previewUrl])
 
   const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
+    fileInputRef.current?.click()
+  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]
+    if (!file) return
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     if (!validTypes.includes(file.type)) {
-      toast.error('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
-      return;
+      toast.error('Please select a valid image file (JPEG, PNG, GIF, or WebP)')
+      return
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
-      return;
+      toast.error('Image size should be less than 5MB')
+      return
     }
 
     // Create preview
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    setIsUploading(true);
+    const objectUrl = URL.createObjectURL(file)
+    setPreviewUrl(objectUrl)
+    setIsUploading(true)
 
     try {
       const result = await uploadFile(file, {
         userId: user!.id,
-        type: 'avatar'
-      });
+        type: 'avatar',
+      })
 
       if ('error' in result) {
-        toast.error(result.error || 'Failed to upload avatar');
-        setPreviewUrl(null); // Clear preview on error
-        return;
+        toast.error(result.error || 'Failed to upload avatar')
+        setPreviewUrl(null) // Clear preview on error
+        return
       }
 
-      await updateProfileMutation.mutateAsync({ image: result.url });
+      await updateProfileMutation.mutateAsync({ image: result.url })
       // Don't clear previewUrl here to avoid flicker.
       // It will be cleared in mutation onSuccess after revalidation.
     } catch {
-      toast.error('An error occurred while uploading avatar');
-      setPreviewUrl(null); // Clear preview on error
+      toast.error('An error occurred while uploading avatar')
+      setPreviewUrl(null) // Clear preview on error
     } finally {
-      setIsUploading(false);
+      setIsUploading(false)
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = ''
       }
     }
-  };
+  }
 
   const updateProfileMutation = api.user.updateProfile.useMutation({
     onSuccess: async () => {
-      await mutate();
-      setPreviewUrl(null); // Clear preview only after successful revalidation
-      toast.success('Profile updated successfully');
+      await mutate()
+      setPreviewUrl(null) // Clear preview only after successful revalidation
+      toast.success('Profile updated successfully')
     },
-    onError: error => {
-      toast.error(error.message || 'Failed to update profile');
-      setPreviewUrl(null);
-    }
-  });
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update profile')
+      setPreviewUrl(null)
+    },
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
-    updateProfileMutation.mutate({ name: name.trim() });
-  };
+    updateProfileMutation.mutate({ name: name.trim() })
+  }
 
   if (isUserLoading) {
     return (
       <div className="flex size-full items-center justify-center">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
-    );
+    )
   }
 
   if (!user) {
-    return null;
+    return null
   }
 
   return (
@@ -133,7 +133,7 @@ export const SettingsProfile = () => {
                     {user.name
                       ? user.name
                           .split(' ')
-                          .map(word => word[0])
+                          .map((word) => word[0])
                           .join('')
                           .toUpperCase()
                           .slice(0, 2)
@@ -173,7 +173,7 @@ export const SettingsProfile = () => {
               type="text"
               placeholder="Enter your name"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
               disabled={updateProfileMutation.isPending || isUploading}
               maxLength={100}
             />
@@ -197,5 +197,5 @@ export const SettingsProfile = () => {
         </div>
       </form>
     </div>
-  );
-};
+  )
+}

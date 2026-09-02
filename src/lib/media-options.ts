@@ -1,4 +1,4 @@
-import { ModelUIOptions } from '@/types/model';
+import { ModelUIOptions } from '@/types/model'
 
 /**
  * 'auto' is a regular option value that admins put in a model's `uiOptions`
@@ -6,13 +6,13 @@ import { ModelUIOptions } from '@/types/model';
  * It flows through selection like any other value; only at the provider call
  * boundary does it resolve to "omit the parameter" via `resolveAutoOption`.
  */
-export const AUTO_OPTION = 'auto';
+export const AUTO_OPTION = 'auto'
 
 /** Map the 'auto' option to undefined so the provider applies its own default. */
 export function resolveAutoOption<T extends string | number>(
-  value: T | undefined
+  value: T | undefined,
 ): T | undefined {
-  return value === AUTO_OPTION ? undefined : value;
+  return value === AUTO_OPTION ? undefined : value
 }
 
 /**
@@ -36,80 +36,80 @@ function pickOption<T extends string | number>(
   requested: T | undefined,
   selected: T | undefined,
   allowed: T[] | undefined,
-  fallback: T | undefined
+  fallback: T | undefined,
 ): T | undefined {
-  requested = resolveAutoOption(requested);
+  requested = resolveAutoOption(requested)
 
   if (!allowed?.length) {
-    return fallback;
+    return fallback
   }
 
   const isAllowed = (value: T | undefined): value is T =>
-    value !== undefined && allowed.includes(value);
+    value !== undefined && allowed.includes(value)
 
   if (isAllowed(requested)) {
-    return requested;
+    return requested
   }
   if (isAllowed(selected)) {
-    return selected;
+    return selected
   }
   if (isAllowed(fallback)) {
-    return fallback;
+    return fallback
   }
-  return allowed[0];
+  return allowed[0]
 }
 
 export function pickAspectRatio(
   requested: string | undefined,
   selected: string | undefined,
-  uiOptions?: ModelUIOptions | null
+  uiOptions?: ModelUIOptions | null,
 ): `${number}:${number}` | undefined {
   return pickOption(
     requested,
     selected,
     uiOptions?.aspectRatios,
-    uiOptions?.aspectRatio
-  ) as `${number}:${number}` | undefined;
+    uiOptions?.aspectRatio,
+  ) as `${number}:${number}` | undefined
 }
 
 export function pickSize(
   requested: string | undefined,
   selected: string | undefined,
-  uiOptions?: ModelUIOptions | null
+  uiOptions?: ModelUIOptions | null,
 ): string | undefined {
-  return pickOption(requested, selected, uiOptions?.sizes, uiOptions?.size);
+  return pickOption(requested, selected, uiOptions?.sizes, uiOptions?.size)
 }
 
 export function pickDuration(
   requested: number | undefined,
   selected: number | undefined,
-  uiOptions?: ModelUIOptions | null
+  uiOptions?: ModelUIOptions | null,
 ): number | undefined {
   return pickOption(
     requested,
     selected,
     uiOptions?.durations,
-    uiOptions?.duration
-  );
+    uiOptions?.duration,
+  )
 }
 
 export function pickResolution(
   requested: string | undefined,
   selected: string | undefined,
-  uiOptions?: ModelUIOptions | null
+  uiOptions?: ModelUIOptions | null,
 ): string | undefined {
   return pickOption(
     requested,
     selected,
     uiOptions?.resolutions,
-    uiOptions?.resolution
-  );
+    uiOptions?.resolution,
+  )
 }
 
 export function pickVoice(
   requested: string | undefined,
   selected: string | undefined,
-  uiOptions?: ModelUIOptions | null
+  uiOptions?: ModelUIOptions | null,
 ): string | undefined {
-  return pickOption(requested, selected, uiOptions?.voices, uiOptions?.voice);
+  return pickOption(requested, selected, uiOptions?.voices, uiOptions?.voice)
 }

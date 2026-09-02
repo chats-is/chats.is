@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
-import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useMemo, useRef, useState } from 'react'
+import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { uploadFile } from '@/lib/api';
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { useCurrentUser } from '@/hooks/use-current-user';
-import { api, RouterOutputs } from '@/trpc/react';
+import { uploadFile } from '@/lib/api'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { useCurrentUser } from '@/hooks/use-current-user'
+import { api, RouterOutputs } from '@/trpc/react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,42 +14,42 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
-type MyPrompt = RouterOutputs['prompt']['list'][number];
-type Visibility = 'private' | 'public';
+type MyPrompt = RouterOutputs['prompt']['list'][number]
+type Visibility = 'private' | 'public'
 
 type PromptFormData = {
-  name: string;
-  content: string;
-  image: string;
+  name: string
+  content: string
+  image: string
   // tags & providers are free-text labels entered as a comma-separated string.
-  tags: string;
-  providers: string;
+  tags: string
+  providers: string
   // models references real model ids.
-  models: string[];
-  visibility: Visibility;
-};
+  models: string[]
+  visibility: Visibility
+}
 
 const EMPTY_FORM: PromptFormData = {
   name: '',
@@ -58,44 +58,44 @@ const EMPTY_FORM: PromptFormData = {
   tags: '',
   providers: '',
   models: [],
-  visibility: 'private'
-};
+  visibility: 'private',
+}
 
 const parseList = (value: string) =>
   value
     .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
+    .map((item) => item.trim())
+    .filter(Boolean)
 
-const joinList = (value?: string[] | null) => (value ?? []).join(', ');
+const joinList = (value?: string[] | null) => (value ?? []).join(', ')
 
 const LabelBadges = ({
   values,
-  className
+  className,
 }: {
-  values?: string[] | null;
-  className: string;
+  values?: string[] | null
+  className: string
 }) => {
-  if (!values?.length) return null;
+  if (!values?.length) return null
   return (
     <div className="flex flex-wrap gap-1">
-      {values.map(value => (
+      {values.map((value) => (
         <span key={value} className={className}>
           {value}
         </span>
       ))}
     </div>
-  );
-};
+  )
+}
 
 const PromptThumbnail = ({
   content,
   image,
-  name
+  name,
 }: {
-  content: string;
-  image?: string | null;
-  name: string;
+  content: string
+  image?: string | null
+  name: string
 }) => {
   if (image) {
     return (
@@ -104,7 +104,7 @@ const PromptThumbnail = ({
         alt={name}
         className="size-12 rounded-md border object-cover"
       />
-    );
+    )
   }
 
   return (
@@ -113,100 +113,100 @@ const PromptThumbnail = ({
         {content}
       </p>
     </div>
-  );
-};
+  )
+}
 
 export const UserPrompt = () => {
-  const { copyToClipboard } = useCopyToClipboard();
-  const utils = api.useUtils();
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const { user } = useCurrentUser();
+  const { copyToClipboard } = useCopyToClipboard()
+  const utils = api.useUtils()
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const { user } = useCurrentUser()
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isOpen, setIsOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
-  const { data: myPrompts, isLoading } = api.prompt.list.useQuery();
-  const { data: models } = api.model.list.useQuery();
+  const { data: myPrompts, isLoading } = api.prompt.list.useQuery()
+  const { data: models } = api.model.list.useQuery()
 
   const modelName = (modelId: string) =>
-    models?.find(m => m.modelId === modelId)?.name ?? modelId;
+    models?.find((m) => m.modelId === modelId)?.name ?? modelId
 
   const resetForm = () => {
-    setEditingId(null);
-    setFormData(EMPTY_FORM);
-    setIsUploadingImage(false);
+    setEditingId(null)
+    setFormData(EMPTY_FORM)
+    setIsUploadingImage(false)
     if (imageInputRef.current) {
-      imageInputRef.current.value = '';
+      imageInputRef.current.value = ''
     }
-  };
+  }
 
   const closeDialog = () => {
-    setIsOpen(false);
-    resetForm();
-  };
+    setIsOpen(false)
+    resetForm()
+  }
 
   const invalidatePrompts = async () => {
     await Promise.all([
       utils.prompt.list.invalidate(),
-      utils.prompt.listUsable.invalidate()
-    ]);
-  };
+      utils.prompt.listUsable.invalidate(),
+    ])
+  }
 
   const createMutation = api.prompt.create.useMutation({
     onSuccess: async () => {
-      await invalidatePrompts();
-      closeDialog();
-      toast.success('Prompt saved');
+      await invalidatePrompts()
+      closeDialog()
+      toast.success('Prompt saved')
     },
-    onError: error => toast.error(error.message)
-  });
+    onError: (error) => toast.error(error.message),
+  })
 
   const updateMutation = api.prompt.update.useMutation({
     onSuccess: async () => {
-      await invalidatePrompts();
-      closeDialog();
-      toast.success('Prompt updated');
+      await invalidatePrompts()
+      closeDialog()
+      toast.success('Prompt updated')
     },
-    onError: error => toast.error(error.message)
-  });
+    onError: (error) => toast.error(error.message),
+  })
 
   const deleteMutation = api.prompt.delete.useMutation({
     onSuccess: async () => {
-      await invalidatePrompts();
-      setDeleteId(null);
-      toast.success('Prompt deleted');
+      await invalidatePrompts()
+      setDeleteId(null)
+      toast.success('Prompt deleted')
     },
-    onError: error => toast.error(error.message)
-  });
+    onError: (error) => toast.error(error.message),
+  })
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
-  const isFormBusy = isSubmitting || isUploadingImage;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+  const isFormBusy = isSubmitting || isUploadingImage
 
   const filteredPrompts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    if (!keyword) return myPrompts ?? [];
+    const keyword = search.trim().toLowerCase()
+    if (!keyword) return myPrompts ?? []
 
     return (myPrompts ?? []).filter(
-      prompt =>
+      (prompt) =>
         prompt.name.toLowerCase().includes(keyword) ||
-        prompt.content.toLowerCase().includes(keyword)
-    );
-  }, [myPrompts, search]);
+        prompt.content.toLowerCase().includes(keyword),
+    )
+  }, [myPrompts, search])
 
   const deletePrompt =
-    myPrompts?.find(prompt => prompt.id === deleteId) ?? null;
+    myPrompts?.find((prompt) => prompt.id === deleteId) ?? null
 
   const handleCreate = () => {
-    resetForm();
-    setIsOpen(true);
-  };
+    resetForm()
+    setIsOpen(true)
+  }
 
   const handleEdit = (prompt: MyPrompt) => {
-    setEditingId(prompt.id);
+    setEditingId(prompt.id)
     setFormData({
       name: prompt.name,
       content: prompt.content,
@@ -214,24 +214,24 @@ export const UserPrompt = () => {
       tags: joinList(prompt.tags),
       providers: joinList(prompt.providers),
       models: prompt.models || [],
-      visibility: prompt.visibility
-    });
-    setIsOpen(true);
-  };
+      visibility: prompt.visibility,
+    })
+    setIsOpen(true)
+  }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    e.preventDefault()
 
-    const name = formData.name.trim();
-    const content = formData.content.trim();
+    const name = formData.name.trim()
+    const content = formData.content.trim()
 
     if (!name || !content) {
-      toast.error('Name and content are required');
-      return;
+      toast.error('Name and content are required')
+      return
     }
 
-    const tags = parseList(formData.tags);
-    const providers = parseList(formData.providers);
+    const tags = parseList(formData.tags)
+    const providers = parseList(formData.providers)
     const payload = {
       name,
       content,
@@ -239,67 +239,67 @@ export const UserPrompt = () => {
       tags: tags.length > 0 ? tags : null,
       providers: providers.length > 0 ? providers : null,
       models: formData.models.length > 0 ? formData.models : null,
-      visibility: formData.visibility
-    };
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload });
-      return;
+      visibility: formData.visibility,
     }
 
-    createMutation.mutate(payload);
-  };
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...payload })
+      return
+    }
+
+    createMutation.mutate(payload)
+  }
 
   const toggleModel = (modelId: string) => {
-    setFormData(current => ({
+    setFormData((current) => ({
       ...current,
       models: current.models.includes(modelId)
-        ? current.models.filter(item => item !== modelId)
-        : [...current.models, modelId]
-    }));
-  };
+        ? current.models.filter((item) => item !== modelId)
+        : [...current.models, modelId],
+    }))
+  }
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]
+    if (!file) return
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be 5MB or smaller');
-      e.target.value = '';
-      return;
+      toast.error('Image must be 5MB or smaller')
+      e.target.value = ''
+      return
     }
 
     if (!user?.id) {
-      toast.error('Please sign in again to upload');
-      return;
+      toast.error('Please sign in again to upload')
+      return
     }
 
-    setIsUploadingImage(true);
+    setIsUploadingImage(true)
 
     try {
       const result = await uploadFile(file, {
         userId: user.id,
-        type: 'prompts'
-      });
+        type: 'prompts',
+      })
 
       if ('error' in result) {
-        toast.error(result.error || 'Upload failed');
-        return;
+        toast.error(result.error || 'Upload failed')
+        return
       }
 
-      setFormData(current => ({ ...current, image: result.url }));
+      setFormData((current) => ({ ...current, image: result.url }))
     } finally {
-      setIsUploadingImage(false);
-      e.target.value = '';
+      setIsUploadingImage(false)
+      e.target.value = ''
     }
-  };
+  }
 
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
-    );
+    )
   }
 
   return (
@@ -310,7 +310,7 @@ export const UserPrompt = () => {
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or content"
               className="pl-9"
             />
@@ -340,7 +340,7 @@ export const UserPrompt = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredPrompts.map(prompt => (
+              {filteredPrompts.map((prompt) => (
                 <tr
                   key={prompt.id}
                   className="border-b transition-colors hover:bg-muted/30"
@@ -376,42 +376,48 @@ export const UserPrompt = () => {
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(prompt.content)}
-                        >
-                          <Copy className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(prompt.content)}
+                          >
+                            <Copy className="size-4" />
+                          </Button>
+                        }
+                      />
                       <TooltipContent>Copy Prompt</TooltipContent>
                     </Tooltip>
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(prompt)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(prompt)}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        }
+                      />
                       <TooltipContent>Edit Prompt</TooltipContent>
                     </Tooltip>
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteId(prompt.id)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteId(prompt.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        }
+                      />
                       <TooltipContent>Delete Prompt</TooltipContent>
                     </Tooltip>
                   </td>
@@ -437,13 +443,13 @@ export const UserPrompt = () => {
 
       <Dialog
         open={isOpen}
-        onOpenChange={open => {
+        onOpenChange={(open) => {
           if (!open) {
-            if (isFormBusy) return;
-            closeDialog();
-            return;
+            if (isFormBusy) return
+            closeDialog()
+            return
           }
-          setIsOpen(true);
+          setIsOpen(true)
         }}
       >
         <DialogContent className="sm:max-w-lg">
@@ -461,10 +467,10 @@ export const UserPrompt = () => {
                 <Input
                   id="prompt-name"
                   value={formData.name}
-                  onChange={e =>
-                    setFormData(current => ({
+                  onChange={(e) =>
+                    setFormData((current) => ({
                       ...current,
-                      name: e.target.value
+                      name: e.target.value,
                     }))
                   }
                   placeholder="Research prompt"
@@ -478,10 +484,10 @@ export const UserPrompt = () => {
                 <Textarea
                   id="prompt-content"
                   value={formData.content}
-                  onChange={e =>
-                    setFormData(current => ({
+                  onChange={(e) =>
+                    setFormData((current) => ({
                       ...current,
-                      content: e.target.value
+                      content: e.target.value,
                     }))
                   }
                   rows={6}
@@ -497,10 +503,10 @@ export const UserPrompt = () => {
                   <Input
                     id="prompt-tags"
                     value={formData.tags}
-                    onChange={e =>
-                      setFormData(current => ({
+                    onChange={(e) =>
+                      setFormData((current) => ({
                         ...current,
-                        tags: e.target.value
+                        tags: e.target.value,
                       }))
                     }
                     placeholder="writing, english"
@@ -515,10 +521,10 @@ export const UserPrompt = () => {
                   <Input
                     id="prompt-providers"
                     value={formData.providers}
-                    onChange={e =>
-                      setFormData(current => ({
+                    onChange={(e) =>
+                      setFormData((current) => ({
                         ...current,
-                        providers: e.target.value
+                        providers: e.target.value,
                       }))
                     }
                     placeholder="openai, anthropic"
@@ -534,7 +540,7 @@ export const UserPrompt = () => {
                 <Label>Models</Label>
                 <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2.5">
                   {models?.length ? (
-                    models.map(model => (
+                    models.map((model) => (
                       <label
                         key={model.id}
                         className="flex items-center gap-2 text-sm"
@@ -592,7 +598,10 @@ export const UserPrompt = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            setFormData(current => ({ ...current, image: '' }))
+                            setFormData((current) => ({
+                              ...current,
+                              image: '',
+                            }))
                           }
                           disabled={isFormBusy}
                         >
@@ -617,10 +626,10 @@ export const UserPrompt = () => {
                 <Switch
                   id="prompt-public"
                   checked={formData.visibility === 'public'}
-                  onCheckedChange={checked =>
-                    setFormData(current => ({
+                  onCheckedChange={(checked) =>
+                    setFormData((current) => ({
                       ...current,
-                      visibility: checked ? 'public' : 'private'
+                      visibility: checked ? 'public' : 'private',
                     }))
                   }
                   disabled={isFormBusy}
@@ -648,9 +657,9 @@ export const UserPrompt = () => {
 
       <AlertDialog
         open={!!deleteId}
-        onOpenChange={open => {
+        onOpenChange={(open) => {
           if (!open && !deleteMutation.isPending) {
-            setDeleteId(null);
+            setDeleteId(null)
           }
         }}
       >
@@ -670,10 +679,10 @@ export const UserPrompt = () => {
             <AlertDialogAction
               variant="destructive"
               disabled={deleteMutation.isPending}
-              onClick={event => {
-                event.preventDefault();
+              onClick={(event) => {
+                event.preventDefault()
                 if (deleteId) {
-                  deleteMutation.mutate({ id: deleteId });
+                  deleteMutation.mutate({ id: deleteId })
                 }
               }}
             >
@@ -686,5 +695,5 @@ export const UserPrompt = () => {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-};
+  )
+}

@@ -1,41 +1,41 @@
-import * as React from 'react';
-import { UseChatHelpers } from '@ai-sdk/react';
+import * as React from 'react'
+import { UseChatHelpers } from '@ai-sdk/react'
 
-import { Artifact, ChatMessage } from '@/types';
-import { cn } from '@/lib/utils';
-import { Message } from '@/components/message';
-import { MessageActions } from '@/components/message-actions';
+import { Artifact, ChatMessage } from '@/types'
+import { cn } from '@/lib/utils'
+import { Message } from '@/components/message'
+import { MessageActions } from '@/components/message-actions'
 import {
   chatRequestErrorMessage,
-  MessageError
-} from '@/components/message-error';
-import { MessageLoading } from '@/components/message-loading';
+  MessageError,
+} from '@/components/message-error'
+import { MessageLoading } from '@/components/message-loading'
 
 export interface MessagesProps
   extends
     Partial<Pick<UseChatHelpers<ChatMessage>, 'status' | 'setMessages'>>,
     Pick<UseChatHelpers<ChatMessage>, 'messages'> {
   /** Display model (for existing messages) */
-  modelId: string;
+  modelId: string
   /** Display image (for existing messages) */
-  image?: string | null;
+  image?: string | null
   /** Current selected model (for regenerate) */
-  currentModelId?: string;
+  currentModelId?: string
   /** Current image (for loading) */
-  currentImage?: string | null;
-  reload?: (message: ChatMessage) => void;
-  isReadonly?: boolean;
-  supportsReasoning?: boolean | null;
-  className?: string;
-  artifacts?: Artifact[];
-  onSelectArtifact?: (id: string) => void;
+  currentImage?: string | null
+  reload?: (message: ChatMessage) => void
+  isReadonly?: boolean
+  supportsReasoning?: boolean | null
+  className?: string
+  artifacts?: Artifact[]
+  onSelectArtifact?: (id: string) => void
   /**
    * A request the server refused, or that failed in flight. Rendered at the end
    * of the thread rather than as a toast: it belongs next to the message it
    * answers, and a toast for "you are over your quota" is gone before the user
    * can act on it.
    */
-  error?: Error;
+  error?: Error
   /** Describes the media being generated, to show a shaped loading placeholder. */
 }
 
@@ -53,92 +53,92 @@ export function Messages({
   className,
   artifacts,
   onSelectArtifact,
-  error
+  error,
 }: MessagesProps) {
   if (!messages.length) {
-    return null;
+    return null
   }
 
   const getReasoningText = (message: ChatMessage) =>
     message.parts
-      .filter(part => part.type === 'reasoning')
-      .map(part => part.text || (part as any).reasoning || '')
+      .filter((part) => part.type === 'reasoning')
+      .map((part) => part.text || (part as any).reasoning || '')
       .join('\n')
-      .trim();
+      .trim()
 
   const hasVisibleMessageContent = (message: ChatMessage) => {
-    return message.parts.some(part => {
+    return message.parts.some((part) => {
       if (part.type === 'text') {
-        return part.text.trim().length > 0 || part.state === 'streaming';
+        return part.text.trim().length > 0 || part.state === 'streaming'
       }
 
       if (part.type === 'reasoning') {
-        return getReasoningText(message).length > 0;
+        return getReasoningText(message).length > 0
       }
 
       // A refused turn's only part. Without this the message is dropped as
       // empty and the refusal is stored but never seen.
       if (part.type === 'data-error') {
-        return true;
+        return true
       }
 
-      return part.type === 'file';
-    });
-  };
+      return part.type === 'file'
+    })
+  }
 
   const hasVisibleArtifactContent = (artifact: Artifact) => {
     if (artifact.type === 'image' || artifact.type === 'file') {
-      return Boolean(artifact.fileUrl);
+      return Boolean(artifact.fileUrl)
     }
 
-    return (artifact.content ?? '').length > 0;
-  };
+    return (artifact.content ?? '').length > 0
+  }
 
   // One card per artifact, under the message that created it, showing the
   // artifact's CURRENT (latest) content. Older versions are reached via the
   // canvas version dropdown — so the inline card always matches what opens.
   const artifactsByMessage = artifacts?.reduce<Record<string, Artifact[]>>(
     (acc, artifact) => {
-      if (!artifact.messageId) return acc;
-      acc[artifact.messageId] ||= [];
-      acc[artifact.messageId].push(artifact);
-      return acc;
+      if (!artifact.messageId) return acc
+      acc[artifact.messageId] ||= []
+      acc[artifact.messageId].push(artifact)
+      return acc
     },
-    {}
-  );
+    {},
+  )
 
   const displayItems: Array<{
-    kind: 'message';
-    message: ChatMessage;
-    index: number;
-    artifacts: Artifact[];
-    hasVisibleArtifacts: boolean;
-    showActions?: boolean;
-  }> = [];
+    kind: 'message'
+    message: ChatMessage
+    index: number
+    artifacts: Artifact[]
+    hasVisibleArtifacts: boolean
+    showActions?: boolean
+  }> = []
 
   messages.forEach((message, index) => {
     const messageArtifacts = message.id
       ? (artifactsByMessage?.[message.id] ?? [])
-      : [];
-    const hasMessageContent = hasVisibleMessageContent(message);
+      : []
+    const hasMessageContent = hasVisibleMessageContent(message)
     const hasRenderableArtifacts = messageArtifacts.some(
-      hasVisibleArtifactContent
-    );
+      hasVisibleArtifactContent,
+    )
     const isPendingAssistantPlaceholder =
       message.role === 'assistant' &&
       !hasMessageContent &&
       !hasRenderableArtifacts &&
       index === messages.length - 1 &&
-      (status === 'submitted' || status === 'streaming');
+      (status === 'submitted' || status === 'streaming')
 
     const shouldRenderMessage =
       message.role !== 'assistant' ||
       hasMessageContent ||
       hasRenderableArtifacts ||
-      isPendingAssistantPlaceholder;
+      isPendingAssistantPlaceholder
 
     if (!shouldRenderMessage) {
-      return;
+      return
     }
 
     displayItems.push({
@@ -147,9 +147,9 @@ export function Messages({
       index,
       artifacts: messageArtifacts,
       hasVisibleArtifacts: hasRenderableArtifacts,
-      showActions: true
-    });
-  });
+      showActions: true,
+    })
+  })
 
   return (
     <div className={cn('mx-auto w-full max-w-4xl flex-1 px-4 py-6', className)}>
@@ -159,10 +159,10 @@ export function Messages({
           index,
           artifacts: messageArtifacts,
           hasVisibleArtifacts,
-          showActions
-        } = item;
-        const isLastMessage = visibleIndex === displayItems.length - 1;
-        const messageKey = message.id || `${message.role}-${index}`;
+          showActions,
+        } = item
+        const isLastMessage = visibleIndex === displayItems.length - 1
+        const messageKey = message.id || `${message.role}-${index}`
 
         return (
           <div key={messageKey}>
@@ -189,7 +189,7 @@ export function Messages({
               )}
             </Message>
           </div>
-        );
+        )
       })}
 
       {status === 'submitted' &&
@@ -199,5 +199,5 @@ export function Messages({
 
       {error && <MessageError message={chatRequestErrorMessage(error)} />}
     </div>
-  );
+  )
 }

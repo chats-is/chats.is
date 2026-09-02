@@ -1,50 +1,48 @@
-import { Download } from 'lucide-react';
+import { Download } from 'lucide-react'
 
-import { Artifact } from '@/types';
-import { downloadArtifact } from '@/lib/download';
-import { cn } from '@/lib/utils';
+import { Artifact } from '@/types'
+import { downloadArtifact } from '@/lib/download'
+import { cn } from '@/lib/utils'
 import {
   artifactRegistry,
   getArtifactKind,
-  getArtifactLanguageLabel
-} from '@/components/artifacts/registry';
+  getArtifactLanguageLabel,
+} from '@/components/artifacts/registry'
 
 interface DocumentPreviewProps {
-  artifact: Artifact;
-  onOpen?: (id: string) => void;
-  hidePreview?: boolean;
-  showDownloadButton?: boolean;
+  artifact: Artifact
+  onOpen?: (id: string) => void
+  hidePreview?: boolean
+  showDownloadButton?: boolean
 }
 
 export function DocumentPreview({
   artifact,
   onOpen,
   hidePreview,
-  showDownloadButton
+  showDownloadButton,
 }: DocumentPreviewProps) {
-  const kind = getArtifactKind(artifact);
-  const registry = artifactRegistry[kind];
-  const Icon = registry.icon;
+  const kind = getArtifactKind(artifact)
+  const registry = artifactRegistry[kind]
+  const Icon = registry.icon
   const languageLabel =
-    kind === 'code' || kind === 'text'
-      ? getArtifactLanguageLabel(artifact)
-      : '';
-  const canDownload = Boolean(artifact.fileUrl || artifact.content);
+    kind === 'code' || kind === 'text' ? getArtifactLanguageLabel(artifact) : ''
+  const canDownload = Boolean(artifact.fileUrl || artifact.content)
 
-  const handleDownload = () => downloadArtifact(artifact);
+  const handleDownload = () => downloadArtifact(artifact)
 
   return (
     <div
       role="button"
       tabIndex={0}
       className={cn(
-        'w-full rounded-lg border bg-background px-3 py-2.5 text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden'
+        'w-full rounded-lg border bg-background px-3 py-2.5 text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden',
       )}
       onClick={() => onOpen?.(artifact.id)}
-      onKeyDown={event => {
+      onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpen?.(artifact.id);
+          event.preventDefault()
+          onOpen?.(artifact.id)
         }
       }}
     >
@@ -61,9 +59,9 @@ export function DocumentPreview({
             type="button"
             className="ml-auto inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             disabled={!canDownload}
-            onClick={event => {
-              event.stopPropagation();
-              handleDownload();
+            onClick={(event) => {
+              event.stopPropagation()
+              handleDownload()
             }}
           >
             <Download className="size-4" />
@@ -77,5 +75,5 @@ export function DocumentPreview({
         <div className="mt-2">{registry.renderPreview(artifact)}</div>
       )}
     </div>
-  );
+  )
 }

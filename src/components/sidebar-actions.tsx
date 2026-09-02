@@ -1,75 +1,77 @@
-import * as React from 'react';
+import * as React from 'react'
 import {
   CheckCircle,
   Loader2,
   MoreVertical,
   Pencil,
   Share2,
-  Trash2
-} from 'lucide-react';
-import { toast } from 'sonner';
+  Trash2,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
-import { Chat } from '@/types';
-import { cn } from '@/lib/utils';
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { api } from '@/trpc/react';
+import { Chat } from '@/types'
+import { cn } from '@/lib/utils'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { api } from '@/trpc/react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { SidebarMenuAction } from '@/components/ui/sidebar';
-import { ChatDeleteDialog } from '@/components/chat-delete-dialog';
-import { ChatRenameDialog } from '@/components/chat-rename-dialog';
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { SidebarMenuAction } from '@/components/ui/sidebar'
+import { ChatDeleteDialog } from '@/components/chat-delete-dialog'
+import { ChatRenameDialog } from '@/components/chat-rename-dialog'
 
 interface SidebarActionsProps {
-  chat: Chat;
-  className?: string;
-  onOpenChange?: (open: boolean) => void;
+  chat: Chat
+  className?: string
+  onOpenChange?: (open: boolean) => void
 }
 
 export function SidebarActions({
   chat,
   className,
-  onOpenChange
+  onOpenChange,
 }: SidebarActionsProps) {
-  const { isCopied, copyToClipboard } = useCopyToClipboard();
-  const [titleDialogOpen, setTitleDialogOpen] = React.useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const { isCopied, copyToClipboard } = useCopyToClipboard()
+  const [titleDialogOpen, setTitleDialogOpen] = React.useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
 
-  const shareMutation = api.share.create.useMutation();
+  const shareMutation = api.share.create.useMutation()
 
   const copyShareLink = async (chatId: string) => {
-    if (isCopied || shareMutation.isPending) return;
+    if (isCopied || shareMutation.isPending) return
 
     try {
-      const result = await shareMutation.mutateAsync({ chatId });
+      const result = await shareMutation.mutateAsync({ chatId })
 
-      const sharedLink = new URL(window.location.origin);
-      sharedLink.pathname = `/share/${result?.id}`;
-      await copyToClipboard(sharedLink.toString());
-      toast.success('Share link copied to clipboard', { duration: 2000 });
+      const sharedLink = new URL(window.location.origin)
+      sharedLink.pathname = `/share/${result?.id}`
+      await copyToClipboard(sharedLink.toString())
+      toast.success('Share link copied to clipboard', { duration: 2000 })
     } catch (error: any) {
-      toast.error(error.message || 'Failed to share');
+      toast.error(error.message || 'Failed to share')
     }
-  };
+  }
 
   return (
     <>
       <DropdownMenu onOpenChange={onOpenChange}>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuAction
-            showOnHover
-            className={cn(
-              'data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground data-[state=open]:opacity-100',
-              className
-            )}
-          >
-            <MoreVertical />
-            <span className="sr-only">More</span>
-          </SidebarMenuAction>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger
+          render={
+            <SidebarMenuAction
+              showOnHover
+              className={cn(
+                'data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground data-[state=open]:opacity-100',
+                className,
+              )}
+            >
+              <MoreVertical />
+              <span className="sr-only">More</span>
+            </SidebarMenuAction>
+          }
+        />
         <DropdownMenuContent sideOffset={8} align="start">
           <DropdownMenuItem
             className="flex items-center gap-2"
@@ -117,5 +119,5 @@ export function SidebarActions({
         onOpenChange={setTitleDialogOpen}
       />
     </>
-  );
+  )
 }

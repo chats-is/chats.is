@@ -1,7 +1,7 @@
-import { ChatMessage } from '@/types';
+import { ChatMessage } from '@/types'
 
 /** `chat.title` is varchar(255); the router validates the same bound. */
-export const TITLE_MAX = 255;
+export const TITLE_MAX = 255
 
 /**
  * What the title model is asked to summarise.
@@ -17,24 +17,24 @@ export const TITLE_MAX = 255;
  * a word for what it is. Returns '' when there is nothing to summarise.
  */
 export function titleInputFromMessage(message: ChatMessage): string {
-  const pieces = (message.parts ?? []).map(part => {
-    if (part.type === 'text') return part.text.trim();
-    if (part.type !== 'file') return '';
+  const pieces = (message.parts ?? []).map((part) => {
+    if (part.type === 'text') return part.text.trim()
+    if (part.type !== 'file') return ''
 
-    const mediaType = part.mediaType ?? '';
-    if (mediaType.startsWith('image/')) return '[image attachment]';
-    if (mediaType.startsWith('audio/')) return '[audio attachment]';
-    if (mediaType.startsWith('video/')) return '[video attachment]';
-    return '[file attachment]';
-  });
+    const mediaType = part.mediaType ?? ''
+    if (mediaType.startsWith('image/')) return '[image attachment]'
+    if (mediaType.startsWith('audio/')) return '[audio attachment]'
+    if (mediaType.startsWith('video/')) return '[video attachment]'
+    return '[file attachment]'
+  })
 
-  const text = pieces.filter(Boolean).join('\n').trim();
-  if (!text) return '';
+  const text = pieces.filter(Boolean).join('\n').trim()
+  if (!text) return ''
 
   // Fenced, so the model reads it as material rather than as something said
   // to it. Left bare, a request like "turn the square green" got answered
   // instead of named, and the reply became the title.
-  return ['Message to name:', '"""', text, '"""'].join('\n');
+  return ['Message to name:', '"""', text, '"""'].join('\n')
 }
 
 /**
@@ -42,8 +42,7 @@ export function titleInputFromMessage(message: ChatMessage): string {
  * `<｜｜DSML｜｜tool_calls>` (full-width bars), the `<|...|>` family, and the
  * XML-ish `<invoke>` / `<tool_call>` forms.
  */
-const TOOL_CALL_MARKER =
-  /<\s*[｜|]|<\s*\/?\s*(invoke|tool_call|function_call)/i;
+const TOOL_CALL_MARKER = /<\s*[｜|]|<\s*\/?\s*(invoke|tool_call|function_call)/i
 
 /**
  * Clean up whatever the title model returned.
@@ -56,11 +55,11 @@ const TOOL_CALL_MARKER =
  * closest thing to a title on offer.
  */
 export function sanitizeTitle(text: string): string {
-  const [readable] = text.split(TOOL_CALL_MARKER);
+  const [readable] = text.split(TOOL_CALL_MARKER)
   return (readable ?? '')
     .replace(/\s+/g, ' ')
     .replace(/^["'“”「」]+|["'“”「」]+$/g, '')
     .trim()
     .slice(0, TITLE_MAX)
-    .trim();
+    .trim()
 }

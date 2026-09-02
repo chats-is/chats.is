@@ -1,5 +1,5 @@
-import { createEnv } from '@t3-oss/env-nextjs';
-import { z } from 'zod';
+import { createEnv } from '@t3-oss/env-nextjs'
+import { z } from 'zod'
 
 export const env = createEnv({
   server: {
@@ -10,8 +10,8 @@ export const env = createEnv({
       .string()
       .optional()
       .refine(
-        port => !port || (parseInt(port) > 0 && parseInt(port) < 65536),
-        'Invalid port number'
+        (port) => !port || (parseInt(port) > 0 && parseInt(port) < 65536),
+        'Invalid port number',
       ),
     VERCEL_URL: z.string().optional(),
 
@@ -19,8 +19,9 @@ export const env = createEnv({
     DATABASE_URL: z
       .string()
       .refine(
-        url => url.startsWith('postgres://') || url.startsWith('postgresql://'),
-        'DATABASE_URL must start with postgres:// or postgresql://'
+        (url) =>
+          url.startsWith('postgres://') || url.startsWith('postgresql://'),
+        'DATABASE_URL must start with postgres:// or postgresql://',
       ),
 
     // Auth
@@ -54,13 +55,13 @@ export const env = createEnv({
 
     // Analytics
     UMAMI_SCRIPT_URL: z.string().optional(),
-    UMAMI_WEBSITE_ID: z.string().optional()
+    UMAMI_WEBSITE_ID: z.string().optional(),
   },
   client: {
     // The browser builds the path it uploads to, and the server checks that
     // path against the session before signing a token for it. Public because
     // it is already the first segment of every blob URL the app serves.
-    NEXT_PUBLIC_UPLOAD_PATH: z.string().default('uploads')
+    NEXT_PUBLIC_UPLOAD_PATH: z.string().default('uploads'),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -100,6 +101,6 @@ export const env = createEnv({
 
     // Analytics
     UMAMI_SCRIPT_URL: process.env.UMAMI_SCRIPT_URL,
-    UMAMI_WEBSITE_ID: process.env.UMAMI_WEBSITE_ID
-  }
-});
+    UMAMI_WEBSITE_ID: process.env.UMAMI_WEBSITE_ID,
+  },
+})

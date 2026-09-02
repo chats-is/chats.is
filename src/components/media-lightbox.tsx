@@ -1,21 +1,21 @@
-import { X } from 'lucide-react';
+import { X } from 'lucide-react'
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-  DialogTrigger
-} from '@/components/ui/dialog';
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface MediaLightboxProps {
-  type: 'image' | 'video';
-  src: string;
-  alt?: string;
+  type: 'image' | 'video'
+  src: string
+  alt?: string
   /** The clickable element shown inline (image thumbnail or a button). */
-  trigger: React.ReactNode;
-  className?: string;
+  trigger: React.ReactNode
+  className?: string
 }
 
 export function MediaLightbox({
@@ -23,18 +23,18 @@ export function MediaLightbox({
   src,
   alt,
   trigger,
-  className
+  className,
 }: MediaLightboxProps) {
-  const title = alt || (type === 'image' ? 'Image preview' : 'Video preview');
+  const title = alt || (type === 'image' ? 'Image preview' : 'Video preview')
 
   return (
     <Dialog>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogTrigger render={{ trigger }} />
       <DialogContent
         showCloseButton={false}
         className={cn(
           'block w-auto max-w-[95vw] border-0 bg-transparent p-0 shadow-none sm:max-w-[90vw]',
-          className
+          className,
         )}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
@@ -58,5 +58,5 @@ export function MediaLightbox({
         </DialogClose>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

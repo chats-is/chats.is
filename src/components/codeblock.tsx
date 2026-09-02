@@ -1,21 +1,23 @@
-import { lazy, memo, Suspense } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { lazy, memo, Suspense } from 'react'
+import { Check, Copy } from 'lucide-react'
 
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { Button } from '@/components/ui/button';
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { Button } from '@/components/ui/button'
 
 const CodeEditor = lazy(() =>
-  import('@/components/code-editor').then(mod => ({ default: mod.CodeEditor }))
-);
+  import('@/components/code-editor').then((mod) => ({
+    default: mod.CodeEditor,
+  })),
+)
 
 interface CodeBlockProps {
-  language: string;
-  value: string;
-  showHeader?: boolean;
-  wrapLongLines?: boolean;
-  autoScrollToBottom?: boolean;
-  bordered?: boolean;
-  showLineNumbers?: boolean;
+  language: string
+  value: string
+  showHeader?: boolean
+  wrapLongLines?: boolean
+  autoScrollToBottom?: boolean
+  bordered?: boolean
+  showLineNumbers?: boolean
 }
 
 const CodeBlock = memo(
@@ -26,14 +28,14 @@ const CodeBlock = memo(
     wrapLongLines = false,
     autoScrollToBottom = false,
     bordered = true,
-    showLineNumbers = true
+    showLineNumbers = true,
   }: CodeBlockProps) => {
-    const { isCopied, copyToClipboard } = useCopyToClipboard();
+    const { isCopied, copyToClipboard } = useCopyToClipboard()
 
     const onCopy = async () => {
-      if (isCopied) return;
-      await copyToClipboard(value);
-    };
+      if (isCopied) return
+      await copyToClipboard(value)
+    }
 
     return (
       <div
@@ -77,9 +79,9 @@ const CodeBlock = memo(
           />
         </Suspense>
       </div>
-    );
-  }
-);
-CodeBlock.displayName = 'CodeBlock';
+    )
+  },
+)
+CodeBlock.displayName = 'CodeBlock'
 
-export { CodeBlock };
+export { CodeBlock }

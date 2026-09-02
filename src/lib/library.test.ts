@@ -1,18 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest'
 
-import { ChatMessage } from '@/types';
+import { ChatMessage } from '@/types'
 
-import { extractLibraryMedia } from './library';
+import { extractLibraryMedia } from './library'
 
-const createdAt = new Date('2026-06-12T10:00:00Z');
+const createdAt = new Date('2026-06-12T10:00:00Z')
 
 function message(parts: any[]) {
   return {
     id: 'm1',
     chatId: 'c1',
     parts: parts as ChatMessage['parts'],
-    createdAt
-  };
+    createdAt,
+  }
 }
 
 describe('extractLibraryMedia', () => {
@@ -28,11 +28,11 @@ describe('extractLibraryMedia', () => {
             status: 'done',
             url: 'https://blob/cat.png',
             mediaType: 'image/png',
-            filename: 'cat.png'
-          }
-        }
-      ])
-    );
+            filename: 'cat.png',
+          },
+        },
+      ]),
+    )
     expect(items).toEqual([
       {
         id: 'm1:0',
@@ -42,10 +42,10 @@ describe('extractLibraryMedia', () => {
         title: 'a cat in space',
         chatId: 'c1',
         messageId: 'm1',
-        createdAt
-      }
-    ]);
-  });
+        createdAt,
+      },
+    ])
+  })
 
   it('extracts legacy file parts and classifies by media type', () => {
     const items = extractLibraryMedia(
@@ -55,13 +55,13 @@ describe('extractLibraryMedia', () => {
           type: 'file',
           mediaType: 'audio/mpeg',
           url: 'https://blob/a.mp3',
-          filename: 'a.mp3'
-        }
-      ])
-    );
-    expect(items.map(i => i.kind)).toEqual(['video', 'audio']);
-    expect(items[1].title).toBe('a.mp3');
-  });
+          filename: 'a.mp3',
+        },
+      ]),
+    )
+    expect(items.map((i) => i.kind)).toEqual(['video', 'audio'])
+    expect(items[1].title).toBe('a.mp3')
+  })
 
   it('uses the text as title for text_to_speech outputs', () => {
     const items = extractLibraryMedia(
@@ -75,13 +75,13 @@ describe('extractLibraryMedia', () => {
             status: 'done',
             url: 'https://blob/s.mp3',
             mediaType: 'audio/mpeg',
-            filename: 's.mp3'
-          }
-        }
-      ])
-    );
-    expect(items[0].title).toBe('hello world');
-  });
+            filename: 's.mp3',
+          },
+        },
+      ]),
+    )
+    expect(items[0].title).toBe('hello world')
+  })
 
   it('skips errored tools, non-media tools, and text parts', () => {
     const items = extractLibraryMedia(
@@ -92,24 +92,24 @@ describe('extractLibraryMedia', () => {
           toolCallId: 't1',
           state: 'output-available',
           input: { prompt: 'x' },
-          output: { status: 'error', message: 'failed' }
+          output: { status: 'error', message: 'failed' },
         },
         {
           type: 'tool-transcribe_audio',
           toolCallId: 't2',
           state: 'output-available',
           input: { audioUrl: 'https://blob/a.mp3' },
-          output: { status: 'done', text: 'transcript' }
+          output: { status: 'done', text: 'transcript' },
         },
         {
           type: 'tool-create_artifact',
           toolCallId: 't3',
           state: 'output-available',
           input: { title: 'Doc', type: 'text' },
-          output: { id: 'art-1' }
-        }
-      ])
-    );
-    expect(items).toEqual([]);
-  });
-});
+          output: { id: 'art-1' },
+        },
+      ]),
+    )
+    expect(items).toEqual([])
+  })
+})

@@ -1,6 +1,6 @@
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert } from 'lucide-react'
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'
 
 /**
  * A failure rendered inside the message thread.
@@ -16,22 +16,22 @@ import { cn } from '@/lib/utils';
  */
 export function MessageError({
   message,
-  className
+  className,
 }: {
-  message?: string;
-  className?: string;
+  message?: string
+  className?: string
 }) {
   return (
     <div
       className={cn(
         'my-2 flex w-fit items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive',
-        className
+        className,
       )}
     >
       <CircleAlert className="size-4 shrink-0" />
       <span>{message || 'Something went wrong.'}</span>
     </div>
-  );
+  )
 }
 
 /**
@@ -48,13 +48,13 @@ export function MessageIncomplete({ className }: { className?: string }) {
     <div
       className={cn(
         'my-2 flex w-fit items-center gap-2 text-xs text-muted-foreground',
-        className
+        className,
       )}
     >
       <CircleAlert className="size-3.5 shrink-0" />
       <span>No response</span>
     </div>
-  );
+  )
 }
 
 /**
@@ -66,17 +66,17 @@ export function MessageIncomplete({ className }: { className?: string }) {
  * that is not our JSON shape (a proxy's HTML error page, say).
  */
 export function chatRequestErrorMessage(error: Error | undefined): string {
-  const raw = error?.message?.trim();
-  if (!raw) return 'Something went wrong.';
+  const raw = error?.message?.trim()
+  if (!raw) return 'Something went wrong.'
 
   try {
-    const parsed = JSON.parse(raw) as { error?: unknown };
+    const parsed = JSON.parse(raw) as { error?: unknown }
     if (typeof parsed?.error === 'string' && parsed.error) {
-      return parsed.error;
+      return parsed.error
     }
   } catch {
     // Not JSON — fall through.
   }
 
-  return raw;
+  return raw
 }

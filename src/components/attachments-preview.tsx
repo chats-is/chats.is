@@ -1,37 +1,37 @@
-import { Dispatch, SetStateAction, useCallback, useTransition } from 'react';
-import { AudioLines, Clapperboard, XCircle } from 'lucide-react';
+import { Dispatch, SetStateAction, useCallback, useTransition } from 'react'
+import { AudioLines, Clapperboard, XCircle } from 'lucide-react'
 
-import { Attachment } from '@/types';
-import { deleteFile } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Attachment } from '@/types'
+import { deleteFile } from '@/lib/api'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
-import { Skeleton } from './ui/skeleton';
+import { Skeleton } from './ui/skeleton'
 
 interface AttachmentsPreviewProps {
-  disabled?: boolean;
-  uploadQueue: string[];
-  attachments: Attachment[];
-  setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
+  disabled?: boolean
+  uploadQueue: string[]
+  attachments: Attachment[]
+  setAttachments: Dispatch<SetStateAction<Array<Attachment>>>
 }
 
 export const AttachmentsPreview = ({
   disabled,
   uploadQueue,
   attachments,
-  setAttachments
+  setAttachments,
 }: AttachmentsPreviewProps) => {
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition()
 
   const removeAttachment = useCallback(
     async (url: string, index: number) => {
-      await deleteFile(url);
-      setAttachments(prevAttachments =>
-        prevAttachments.filter((_, i) => i !== index)
-      );
+      await deleteFile(url)
+      setAttachments((prevAttachments) =>
+        prevAttachments.filter((_, i) => i !== index),
+      )
     },
-    [setAttachments]
-  );
+    [setAttachments],
+  )
 
   return (
     (attachments.length > 0 || uploadQueue.length > 0) && (
@@ -41,7 +41,7 @@ export const AttachmentsPreview = ({
             <div
               className={cn(
                 'h-7 w-11 cursor-pointer overflow-hidden rounded-lg border p-px sm:h-16 sm:w-24',
-                { 'opacity-50': isPending }
+                { 'opacity-50': isPending },
               )}
             >
               {attachment.contentType?.startsWith('audio/') ? (
@@ -83,7 +83,7 @@ export const AttachmentsPreview = ({
           </div>
         ))}
 
-        {uploadQueue.map(filename => (
+        {uploadQueue.map((filename) => (
           <Skeleton
             key={filename}
             className="h-7 w-11 rounded-lg p-px sm:h-16 sm:w-24"
@@ -91,5 +91,5 @@ export const AttachmentsPreview = ({
         ))}
       </div>
     )
-  );
-};
+  )
+}

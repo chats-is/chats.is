@@ -1,20 +1,20 @@
-import '@tanstack/react-start/server-only';
+import '@tanstack/react-start/server-only'
 
-import { transcribe } from 'ai';
+import { transcribe } from 'ai'
 
-import { Model } from '@/types';
-import { audioDurationInSeconds } from '@/lib/media-duration';
+import { Model } from '@/types'
+import { audioDurationInSeconds } from '@/lib/media-duration'
 import {
   FailoverProvider,
   getTranscriptionModel,
-  runWithProviderFailover
-} from '@/lib/provider';
+  runWithProviderFailover,
+} from '@/lib/provider'
 
 export type TranscriptionOutput = {
-  text: string;
-  durationInSeconds?: number;
-  provider: FailoverProvider;
-};
+  text: string
+  durationInSeconds?: number
+  provider: FailoverProvider
+}
 
 /**
  * Transcribe audio (STT) with provider failover. Returns plain text — nothing
@@ -22,35 +22,35 @@ export type TranscriptionOutput = {
  * tool (and any future standalone STT surface).
  */
 export async function transcribeAudio(args: {
-  audio: Uint8Array;
+  audio: Uint8Array
   /** The uploaded file's type, so the duration can be read from the bytes. */
-  mediaType?: string;
-  dbModel: Model;
-  candidates: FailoverProvider[];
-  abortSignal?: AbortSignal;
+  mediaType?: string
+  dbModel: Model
+  candidates: FailoverProvider[]
+  abortSignal?: AbortSignal
 }): Promise<TranscriptionOutput> {
-  const { audio, mediaType, dbModel, candidates, abortSignal } = args;
-  const modelId = dbModel.modelId;
+  const { audio, mediaType, dbModel, candidates, abortSignal } = args
+  const modelId = dbModel.modelId
 
   const { result, provider: usedProvider } = await runWithProviderFailover(
     candidates,
-    async provider => {
+    async (provider) => {
       const transcript = await transcribe({
         model: getTranscriptionModel(provider, modelId),
         audio,
         abortSignal,
         ...(provider.apiOptions && {
           providerOptions: {
-            [provider.type]: provider.apiOptions
-          } as any
-        })
-      });
+            [provider.type]: provider.apiOptions,
+          } as any,
+        }),
+      })
       return {
         text: transcript.text,
-        durationInSeconds: transcript.durationInSeconds
-      };
-    }
-  );
+        durationInSeconds: transcript.durationInSeconds,
+      }
+    },
+  )
 
   // Transcription bills per second, and whether a provider reports the length
   // it processed is up to that provider. The file is in hand either way, so
@@ -60,7 +60,7 @@ export async function transcribeAudio(args: {
   const durationInSeconds =
     result.durationInSeconds && result.durationInSeconds > 0
       ? result.durationInSeconds
-      : await audioDurationInSeconds(audio, mediaType);
+      : await audioDurationInSeconds(audio, mediaType)
 
-  return { ...result, durationInSeconds, provider: usedProvider };
+  return { ...result, durationInSeconds, provider: usedProvider }
 }

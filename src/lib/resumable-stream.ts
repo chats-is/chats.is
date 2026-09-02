@@ -1,25 +1,25 @@
-import '@tanstack/react-start/server-only';
+import '@tanstack/react-start/server-only'
 
-import { waitUntil } from '@vercel/functions';
-import { createClient } from 'redis';
+import { waitUntil } from '@vercel/functions'
+import { createClient } from 'redis'
 import {
   createResumableStreamContext,
-  type ResumableStreamContext
-} from 'resumable-stream';
+  type ResumableStreamContext,
+} from 'resumable-stream'
 
-import { env } from '@/lib/env';
+import { env } from '@/lib/env'
 
 // `undefined` = not yet initialized; `null` = disabled (no REDIS_URL) so resume
 // falls back to one-shot streaming. A successful context is cached forever; a
 // connect failure is NOT cached, so a later request can retry.
 /** Upper bound on the initial connect; see the socket options below. */
-const CONNECT_TIMEOUT_MS = 5000;
+const CONNECT_TIMEOUT_MS = 5000
 
 /** Reconnect attempts before a client gives up. See `reconnectStrategy`. */
-const MAX_RECONNECT_ATTEMPTS = 3;
+const MAX_RECONNECT_ATTEMPTS = 3
 
-let cached: ResumableStreamContext | null | undefined;
-let inflight: Promise<ResumableStreamContext | null> | undefined;
+let cached: ResumableStreamContext | null | undefined
+let inflight: Promise<ResumableStreamContext | null> | undefined
 
 async function init(): Promise<ResumableStreamContext | null> {
   try {
@@ -43,35 +43,35 @@ async function init(): Promise<ResumableStreamContext | null> {
         // Bounded rather than disabled, because the connection is a long-lived
         // singleton and hosted Redis drops it when idle — that has to heal on
         // its own, it just must not retry indefinitely.
-        reconnectStrategy: retries =>
+        reconnectStrategy: (retries) =>
           retries >= MAX_RECONNECT_ATTEMPTS
             ? new Error('redis unreachable, giving up')
-            : Math.min((retries + 1) * 200, 1000)
-      }
-    });
-    const subscriber = publisher.duplicate();
-    publisher.on('error', e =>
-      console.error('[resumable-stream] redis publisher error:', e?.message)
-    );
-    subscriber.on('error', e =>
-      console.error('[resumable-stream] redis subscriber error:', e?.message)
-    );
+            : Math.min((retries + 1) * 200, 1000),
+      },
+    })
+    const subscriber = publisher.duplicate()
+    publisher.on('error', (e) =>
+      console.error('[resumable-stream] redis publisher error:', e?.message),
+    )
+    subscriber.on('error', (e) =>
+      console.error('[resumable-stream] redis subscriber error:', e?.message),
+    )
     try {
-      await Promise.all([publisher.connect(), subscriber.connect()]);
+      await Promise.all([publisher.connect(), subscriber.connect()])
     } catch (err) {
       // Don't leave half-open clients behind retrying in the background.
-      await Promise.allSettled([publisher.destroy(), subscriber.destroy()]);
-      throw err;
+      await Promise.allSettled([publisher.destroy(), subscriber.destroy()])
+      throw err
     }
 
     return createResumableStreamContext({
-      waitUntil: promise => waitUntil(promise),
+      waitUntil: (promise) => waitUntil(promise),
       publisher,
-      subscriber
-    });
+      subscriber,
+    })
   } catch (err) {
-    console.error('[resumable-stream] failed to init context:', err);
-    return null;
+    console.error('[resumable-stream] failed to init context:', err)
+    return null
   }
 }
 
@@ -81,18 +81,18 @@ async function init(): Promise<ResumableStreamContext | null> {
  * the buffered stream via the chat route's GET handler instead of losing it.
  */
 export async function getResumableStreamContext(): Promise<ResumableStreamContext | null> {
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return cached
   if (!env.REDIS_URL) {
-    cached = null;
-    return cached;
+    cached = null
+    return cached
   }
-  if (!inflight) inflight = init();
-  const ctx = await inflight;
+  if (!inflight) inflight = init()
+  const ctx = await inflight
   if (ctx) {
-    cached = ctx;
+    cached = ctx
   } else {
     // Don't cache a failed init — let the next request retry the connection.
-    inflight = undefined;
+    inflight = undefined
   }
-  return ctx;
+  return ctx
 }

@@ -1,10 +1,10 @@
 type ArtifactLanguageSource = {
-  language?: string | null;
-  fileName?: string | null;
-  title?: string | null;
-  mimeType?: string | null;
-  type?: string | null;
-};
+  language?: string | null
+  fileName?: string | null
+  title?: string | null
+  mimeType?: string | null
+  type?: string | null
+}
 
 export type CodeLanguageKey =
   | 'javascript'
@@ -35,7 +35,7 @@ export type CodeLanguageKey =
   | 'bash'
   | 'zsh'
   | 'text'
-  | 'code';
+  | 'code'
 
 const LANGUAGE_ALIASES: Record<CodeLanguageKey, string[]> = {
   javascript: ['javascript', 'js', 'mjs', 'cjs'],
@@ -68,8 +68,8 @@ const LANGUAGE_ALIASES: Record<CodeLanguageKey, string[]> = {
   bash: ['bash', 'shell', 'sh', 'env'],
   zsh: ['zsh'],
   text: ['text', 'txt'],
-  code: ['code']
-};
+  code: ['code'],
+}
 
 const PATH_LANGUAGE_MATCHERS: Array<[string[], CodeLanguageKey]> = [
   [['.html', '.htm'], 'html'],
@@ -96,97 +96,97 @@ const PATH_LANGUAGE_MATCHERS: Array<[string[], CodeLanguageKey]> = [
   [['.ini', '.conf'], 'ini'],
   [['.properties'], 'properties'],
   [['.sh', '.bash', '.env'], 'bash'],
-  [['.zsh'], 'zsh']
-];
+  [['.zsh'], 'zsh'],
+]
 
 export function normalizeCodeLanguage(
-  language?: string | null
+  language?: string | null,
 ): CodeLanguageKey | null {
-  if (!language) return null;
+  if (!language) return null
 
-  const normalized = language.toLowerCase().trim();
+  const normalized = language.toLowerCase().trim()
 
   for (const [key, aliases] of Object.entries(LANGUAGE_ALIASES) as Array<
     [CodeLanguageKey, string[]]
   >) {
     if (aliases.includes(normalized)) {
-      return key;
+      return key
     }
   }
 
-  return null;
+  return null
 }
 
 export function inferCodeLanguageFromPath(
-  value?: string | null
+  value?: string | null,
 ): CodeLanguageKey | null {
-  if (!value) return null;
+  if (!value) return null
 
-  const normalized = value.toLowerCase().trim();
+  const normalized = value.toLowerCase().trim()
 
   for (const [extensions, language] of PATH_LANGUAGE_MATCHERS) {
-    if (extensions.some(extension => normalized.endsWith(extension))) {
-      return language;
+    if (extensions.some((extension) => normalized.endsWith(extension))) {
+      return language
     }
   }
 
   if (normalized.endsWith('/dockerfile') || normalized === 'dockerfile') {
-    return 'dockerfile';
+    return 'dockerfile'
   }
 
   if (normalized.endsWith('.nginx') || normalized.endsWith('nginx.conf')) {
-    return 'nginx';
+    return 'nginx'
   }
 
-  return null;
+  return null
 }
 
 export function inferCodeLanguageFromMimeType(
-  mimeType?: string | null
+  mimeType?: string | null,
 ): CodeLanguageKey | null {
-  if (!mimeType) return null;
+  if (!mimeType) return null
 
-  const normalized = mimeType.toLowerCase();
+  const normalized = mimeType.toLowerCase()
 
-  if (normalized.includes('text/html')) return 'html';
-  if (normalized.includes('text/css')) return 'css';
-  if (normalized.includes('application/json')) return 'json';
-  if (normalized.includes('text/markdown')) return 'markdown';
-  if (normalized.includes('javascript')) return 'javascript';
-  if (normalized.includes('typescript')) return 'typescript';
-  if (normalized.includes('yaml')) return 'yaml';
-  if (normalized.includes('toml')) return 'toml';
-  if (normalized.includes('python')) return 'python';
-  if (normalized.includes('java')) return 'java';
-  if (normalized.includes('php')) return 'php';
+  if (normalized.includes('text/html')) return 'html'
+  if (normalized.includes('text/css')) return 'css'
+  if (normalized.includes('application/json')) return 'json'
+  if (normalized.includes('text/markdown')) return 'markdown'
+  if (normalized.includes('javascript')) return 'javascript'
+  if (normalized.includes('typescript')) return 'typescript'
+  if (normalized.includes('yaml')) return 'yaml'
+  if (normalized.includes('toml')) return 'toml'
+  if (normalized.includes('python')) return 'python'
+  if (normalized.includes('java')) return 'java'
+  if (normalized.includes('php')) return 'php'
   if (normalized.includes('csharp') || normalized.includes('c#'))
-    return 'csharp';
-  if (normalized.includes('sql')) return 'sql';
-  if (normalized.includes('xml')) return 'xml';
-  if (normalized.includes('svg')) return 'svg';
-  if (normalized.includes('docker')) return 'dockerfile';
-  if (normalized.includes('nginx')) return 'nginx';
-  if (normalized.includes('x-ini')) return 'ini';
-  if (normalized.includes('properties')) return 'properties';
+    return 'csharp'
+  if (normalized.includes('sql')) return 'sql'
+  if (normalized.includes('xml')) return 'xml'
+  if (normalized.includes('svg')) return 'svg'
+  if (normalized.includes('docker')) return 'dockerfile'
+  if (normalized.includes('nginx')) return 'nginx'
+  if (normalized.includes('x-ini')) return 'ini'
+  if (normalized.includes('properties')) return 'properties'
   if (normalized.includes('shellscript') || normalized.includes('x-sh')) {
-    return 'bash';
+    return 'bash'
   }
 
-  return null;
+  return null
 }
 
 export function getArtifactLanguageLabel(
-  artifact: ArtifactLanguageSource
+  artifact: ArtifactLanguageSource,
 ): string {
-  const explicitLanguage = artifact.language?.toLowerCase().trim();
-  if (explicitLanguage) return explicitLanguage;
+  const explicitLanguage = artifact.language?.toLowerCase().trim()
+  if (explicitLanguage) return explicitLanguage
 
   const inferredLanguage =
     inferCodeLanguageFromPath(artifact.fileName) ??
     inferCodeLanguageFromPath(artifact.title) ??
-    inferCodeLanguageFromMimeType(artifact.mimeType);
+    inferCodeLanguageFromMimeType(artifact.mimeType)
 
-  if (inferredLanguage) return inferredLanguage;
+  if (inferredLanguage) return inferredLanguage
 
-  return artifact.type?.toLowerCase().trim() || '';
+  return artifact.type?.toLowerCase().trim() || ''
 }

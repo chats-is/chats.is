@@ -1,4 +1,4 @@
-import { ChatMessage } from '@/types';
+import { ChatMessage } from '@/types'
 
 /**
  * Hosts the media tools are allowed to fetch from. Everything the app stores
@@ -9,13 +9,13 @@ import { ChatMessage } from '@/types';
  */
 export function isTrustedMediaUrl(url: string): boolean {
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(url)
     return (
       parsed.protocol === 'https:' &&
       parsed.hostname.endsWith('.public.blob.vercel-storage.com')
-    );
+    )
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -37,28 +37,28 @@ export function isTrustedMediaUrl(url: string): boolean {
  */
 export function maskUnsupportedFileParts(
   messages: ChatMessage[],
-  options: { supportsVision?: boolean | null }
+  options: { supportsVision?: boolean | null },
 ): ChatMessage[] {
-  return messages.map(message => ({
+  return messages.map((message) => ({
     ...message,
     parts: (message.parts ?? []).flatMap((part): ChatMessage['parts'] => {
-      if (part.type !== 'file') return [part];
-      const mediaType = part.mediaType ?? '';
+      if (part.type !== 'file') return [part]
+      const mediaType = part.mediaType ?? ''
       const marker = (label: string) => ({
         type: 'text' as const,
-        text: `[${label} file attached: ${part.url}]`
-      });
+        text: `[${label} file attached: ${part.url}]`,
+      })
 
-      if (mediaType.startsWith('audio/')) return [marker('Audio')];
-      if (mediaType.startsWith('video/')) return [marker('Video')];
+      if (mediaType.startsWith('audio/')) return [marker('Audio')]
+      if (mediaType.startsWith('video/')) return [marker('Video')]
       if (mediaType.startsWith('image/')) {
         return options.supportsVision
           ? [part, marker('Image')]
-          : [marker('Image')];
+          : [marker('Image')]
       }
-      return [part];
-    })
-  }));
+      return [part]
+    }),
+  }))
 }
 
 /**
@@ -69,13 +69,13 @@ export function maskUnsupportedFileParts(
  * `isTrustedMediaUrl` as the storage-origin trust boundary).
  */
 export function collectConversationMediaUrls(
-  messages: ChatMessage[]
+  messages: ChatMessage[],
 ): Set<string> {
-  const urls = new Set<string>();
+  const urls = new Set<string>()
   for (const message of messages) {
     for (const part of message.parts ?? []) {
       if (part.type === 'file' && part.url) {
-        urls.add(part.url);
+        urls.add(part.url)
       }
       if (
         part.type.startsWith('tool-') &&
@@ -85,9 +85,9 @@ export function collectConversationMediaUrls(
         'url' in part.output &&
         typeof part.output.url === 'string'
       ) {
-        urls.add(part.output.url);
+        urls.add(part.output.url)
       }
     }
   }
-  return urls;
+  return urls
 }

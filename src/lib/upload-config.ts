@@ -11,7 +11,7 @@ export const UPLOAD_CONFIG = {
   avatar: {
     folder: 'avatars',
     allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    maxSize: 5 * 1024 * 1024
+    maxSize: 5 * 1024 * 1024,
   },
   attachment: {
     folder: 'attachments',
@@ -33,26 +33,26 @@ export const UPLOAD_CONFIG = {
       // Video attachments feed the chat edit_video tool.
       'video/mp4',
       'video/quicktime',
-      'video/webm'
+      'video/webm',
     ],
     maxSize: 10 * 1024 * 1024,
     /** Video is the reason client uploads exist here; a clip needs the room. */
-    videoMaxSize: 100 * 1024 * 1024
+    videoMaxSize: 100 * 1024 * 1024,
   },
   prompts: {
     folder: 'prompts',
     allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    maxSize: 5 * 1024 * 1024
-  }
-} as const;
+    maxSize: 5 * 1024 * 1024,
+  },
+} as const
 
-export type UploadType = keyof typeof UPLOAD_CONFIG;
+export type UploadType = keyof typeof UPLOAD_CONFIG
 
 export function isUploadType(value: unknown): value is UploadType {
-  return typeof value === 'string' && value in UPLOAD_CONFIG;
+  return typeof value === 'string' && value in UPLOAD_CONFIG
 }
 
-const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm'];
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm']
 
 /**
  * The ceiling for one file. A token is signed for a single pathname before the
@@ -60,11 +60,11 @@ const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm'];
  * the larger allowance, everything else the ordinary one.
  */
 export function maxSizeForPathname(type: UploadType, pathname: string): number {
-  const config = UPLOAD_CONFIG[type];
-  if (!('videoMaxSize' in config)) return config.maxSize;
+  const config = UPLOAD_CONFIG[type]
+  if (!('videoMaxSize' in config)) return config.maxSize
 
-  const isVideo = VIDEO_EXTENSIONS.some(ext =>
-    pathname.toLowerCase().endsWith(ext)
-  );
-  return isVideo ? config.videoMaxSize : config.maxSize;
+  const isVideo = VIDEO_EXTENSIONS.some((ext) =>
+    pathname.toLowerCase().endsWith(ext),
+  )
+  return isVideo ? config.videoMaxSize : config.maxSize
 }

@@ -1,120 +1,120 @@
-import { useEffect, useState } from 'react';
-import { Link } from '@tanstack/react-router';
+import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
   Github,
   Loader2,
   Mail,
   Search,
   ShieldCheck,
-  User as UserIcon
-} from 'lucide-react';
-import { toast } from 'sonner';
+  User as UserIcon,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
-import { api } from '@/trpc/react';
-import { IconGoogle } from '@/components/icons';
-import { Input } from '@/components/ui/input';
+import { api } from '@/trpc/react'
+import { IconGoogle } from '@/components/icons'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+  SelectValue,
+} from '@/components/ui/select'
 
 const ProviderIcon = ({ provider }: { provider: string }) => {
   switch (provider.toLowerCase()) {
     case 'github':
-      return <Github className="size-4" />;
+      return <Github className="size-4" />
     case 'google':
-      return <IconGoogle className="size-4" />;
+      return <IconGoogle className="size-4" />
     case 'email-code':
     case 'email':
-      return <Mail className="size-4" />;
+      return <Mail className="size-4" />
     default:
-      return <span className="text-xs">{provider}</span>;
+      return <span className="text-xs">{provider}</span>
   }
-};
+}
 
-const QUOTA_NONE = '__none__';
+const QUOTA_NONE = '__none__'
 
 export default function UsersPage() {
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [updatingRoleUserId, setUpdatingRoleUserId] = useState<string | null>(
-    null
-  );
+    null,
+  )
   const [updatingQuotaUserId, setUpdatingQuotaUserId] = useState<string | null>(
-    null
-  );
+    null,
+  )
 
-  const utils = api.useUtils();
+  const utils = api.useUtils()
   const { data: users, isLoading } = api.user.list.useQuery({
-    search: search || undefined
-  });
-  const { data: stats } = api.user.getStats.useQuery();
-  const { data: quotaOptions } = api.quota.listForSelect.useQuery();
+    search: search || undefined,
+  })
+  const { data: stats } = api.user.getStats.useQuery()
+  const { data: quotaOptions } = api.quota.listForSelect.useQuery()
 
   const updateRoleMutation = api.user.updateRole.useMutation({
     onSuccess: async () => {
-      await utils.user.list.invalidate();
-      await utils.user.getStats.invalidate();
-      setUpdatingRoleUserId(null);
+      await utils.user.list.invalidate()
+      await utils.user.getStats.invalidate()
+      setUpdatingRoleUserId(null)
     },
-    onError: error => {
-      setUpdatingRoleUserId(null);
-      toast.error(error.message);
-    }
-  });
+    onError: (error) => {
+      setUpdatingRoleUserId(null)
+      toast.error(error.message)
+    },
+  })
 
   const setQuotaMutation = api.quota.setUserQuota.useMutation({
     onSuccess: async () => {
-      await utils.user.list.invalidate();
-      await utils.quota.getByUser.invalidate();
-      setUpdatingQuotaUserId(null);
-      toast.success('Quota override updated');
+      await utils.user.list.invalidate()
+      await utils.quota.getByUser.invalidate()
+      setUpdatingQuotaUserId(null)
+      toast.success('Quota override updated')
     },
-    onError: error => {
-      setUpdatingQuotaUserId(null);
-      toast.error(error.message);
-    }
-  });
+    onError: (error) => {
+      setUpdatingQuotaUserId(null)
+      toast.error(error.message)
+    },
+  })
 
   const removeQuotaMutation = api.quota.removeUserQuota.useMutation({
     onSuccess: async () => {
-      await utils.user.list.invalidate();
-      await utils.quota.getByUser.invalidate();
-      setUpdatingQuotaUserId(null);
-      toast.success('Quota override removed');
+      await utils.user.list.invalidate()
+      await utils.quota.getByUser.invalidate()
+      setUpdatingQuotaUserId(null)
+      toast.success('Quota override removed')
     },
-    onError: error => {
-      setUpdatingQuotaUserId(null);
-      toast.error(error.message);
-    }
-  });
+    onError: (error) => {
+      setUpdatingQuotaUserId(null)
+      toast.error(error.message)
+    },
+  })
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSearch(searchInput);
-    }, 500);
+      setSearch(searchInput)
+    }, 500)
 
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const formatDate = (date: Date | null) => {
-    if (!date) return 'Never';
+    if (!date) return 'Never'
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
-    });
-  };
+      day: 'numeric',
+    })
+  }
 
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         Loading...
       </div>
-    );
+    )
   }
 
   return (
@@ -126,7 +126,7 @@ export default function UsersPage() {
             <Input
               placeholder="Search by name or email..."
               value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -157,14 +157,15 @@ export default function UsersPage() {
             </tr>
           </thead>
           <tbody>
-            {users?.map(user => (
+            {users?.map((user) => (
               <tr
                 key={user.id}
                 className="border-b transition-colors hover:bg-muted/30"
               >
                 <td className="p-3">
                   <Link
-                    to="/console/users/$userId" params={{ userId: user.id }}
+                    to="/console/users/$userId"
+                    params={{ userId: user.id }}
                     className="flex items-center gap-3 hover:text-primary"
                   >
                     <div className="size-8 overflow-hidden rounded-full border bg-muted">
@@ -216,12 +217,12 @@ export default function UsersPage() {
                     <Select
                       value={user.role}
                       disabled={updatingRoleUserId === user.id}
-                      onValueChange={value => {
-                        setUpdatingRoleUserId(user.id);
+                      onValueChange={(value) => {
+                        setUpdatingRoleUserId(user.id)
                         updateRoleMutation.mutate({
                           id: user.id,
-                          role: value as 'user' | 'admin'
-                        });
+                          role: value as 'user' | 'admin',
+                        })
                       }}
                     >
                       <SelectTrigger className="h-8 w-28">
@@ -262,15 +263,15 @@ export default function UsersPage() {
                       disabled={
                         updatingQuotaUserId === user.id || !quotaOptions?.length
                       }
-                      onValueChange={value => {
-                        setUpdatingQuotaUserId(user.id);
+                      onValueChange={(value) => {
+                        setUpdatingQuotaUserId(user.id)
                         if (value === QUOTA_NONE) {
-                          removeQuotaMutation.mutate({ userId: user.id });
+                          removeQuotaMutation.mutate({ userId: user.id })
                         } else {
                           setQuotaMutation.mutate({
                             userId: user.id,
-                            quotaId: value
-                          });
+                            quotaId: value,
+                          })
                         }
                       }}
                     >
@@ -285,7 +286,7 @@ export default function UsersPage() {
                         <SelectItem value={QUOTA_NONE}>
                           <span className="text-muted-foreground">None</span>
                         </SelectItem>
-                        {quotaOptions?.map(q => (
+                        {quotaOptions?.map((q) => (
                           <SelectItem key={q.id} value={q.id}>
                             {q.name}
                             {q.isUnlimited ? ' (∞)' : ''}
@@ -313,5 +314,5 @@ export default function UsersPage() {
         </table>
       </div>
     </div>
-  );
+  )
 }

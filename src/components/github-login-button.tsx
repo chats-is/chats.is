@@ -1,16 +1,16 @@
-import * as React from 'react';
-import { Loader2 } from 'lucide-react';
-import { signIn } from 'next-auth/react';
+import * as React from 'react'
+import { Loader2 } from 'lucide-react'
+import { signIn } from 'next-auth/react'
 
-import { Button } from '@/components/ui/button';
-import { IconGitHub } from '@/components/icons';
+import { Button } from '@/components/ui/button'
+import { IconGitHub } from '@/components/icons'
 
 interface GitHubLoginButtonProps extends Omit<
   React.ComponentProps<typeof Button>,
   'children' | 'disabled' | 'onClick'
 > {
-  isLoading?: string | null;
-  setIsLoading?: (provider: string | null) => void;
+  isLoading?: string | null
+  setIsLoading?: (provider: string | null) => void
 }
 
 export function GitHubLoginButton({
@@ -18,12 +18,12 @@ export function GitHubLoginButton({
   setIsLoading,
   ...buttonProps
 }: GitHubLoginButtonProps) {
-  const disabled = isLoading !== null;
+  const disabled = isLoading !== null
 
   const handleSignIn = () => {
-    setIsLoading?.('github');
-    signIn('github', { callbackUrl: '/' });
-  };
+    setIsLoading?.('github')
+    signIn('github', { callbackUrl: '/' })
+  }
 
   return (
     <Button
@@ -41,5 +41,5 @@ export function GitHubLoginButton({
       )}
       <span className="ml-2">Continue with GitHub</span>
     </Button>
-  );
+  )
 }

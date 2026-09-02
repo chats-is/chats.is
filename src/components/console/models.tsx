@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
 import {
   AlertCircle,
   ArrowDown,
@@ -7,13 +7,13 @@ import {
   Pencil,
   Plus,
   Search,
-  Trash2
-} from 'lucide-react';
-import { toast } from 'sonner';
+  Trash2,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
-import { ModelCapability } from '@/types';
-import { CAPABILITIES } from '@/lib/constant';
-import { api } from '@/trpc/react';
+import { ModelCapability } from '@/types'
+import { CAPABILITIES } from '@/lib/constant'
+import { api } from '@/trpc/react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,39 +22,39 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
+  SelectValue,
+} from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
-import { IconPicker } from '@/components/console/icon-picker';
-import { ModelIcon } from '@/components/model-icon';
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { IconPicker } from '@/components/console/icon-picker'
+import { ModelIcon } from '@/components/model-icon'
 
 type ProviderBindingForm = {
-  providerId: string;
-  isEnabled: boolean;
-};
+  providerId: string
+  isEnabled: boolean
+}
 
 function ProviderBindingRow({
   binding,
@@ -66,33 +66,33 @@ function ProviderBindingRow({
   onChange,
   onMoveUp,
   onMoveDown,
-  onRemove
+  onRemove,
 }: {
-  binding: ProviderBindingForm;
-  index: number;
-  bindings: ProviderBindingForm[];
+  binding: ProviderBindingForm
+  index: number
+  bindings: ProviderBindingForm[]
   /** Providers compatible with the model id (same-kind) — the only selectable ones. */
-  providers: { id: string; name: string }[] | undefined;
+  providers: { id: string; name: string }[] | undefined
   /** All providers, used to label an already-selected but now-incompatible one. */
-  allProviders: { id: string; name: string }[] | undefined;
-  isPending: boolean;
-  onChange: (patch: Partial<ProviderBindingForm>) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onRemove: () => void;
+  allProviders: { id: string; name: string }[] | undefined
+  isPending: boolean
+  onChange: (patch: Partial<ProviderBindingForm>) => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onRemove: () => void
 }) {
-  const options = providers ?? [];
+  const options = providers ?? []
   const selectedMissing =
-    !!binding.providerId && !options.some(p => p.id === binding.providerId);
+    !!binding.providerId && !options.some((p) => p.id === binding.providerId)
   const selectedName =
-    allProviders?.find(p => p.id === binding.providerId)?.name ??
-    binding.providerId;
+    allProviders?.find((p) => p.id === binding.providerId)?.name ??
+    binding.providerId
 
   return (
     <div className="flex items-center gap-2 rounded-md border p-2">
       <Select
         value={binding.providerId || undefined}
-        onValueChange={value => onChange({ providerId: value })}
+        onValueChange={(value) => onChange({ providerId: value })}
         disabled={isPending}
       >
         <SelectTrigger className="flex-1">
@@ -102,21 +102,21 @@ function ProviderBindingRow({
           {selectedMissing && (
             <SelectItem value={binding.providerId}>{selectedName}</SelectItem>
           )}
-          {options.map(p => {
+          {options.map((p) => {
             const takenByOther = bindings.some(
-              (b, i) => i !== index && b.providerId === p.id
-            );
+              (b, i) => i !== index && b.providerId === p.id,
+            )
             return (
               <SelectItem key={p.id} value={p.id} disabled={takenByOther}>
                 {p.name}
               </SelectItem>
-            );
+            )
           })}
         </SelectContent>
       </Select>
       <Switch
         checked={binding.isEnabled}
-        onCheckedChange={checked => onChange({ isEnabled: checked })}
+        onCheckedChange={(checked) => onChange({ isEnabled: checked })}
         disabled={isPending}
       />
       <Button
@@ -147,53 +147,53 @@ function ProviderBindingRow({
         <Trash2 className="size-4" />
       </Button>
     </div>
-  );
+  )
 }
 
 export default function ModelsPage() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [filterCapability, setFilterCapability] = useState<string>('all');
-  const [search, setSearch] = useState('');
+  const [isOpen, setIsOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [filterCapability, setFilterCapability] = useState<string>('all')
+  const [search, setSearch] = useState('')
 
-  const utils = api.useUtils();
-  const { data: models, isLoading } = api.model.list.useQuery();
-  const { data: providers } = api.provider.list.useQuery();
+  const utils = api.useUtils()
+  const { data: models, isLoading } = api.model.list.useQuery()
+  const { data: providers } = api.provider.list.useQuery()
 
   const createMutation = api.model.create.useMutation({
     onSuccess: () => {
-      utils.model.list.invalidate();
-      setIsOpen(false);
-      resetForm();
+      utils.model.list.invalidate()
+      setIsOpen(false)
+      resetForm()
     },
-    onError: error => toast.error(error.message)
-  });
+    onError: (error) => toast.error(error.message),
+  })
 
   const updateMutation = api.model.update.useMutation({
     onSuccess: () => {
-      utils.model.list.invalidate();
-      setIsOpen(false);
-      setEditingId(null);
-      resetForm();
+      utils.model.list.invalidate()
+      setIsOpen(false)
+      setEditingId(null)
+      resetForm()
     },
-    onError: error => toast.error(error.message)
-  });
+    onError: (error) => toast.error(error.message),
+  })
 
   const deleteMutation = api.model.delete.useMutation({
     onSuccess: () => {
-      utils.model.list.invalidate();
-      setDeleteId(null);
+      utils.model.list.invalidate()
+      setDeleteId(null)
     },
-    onError: error => toast.error(error.message)
-  });
+    onError: (error) => toast.error(error.message),
+  })
 
   const toggleMutation = api.model.toggleEnabled.useMutation({
     onSuccess: () => {
-      utils.model.list.invalidate();
+      utils.model.list.invalidate()
     },
-    onError: error => toast.error(error.message)
-  });
+    onError: (error) => toast.error(error.message),
+  })
 
   const [formData, setFormData] = useState({
     name: '',
@@ -210,21 +210,21 @@ export default function ModelsPage() {
     isEnabled: true,
     systemPrompt: '',
     uiOptions: '',
-    apiParams: ''
-  });
+    apiParams: '',
+  })
 
   const [providerBindings, setProviderBindings] = useState<
     ProviderBindingForm[]
-  >([]);
+  >([])
 
   // Debounce the modelId before querying compatible providers, so typing in the
   // Model ID field doesn't fan out a /models call to every provider per keystroke.
-  const [debouncedModelId, setDebouncedModelId] = useState('');
+  const [debouncedModelId, setDebouncedModelId] = useState('')
   useEffect(() => {
-    const trimmed = formData.modelId.trim();
-    const timer = setTimeout(() => setDebouncedModelId(trimmed), 400);
-    return () => clearTimeout(timer);
-  }, [formData.modelId]);
+    const trimmed = formData.modelId.trim()
+    const timer = setTimeout(() => setDebouncedModelId(trimmed), 400)
+    return () => clearTimeout(timer)
+  }, [formData.modelId])
 
   // Providers that actually support the entered modelId — the only ones a
   // binding may select (same-kind failover).
@@ -234,9 +234,9 @@ export default function ModelsPage() {
       {
         enabled: isOpen && !!debouncedModelId,
         refetchOnWindowFocus: false,
-        retry: false
-      }
-    );
+        retry: false,
+      },
+    )
 
   const uiOptionsPlaceholderByCapability: Record<string, string> = {
     chat: `{
@@ -259,11 +259,11 @@ export default function ModelsPage() {
     audio: `{
   "voice": "auto",
   "voices": ["auto"]
-}`
-  };
+}`,
+  }
 
   const uiOptionsPlaceholder =
-    uiOptionsPlaceholderByCapability[formData.capability] ?? '{\n}';
+    uiOptionsPlaceholderByCapability[formData.capability] ?? '{\n}'
 
   const apiParamsPlaceholderByCapability: Record<string, string> = {
     chat: `{
@@ -276,11 +276,11 @@ export default function ModelsPage() {
 }`,
     image: '{\n}',
     video: '{}',
-    audio: '{}'
-  };
+    audio: '{}',
+  }
 
   const apiParamsPlaceholder =
-    apiParamsPlaceholderByCapability[formData.capability] ?? '{}';
+    apiParamsPlaceholderByCapability[formData.capability] ?? '{}'
 
   const resetForm = () => {
     setFormData({
@@ -298,13 +298,13 @@ export default function ModelsPage() {
       isEnabled: true,
       systemPrompt: '',
       uiOptions: '',
-      apiParams: ''
-    });
-    setProviderBindings([{ providerId: '', isEnabled: true }]);
-  };
+      apiParams: '',
+    })
+    setProviderBindings([{ providerId: '', isEnabled: true }])
+  }
 
   const handleEdit = (model: any) => {
-    setEditingId(model.id);
+    setEditingId(model.id)
     setFormData({
       name: model.name,
       modelId: model.modelId,
@@ -322,68 +322,69 @@ export default function ModelsPage() {
       uiOptions: model.uiOptions
         ? JSON.stringify(model.uiOptions, null, 2)
         : '',
-      apiParams: model.apiParams ? JSON.stringify(model.apiParams, null, 2) : ''
-    });
+      apiParams: model.apiParams
+        ? JSON.stringify(model.apiParams, null, 2)
+        : '',
+    })
     const bindings: ProviderBindingForm[] = (model.modelProviders ?? [])
       .slice()
       .sort((a: any, b: any) => a.priority - b.priority)
       .map((b: any) => ({
         providerId: b.providerId,
-        isEnabled: b.isEnabled
-      }));
+        isEnabled: b.isEnabled,
+      }))
     setProviderBindings(
       bindings.length > 0
         ? bindings
-        : [{ providerId: model.providerId || '', isEnabled: true }]
-    );
-    setIsOpen(true);
-  };
+        : [{ providerId: model.providerId || '', isEnabled: true }],
+    )
+    setIsOpen(true)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    let uiOptions: Record<string, unknown> | null | undefined;
-    let apiParams: Record<string, unknown> | null | undefined;
+    e.preventDefault()
+    let uiOptions: Record<string, unknown> | null | undefined
+    let apiParams: Record<string, unknown> | null | undefined
     try {
       if (formData.uiOptions) {
-        uiOptions = JSON.parse(formData.uiOptions);
+        uiOptions = JSON.parse(formData.uiOptions)
       } else {
-        uiOptions = editingId ? null : undefined;
+        uiOptions = editingId ? null : undefined
       }
       if (formData.apiParams) {
-        apiParams = JSON.parse(formData.apiParams);
+        apiParams = JSON.parse(formData.apiParams)
       } else {
-        apiParams = editingId ? null : undefined;
+        apiParams = editingId ? null : undefined
       }
     } catch {
-      toast.error('Invalid JSON format');
-      return;
+      toast.error('Invalid JSON format')
+      return
     }
 
-    const systemPrompt =
-      formData.systemPrompt || (editingId ? null : undefined);
+    const systemPrompt = formData.systemPrompt || (editingId ? null : undefined)
     const aliases = formData.aliases
       ? formData.aliases
           .split(',')
-          .map(s => s.trim())
+          .map((s) => s.trim())
           .filter(Boolean)
       : editingId
         ? []
-        : undefined;
+        : undefined
     const providersPayload = providerBindings
-      .filter(b => b.providerId)
+      .filter((b) => b.providerId)
       .map((b, index) => ({
         providerId: b.providerId,
         priority: index,
-        isEnabled: b.isEnabled
-      }));
+        isEnabled: b.isEnabled,
+      }))
     if (providersPayload.length === 0) {
-      toast.error('At least one provider is required');
-      return;
+      toast.error('At least one provider is required')
+      return
     }
-    const selectedProviderIds = providersPayload.map(b => b.providerId);
+    const selectedProviderIds = providersPayload.map((b) => b.providerId)
     if (new Set(selectedProviderIds).size !== selectedProviderIds.length) {
-      toast.error('Each provider can only be added once');
-      return;
+      toast.error('Each provider can only be added once')
+      return
     }
 
     const data = {
@@ -392,37 +393,35 @@ export default function ModelsPage() {
       systemPrompt,
       uiOptions,
       apiParams,
-      providers: providersPayload
-    };
+      providers: providersPayload,
+    }
 
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...data });
+      updateMutation.mutate({ id: editingId, ...data })
     } else {
-      createMutation.mutate(
-        data as Parameters<typeof createMutation.mutate>[0]
-      );
+      createMutation.mutate(data as Parameters<typeof createMutation.mutate>[0])
     }
-  };
+  }
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending = createMutation.isPending || updateMutation.isPending
 
-  const filteredModels = models?.filter(m => {
+  const filteredModels = models?.filter((m) => {
     const matchesCapability =
-      filterCapability === 'all' || m.capability === filterCapability;
+      filterCapability === 'all' || m.capability === filterCapability
     const matchesSearch =
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.modelId.toLowerCase().includes(search.toLowerCase()) ||
-      m.provider?.name.toLowerCase().includes(search.toLowerCase());
+      m.provider?.name.toLowerCase().includes(search.toLowerCase())
 
-    return matchesCapability && matchesSearch;
-  });
+    return matchesCapability && matchesSearch
+  })
 
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         Loading...
       </div>
-    );
+    )
   }
 
   return (
@@ -434,7 +433,7 @@ export default function ModelsPage() {
             <Input
               placeholder="Search models..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -444,7 +443,7 @@ export default function ModelsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Capabilities</SelectItem>
-              {CAPABILITIES.map(cap => (
+              {CAPABILITIES.map((cap) => (
                 <SelectItem key={cap.value} value={cap.value}>
                   {cap.label}
                 </SelectItem>
@@ -454,18 +453,20 @@ export default function ModelsPage() {
         </div>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button
-              className="gap-2"
-              onClick={() => {
-                setEditingId(null);
-                resetForm();
-              }}
-            >
-              <Plus className="size-4" />
-              Add Model
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  setEditingId(null)
+                  resetForm()
+                }}
+              >
+                <Plus className="size-4" />
+                Add Model
+              </Button>
+            }
+          />
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>
@@ -480,7 +481,7 @@ export default function ModelsPage() {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={e =>
+                      onChange={(e) =>
                         setFormData({ ...formData, name: e.target.value })
                       }
                       placeholder="GPT-4o"
@@ -493,7 +494,7 @@ export default function ModelsPage() {
                     <Input
                       id="modelId"
                       value={formData.modelId}
-                      onChange={e =>
+                      onChange={(e) =>
                         setFormData({ ...formData, modelId: e.target.value })
                       }
                       placeholder="gpt-4o"
@@ -515,38 +516,38 @@ export default function ModelsPage() {
                           providers={compatibleProviders}
                           allProviders={providers}
                           isPending={isPending}
-                          onChange={patch =>
-                            setProviderBindings(prev =>
+                          onChange={(patch) =>
+                            setProviderBindings((prev) =>
                               prev.map((b, i) =>
-                                i === index ? { ...b, ...patch } : b
-                              )
+                                i === index ? { ...b, ...patch } : b,
+                              ),
                             )
                           }
                           onMoveUp={() =>
-                            setProviderBindings(prev => {
-                              if (index === 0) return prev;
-                              const next = [...prev];
-                              [next[index - 1], next[index]] = [
+                            setProviderBindings((prev) => {
+                              if (index === 0) return prev
+                              const next = [...prev]
+                              ;[next[index - 1], next[index]] = [
                                 next[index],
-                                next[index - 1]
-                              ];
-                              return next;
+                                next[index - 1],
+                              ]
+                              return next
                             })
                           }
                           onMoveDown={() =>
-                            setProviderBindings(prev => {
-                              if (index === prev.length - 1) return prev;
-                              const next = [...prev];
-                              [next[index], next[index + 1]] = [
+                            setProviderBindings((prev) => {
+                              if (index === prev.length - 1) return prev
+                              const next = [...prev]
+                              ;[next[index], next[index + 1]] = [
                                 next[index + 1],
-                                next[index]
-                              ];
-                              return next;
+                                next[index],
+                              ]
+                              return next
                             })
                           }
                           onRemove={() =>
-                            setProviderBindings(prev =>
-                              prev.filter((_, i) => i !== index)
+                            setProviderBindings((prev) =>
+                              prev.filter((_, i) => i !== index),
                             )
                           }
                         />
@@ -558,9 +559,9 @@ export default function ModelsPage() {
                         className="gap-2"
                         disabled={isPending}
                         onClick={() =>
-                          setProviderBindings(prev => [
+                          setProviderBindings((prev) => [
                             ...prev,
-                            { providerId: '', isEnabled: true }
+                            { providerId: '', isEnabled: true },
                           ])
                         }
                       >
@@ -574,7 +575,7 @@ export default function ModelsPage() {
                     <Input
                       id="aliases"
                       value={formData.aliases}
-                      onChange={e =>
+                      onChange={(e) =>
                         setFormData({ ...formData, aliases: e.target.value })
                       }
                       placeholder="gpt-4, gpt-4-turbo"
@@ -587,7 +588,7 @@ export default function ModelsPage() {
                     <Label htmlFor="capability">Capability</Label>
                     <Select
                       value={formData.capability}
-                      onValueChange={value =>
+                      onValueChange={(value) =>
                         setFormData({ ...formData, capability: value as any })
                       }
                       disabled={isPending}
@@ -596,7 +597,7 @@ export default function ModelsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CAPABILITIES.map(cap => (
+                        {CAPABILITIES.map((cap) => (
                           <SelectItem key={cap.value} value={cap.value}>
                             {cap.label}
                           </SelectItem>
@@ -611,10 +612,10 @@ export default function ModelsPage() {
                     <Textarea
                       id="systemPrompt"
                       value={formData.systemPrompt}
-                      onChange={e =>
+                      onChange={(e) =>
                         setFormData({
                           ...formData,
-                          systemPrompt: e.target.value
+                          systemPrompt: e.target.value,
                         })
                       }
                       placeholder="Instructions prepended to every chat with this model. Supports {provider}, {modelId}, {date}."
@@ -636,7 +637,7 @@ export default function ModelsPage() {
                     <Input
                       id="image"
                       value={formData.image}
-                      onChange={e =>
+                      onChange={(e) =>
                         setFormData({ ...formData, image: e.target.value })
                       }
                       placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
@@ -645,10 +646,10 @@ export default function ModelsPage() {
                   </div>
                   <IconPicker
                     value={formData.image}
-                    onChange={value =>
+                    onChange={(value) =>
                       setFormData({
                         ...formData,
-                        image: value
+                        image: value,
                       })
                     }
                     disabled={isPending}
@@ -659,15 +660,17 @@ export default function ModelsPage() {
                     <div className="flex items-center gap-2">
                       <Label htmlFor="uiOptions">UI Options (JSON)</Label>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-muted-foreground/60 hover:text-muted-foreground"
-                            aria-label="UI Options demo"
-                          >
-                            <AlertCircle className="size-3.5" />
-                          </button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="text-muted-foreground/60 hover:text-muted-foreground"
+                              aria-label="UI Options demo"
+                            >
+                              <AlertCircle className="size-3.5" />
+                            </button>
+                          }
+                        />
                         <TooltipContent className="max-w-sm">
                           <pre className="font-mono text-xs whitespace-pre-wrap">
                             {uiOptionsPlaceholder}
@@ -678,7 +681,7 @@ export default function ModelsPage() {
                     <Textarea
                       id="uiOptions"
                       value={formData.uiOptions}
-                      onChange={e =>
+                      onChange={(e) =>
                         setFormData({ ...formData, uiOptions: e.target.value })
                       }
                       placeholder={uiOptionsPlaceholder}
@@ -691,15 +694,17 @@ export default function ModelsPage() {
                     <div className="flex items-center gap-2">
                       <Label htmlFor="apiParams">API Params (JSON)</Label>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-muted-foreground/60 hover:text-muted-foreground"
-                            aria-label="API Params demo"
-                          >
-                            <AlertCircle className="size-3.5" />
-                          </button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="text-muted-foreground/60 hover:text-muted-foreground"
+                              aria-label="API Params demo"
+                            >
+                              <AlertCircle className="size-3.5" />
+                            </button>
+                          }
+                        />
                         <TooltipContent className="max-w-sm">
                           <pre className="font-mono text-xs whitespace-pre-wrap">
                             {apiParamsPlaceholder}
@@ -710,7 +715,7 @@ export default function ModelsPage() {
                     <Textarea
                       id="apiParams"
                       value={formData.apiParams}
-                      onChange={e =>
+                      onChange={(e) =>
                         setFormData({ ...formData, apiParams: e.target.value })
                       }
                       placeholder={apiParamsPlaceholder}
@@ -725,7 +730,7 @@ export default function ModelsPage() {
                     <Switch
                       id="supportsVision"
                       checked={formData.supportsVision}
-                      onCheckedChange={checked =>
+                      onCheckedChange={(checked) =>
                         setFormData({ ...formData, supportsVision: checked })
                       }
                       disabled={isPending}
@@ -736,7 +741,7 @@ export default function ModelsPage() {
                     <Switch
                       id="supportsReasoning"
                       checked={formData.supportsReasoning}
-                      onCheckedChange={checked =>
+                      onCheckedChange={(checked) =>
                         setFormData({ ...formData, supportsReasoning: checked })
                       }
                       disabled={isPending}
@@ -748,10 +753,10 @@ export default function ModelsPage() {
                       <Switch
                         id="supportsImageEdit"
                         checked={formData.supportsImageEdit}
-                        onCheckedChange={checked =>
+                        onCheckedChange={(checked) =>
                           setFormData({
                             ...formData,
-                            supportsImageEdit: checked
+                            supportsImageEdit: checked,
                           })
                         }
                         disabled={isPending}
@@ -764,10 +769,10 @@ export default function ModelsPage() {
                       <Switch
                         id="supportsImageToVideo"
                         checked={formData.supportsImageToVideo}
-                        onCheckedChange={checked =>
+                        onCheckedChange={(checked) =>
                           setFormData({
                             ...formData,
-                            supportsImageToVideo: checked
+                            supportsImageToVideo: checked,
                           })
                         }
                         disabled={isPending}
@@ -782,10 +787,10 @@ export default function ModelsPage() {
                       <Switch
                         id="supportsVideoEdit"
                         checked={formData.supportsVideoEdit}
-                        onCheckedChange={checked =>
+                        onCheckedChange={(checked) =>
                           setFormData({
                             ...formData,
-                            supportsVideoEdit: checked
+                            supportsVideoEdit: checked,
                           })
                         }
                         disabled={isPending}
@@ -798,10 +803,10 @@ export default function ModelsPage() {
                       <Switch
                         id="supportsTranscription"
                         checked={formData.supportsTranscription}
-                        onCheckedChange={checked =>
+                        onCheckedChange={(checked) =>
                           setFormData({
                             ...formData,
-                            supportsTranscription: checked
+                            supportsTranscription: checked,
                           })
                         }
                         disabled={isPending}
@@ -815,7 +820,7 @@ export default function ModelsPage() {
                     <Switch
                       id="isEnabled"
                       checked={formData.isEnabled}
-                      onCheckedChange={checked =>
+                      onCheckedChange={(checked) =>
                         setFormData({ ...formData, isEnabled: checked })
                       }
                       disabled={isPending}
@@ -865,7 +870,7 @@ export default function ModelsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredModels?.map(model => (
+            {filteredModels?.map((model) => (
               <tr
                 key={model.id}
                 className="border-b transition-colors hover:bg-muted/30"
@@ -902,39 +907,43 @@ export default function ModelsPage() {
                 <td className="p-3 text-center">
                   <Switch
                     checked={model.isEnabled}
-                    onCheckedChange={checked =>
+                    onCheckedChange={(checked) =>
                       toggleMutation.mutate({
                         id: model.id,
-                        isEnabled: checked
+                        isEnabled: checked,
                       })
                     }
                   />
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(model)}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(model)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                      }
+                    />
                     <TooltipContent>Edit Model</TooltipContent>
                   </Tooltip>
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setDeleteId(model.id);
-                        }}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteId(model.id)
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      }
+                    />
                     <TooltipContent>Delete Model</TooltipContent>
                   </Tooltip>
                 </td>
@@ -956,7 +965,7 @@ export default function ModelsPage() {
 
       <AlertDialog
         open={!!deleteId}
-        onOpenChange={open => !open && setDeleteId(null)}
+        onOpenChange={(open) => !open && setDeleteId(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -973,7 +982,7 @@ export default function ModelsPage() {
             <AlertDialogAction
               onClick={() => {
                 if (deleteId) {
-                  deleteMutation.mutate({ id: deleteId });
+                  deleteMutation.mutate({ id: deleteId })
                 }
               }}
               disabled={deleteMutation.isPending}
@@ -989,5 +998,5 @@ export default function ModelsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
+  )
 }

@@ -1,4 +1,4 @@
-import type { ChatUsage } from '@/types';
+import type { ChatUsage } from '@/types'
 
 /**
  * The subset of the AI SDK's `LanguageModelUsage` (the `usage` object passed to
@@ -20,22 +20,22 @@ import type { ChatUsage } from '@/types';
  * any provider/version that doesn't populate the details objects).
  */
 export type RawChatUsage = {
-  inputTokens?: number;
-  outputTokens?: number;
+  inputTokens?: number
+  outputTokens?: number
   inputTokenDetails?: {
-    noCacheTokens?: number;
-    cacheReadTokens?: number;
-    cacheWriteTokens?: number;
-  };
+    noCacheTokens?: number
+    cacheReadTokens?: number
+    cacheWriteTokens?: number
+  }
   outputTokenDetails?: {
-    textTokens?: number;
-    reasoningTokens?: number;
-  };
+    textTokens?: number
+    reasoningTokens?: number
+  }
   /** @deprecated SDK alias for inputTokenDetails.cacheReadTokens — fallback only. */
-  cachedInputTokens?: number;
+  cachedInputTokens?: number
   /** @deprecated SDK alias for outputTokenDetails.reasoningTokens — fallback only. */
-  reasoningTokens?: number;
-};
+  reasoningTokens?: number
+}
 
 /**
  * Map the AI SDK's usage into the mutually-exclusive, additive token buckets we
@@ -51,31 +51,31 @@ export type RawChatUsage = {
  * multiplication and can never double-bill the cached or reasoning portions.
  */
 export function normalizeChatUsage(raw: RawChatUsage): ChatUsage {
-  const inDetails = raw.inputTokenDetails;
-  const outDetails = raw.outputTokenDetails;
+  const inDetails = raw.inputTokenDetails
+  const outDetails = raw.outputTokenDetails
 
   const cacheReadTokens =
-    inDetails?.cacheReadTokens ?? raw.cachedInputTokens ?? 0;
-  const cacheWriteTokens = inDetails?.cacheWriteTokens ?? 0;
+    inDetails?.cacheReadTokens ?? raw.cachedInputTokens ?? 0
+  const cacheWriteTokens = inDetails?.cacheWriteTokens ?? 0
   const reasoningTokens =
-    outDetails?.reasoningTokens ?? raw.reasoningTokens ?? 0;
+    outDetails?.reasoningTokens ?? raw.reasoningTokens ?? 0
 
   // Plain (uncached) input: prefer the SDK's noCacheTokens; otherwise derive it
   // from the total minus the cached portions.
   const plainInput =
     inDetails?.noCacheTokens ??
-    Math.max(0, (raw.inputTokens ?? 0) - cacheReadTokens - cacheWriteTokens);
+    Math.max(0, (raw.inputTokens ?? 0) - cacheReadTokens - cacheWriteTokens)
 
   // Text output: prefer the SDK's textTokens; otherwise total minus reasoning.
   const textOutput =
     outDetails?.textTokens ??
-    Math.max(0, (raw.outputTokens ?? 0) - reasoningTokens);
+    Math.max(0, (raw.outputTokens ?? 0) - reasoningTokens)
 
   return {
     inputTokens: plainInput,
     outputTokens: textOutput,
     cacheReadTokens: cacheReadTokens,
     cacheWriteTokens,
-    reasoningTokens
-  };
+    reasoningTokens,
+  }
 }

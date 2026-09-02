@@ -1,26 +1,26 @@
-import type { ChangeEvent } from 'react';
-import { lazy, Suspense, type ComponentProps } from 'react';
-import { ClientOnly } from '@tanstack/react-router';
+import type { ChangeEvent } from 'react'
+import { lazy, Suspense, type ComponentProps } from 'react'
+import { ClientOnly } from '@tanstack/react-router'
 
-import type { UseChatHelpers } from '@ai-sdk/react';
-import { MessageSquare } from 'lucide-react';
+import type { UseChatHelpers } from '@ai-sdk/react'
+import { MessageSquare } from 'lucide-react'
 
-import type { Artifact, Attachment, ChatMessage } from '@/types';
-import { cn } from '@/lib/utils';
-import { ChatHeader } from '@/components/chat-header';
+import type { Artifact, Attachment, ChatMessage } from '@/types'
+import { cn } from '@/lib/utils'
+import { ChatHeader } from '@/components/chat-header'
 import {
   ChatPromptForm,
-  type ModelOptions
-} from '@/components/chat-prompt-form';
-import { EmptyScreen } from '@/components/empty-screen';
-import { Messages } from '@/components/messages';
-import { PromptSuggestions } from '@/components/prompt-suggestions';
-import { UsageLimitAlert } from '@/components/usage-limit-alert';
+  type ModelOptions,
+} from '@/components/chat-prompt-form'
+import { EmptyScreen } from '@/components/empty-screen'
+import { Messages } from '@/components/messages'
+import { PromptSuggestions } from '@/components/prompt-suggestions'
+import { UsageLimitAlert } from '@/components/usage-limit-alert'
 
 // react-scroll-to-bottom measures the scroll container, so it can only run in
 // the browser. Keeping the wrapper's own signature means the call site below
 // reads exactly as it did.
-const LazyScrollToBottom = lazy(() => import('@/components/scroll-to-bottom'));
+const LazyScrollToBottom = lazy(() => import('@/components/scroll-to-bottom'))
 
 function ScrollToBottom(props: ComponentProps<typeof LazyScrollToBottom>) {
   return (
@@ -29,31 +29,31 @@ function ScrollToBottom(props: ComponentProps<typeof LazyScrollToBottom>) {
         <LazyScrollToBottom {...props} />
       </Suspense>
     </ClientOnly>
-  );
+  )
 }
 
 interface ChatPanelProps extends Pick<
   UseChatHelpers<ChatMessage>,
   'messages' | 'setMessages' | 'status' | 'stop'
 > {
-  title?: string;
-  noChat: boolean;
-  modelId: string;
-  image?: string | null;
-  currentModelId: string;
-  currentImage?: string | null;
-  supportsReasoning?: boolean | null;
-  artifacts: Artifact[];
-  input: string;
-  setInput: (value: string) => void;
-  onInputChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
-  onSubmit: (attachments?: Attachment[]) => boolean;
+  title?: string
+  noChat: boolean
+  modelId: string
+  image?: string | null
+  currentModelId: string
+  currentImage?: string | null
+  supportsReasoning?: boolean | null
+  artifacts: Artifact[]
+  input: string
+  setInput: (value: string) => void
+  onInputChange: (e: ChangeEvent<HTMLTextAreaElement>) => void
+  onSubmit: (attachments?: Attachment[]) => boolean
   /** A refused or failed request, rendered at the end of the thread. */
-  error?: Error;
-  onModelChange: (modelId: string) => void;
-  onOptionsChange: (options: ModelOptions) => void;
-  onSelectArtifact: (artifactId: string) => void;
-  onReload: (message: ChatMessage) => void;
+  error?: Error
+  onModelChange: (modelId: string) => void
+  onOptionsChange: (options: ModelOptions) => void
+  onSelectArtifact: (artifactId: string) => void
+  onReload: (message: ChatMessage) => void
 }
 
 export function ChatPanel({
@@ -77,7 +77,7 @@ export function ChatPanel({
   onModelChange,
   onOptionsChange,
   onSelectArtifact,
-  onReload
+  onReload,
 }: ChatPanelProps) {
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
@@ -86,7 +86,7 @@ export function ChatPanel({
         className={cn('min-h-0 w-full flex-1 overflow-hidden', {
           // Nothing to show — `noChat` means a ready status and zero messages —
           // and a flexing empty region would push the composer down the page.
-          hidden: noChat
+          hidden: noChat,
         })}
       >
         <ScrollToBottom status={status} messages={messages}>
@@ -117,7 +117,7 @@ export function ChatPanel({
           // and the suggestions scroll together when the window is too short to
           // hold them, rather than being clipped by the ancestor.
           'flex min-h-0 flex-1 flex-col items-center overflow-y-auto pt-[max(3rem,14vh)]':
-            noChat
+            noChat,
         })}
       >
         {noChat && (
@@ -149,5 +149,5 @@ export function ChatPanel({
         )}
       </div>
     </div>
-  );
+  )
 }
