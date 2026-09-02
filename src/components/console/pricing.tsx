@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import { formatUsd } from '@/lib/utils';
 import {
   previewPricingSync,
@@ -396,7 +397,10 @@ export default function PricingPage() {
               className="pl-9"
             />
           </div>
-          <Select value={filterCapability} onValueChange={setFilterCapability}>
+          <Select
+            value={filterCapability}
+            onValueChange={onSelect(setFilterCapability)}
+          >
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>

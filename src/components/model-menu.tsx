@@ -9,6 +9,7 @@ import {
   ImageSizeLabels,
   VideoResolutionLabels
 } from '@/lib/constant';
+import { onSelect } from '@/lib/select';
 import { cn, modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -337,7 +338,7 @@ export function ModelMenu({
       <Select
         disabled={isDisabled}
         value={selectedModel?.modelId || ''}
-        onValueChange={handleModelChange}
+        onValueChange={onSelect(handleModelChange)}
       >
         <SelectTrigger className="h-9 rounded-full border shadow-none hover:bg-accent disabled:hover:bg-transparent">
           <SelectValue
@@ -360,7 +361,7 @@ export function ModelMenu({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent position="popper">
+        <SelectContent alignItemWithTrigger={false}>
           {models &&
             models.length > 0 &&
             Object.entries(groupedModels).map(
@@ -379,8 +380,8 @@ export function ModelMenu({
                     <SelectItem
                       key={m.modelId}
                       value={m.modelId}
-                      textValue={`${m.name} ${m.modelId}`}
-                      className="pr-2 data-[state=checked]:bg-accent [&>span:first-child]:hidden [&>span:last-child]:w-full"
+                      label={`${m.name} ${m.modelId}`}
+                      className="pr-2 data-checked:bg-accent [&>span:first-child]:hidden [&>span:last-child]:w-full"
                     >
                       <span className="flex w-full items-start">
                         <ModelIcon
@@ -495,14 +496,16 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={size || ''}
-          onValueChange={newSize => onOptionsChange?.({ size: newSize })}
+          onValueChange={onSelect(newSize =>
+            onOptionsChange?.({ size: newSize })
+          )}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
               {size ? ImageSizeLabels[size] || size : 'Size'}
             </span>
           </SelectTrigger>
-          <SelectContent position="popper">
+          <SelectContent alignItemWithTrigger={false}>
             {availableSizes.map(s => (
               <SelectItem key={s} value={s}>
                 {ImageSizeLabels[s] || s}
@@ -518,9 +521,9 @@ export function ModelMenu({
           <Select
             disabled={isDisabled}
             value={aspectRatio || ''}
-            onValueChange={newRatio =>
+            onValueChange={onSelect(newRatio =>
               onOptionsChange?.({ aspectRatio: newRatio })
-            }
+            )}
           >
             <SelectTrigger className="h-9 rounded-full shadow-none">
               <span className="text-sm">
@@ -529,7 +532,7 @@ export function ModelMenu({
                   : 'Aspect'}
               </span>
             </SelectTrigger>
-            <SelectContent position="popper">
+            <SelectContent alignItemWithTrigger={false}>
               {availableAspectRatios.map(r => (
                 <SelectItem key={r} value={r}>
                   {AspectRatioLabels[r] || r}
@@ -544,9 +547,9 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={resolution || ''}
-          onValueChange={newResolution =>
+          onValueChange={onSelect(newResolution =>
             onOptionsChange?.({ resolution: newResolution })
-          }
+          )}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
@@ -555,7 +558,7 @@ export function ModelMenu({
                 : 'Resolution'}
             </span>
           </SelectTrigger>
-          <SelectContent position="popper">
+          <SelectContent alignItemWithTrigger={false}>
             {availableResolutions.map(r => (
               <SelectItem key={r} value={r}>
                 {VideoResolutionLabels[r] || r}
@@ -570,19 +573,19 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={duration !== undefined ? String(duration) : ''}
-          onValueChange={newDuration => {
+          onValueChange={onSelect(newDuration => {
             const parsed = Number(newDuration);
             if (Number.isFinite(parsed)) {
               onOptionsChange?.({ duration: parsed });
             }
-          }}
+          })}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
               {duration !== undefined ? `${duration}s` : 'Duration'}
             </span>
           </SelectTrigger>
-          <SelectContent position="popper">
+          <SelectContent alignItemWithTrigger={false}>
             {availableDurations.map(d => (
               <SelectItem key={d} value={String(d)}>
                 {`${d}s`}
@@ -597,14 +600,16 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={voice || ''}
-          onValueChange={newVoice => onOptionsChange?.({ voice: newVoice })}
+          onValueChange={onSelect(newVoice =>
+            onOptionsChange?.({ voice: newVoice })
+          )}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
               {voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : 'Voice'}
             </span>
           </SelectTrigger>
-          <SelectContent position="popper">
+          <SelectContent alignItemWithTrigger={false}>
             {availableVoices.map(v => (
               <SelectItem key={v} value={v}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}

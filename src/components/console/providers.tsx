@@ -10,6 +10,7 @@ import type {
 } from '@/types';
 import { ProviderTypes } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import {
   createProvider,
   deleteProvider,
@@ -492,7 +493,7 @@ export default function ProvidersPage() {
                   <Label htmlFor="type">Type</Label>
                   <Select
                     value={formData.type}
-                    onValueChange={handleTypeChange}
+                    onValueChange={onSelect(handleTypeChange)}
                     disabled={isPending}
                   >
                     <SelectTrigger>
@@ -513,13 +514,13 @@ export default function ProvidersPage() {
                       <Label htmlFor="vertexAuthMode">Authentication</Label>
                       <Select
                         value={formData.vertexAuthMode}
-                        onValueChange={value =>
+                        onValueChange={onSelect(value =>
                           setFormData(current => ({
                             ...current,
                             vertexAuthMode: value as VertexAuthMode,
                             apiKey: ''
                           }))
-                        }
+                        )}
                         disabled={isPending}
                       >
                         <SelectTrigger id="vertexAuthMode">

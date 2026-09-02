@@ -67,7 +67,7 @@ export function SidebarActions({
             <SidebarMenuAction
               showOnHover
               className={cn(
-                'data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground data-[state=open]:opacity-100',
+                'data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground data-open:opacity-100',
                 className
               )}
             >

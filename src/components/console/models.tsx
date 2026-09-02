@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { type ModelCapability } from '@/types';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import {
   createModel,
   deleteModel,
@@ -101,7 +102,7 @@ function ProviderBindingRow({
     <div className="flex items-center gap-2 rounded-md border p-2">
       <Select
         value={binding.providerId || undefined}
-        onValueChange={value => onChange({ providerId: value })}
+        onValueChange={onSelect(value => onChange({ providerId: value }))}
         disabled={isPending}
       >
         <SelectTrigger className="flex-1">
@@ -448,7 +449,10 @@ export default function ModelsPage() {
               className="pl-9"
             />
           </div>
-          <Select value={filterCapability} onValueChange={setFilterCapability}>
+          <Select
+            value={filterCapability}
+            onValueChange={onSelect(setFilterCapability)}
+          >
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -599,9 +603,9 @@ export default function ModelsPage() {
                     <Label htmlFor="capability">Capability</Label>
                     <Select
                       value={formData.capability}
-                      onValueChange={value =>
+                      onValueChange={onSelect(value =>
                         setFormData({ ...formData, capability: value as any })
-                      }
+                      )}
                       disabled={isPending}
                     >
                       <SelectTrigger>

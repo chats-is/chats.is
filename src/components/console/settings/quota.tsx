@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { onSelect } from '@/lib/select';
 import { quotaQueries } from '@/server/fn/quota';
 import { Label } from '@/components/ui/label';
 import {
@@ -44,7 +45,9 @@ export function QuotaSettings() {
                   ? formData['default.quotaId']
                   : undefined
               }
-              onValueChange={value => handleChange('default.quotaId', value)}
+              onValueChange={onSelect(value =>
+                handleChange('default.quotaId', value)
+              )}
             >
               <SelectTrigger>
                 <SelectValue

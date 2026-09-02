@@ -38,7 +38,7 @@ export function UserMenu() {
         <SidebarMenuItem>
           <SidebarMenuButton
             size="lg"
-            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
           >
             <Skeleton className="size-8 rounded-full" />
             <div className="grid flex-1 gap-1 text-left text-sm leading-tight">
@@ -61,7 +61,7 @@ export function UserMenu() {
             render={
               <SidebarMenuButton
                 size="lg"
-                className="group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                className="group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
               >
                 <Avatar className="size-8 rounded-full border">
                   <AvatarImage src={user.image || ''} alt={user.name || ''} />

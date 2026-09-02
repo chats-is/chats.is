@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
+import { onSelect } from '@/lib/select';
 import { reportWindowStart } from '@/lib/utils';
 import { quotaQueries } from '@/server/fn/quota';
 import { usageQueries } from '@/server/fn/usage';
@@ -93,7 +94,10 @@ export function SettingsUsage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">Stats</h2>
-          <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
+          <Select
+            value={String(days)}
+            onValueChange={onSelect(v => setDays(Number(v)))}
+          >
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>

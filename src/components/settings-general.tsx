@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
+import { onSelect } from '@/lib/select';
 import { Button } from '@/components/ui/button';
 import { Label as UiLabel } from '@/components/ui/label';
 import {
@@ -38,7 +39,7 @@ export const SettingsGeneral = () => {
       <div className="flex items-center justify-between space-y-0">
         <UiLabel>Theme</UiLabel>
         <Select
-          onValueChange={value => setTheme(value)}
+          onValueChange={onSelect(value => setTheme(value))}
           value={mounted ? theme : undefined}
         >
           <SelectTrigger className="w-auto rounded-full capitalize">

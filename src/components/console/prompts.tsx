@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { modelQueries } from '@/server/fn/model';
 import {
@@ -426,12 +427,12 @@ export default function PromptsPage() {
                   <Label htmlFor="visibility">Visibility</Label>
                   <Select
                     value={formData.visibility}
-                    onValueChange={value =>
+                    onValueChange={onSelect(value =>
                       setFormData({
                         ...formData,
                         visibility: value as Visibility
                       })
-                    }
+                    )}
                     disabled={isPending}
                   >
                     <SelectTrigger id="visibility">

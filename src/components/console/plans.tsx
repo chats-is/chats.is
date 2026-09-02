@@ -4,6 +4,7 @@ import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import {
   createPlan,
   deletePlan,
@@ -219,7 +220,9 @@ export default function PlansPage() {
                   <Label>Quota</Label>
                   <Select
                     value={form.quotaId}
-                    onValueChange={v => setForm({ ...form, quotaId: v })}
+                    onValueChange={onSelect(v =>
+                      setForm({ ...form, quotaId: v })
+                    )}
                     disabled={isPending}
                   >
                     <SelectTrigger>

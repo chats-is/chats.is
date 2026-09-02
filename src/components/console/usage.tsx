@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
 import { CAPABILITIES } from '@/lib/constant';
+import { onSelect } from '@/lib/select';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
 import { modelQueries } from '@/server/fn/model';
 import { usageQueries } from '@/server/fn/usage';
@@ -49,7 +50,7 @@ export default function UsagePage() {
           <div className="flex items-center gap-2">
             <Select
               value={String(days)}
-              onValueChange={v => setDays(Number(v))}
+              onValueChange={onSelect(v => setDays(Number(v)))}
             >
               <SelectTrigger className="w-40">
                 <SelectValue />
@@ -157,10 +158,10 @@ function UsageLog({ days }: { days: number }) {
           />
           <Select
             value={modelId || '__all__'}
-            onValueChange={v => {
+            onValueChange={onSelect(v => {
               setModelId(v === '__all__' ? '' : v);
               setPage(1);
-            }}
+            })}
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All models" />
@@ -176,10 +177,10 @@ function UsageLog({ days }: { days: number }) {
           </Select>
           <Select
             value={capability || '__all__'}
-            onValueChange={v => {
+            onValueChange={onSelect(v => {
               setCapability(v === '__all__' ? '' : v);
               setPage(1);
-            }}
+            })}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All capabilities" />

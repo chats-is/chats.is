@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { ModelCapability } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import { modelQueries } from '@/server/fn/model';
 import { providerQueries, syncProviderModels } from '@/server/fn/provider';
 import { Button } from '@/components/ui/button';
@@ -251,12 +252,12 @@ export function ProviderModelSyncDialog({
                       <td className="p-3 align-top">
                         <Select
                           value={capabilities[model.modelId] ?? 'chat'}
-                          onValueChange={value =>
+                          onValueChange={onSelect(value =>
                             setModelCapability(
                               model.modelId,
                               value as ModelCapability
                             )
-                          }
+                          )}
                           disabled={model.exists || syncMutation.isPending}
                         >
                           <SelectTrigger className="w-32">

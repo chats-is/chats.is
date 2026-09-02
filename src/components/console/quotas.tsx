@@ -4,6 +4,7 @@ import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import { modelQueries } from '@/server/fn/model';
 import {
   createQuota,
@@ -333,7 +334,9 @@ export default function QuotasPage() {
                     <Label>Roles</Label>
                     <Select
                       value={form.role}
-                      onValueChange={v => setForm({ ...form, role: v as Role })}
+                      onValueChange={onSelect(v =>
+                        setForm({ ...form, role: v as Role })
+                      )}
                       disabled={form.isUnlimited || isPending}
                     >
                       <SelectTrigger className="w-full">

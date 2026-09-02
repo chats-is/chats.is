@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner';
 
 import { type Artifact } from '@/types';
+import { onSelect } from '@/lib/select';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { Button } from '@/components/ui/button';
@@ -254,7 +255,7 @@ export function ArtifactViewer({
             {artifacts.length > 1 ? (
               <Select
                 value={artifact.id}
-                onValueChange={value => onSelectArtifact?.(value)}
+                onValueChange={onSelect(value => onSelectArtifact?.(value))}
                 disabled={isHeaderActionDisabled}
               >
                 <SelectTrigger className="h-6 w-fit max-w-full min-w-0 border-0 p-0 text-sm font-semibold shadow-none">

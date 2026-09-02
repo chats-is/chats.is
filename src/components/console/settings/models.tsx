@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { onSelect } from '@/lib/select';
 import { modelQueries } from '@/server/fn/model';
 import { Label } from '@/components/ui/label';
 import {
@@ -56,7 +57,7 @@ function ModelSelect({
         value={
           options?.some(option => option.modelId === value) ? value : undefined
         }
-        onValueChange={onChange}
+        onValueChange={onSelect(onChange)}
       >
         <SelectTrigger>
           <SelectValue

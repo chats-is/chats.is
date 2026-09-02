@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner';
 
 import { mutating } from '@/lib/mutation';
+import { onSelect } from '@/lib/select';
 import { quotaQueries, removeUserQuota, setUserQuota } from '@/server/fn/quota';
 import { updateUserRole, userQueries } from '@/server/fn/user';
 import { Input } from '@/components/ui/input';
@@ -231,13 +232,13 @@ export default function UsersPage() {
                     <Select
                       value={user.role}
                       disabled={updatingRoleUserId === user.id}
-                      onValueChange={value => {
+                      onValueChange={onSelect(value => {
                         setUpdatingRoleUserId(user.id);
                         updateRoleMutation.mutate({
                           id: user.id,
                           role: value as 'user' | 'admin'
                         });
-                      }}
+                      })}
                     >
                       <SelectTrigger className="h-8 w-28">
                         <div className="flex items-center gap-2">
@@ -277,7 +278,7 @@ export default function UsersPage() {
                       disabled={
                         updatingQuotaUserId === user.id || !quotaOptions?.length
                       }
-                      onValueChange={value => {
+                      onValueChange={onSelect(value => {
                         setUpdatingQuotaUserId(user.id);
                         if (value === QUOTA_NONE) {
                           removeQuotaMutation.mutate({ userId: user.id });
@@ -287,7 +288,7 @@ export default function UsersPage() {
                             quotaId: value
                           });
                         }
-                      }}
+                      })}
                     >
                       <SelectTrigger className="h-8 w-36">
                         {updatingQuotaUserId === user.id ? (
