@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { mutating } from '@/lib/mutation';
+import { modelQueries } from '@/server/fn/model';
+import {
+  createQuota,
+  deleteQuota,
+  quotaQueries,
+  updateQuota
+} from '@/server/fn/quota';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -107,19 +115,22 @@ const fmtLimit = (v: string | null | undefined) => {
 };
 
 export default function QuotasPage() {
-  const utils = api.useUtils();
-  const { data: quotas, isLoading } = api.quota.list.useQuery();
-  const { data: models } = api.model.list.useQuery();
+  const queryClient = useQueryClient();
+  const { data: quotas, isLoading } = useQuery(quotaQueries.list());
+  const { data: models } = useQuery(modelQueries.list());
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const create = api.quota.create.useMutation({
+  const create = useMutation({
+    mutationFn: mutating(createQuota),
     onSuccess: () => {
-      utils.quota.list.invalidate();
-      utils.quota.listForSelect.invalidate();
+      queryClient.invalidateQueries({ queryKey: quotaQueries.key.list() });
+      queryClient.invalidateQueries({
+        queryKey: quotaQueries.key.listForSelect()
+      });
       setOpen(false);
       setForm(emptyForm);
       toast.success('Quota created');
@@ -127,10 +138,13 @@ export default function QuotasPage() {
     onError: e => toast.error(e.message)
   });
 
-  const update = api.quota.update.useMutation({
+  const update = useMutation({
+    mutationFn: mutating(updateQuota),
     onSuccess: () => {
-      utils.quota.list.invalidate();
-      utils.quota.listForSelect.invalidate();
+      queryClient.invalidateQueries({ queryKey: quotaQueries.key.list() });
+      queryClient.invalidateQueries({
+        queryKey: quotaQueries.key.listForSelect()
+      });
       setOpen(false);
       setEditingId(null);
       setForm(emptyForm);
@@ -139,10 +153,13 @@ export default function QuotasPage() {
     onError: e => toast.error(e.message)
   });
 
-  const del = api.quota.delete.useMutation({
+  const del = useMutation({
+    mutationFn: mutating(deleteQuota),
     onSuccess: () => {
-      utils.quota.list.invalidate();
-      utils.quota.listForSelect.invalidate();
+      queryClient.invalidateQueries({ queryKey: quotaQueries.key.list() });
+      queryClient.invalidateQueries({
+        queryKey: quotaQueries.key.listForSelect()
+      });
       setDeleteId(null);
       toast.success('Quota deleted');
     },

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { mutating } from '@/lib/mutation';
+import { bulkUpdateSettings, settingsQueries } from '@/server/fn/settings';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -40,8 +42,8 @@ const SETTING_DESCRIPTIONS: Record<string, string> = {
  * given — so saving one section never clobbers another.
  */
 export function useSettingsForm(keys: readonly string[]) {
-  const utils = api.useUtils();
-  const { data: settings, isLoading } = api.settings.list.useQuery();
+  const queryClient = useQueryClient();
+  const { data: settings, isLoading } = useQuery(settingsQueries.list());
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
   // Read inside the hydrate effect without making it a dependency — depending
@@ -69,9 +71,10 @@ export function useSettingsForm(keys: readonly string[]) {
     setHasChanges(false);
   }, [settings]);
 
-  const mutation = api.settings.bulkUpdate.useMutation({
+  const mutation = useMutation({
+    mutationFn: mutating(bulkUpdateSettings),
     onSuccess: () => {
-      utils.settings.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: settingsQueries.key.list() });
       setHasChanges(false);
       toast.success('Settings saved successfully');
     },

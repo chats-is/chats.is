@@ -210,24 +210,32 @@ export const getUserStats = createServerFn({ method: 'GET' })
 
 export const userQueries = {
   all: () => ['user'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    me: () => ['user', 'me'] as const,
+    list: () => ['user', 'list'] as const,
+    detail: () => ['user', 'detail'] as const,
+    stats: () => ['user', 'stats'] as const
+  },
   me: () =>
     queryOptions({
-      queryKey: ['user', 'me'] as const,
+      queryKey: [...userQueries.key.me()] as const,
       queryFn: () => getMe()
     }),
   list: (input: { limit?: number; offset?: number; search?: string } = {}) =>
     queryOptions({
-      queryKey: ['user', 'list', input] as const,
+      queryKey: [...userQueries.key.list(), input] as const,
       queryFn: () => listUsers({ data: input })
     }),
   detail: (id: string) =>
     queryOptions({
-      queryKey: ['user', 'detail', id] as const,
+      queryKey: [...userQueries.key.detail(), id] as const,
       queryFn: () => getUser({ data: { id } })
     }),
   stats: () =>
     queryOptions({
-      queryKey: ['user', 'stats'] as const,
+      queryKey: [...userQueries.key.stats()] as const,
       queryFn: () => getUserStats()
     })
 };

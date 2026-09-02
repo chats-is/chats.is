@@ -228,24 +228,32 @@ export const adminDeletePrompt = createServerFn({ method: 'POST' })
 
 export const promptQueries = {
   all: () => ['prompt'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    stats: () => ['prompt', 'stats'] as const,
+    adminList: () => ['prompt', 'adminList'] as const,
+    list: () => ['prompt', 'list'] as const,
+    usable: () => ['prompt', 'usable'] as const
+  },
   stats: () =>
     queryOptions({
-      queryKey: ['prompt', 'stats'] as const,
+      queryKey: [...promptQueries.key.stats()] as const,
       queryFn: () => getPromptStats()
     }),
   adminList: () =>
     queryOptions({
-      queryKey: ['prompt', 'adminList'] as const,
+      queryKey: [...promptQueries.key.adminList()] as const,
       queryFn: () => adminListPrompts()
     }),
   list: () =>
     queryOptions({
-      queryKey: ['prompt', 'list'] as const,
+      queryKey: [...promptQueries.key.list()] as const,
       queryFn: () => listPrompts()
     }),
   usable: () =>
     queryOptions({
-      queryKey: ['prompt', 'usable'] as const,
+      queryKey: [...promptQueries.key.usable()] as const,
       queryFn: () => listUsablePrompts()
     })
 };

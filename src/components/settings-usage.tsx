@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
 import { reportWindowStart } from '@/lib/utils';
+import { quotaQueries } from '@/server/fn/quota';
+import { usageQueries } from '@/server/fn/usage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -20,19 +22,19 @@ import {
 } from '@/components/usage-module';
 
 export function SettingsUsage() {
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const [days, setDays] = useState(7);
   const [refreshing, setRefreshing] = useState(false);
   const from = useMemo(() => reportWindowStart(days), [days]);
-  const { data: quota, isLoading: quotaLoading } = api.quota.me.useQuery();
-  const { data: usage, isLoading } = api.usage.me.useQuery({ from });
+  const { data: quota, isLoading: quotaLoading } = useQuery(quotaQueries.me());
+  const { data: usage, isLoading } = useQuery(usageQueries.me({ from }));
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       await Promise.all([
         utils.usage.invalidate(),
-        utils.quota.me.invalidate()
+        queryClient.invalidateQueries({ queryKey: quotaQueries.key.me() })
       ]);
     } finally {
       setRefreshing(false);

@@ -1,5 +1,6 @@
-import { api } from '@/trpc/react';
+import { useQuery } from '@tanstack/react-query';
 
+import { quotaQueries } from '@/server/fn/quota';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -16,7 +17,7 @@ const KEYS = ['default.quotaId'] as const;
 export function QuotaSettings() {
   const { formData, handleChange, save, hasChanges, isLoading, isSaving } =
     useSettingsForm(KEYS);
-  const { data: quotaOptions } = api.quota.listForSelect.useQuery();
+  const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
 
   if (isLoading) return <SettingsLoading />;
 

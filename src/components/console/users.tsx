@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Github,
   Loader2,
@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { mutating } from '@/lib/mutation';
+import { quotaQueries, removeUserQuota, setUserQuota } from '@/server/fn/quota';
+import { updateUserRole, userQueries } from '@/server/fn/user';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -47,17 +50,22 @@ export default function UsersPage() {
     null
   );
 
-  const utils = api.useUtils();
-  const { data: users, isLoading } = api.user.list.useQuery({
-    search: search || undefined
-  });
-  const { data: stats } = api.user.getStats.useQuery();
-  const { data: quotaOptions } = api.quota.listForSelect.useQuery();
+  const queryClient = useQueryClient();
+  const { data: users, isLoading } = useQuery(
+    userQueries.list({
+      search: search || undefined
+    })
+  );
+  const { data: stats } = useQuery(userQueries.stats());
+  const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
 
-  const updateRoleMutation = api.user.updateRole.useMutation({
+  const updateRoleMutation = useMutation({
+    mutationFn: mutating(updateUserRole),
     onSuccess: async () => {
-      await utils.user.list.invalidate();
-      await utils.user.getStats.invalidate();
+      await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
+      await queryClient.invalidateQueries({
+        queryKey: userQueries.key.getStats()
+      });
       setUpdatingRoleUserId(null);
     },
     onError: error => {
@@ -66,10 +74,13 @@ export default function UsersPage() {
     }
   });
 
-  const setQuotaMutation = api.quota.setUserQuota.useMutation({
+  const setQuotaMutation = useMutation({
+    mutationFn: mutating(setUserQuota),
     onSuccess: async () => {
-      await utils.user.list.invalidate();
-      await utils.quota.getByUser.invalidate();
+      await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
+      await queryClient.invalidateQueries({
+        queryKey: quotaQueries.key.getByUser()
+      });
       setUpdatingQuotaUserId(null);
       toast.success('Quota override updated');
     },
@@ -79,10 +90,13 @@ export default function UsersPage() {
     }
   });
 
-  const removeQuotaMutation = api.quota.removeUserQuota.useMutation({
+  const removeQuotaMutation = useMutation({
+    mutationFn: mutating(removeUserQuota),
     onSuccess: async () => {
-      await utils.user.list.invalidate();
-      await utils.quota.getByUser.invalidate();
+      await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
+      await queryClient.invalidateQueries({
+        queryKey: quotaQueries.key.getByUser()
+      });
       setUpdatingQuotaUserId(null);
       toast.success('Quota override removed');
     },

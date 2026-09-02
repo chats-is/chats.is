@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Ban } from 'lucide-react';
+
+import { quotaQueries } from '@/server/fn/quota';
 
 /**
  * Inline alert shown above a generation input. Warns the user as their usage
@@ -12,7 +14,7 @@ import { AlertTriangle, Ban } from 'lucide-react';
  * countdown to reset (server returns just those two values).
  */
 export function UsageLimitAlert() {
-  const { data, isLoading } = api.quota.me.useQuery();
+  const { data, isLoading } = useQuery(quotaQueries.me());
 
   if (isLoading || !data) return null;
 

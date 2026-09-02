@@ -295,29 +295,42 @@ type UsageLogFilters = {
 
 export const usageQueries = {
   all: () => ['usage'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    me: () => ['usage', 'me'] as const,
+    byUser: () => ['usage', 'byUser'] as const,
+    adminList: () => ['usage', 'adminList'] as const,
+    userModels: () => ['usage', 'userModels'] as const,
+    log: () => ['usage', 'log'] as const
+  },
   me: (from: Date) =>
     queryOptions({
-      queryKey: ['usage', 'me', from.toISOString()] as const,
+      queryKey: [...usageQueries.key.me(), from.toISOString()] as const,
       queryFn: () => getMyUsage({ data: { from } })
     }),
   byUser: (userId: string, from: Date) =>
     queryOptions({
-      queryKey: ['usage', 'byUser', userId, from.toISOString()] as const,
+      queryKey: [
+        ...usageQueries.key.byUser(),
+        userId,
+        from.toISOString()
+      ] as const,
       queryFn: () => adminUsageByUser({ data: { userId, from } })
     }),
   adminList: (from: Date) =>
     queryOptions({
-      queryKey: ['usage', 'adminList', from.toISOString()] as const,
+      queryKey: [...usageQueries.key.adminList(), from.toISOString()] as const,
       queryFn: () => adminListUsage({ data: { from } })
     }),
   userModels: (userId: string) =>
     queryOptions({
-      queryKey: ['usage', 'userModels', userId] as const,
+      queryKey: [...usageQueries.key.userModels(), userId] as const,
       queryFn: () => adminUserModels({ data: { userId } })
     }),
   log: (filters: UsageLogFilters = {}) =>
     queryOptions({
-      queryKey: ['usage', 'log', filters] as const,
+      queryKey: [...usageQueries.key.log(), filters] as const,
       queryFn: () =>
         adminUsageLog({ data: { page: 1, pageSize: 50, ...filters } })
     })

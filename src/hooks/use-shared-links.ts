@@ -1,23 +1,28 @@
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { mutating } from '@/lib/mutation';
+import { deleteAllShares, deleteShare, shareQueries } from '@/server/fn/share';
 
 export function useSharedLinks(page: number = 0, limit: number = 5) {
   const offset = page * limit;
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
 
-  const { data, error, isLoading, refetch } = api.share.list.useQuery(
-    { limit, offset },
-    { staleTime: 1000 * 60 * 5 }
-  );
+  const { data, error, isLoading, refetch } = useQuery({
+    ...shareQueries.list({ limit, offset }),
+    staleTime: 1000 * 60 * 5
+  });
 
-  const deleteMutation = api.share.delete.useMutation({
+  const deleteMutation = useMutation({
+    mutationFn: mutating(deleteShare),
     onSuccess: () => {
-      utils.share.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: shareQueries.key.list() });
     }
   });
 
-  const deleteAllMutation = api.share.deleteAll.useMutation({
+  const deleteAllMutation = useMutation({
+    mutationFn: mutating(deleteAllShares),
     onSuccess: () => {
-      utils.share.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: shareQueries.key.list() });
     }
   });
 

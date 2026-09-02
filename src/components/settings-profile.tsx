@@ -1,10 +1,12 @@
 import * as React from 'react';
-import { api } from '@/trpc/react';
+import { useMutation } from '@tanstack/react-query';
 import { Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { uploadFile } from '@/lib/api';
+import { mutating } from '@/lib/mutation';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { updateProfile } from '@/server/fn/user';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -79,7 +81,8 @@ export const SettingsProfile = () => {
     }
   };
 
-  const updateProfileMutation = api.user.updateProfile.useMutation({
+  const updateProfileMutation = useMutation({
+    mutationFn: mutating(updateProfile),
     onSuccess: async () => {
       await mutate();
       setPreviewUrl(null); // Clear preview only after successful revalidation

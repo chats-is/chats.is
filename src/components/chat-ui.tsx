@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useArtifact } from '@/contexts/artifact-context';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { api } from '@/trpc/react';
 import { useChat } from '@ai-sdk/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import { toast } from 'sonner';
 
@@ -20,6 +20,7 @@ import {
   modelMatchesId
 } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
+import { artifactQueries } from '@/server/fn/artifact';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -178,31 +179,29 @@ export function ChatUI({
     chatRequestBodyRef.current = chatRequestBody;
   }, [chatRequestBody]);
 
-  const artifactsQuery = api.artifact.list.useQuery(
-    { chatId: id },
-    {
-      initialData: initialArtifacts.map(artifact => ({
-        id: artifact.id,
-        chatId: artifact.chatId,
-        messageId: artifact.messageId,
-        title: artifact.title,
-        type: artifact.type,
-        language: artifact.language ?? null,
-        content: artifact.content ?? null,
-        fileUrl: artifact.fileUrl ?? null,
-        fileName: artifact.fileName ?? null,
-        mimeType: artifact.mimeType ?? null,
-        size: artifact.size ?? null,
-        createdAt: artifact.createdAt,
-        updatedAt: artifact.updatedAt
-      })),
-      // We invalidate these explicitly when a turn finishes; don't also refetch
-      // on window focus (it churns artifacts/versions and the preview).
-      refetchOnWindowFocus: false
-    }
-  );
+  const artifactsQuery = useQuery({
+    ...artifactQueries.list({ chatId: id }),
+    initialData: initialArtifacts.map(artifact => ({
+      id: artifact.id,
+      chatId: artifact.chatId,
+      messageId: artifact.messageId,
+      title: artifact.title,
+      type: artifact.type,
+      language: artifact.language ?? null,
+      content: artifact.content ?? null,
+      fileUrl: artifact.fileUrl ?? null,
+      fileName: artifact.fileName ?? null,
+      mimeType: artifact.mimeType ?? null,
+      size: artifact.size ?? null,
+      createdAt: artifact.createdAt,
+      updatedAt: artifact.updatedAt
+    })),
+    // We invalidate these explicitly when a turn finishes; don't also refetch
+    // on window focus (it churns artifacts/versions and the preview).
+    refetchOnWindowFocus: false
+  });
 
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const prevStatusRef = useRef<string | null>(null);
 
   const {

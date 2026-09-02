@@ -1,11 +1,19 @@
 import { useMemo, useRef, useState } from 'react';
-import { api, RouterOutputs } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { uploadFile } from '@/lib/api';
+import { mutating, mutating } from '@/lib/mutation';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import {
+  createPrompt,
+  deletePrompt,
+  listPrompts,
+  promptQueries,
+  updatePrompt
+} from '@/server/fn/prompt';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +44,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 
-type MyPrompt = RouterOutputs['prompt']['list'][number];
+type MyPrompt = Awaited<ReturnType<typeof listPrompts>>[number];
 type Visibility = 'private' | 'public';
 
 type PromptFormData = {
@@ -118,7 +126,7 @@ const PromptThumbnail = ({
 
 export const UserPrompt = () => {
   const { copyToClipboard } = useCopyToClipboard();
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const { user } = useCurrentUser();
 
@@ -129,8 +137,8 @@ export const UserPrompt = () => {
   const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  const { data: myPrompts, isLoading } = api.prompt.list.useQuery();
-  const { data: models } = api.model.list.useQuery();
+  const { data: myPrompts, isLoading } = useQuery(promptQueries.list());
+  const { data: models } = useQuery(modelQueries.list());
 
   const modelName = (modelId: string) =>
     models?.find(m => m.modelId === modelId)?.name ?? modelId;
@@ -151,12 +159,15 @@ export const UserPrompt = () => {
 
   const invalidatePrompts = async () => {
     await Promise.all([
-      utils.prompt.list.invalidate(),
-      utils.prompt.listUsable.invalidate()
+      queryClient.invalidateQueries({ queryKey: promptQueries.key.list() }),
+      queryClient.invalidateQueries({
+        queryKey: promptQueries.key.listUsable()
+      })
     ]);
   };
 
-  const createMutation = api.prompt.create.useMutation({
+  const createMutation = useMutation({
+    mutationFn: mutating(createPrompt),
     onSuccess: async () => {
       await invalidatePrompts();
       closeDialog();
@@ -165,7 +176,8 @@ export const UserPrompt = () => {
     onError: error => toast.error(error.message)
   });
 
-  const updateMutation = api.prompt.update.useMutation({
+  const updateMutation = useMutation({
+    mutationFn: mutating(updatePrompt),
     onSuccess: async () => {
       await invalidatePrompts();
       closeDialog();
@@ -174,7 +186,8 @@ export const UserPrompt = () => {
     onError: error => toast.error(error.message)
   });
 
-  const deleteMutation = api.prompt.delete.useMutation({
+  const deleteMutation = useMutation({
+    mutationFn: mutating(deletePrompt),
     onSuccess: async () => {
       await invalidatePrompts();
       setDeleteId(null);

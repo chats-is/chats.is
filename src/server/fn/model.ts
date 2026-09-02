@@ -311,6 +311,11 @@ export const toggleEnabledModel = createServerFn({ method: 'POST' })
 
 export const modelQueries = {
   all: () => ['model'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['model', 'list'] as const
+  },
   list: (
     input: {
       capability?: 'chat' | 'image' | 'video' | 'audio';
@@ -318,7 +323,7 @@ export const modelQueries = {
     } = {}
   ) =>
     queryOptions({
-      queryKey: ['model', 'list', input] as const,
+      queryKey: [...modelQueries.key.list(), input] as const,
       queryFn: () => listModels({ data: input })
     })
 };

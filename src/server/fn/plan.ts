@@ -126,14 +126,20 @@ export const deletePlan = createServerFn({ method: 'POST' })
 
 export const planQueries = {
   all: () => ['plan'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    listPublic: () => ['plan', 'listPublic'] as const,
+    list: () => ['plan', 'list'] as const
+  },
   listPublic: () =>
     queryOptions({
-      queryKey: ['plan', 'listPublic'] as const,
+      queryKey: [...planQueries.key.listPublic()] as const,
       queryFn: () => listPublicPlans()
     }),
   list: () =>
     queryOptions({
-      queryKey: ['plan', 'list'] as const,
+      queryKey: [...planQueries.key.list()] as const,
       queryFn: () => listPlans()
     })
 };

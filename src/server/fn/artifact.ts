@@ -49,14 +49,20 @@ export const listArtifacts = createServerFn({ method: 'GET' })
  */
 export const artifactQueries = {
   all: () => ['artifact'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    get: () => ['artifact', 'get'] as const,
+    list: () => ['artifact', 'list'] as const
+  },
   get: (id: string) =>
     queryOptions({
-      queryKey: ['artifact', 'get', id] as const,
+      queryKey: [...artifactQueries.key.get(), id] as const,
       queryFn: () => getArtifact({ data: { id } })
     }),
   list: (chatId: string) =>
     queryOptions({
-      queryKey: ['artifact', 'list', chatId] as const,
+      queryKey: [...artifactQueries.key.list(), chatId] as const,
       queryFn: () => listArtifacts({ data: { chatId } })
     })
 };

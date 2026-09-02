@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Link, useRouter } from '@tanstack/react-router';
-import { api } from '@/trpc/react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Code2,
   Download,
@@ -22,6 +22,7 @@ import { getArtifactLanguageLabel } from '@/lib/code-language';
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
 import { formatMediaTime } from '@/lib/utils';
 import type { LibraryItem } from '@/server/api/routers/library';
+import { libraryQueries } from '@/server/fn/library';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -298,7 +299,7 @@ function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
 
 function LibraryCard({ item }: { item: LibraryItem }) {
   const router = useRouter();
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
 
   const handleArtifactDownload = async (id: string) => {
     // The feed carries a truncated preview; download needs the full body.
@@ -437,16 +438,14 @@ function LibraryCard({ item }: { item: LibraryItem }) {
 
 export function LibraryView() {
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    api.library.list.useInfiniteQuery(
-      { limit: 24 },
-      {
-        getNextPageParam: page => page.nextCursor,
-        // Refocusing would serially replay every loaded page — not worth it
-        // for an archive view.
-        refetchOnWindowFocus: false,
-        staleTime: 60_000
-      }
-    );
+    useInfiniteQuery({
+      ...libraryQueries.list({ limit: 24 }),
+      getNextPageParam: page => page.nextCursor,
+      // Refocusing would serially replay every loaded page — not worth it
+      // for an archive view.
+      refetchOnWindowFocus: false,
+      staleTime: 60_000
+    });
 
   const items = data?.pages.flatMap(page => page.items) ?? [];
 

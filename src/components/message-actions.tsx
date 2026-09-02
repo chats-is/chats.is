@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { api } from '@/trpc/react';
 import { type UseChatHelpers } from '@ai-sdk/react';
+import { useMutation } from '@tanstack/react-query';
 import {
   CheckCircle,
   Copy,
@@ -18,8 +18,10 @@ import { toast } from 'sonner';
 
 import { type ChatMessage } from '@/types';
 import { createSpeech } from '@/lib/api';
+import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { deleteMessages, updateMessage } from '@/server/fn/message';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,8 +80,12 @@ export function MessageActions({
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [isPlaying, setIsPlaying] = React.useState(false);
 
-  const updateMutation = api.message.update.useMutation();
-  const deleteMutation = api.message.delete.useMutation();
+  const updateMutation = useMutation({
+    mutationFn: mutating(updateMessage)
+  });
+  const deleteMutation = useMutation({
+    mutationFn: mutating(deleteMessages)
+  });
   const [isLoadingAudio, setIsLoadingAudio] = React.useState(false);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 

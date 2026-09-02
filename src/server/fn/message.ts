@@ -141,9 +141,14 @@ export const deleteMessages = createServerFn({ method: 'POST' })
 
 export const messageQueries = {
   all: () => ['message'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['message', 'list'] as const
+  },
   list: (chatId: string) =>
     queryOptions({
-      queryKey: ['message', 'list', chatId] as const,
+      queryKey: [...messageQueries.key.list(), chatId] as const,
       queryFn: () => listMessages({ data: { chatId } })
     })
 };

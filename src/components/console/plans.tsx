@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { mutating } from '@/lib/mutation';
+import {
+  createPlan,
+  deletePlan,
+  planQueries,
+  updatePlan
+} from '@/server/fn/plan';
+import { quotaQueries } from '@/server/fn/quota';
+import { userQueries } from '@/server/fn/user';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,17 +63,18 @@ const emptyForm: FormState = {
 };
 
 export default function PlansPage() {
-  const utils = api.useUtils();
-  const { data: plans, isLoading } = api.plan.list.useQuery();
-  const { data: quotaOptions } = api.quota.listForSelect.useQuery();
+  const queryClient = useQueryClient();
+  const { data: plans, isLoading } = useQuery(planQueries.list());
+  const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const create = api.plan.create.useMutation({
+  const create = useMutation({
+    mutationFn: mutating(createPlan),
     onSuccess: () => {
-      utils.plan.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
       setOpen(false);
       setForm(emptyForm);
       toast.success('Plan created');
@@ -72,9 +82,10 @@ export default function PlansPage() {
     onError: e => toast.error(e.message)
   });
 
-  const update = api.plan.update.useMutation({
+  const update = useMutation({
+    mutationFn: mutating(updatePlan),
     onSuccess: () => {
-      utils.plan.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
       setOpen(false);
       setEditingId(null);
       setForm(emptyForm);
@@ -83,10 +94,11 @@ export default function PlansPage() {
     onError: e => toast.error(e.message)
   });
 
-  const del = api.plan.delete.useMutation({
+  const del = useMutation({
+    mutationFn: mutating(deletePlan),
     onSuccess: () => {
-      utils.plan.list.invalidate();
-      utils.user.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
+      queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
       setDeleteId(null);
       toast.success('Plan deleted');
     },

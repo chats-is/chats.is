@@ -314,25 +314,33 @@ export const syncProviderModels = createServerFn({ method: 'POST' })
 
 export const providerQueries = {
   all: () => ['provider'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['provider', 'list'] as const,
+    enabled: () => ['provider', 'enabled'] as const,
+    remoteModels: () => ['provider', 'remoteModels'] as const,
+    compatible: () => ['provider', 'compatible'] as const
+  },
   list: () =>
     queryOptions({
-      queryKey: ['provider', 'list'] as const,
+      queryKey: [...providerQueries.key.list()] as const,
       queryFn: () => listProviders()
     }),
   enabled: () =>
     queryOptions({
-      queryKey: ['provider', 'enabled'] as const,
+      queryKey: [...providerQueries.key.enabled()] as const,
       queryFn: () => listEnabledProviders()
     }),
   /** Reaches the provider's own API, so it is only fetched on demand. */
   remoteModels: (providerId: string) =>
     queryOptions({
-      queryKey: ['provider', 'remoteModels', providerId] as const,
+      queryKey: [...providerQueries.key.remoteModels(), providerId] as const,
       queryFn: () => fetchProviderModels({ data: { providerId } })
     }),
   compatible: (modelId: string) =>
     queryOptions({
-      queryKey: ['provider', 'compatible', modelId] as const,
+      queryKey: [...providerQueries.key.compatible(), modelId] as const,
       queryFn: () => compatibleProviders({ data: { modelId } })
     })
 };

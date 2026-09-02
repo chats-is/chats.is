@@ -1,10 +1,19 @@
 import { useMemo, useState } from 'react';
-import { api, RouterOutputs } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { uploadFile } from '@/lib/api';
+import { mutating } from '@/lib/mutation';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { modelQueries } from '@/server/fn/model';
+import {
+  adminCreatePrompt,
+  adminDeletePrompt,
+  adminListPrompts,
+  adminUpdatePrompt,
+  promptQueries
+} from '@/server/fn/prompt';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +49,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 
-type AdminPrompt = RouterOutputs['prompt']['adminList'][number];
+type AdminPrompt = Awaited<ReturnType<typeof adminListPrompts>>[number];
 type Visibility = 'private' | 'public';
 
 type PromptFormData = {
@@ -100,9 +109,9 @@ export default function PromptsPage() {
   const [search, setSearch] = useState('');
   const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
 
-  const utils = api.useUtils();
-  const { data: prompts, isLoading } = api.prompt.adminList.useQuery();
-  const { data: models } = api.model.list.useQuery();
+  const queryClient = useQueryClient();
+  const { data: prompts, isLoading } = useQuery(promptQueries.adminList());
+  const { data: models } = useQuery(modelQueries.list());
 
   const modelName = (modelId: string) =>
     models?.find(m => m.modelId === modelId)?.name ?? modelId;
@@ -114,11 +123,16 @@ export default function PromptsPage() {
 
   const invalidate = () =>
     Promise.all([
-      utils.prompt.adminList.invalidate(),
-      utils.prompt.listUsable.invalidate()
+      queryClient.invalidateQueries({
+        queryKey: promptQueries.key.adminList()
+      }),
+      queryClient.invalidateQueries({
+        queryKey: promptQueries.key.listUsable()
+      })
     ]);
 
-  const adminCreateMutation = api.prompt.adminCreate.useMutation({
+  const adminCreateMutation = useMutation({
+    mutationFn: mutating(adminCreatePrompt),
     onSuccess: async () => {
       await invalidate();
       setIsOpen(false);
@@ -128,7 +142,8 @@ export default function PromptsPage() {
     onError: error => toast.error(error.message)
   });
 
-  const adminUpdateMutation = api.prompt.adminUpdate.useMutation({
+  const adminUpdateMutation = useMutation({
+    mutationFn: mutating(adminUpdatePrompt),
     onSuccess: async () => {
       await invalidate();
       setIsOpen(false);
@@ -138,7 +153,8 @@ export default function PromptsPage() {
     onError: error => toast.error(error.message)
   });
 
-  const adminDeleteMutation = api.prompt.adminDelete.useMutation({
+  const adminDeleteMutation = useMutation({
+    mutationFn: mutating(adminDeletePrompt),
     onSuccess: async () => {
       await invalidate();
       setDeletePrompt(null);

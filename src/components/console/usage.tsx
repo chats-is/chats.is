@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { api } from '@/trpc/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
 import { CAPABILITIES } from '@/lib/constant';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
+import { modelQueries } from '@/server/fn/model';
+import { usageQueries } from '@/server/fn/usage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,11 +26,11 @@ import { UsageQuantity } from '@/components/usage-quantity';
 import { UsageUnitPrice } from '@/components/usage-unit-price';
 
 export default function UsagePage() {
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const [days, setDays] = useState(7);
   const [refreshing, setRefreshing] = useState(false);
   const from = useMemo(() => reportWindowStart(days), [days]);
-  const { data, isLoading } = api.usage.adminList.useQuery({ from });
+  const { data, isLoading } = useQuery(usageQueries.adminList({ from }));
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -119,18 +121,20 @@ function UsageLog({ days }: { days: number }) {
 
   const from = useMemo(() => reportWindowStart(days), [days]);
 
-  const { data: models } = api.model.list.useQuery();
+  const { data: models } = useQuery(modelQueries.list());
 
-  const { data, isLoading } = api.usage.adminLog.useQuery({
-    from,
-    userQuery: userQuery.trim() || undefined,
-    modelId: modelId || undefined,
-    capability: capability
-      ? (capability as 'chat' | 'image' | 'video' | 'audio')
-      : undefined,
-    page,
-    pageSize
-  });
+  const { data, isLoading } = useQuery(
+    usageQueries.log({
+      from,
+      userQuery: userQuery.trim() || undefined,
+      modelId: modelId || undefined,
+      capability: capability
+        ? (capability as 'chat' | 'image' | 'video' | 'audio')
+        : undefined,
+      page,
+      pageSize
+    })
+  );
 
   const totalPages = useMemo(() => {
     if (!data) return 1;

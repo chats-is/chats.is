@@ -1,6 +1,17 @@
-import { api } from '@/trpc/react';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient
+} from '@tanstack/react-query';
 
 import { type Chat } from '@/types';
+import { mutating } from '@/lib/mutation';
+import {
+  chatQueries,
+  deleteAllChats,
+  deleteChat,
+  updateChat
+} from '@/server/fn/chat';
 
 const LIMIT = 25;
 
@@ -13,17 +24,15 @@ export function useChatsInfinite() {
     hasNextPage,
     isError,
     error
-  } = api.chat.list.useInfiniteQuery(
-    { limit: LIMIT },
-    {
-      getNextPageParam: (lastPage, allPages) => {
-        if (!lastPage || lastPage.length < LIMIT) return undefined;
-        return allPages.length * LIMIT;
-      },
-      initialCursor: 0,
-      refetchOnWindowFocus: false
-    }
-  );
+  } = useInfiniteQuery({
+    ...chatQueries.list({ limit: LIMIT }),
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage || lastPage.length < LIMIT) return undefined;
+      return allPages.length * LIMIT;
+    },
+    initialCursor: 0,
+    refetchOnWindowFocus: false
+  });
 
   const chats = data ? data.pages.flat() : [];
 
@@ -39,11 +48,12 @@ export function useChatsInfinite() {
 }
 
 export function useChats() {
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
 
-  const update = api.chat.update.useMutation({
+  const update = useMutation({
+    mutationFn: mutating(updateChat),
     onMutate: async newChat => {
-      await utils.chat.list.cancel();
+      await queryClient.cancelQueries({ queryKey: chatQueries.key.list() });
       const previousChats = utils.chat.list.getInfiniteData();
 
       utils.chat.list.setInfiniteData({ limit: LIMIT }, old => {
@@ -64,13 +74,14 @@ export function useChats() {
       utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
     },
     onSettled: () => {
-      utils.chat.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
     }
   });
 
-  const remove = api.chat.delete.useMutation({
+  const remove = useMutation({
+    mutationFn: mutating(deleteChat),
     onMutate: async ({ id }) => {
-      await utils.chat.list.cancel();
+      await queryClient.cancelQueries({ queryKey: chatQueries.key.list() });
       const previousChats = utils.chat.list.getInfiniteData();
 
       utils.chat.list.setInfiniteData({ limit: LIMIT }, old => {
@@ -87,13 +98,14 @@ export function useChats() {
       utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
     },
     onSettled: () => {
-      utils.chat.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
     }
   });
 
-  const clear = api.chat.deleteAll.useMutation({
+  const clear = useMutation({
+    mutationFn: mutating(deleteAllChats),
     onMutate: async () => {
-      await utils.chat.list.cancel();
+      await queryClient.cancelQueries({ queryKey: chatQueries.key.list() });
       const previousChats = utils.chat.list.getInfiniteData();
       utils.chat.list.setInfiniteData(
         { limit: LIMIT },
@@ -105,12 +117,12 @@ export function useChats() {
       utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
     },
     onSettled: () => {
-      utils.chat.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
     }
   });
 
   const refresh = () => {
-    return utils.chat.list.invalidate();
+    return queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
   };
 
   return {

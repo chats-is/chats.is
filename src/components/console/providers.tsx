@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -9,6 +9,14 @@ import type {
   VertexServiceAccountKey
 } from '@/types';
 import { ProviderTypes } from '@/lib/constant';
+import { mutating } from '@/lib/mutation';
+import {
+  createProvider,
+  deleteProvider,
+  providerQueries,
+  toggleEnabledProvider,
+  updateProvider
+} from '@/server/fn/provider';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,21 +65,23 @@ export default function ProvidersPage() {
     null
   );
 
-  const utils = api.useUtils();
-  const { data: providers, isLoading } = api.provider.list.useQuery();
+  const queryClient = useQueryClient();
+  const { data: providers, isLoading } = useQuery(providerQueries.list());
 
-  const createMutation = api.provider.create.useMutation({
+  const createMutation = useMutation({
+    mutationFn: mutating(createProvider),
     onSuccess: () => {
-      utils.provider.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
       setIsOpen(false);
       resetForm();
     },
     onError: error => toast.error(error.message)
   });
 
-  const updateMutation = api.provider.update.useMutation({
+  const updateMutation = useMutation({
+    mutationFn: mutating(updateProvider),
     onSuccess: () => {
-      utils.provider.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
       setIsOpen(false);
       setEditingId(null);
       resetForm();
@@ -79,17 +89,19 @@ export default function ProvidersPage() {
     onError: error => toast.error(error.message)
   });
 
-  const deleteMutation = api.provider.delete.useMutation({
+  const deleteMutation = useMutation({
+    mutationFn: mutating(deleteProvider),
     onSuccess: () => {
-      utils.provider.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
       setDeleteId(null);
     },
     onError: error => toast.error(error.message)
   });
 
-  const toggleMutation = api.provider.toggleEnabled.useMutation({
+  const toggleMutation = useMutation({
+    mutationFn: mutating(toggleEnabledProvider),
     onSuccess: () => {
-      utils.provider.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
     },
     onError: error => toast.error(error.message)
   });

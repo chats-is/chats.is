@@ -1,5 +1,6 @@
-import { api } from '@/trpc/react';
+import { useQuery } from '@tanstack/react-query';
 
+import { modelQueries } from '@/server/fn/model';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -77,7 +78,7 @@ function ModelSelect({
 export function ModelsSettings() {
   const { formData, handleChange, save, hasChanges, isLoading, isSaving } =
     useSettingsForm(KEYS);
-  const { data: models } = api.model.list.useQuery();
+  const { data: models } = useQuery(modelQueries.list());
 
   const chatModels = models?.filter(
     m => m.capability === 'chat' && m.isEnabled

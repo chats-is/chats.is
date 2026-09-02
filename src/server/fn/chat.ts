@@ -171,15 +171,22 @@ type ListInput = { type?: z.infer<typeof chatTypeSchema>; limit?: number };
 
 export const chatQueries = {
   all: () => ['chat'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['chat', 'list'] as const,
+    infinite: () => ['chat', 'infinite'] as const,
+    detail: () => ['chat', 'detail'] as const
+  },
   list: (input: ListInput = {}) =>
     queryOptions({
-      queryKey: ['chat', 'list', input] as const,
+      queryKey: [...chatQueries.key.list(), input] as const,
       queryFn: () => listChats({ data: input })
     }),
   /** The sidebar pages through history; the cursor is the row offset. */
   infinite: (input: ListInput = {}) =>
     infiniteQueryOptions({
-      queryKey: ['chat', 'infinite', input] as const,
+      queryKey: [...chatQueries.key.infinite(), input] as const,
       queryFn: ({ pageParam }) =>
         listChats({ data: { ...input, cursor: pageParam } }),
       initialPageParam: 0,
@@ -195,7 +202,7 @@ export const chatQueries = {
     includeArtifacts?: boolean;
   }) =>
     queryOptions({
-      queryKey: ['chat', 'detail', input] as const,
+      queryKey: [...chatQueries.key.detail(), input] as const,
       queryFn: () =>
         getChat({
           data: {

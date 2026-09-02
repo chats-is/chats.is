@@ -229,24 +229,32 @@ export const removeUserQuota = createServerFn({ method: 'POST' })
 
 export const quotaQueries = {
   all: () => ['quota'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['quota', 'list'] as const,
+    listForSelect: () => ['quota', 'listForSelect'] as const,
+    me: () => ['quota', 'me'] as const,
+    byUser: () => ['quota', 'byUser'] as const
+  },
   list: () =>
     queryOptions({
-      queryKey: ['quota', 'list'] as const,
+      queryKey: [...quotaQueries.key.list()] as const,
       queryFn: () => listQuotas()
     }),
   listForSelect: () =>
     queryOptions({
-      queryKey: ['quota', 'listForSelect'] as const,
+      queryKey: [...quotaQueries.key.listForSelect()] as const,
       queryFn: () => listQuotasForSelect()
     }),
   me: () =>
     queryOptions({
-      queryKey: ['quota', 'me'] as const,
+      queryKey: [...quotaQueries.key.me()] as const,
       queryFn: () => getMyQuota()
     }),
   byUser: (userId: string) =>
     queryOptions({
-      queryKey: ['quota', 'byUser', userId] as const,
+      queryKey: [...quotaQueries.key.byUser(), userId] as const,
       queryFn: () => getQuotaForUser({ data: { userId } })
     })
 };

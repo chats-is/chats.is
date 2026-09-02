@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { api } from '@/trpc/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 
 import { CAPABILITIES } from '@/lib/constant';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
+import { quotaQueries } from '@/server/fn/quota';
+import { usageQueries } from '@/server/fn/usage';
+import { userQueries } from '@/server/fn/user';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -34,18 +37,21 @@ const sourceLabel: Record<string, string> = {
 };
 
 export default function UserDetail({ userId }: { userId: string }) {
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const [days, setDays] = useState(7);
   const [refreshing, setRefreshing] = useState(false);
 
   const from = useMemo(() => reportWindowStart(days), [days]);
 
-  const { data: user, isLoading: userLoading } = api.user.get.useQuery({
-    id: userId
-  });
-  const { data: status, isLoading: statusLoading } =
-    api.quota.getByUser.useQuery({ userId });
-  const { data: usage } = api.usage.adminByUser.useQuery({ userId, from });
+  const { data: user, isLoading: userLoading } = useQuery(
+    userQueries.detail({
+      id: userId
+    })
+  );
+  const { data: status, isLoading: statusLoading } = useQuery(
+    quotaQueries.byUser({ userId })
+  );
+  const { data: usage } = useQuery(usageQueries.byUser({ userId, from }));
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -233,18 +239,20 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
 
   const from = useMemo(() => reportWindowStart(days), [days]);
 
-  const { data, isLoading } = api.usage.adminLog.useQuery({
-    userId,
-    from,
-    modelId: modelId || undefined,
-    capability: capability
-      ? (capability as 'chat' | 'image' | 'video' | 'audio')
-      : undefined,
-    page,
-    pageSize
-  });
+  const { data, isLoading } = useQuery(
+    usageQueries.log({
+      userId,
+      from,
+      modelId: modelId || undefined,
+      capability: capability
+        ? (capability as 'chat' | 'image' | 'video' | 'audio')
+        : undefined,
+      page,
+      pageSize
+    })
+  );
 
-  const { data: userModels } = api.usage.adminUserModels.useQuery({ userId });
+  const { data: userModels } = useQuery(usageQueries.userModels({ userId }));
 
   const totalPages = useMemo(() => {
     if (!data) return 1;

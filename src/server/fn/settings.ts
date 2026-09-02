@@ -123,24 +123,32 @@ export const deleteSetting = createServerFn({ method: 'POST' })
 
 export const settingsQueries = {
   all: () => ['settings'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['settings', 'list'] as const,
+    get: () => ['settings', 'get'] as const,
+    defaults: () => ['settings', 'defaults'] as const,
+    system: () => ['settings', 'system'] as const
+  },
   list: () =>
     queryOptions({
-      queryKey: ['settings', 'list'] as const,
+      queryKey: [...settingsQueries.key.list()] as const,
       queryFn: () => listSettings()
     }),
   get: (key: string) =>
     queryOptions({
-      queryKey: ['settings', 'get', key] as const,
+      queryKey: [...settingsQueries.key.get(), key] as const,
       queryFn: () => getSetting({ data: { key } })
     }),
   defaults: () =>
     queryOptions({
-      queryKey: ['settings', 'defaults'] as const,
+      queryKey: [...settingsQueries.key.defaults()] as const,
       queryFn: () => getSettingDefaults()
     }),
   system: () =>
     queryOptions({
-      queryKey: ['settings', 'system'] as const,
+      queryKey: [...settingsQueries.key.system()] as const,
       queryFn: () => getSystemSettingsFn()
     })
 };

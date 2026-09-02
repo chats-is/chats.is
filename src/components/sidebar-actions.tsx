@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { api } from '@/trpc/react';
+import { useMutation } from '@tanstack/react-query';
 import {
   CheckCircle,
   Loader2,
@@ -11,8 +11,10 @@ import {
 import { toast } from 'sonner';
 
 import { type Chat } from '@/types';
+import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { createShare } from '@/server/fn/share';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +40,9 @@ export function SidebarActions({
   const [titleDialogOpen, setTitleDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
 
-  const shareMutation = api.share.create.useMutation();
+  const shareMutation = useMutation({
+    mutationFn: mutating(createShare)
+  });
 
   const copyShareLink = async (chatId: string) => {
     if (isCopied || shareMutation.isPending) return;

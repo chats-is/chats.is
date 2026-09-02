@@ -1,10 +1,17 @@
 import { Fragment, useMemo, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Loader2, Pencil, RefreshCw, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { CAPABILITIES } from '@/lib/constant';
+import { mutating } from '@/lib/mutation';
 import { formatUsd } from '@/lib/utils';
+import {
+  previewPricingSync,
+  pricingQueries,
+  runPricingSync,
+  upsertPricing
+} from '@/server/fn/pricing';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -167,7 +174,7 @@ function summarizePricing(
 }
 
 export default function PricingPage() {
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const [filterCapability, setFilterCapability] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -179,11 +186,14 @@ export default function PricingPage() {
     'llm-metadata'
   ]);
 
-  const { data: rows, isLoading } = api.pricing.listWithModels.useQuery();
+  const { data: rows, isLoading } = useQuery(pricingQueries.listWithModels());
 
-  const upsertMutation = api.pricing.upsert.useMutation({
+  const upsertMutation = useMutation({
+    mutationFn: mutating(upsertPricing),
     onSuccess: () => {
-      utils.pricing.listWithModels.invalidate();
+      queryClient.invalidateQueries({
+        queryKey: pricingQueries.key.listWithModels()
+      });
       setEdit(null);
       toast.success('Pricing saved');
     },
@@ -192,11 +202,16 @@ export default function PricingPage() {
 
   // Two mutation instances so we can fire them in parallel without state
   // collision on a single hook.
-  const previewMd = api.pricing.previewSync.useMutation();
-  const previewLm = api.pricing.previewSync.useMutation();
+  const previewMd = useMutation({
+    mutationFn: mutating(previewPricingSync)
+  });
+  const previewLm = useMutation({
+    mutationFn: mutating(previewPricingSync)
+  });
   const previewLoading = previewMd.isPending || previewLm.isPending;
 
-  const syncMutation = api.pricing.sync.useMutation({
+  const syncMutation = useMutation({
+    mutationFn: mutating(runPricingSync),
     onError: e => toast.error(e.message)
   });
 
@@ -348,7 +363,9 @@ export default function PricingPage() {
         updated += result.updated;
         unchanged += result.unchanged;
       }
-      utils.pricing.listWithModels.invalidate();
+      queryClient.invalidateQueries({
+        queryKey: pricingQueries.key.listWithModels()
+      });
       setPreviewOpen(false);
       toast.success(
         `Applied: ${created} new, ${updated} updated${unchanged ? `, ${unchanged} unchanged` : ''}`

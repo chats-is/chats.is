@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { ModelCapability } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
+import { mutating } from '@/lib/mutation';
+import { modelQueries } from '@/server/fn/model';
+import { providerQueries, syncProviderModels } from '@/server/fn/provider';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -36,7 +39,7 @@ export function ProviderModelSyncDialog({
   providerName,
   onOpenChange
 }: ProviderModelSyncDialogProps) {
-  const utils = api.useUtils();
+  const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [capabilities, setCapabilities] = useState<
     Record<string, ModelCapability>
@@ -47,21 +50,20 @@ export function ProviderModelSyncDialog({
     data: models,
     isLoading,
     isFetching
-  } = api.provider.fetchModels.useQuery(
-    { providerId: providerId || '' },
-    {
-      enabled: open && !!providerId,
-      retry: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-      refetchOnWindowFocus: false
-    }
-  );
+  } = useQuery({
+    ...providerQueries.remoteModels({ providerId: providerId || '' }),
+    enabled: open && !!providerId,
+    retry: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false
+  });
 
-  const syncMutation = api.provider.syncModels.useMutation({
+  const syncMutation = useMutation({
+    mutationFn: mutating(syncProviderModels),
     onSuccess: result => {
-      utils.provider.list.invalidate();
-      utils.model.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
+      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
       reset();
       onOpenChange(false);
       toast.success(
@@ -123,13 +125,19 @@ export function ProviderModelSyncDialog({
 
     setIsRefreshing(true);
     try {
-      utils.provider.fetchModels.setData({ providerId }, undefined);
+      queryClient.setQueryData(
+        providerQueries.remoteModels({ providerId }).queryKey,
+        undefined
+      );
       setSelectedIds([]);
       setCapabilities({});
       const refreshedModels = await utils.provider.fetchModels.fetch({
         providerId
       });
-      utils.provider.fetchModels.setData({ providerId }, refreshedModels);
+      queryClient.setQueryData(
+        providerQueries.remoteModels({ providerId }).queryKey,
+        refreshedModels
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to refresh models'

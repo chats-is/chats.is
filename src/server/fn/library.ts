@@ -163,10 +163,15 @@ export const listLibrary = createServerFn({ method: 'GET' })
 
 export const libraryQueries = {
   all: () => ['library'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['library', 'list'] as const
+  },
   /** The library scrolls; the cursor is the timestamp of the last item shown. */
   list: (limit = 24) =>
     infiniteQueryOptions({
-      queryKey: ['library', 'list', limit] as const,
+      queryKey: [...libraryQueries.key.list(), limit] as const,
       queryFn: ({ pageParam }) =>
         listLibrary({ data: { cursor: pageParam, limit } }),
       initialPageParam: null as string | null | undefined,

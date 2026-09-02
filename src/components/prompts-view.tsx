@@ -1,12 +1,13 @@
 import { useRouter } from '@tanstack/react-router';
-import { api, type RouterOutputs } from '@/trpc/react';
+import { useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 
 import { setPendingPrompt } from '@/lib/pending-prompt';
+import { listUsablePrompts, promptQueries } from '@/server/fn/prompt';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatHeader } from '@/components/chat-header';
 
-type UsablePrompt = RouterOutputs['prompt']['listUsable'][number];
+type UsablePrompt = Awaited<ReturnType<typeof listUsablePrompts>>[number];
 
 /** Card for a single prompt — clicking seeds it into a fresh chat composer. */
 function PromptCard({ prompt }: { prompt: UsablePrompt }) {
@@ -59,10 +60,11 @@ function PromptCard({ prompt }: { prompt: UsablePrompt }) {
 }
 
 export function PromptsView() {
-  const { data: prompts, isLoading } = api.prompt.listUsable.useQuery(
-    undefined,
-    { refetchOnWindowFocus: false, staleTime: 60_000 }
-  );
+  const { data: prompts, isLoading } = useQuery({
+    ...promptQueries.usable(),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000
+  });
 
   return (
     <div className="flex size-full flex-col">

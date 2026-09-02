@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { api } from '@/trpc/react';
+import { useQuery } from '@tanstack/react-query';
+
+import { promptQueries } from '@/server/fn/prompt';
 
 /** One row's worth. Suggestions, not a browsable list — /prompts has the rest. */
 const SUGGESTION_COUNT = 4;
@@ -47,7 +49,8 @@ export function PromptSuggestions({
   onInsert,
   disabled = false
 }: PromptSuggestionsProps) {
-  const { data: prompts } = api.prompt.listUsable.useQuery(undefined, {
+  const { data: prompts } = useQuery({
+    ...promptQueries.usable(),
     refetchOnWindowFocus: false
   });
 

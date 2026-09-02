@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '@/trpc/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowDown,
@@ -14,6 +14,15 @@ import { toast } from 'sonner';
 
 import { type ModelCapability } from '@/types';
 import { CAPABILITIES } from '@/lib/constant';
+import { mutating } from '@/lib/mutation';
+import {
+  createModel,
+  deleteModel,
+  modelQueries,
+  toggleEnabledModel,
+  updateModel
+} from '@/server/fn/model';
+import { providerQueries } from '@/server/fn/provider';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -157,22 +166,24 @@ export default function ModelsPage() {
   const [filterCapability, setFilterCapability] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  const utils = api.useUtils();
-  const { data: models, isLoading } = api.model.list.useQuery();
-  const { data: providers } = api.provider.list.useQuery();
+  const queryClient = useQueryClient();
+  const { data: models, isLoading } = useQuery(modelQueries.list());
+  const { data: providers } = useQuery(providerQueries.list());
 
-  const createMutation = api.model.create.useMutation({
+  const createMutation = useMutation({
+    mutationFn: mutating(createModel),
     onSuccess: () => {
-      utils.model.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
       setIsOpen(false);
       resetForm();
     },
     onError: error => toast.error(error.message)
   });
 
-  const updateMutation = api.model.update.useMutation({
+  const updateMutation = useMutation({
+    mutationFn: mutating(updateModel),
     onSuccess: () => {
-      utils.model.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
       setIsOpen(false);
       setEditingId(null);
       resetForm();
@@ -180,17 +191,19 @@ export default function ModelsPage() {
     onError: error => toast.error(error.message)
   });
 
-  const deleteMutation = api.model.delete.useMutation({
+  const deleteMutation = useMutation({
+    mutationFn: mutating(deleteModel),
     onSuccess: () => {
-      utils.model.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
       setDeleteId(null);
     },
     onError: error => toast.error(error.message)
   });
 
-  const toggleMutation = api.model.toggleEnabled.useMutation({
+  const toggleMutation = useMutation({
+    mutationFn: mutating(toggleEnabledModel),
     onSuccess: () => {
-      utils.model.list.invalidate();
+      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
     },
     onError: error => toast.error(error.message)
   });
@@ -228,15 +241,12 @@ export default function ModelsPage() {
 
   // Providers that actually support the entered modelId — the only ones a
   // binding may select (same-kind failover).
-  const { data: compatibleProviders } =
-    api.provider.compatibleProviders.useQuery(
-      { modelId: debouncedModelId },
-      {
-        enabled: isOpen && !!debouncedModelId,
-        refetchOnWindowFocus: false,
-        retry: false
-      }
-    );
+  const { data: compatibleProviders } = useQuery({
+    ...providerQueries.compatible({ modelId: debouncedModelId }),
+    enabled: isOpen && !!debouncedModelId,
+    refetchOnWindowFocus: false,
+    retry: false
+  });
 
   const uiOptionsPlaceholderByCapability: Record<string, string> = {
     chat: `{

@@ -140,14 +140,20 @@ export const deleteAllShares = createServerFn({ method: 'POST' })
 
 export const shareQueries = {
   all: () => ['share'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    list: () => ['share', 'list'] as const,
+    detail: () => ['share', 'detail'] as const
+  },
   list: (input: { limit?: number; offset?: number } = {}) =>
     queryOptions({
-      queryKey: ['share', 'list', input] as const,
+      queryKey: [...shareQueries.key.list(), input] as const,
       queryFn: () => listShares({ data: input })
     }),
   detail: (id: string) =>
     queryOptions({
-      queryKey: ['share', 'detail', id] as const,
+      queryKey: [...shareQueries.key.detail(), id] as const,
       queryFn: () => getSharedChat({ data: { id } })
     })
 };

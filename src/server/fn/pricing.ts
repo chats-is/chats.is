@@ -249,6 +249,12 @@ export const searchRemotePricingFn = createServerFn({ method: 'GET' })
 
 export const pricingQueries = {
   all: () => ['pricing'] as const,
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
+  key: {
+    listWithModels: () => ['pricing', 'listWithModels'] as const,
+    searchRemote: () => ['pricing', 'searchRemote'] as const
+  },
   listWithModels: (
     input: {
       capability?: 'chat' | 'image' | 'video' | 'audio';
@@ -256,7 +262,7 @@ export const pricingQueries = {
     } = {}
   ) =>
     queryOptions({
-      queryKey: ['pricing', 'listWithModels', input] as const,
+      queryKey: [...pricingQueries.key.listWithModels(), input] as const,
       queryFn: () => listPricingWithModels({ data: input })
     }),
   /** Reads the upstream catalogue, so it is only fetched when asked for. */
@@ -266,7 +272,7 @@ export const pricingQueries = {
     limit?: number;
   }) =>
     queryOptions({
-      queryKey: ['pricing', 'searchRemote', input] as const,
+      queryKey: [...pricingQueries.key.searchRemote(), input] as const,
       queryFn: () => searchRemotePricingFn({ data: { limit: 50, ...input } })
     })
 };
