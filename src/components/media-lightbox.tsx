@@ -29,7 +29,7 @@ export function MediaLightbox({
 
   return (
     <Dialog>
-      <DialogTrigger render={{ trigger }} />
+      <DialogTrigger render={trigger} />
       <DialogContent
         showCloseButton={false}
         className={cn(

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Loader2, Mail } from 'lucide-react';
-import { signIn } from 'next-auth/react';
 
+import { authClient } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,16 +43,13 @@ export function EmailLoginForm({
     setIsLoading?.('email');
 
     try {
-      const response = await fetch('/api/auth/send-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+      const { error } = await authClient.emailOtp.sendVerificationOtp({
+        email,
+        type: 'sign-in'
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to send verification code');
+      if (error) {
+        setError(error.message || 'Failed to send verification code');
         setIsLoading?.(null);
         return;
       }
@@ -72,22 +69,18 @@ export function EmailLoginForm({
     setIsLoading?.('email');
 
     try {
-      const result = await signIn('email-code', {
+      const { error } = await authClient.signIn.emailOtp({
         email,
-        code,
-        callbackUrl: '/',
-        redirect: false
+        otp: code
       });
 
-      if (result?.error) {
+      if (error) {
         setError('Invalid or expired verification code');
         setIsLoading?.(null);
         return;
       }
 
-      if (result?.ok) {
-        window.location.href = '/';
-      }
+      window.location.href = '/';
     } catch {
       setError('An error occurred. Please try again.');
       setIsLoading?.(null);
@@ -100,16 +93,13 @@ export function EmailLoginForm({
     setIsLoading?.('email');
 
     try {
-      const response = await fetch('/api/auth/send-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+      const { error } = await authClient.emailOtp.sendVerificationOtp({
+        email,
+        type: 'sign-in'
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to resend code');
+      if (error) {
+        setError(error.message || 'Failed to resend code');
         setIsLoading?.(null);
         return;
       }

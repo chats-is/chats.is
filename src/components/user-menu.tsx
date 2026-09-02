@@ -8,7 +8,6 @@ import {
   Settings,
   Shield
 } from 'lucide-react';
-import { signOut } from 'next-auth/react';
 
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -143,8 +142,8 @@ export function UserMenu() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() =>
-                signOut({
-                  callbackUrl: '/'
+                authClient.signOut().then(() => {
+                  window.location.href = '/';
                 })
               }
               className="flex items-center gap-2"

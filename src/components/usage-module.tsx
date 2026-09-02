@@ -340,7 +340,7 @@ export function DailyStackedChart({
                         className="flex flex-1 items-end"
                         style={{ height: '100%' }}
                       >
-                        <HoverCard openDelay={80} closeDelay={40}>
+                        <HoverCard delay={80} closeDelay={40}>
                           <HoverCardTrigger
                             render={
                               <div
@@ -593,7 +593,7 @@ export function UsageModule({
             <div className="text-sm font-medium text-muted-foreground">
               Tokens
             </div>
-            <HoverCard openDelay={50} closeDelay={50}>
+            <HoverCard delay={50} closeDelay={50}>
               <HoverCardTrigger
                 render={
                   <div className="inline-block cursor-default text-2xl font-bold">
@@ -774,7 +774,7 @@ function Sparkline({ points, color }: { points: SparkPoint[]; color: string }) {
         const left = `${(c.x / W) * 100}%`;
         const top = `${(c.y / H) * 100}%`;
         return (
-          <HoverCard key={i} openDelay={50} closeDelay={50}>
+          <HoverCard key={i} delay={50} closeDelay={50}>
             <HoverCardTrigger
               render={
                 <div

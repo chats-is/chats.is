@@ -34,7 +34,7 @@ export function SettingsUsage() {
     setRefreshing(true);
     try {
       await Promise.all([
-        utils.usage.invalidate(),
+        queryClient.invalidateQueries({ queryKey: usageQueries.all() }),
         queryClient.invalidateQueries({ queryKey: quotaQueries.key.me() })
       ]);
     } finally {

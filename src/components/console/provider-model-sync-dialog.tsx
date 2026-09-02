@@ -132,9 +132,9 @@ export function ProviderModelSyncDialog({
       );
       setSelectedIds([]);
       setCapabilities({});
-      const refreshedModels = await utils.provider.fetchModels.fetch({
-        providerId
-      });
+      const refreshedModels = await queryClient.fetchQuery(
+        providerQueries.remoteModels({ providerId })
+      );
       queryClient.setQueryData(
         providerQueries.remoteModels({ providerId }).queryKey,
         refreshedModels

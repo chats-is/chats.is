@@ -21,7 +21,7 @@ import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 import { getArtifactLanguageLabel } from '@/lib/code-language';
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
 import { formatMediaTime } from '@/lib/utils';
-import type { LibraryItem } from '@/server/api/routers/library';
+import type { LibraryItem } from '@/server/fn/library';
 import { libraryQueries } from '@/server/fn/library';
 import { Button } from '@/components/ui/button';
 import {
@@ -105,7 +105,7 @@ function LibraryLightbox({
 
   return (
     <Dialog>
-      <DialogTrigger render={{ trigger }} />
+      <DialogTrigger render={trigger} />
       <DialogContent
         showCloseButton={false}
         className="block w-auto max-w-[95vw] border-0 bg-transparent p-0 shadow-none sm:max-w-[90vw]"
@@ -303,7 +303,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
 
   const handleArtifactDownload = async (id: string) => {
     // The feed carries a truncated preview; download needs the full body.
-    const full = await utils.artifact.get.fetch({ id });
+    const full = await queryClient.fetchQuery(artifactQueries.get({ id }));
     if (full) downloadArtifact(full);
   };
 

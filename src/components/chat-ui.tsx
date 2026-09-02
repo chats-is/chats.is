@@ -289,7 +289,9 @@ export function ChatUI({
     const prev = prevStatusRef.current;
     prevStatusRef.current = status;
     if ((prev === 'streaming' || prev === 'submitted') && status === 'ready') {
-      void utils.artifact.list.invalidate({ chatId: id });
+      void queryClient.invalidateQueries({
+        queryKey: artifactQueries.list({ chatId: id }).queryKey
+      });
     }
   }, [status, id, utils]);
 

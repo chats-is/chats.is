@@ -36,7 +36,7 @@ export default function UsagePage() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await utils.usage.invalidate();
+      await queryClient.invalidateQueries({ queryKey: usageQueries.all() });
     } finally {
       setRefreshing(false);
     }

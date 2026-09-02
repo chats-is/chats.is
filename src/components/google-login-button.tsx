@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
-import { signIn } from 'next-auth/react';
 
+import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { IconGoogle } from '@/components/icons';
 
@@ -22,7 +22,7 @@ export function GoogleLoginButton({
 
   const handleSignIn = () => {
     setIsLoading?.('google');
-    signIn('google', { callbackUrl: '/' });
+    authClient.signIn.social({ provider: 'google', callbackURL: '/' });
   };
 
   return (

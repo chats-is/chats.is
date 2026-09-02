@@ -58,9 +58,13 @@ export default function UserDetail({ userId }: { userId: string }) {
     setRefreshing(true);
     try {
       await Promise.all([
-        utils.usage.invalidate(),
-        utils.quota.getByUser.invalidate({ userId }),
-        utils.user.get.invalidate({ id: userId })
+        queryClient.invalidateQueries({ queryKey: usageQueries.all() }),
+        queryClient.invalidateQueries({
+          queryKey: quotaQueries.byUser({ userId }).queryKey
+        }),
+        queryClient.invalidateQueries({
+          queryKey: userQueries.detail({ id: userId }).queryKey
+        })
       ]);
     } finally {
       setRefreshing(false);
