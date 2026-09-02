@@ -1,3 +1,10 @@
-package-lock.json
+node_modules
+.output
+.nitro
+.vercel
 pnpm-lock.yaml
-yarn.lock
+src/routeTree.gen.ts
+
+# Installed by the shadcn CLI and left exactly as installed. Where Base UI
+# differs from what a call site expected, the call site adapts.
+src/components/ui

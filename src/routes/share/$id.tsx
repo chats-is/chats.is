@@ -1,11 +1,11 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import { format } from 'date-fns';
-
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
+import { format } from 'date-fns';
+
 import { convertToChatMessages } from '@/lib/utils';
-import { getSharedChat } from '@/server/fn/share';
 import { getSystemSettingsFn } from '@/server/fn/settings';
+import { getSharedChat } from '@/server/fn/share';
 import { SharedChatView } from '@/components/shared-chat-view';
 
 /** A share link is public: no guard above it, and none needed. */

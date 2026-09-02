@@ -7,11 +7,13 @@ import { requireUser } from '@/server/fn/auth';
 import { LoginForm } from '@/components/login-form';
 
 /** Which ways in are configured; the form shows only those. */
-const getSignInMethods = createServerFn({ method: 'GET' }).handler(async () => ({
-  emailEnabled: env.AUTH_EMAIL_ENABLED,
-  githubEnabled: env.AUTH_GITHUB_ENABLED,
-  googleEnabled: env.AUTH_GOOGLE_ENABLED
-}));
+const getSignInMethods = createServerFn({ method: 'GET' }).handler(
+  async () => ({
+    emailEnabled: env.AUTH_EMAIL_ENABLED,
+    githubEnabled: env.AUTH_GITHUB_ENABLED,
+    googleEnabled: env.AUTH_GOOGLE_ENABLED
+  })
+);
 
 export const Route = createFileRoute('/login')({
   validateSearch: z.object({ redirect: z.string().optional() }),

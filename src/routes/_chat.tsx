@@ -1,10 +1,10 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
-
 import { ArtifactProvider } from '@/contexts/artifact-context';
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
-import { getSystemSettingsFn } from '@/server/fn/settings';
+
 import { requireUser } from '@/server/fn/auth';
+import { getSystemSettingsFn } from '@/server/fn/settings';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Sidebar } from '@/components/sidebar';
 
