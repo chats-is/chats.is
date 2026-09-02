@@ -101,7 +101,9 @@ function ProviderBindingRow({
   return (
     <div className="flex items-center gap-2 rounded-md border p-2">
       <Select
-        value={binding.providerId || undefined}
+        // `null`, not undefined: an empty binding is a select with nothing
+        // chosen, not one that owns its own value — see settings/models.
+        value={binding.providerId || null}
         onValueChange={onSelect(value => onChange({ providerId: value }))}
         disabled={isPending}
       >

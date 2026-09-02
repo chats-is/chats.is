@@ -1,0 +1,15 @@
+import { open } from './verify.mjs';
+const { browser, page, errs } = await open();
+await page.goto('http://localhost:3000/console/providers', { waitUntil: 'networkidle' });
+await page.getByRole('button', { name: /add provider/i }).click();
+await page.waitForTimeout(700);
+const d = page.locator('[role="dialog"]').last();
+await d.getByPlaceholder('OpenAI').fill('VPX' + Date.now());
+await d.locator('input').nth(1).fill('sk-verify-only');
+await d.getByRole('button', { name: 'Create' }).click();
+await page.waitForTimeout(4000);
+console.log('对话框还在:', await page.locator('[role="dialog"]').count());
+console.log('toast/提示:', (await page.locator('body').innerText()).split('\n').filter(l=>/fail|error|invalid|required/i.test(l)).slice(0,4));
+console.log('错误:', errs.slice(0,5));
+console.log('Enabled 单元格:', await page.locator('tbody tr').first().locator('td').nth(4).innerHTML().then(h=>h.replace(/\s+/g,' ').slice(0,300)));
+await browser.close();
