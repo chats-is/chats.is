@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import { type Chat } from '@/types';
-import { type Input, mutating } from '@/lib/mutation';
+import { mutating, type Input } from '@/lib/mutation';
 import {
   chatQueries,
   deleteAllChats,

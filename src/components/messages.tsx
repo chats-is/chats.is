@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { type UseChatHelpers } from '@ai-sdk/react';
 
 import { type Artifact, type ChatMessage } from '@/types';

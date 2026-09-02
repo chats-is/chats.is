@@ -20,7 +20,7 @@ export function useSharedLinks(page: number = 0, limit: number = 5) {
   });
 
   const deleteAllMutation = useMutation({
-    mutationFn: mutating(deleteAllShares),
+    mutationFn: () => deleteAllShares(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: shareQueries.key.list() });
     }

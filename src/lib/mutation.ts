@@ -10,6 +10,11 @@
 /** What a server function is called with, as a mutation sees it. */
 export type Input<TFn> = DataOf<TFn>;
 
+/** What it answers with. */
+export type Output<TFn> = TFn extends (opts: never) => Promise<infer TResult>
+  ? TResult
+  : never;
+
 type DataOf<TFn> = TFn extends (opts: infer TOpts) => unknown
   ? TOpts extends { data: infer TData }
     ? TData
@@ -20,7 +25,9 @@ export function mutating<TFn extends (opts: never) => Promise<unknown>>(
   fn: TFn
 ): (data: DataOf<TFn>) => Promise<Awaited<ReturnType<TFn>>> {
   return data =>
-    (fn as unknown as (opts: { data: unknown }) => Promise<
-      Awaited<ReturnType<TFn>>
-    >)({ data });
+    (
+      fn as unknown as (opts: {
+        data: unknown;
+      }) => Promise<Awaited<ReturnType<TFn>>>
+    )({ data });
 }

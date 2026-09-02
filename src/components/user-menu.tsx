@@ -9,6 +9,7 @@ import {
   Shield
 } from 'lucide-react';
 
+import { authClient } from '@/lib/auth-client';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {

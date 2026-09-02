@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Check,
   Github,
   Loader2,
   Mail,
@@ -211,7 +212,7 @@ export default function UsersPage() {
                   <div className="flex items-center gap-2">
                     {user.accounts && user.accounts.length > 0 ? (
                       user.accounts.map((account, idx) => (
-                        <ProviderIcon key={idx} provider={account.provider} />
+                        <ProviderIcon key={idx} provider={account.providerId} />
                       ))
                     ) : (
                       <span className="text-xs text-muted-foreground">-</span>
@@ -224,7 +225,14 @@ export default function UsersPage() {
                   </span>
                 </td>
                 <td className="p-3 text-sm">
-                  {formatDate(user.emailVerified)}
+                  {/* Verification is a yes or no now, not a date: the auth
+                      library records whether an address was confirmed, not
+                      when. The column always asked "Verified". */}
+                  {user.emailVerified ? (
+                    <Check className="size-4 text-muted-foreground" />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </td>
                 <td className="p-3 text-sm">{formatDate(user.createdAt)}</td>
                 <td className="p-3 text-center">

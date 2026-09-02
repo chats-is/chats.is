@@ -293,7 +293,7 @@ export function ChatUI({
         queryKey: artifactQueries.list({ chatId: id }).queryKey
       });
     }
-  }, [status, id, utils]);
+  }, [status, id, queryClient]);
 
   useEffect(() => {
     if (artifactsQuery.data) {

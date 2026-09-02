@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { ChatHeader } from '@/components/chat-header';
 
 export function ChatNotFound() {

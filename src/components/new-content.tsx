@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useLocation, useRouter } from '@tanstack/react-router';
 
 import { contentTypes } from '@/lib/content-types';

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 import type { ModelCapability } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
-import { mutating } from '@/lib/mutation';
+import { mutating, type Output } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';
 import { modelQueries } from '@/server/fn/model';
 import { providerQueries, syncProviderModels } from '@/server/fn/provider';
@@ -62,7 +62,7 @@ export function ProviderModelSyncDialog({
 
   const syncMutation = useMutation({
     mutationFn: mutating(syncProviderModels),
-    onSuccess: result => {
+    onSuccess: (result: Output<typeof syncProviderModels>) => {
       queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
       queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
       reset();

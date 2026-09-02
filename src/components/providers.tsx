@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { ThemeProvider, type ThemeProviderProps } from 'next-themes';
 
 import { Toaster } from '@/components/ui/sonner';

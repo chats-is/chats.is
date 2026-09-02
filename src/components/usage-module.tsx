@@ -340,8 +340,10 @@ export function DailyStackedChart({
                         className="flex flex-1 items-end"
                         style={{ height: '100%' }}
                       >
-                        <HoverCard delay={80} closeDelay={40}>
+                        <HoverCard>
                           <HoverCardTrigger
+                            delay={80}
+                            closeDelay={40}
                             render={
                               <div
                                 className="mx-auto flex w-1/2 max-w-5 cursor-pointer flex-col-reverse overflow-hidden rounded-t transition-[filter] hover:brightness-110"
@@ -374,7 +376,6 @@ export function DailyStackedChart({
                             side="left"
                             align="center"
                             sideOffset={8}
-                            collisionPadding={16}
                             className="w-72 p-3"
                           >
                             <DayTooltipContent
@@ -593,8 +594,10 @@ export function UsageModule({
             <div className="text-sm font-medium text-muted-foreground">
               Tokens
             </div>
-            <HoverCard delay={50} closeDelay={50}>
+            <HoverCard>
               <HoverCardTrigger
+                delay={50}
+                closeDelay={50}
                 render={
                   <div className="inline-block cursor-default text-2xl font-bold">
                     {formatNumber(tokensTotal)}
@@ -774,8 +777,10 @@ function Sparkline({ points, color }: { points: SparkPoint[]; color: string }) {
         const left = `${(c.x / W) * 100}%`;
         const top = `${(c.y / H) * 100}%`;
         return (
-          <HoverCard key={i} delay={50} closeDelay={50}>
+          <HoverCard key={i}>
             <HoverCardTrigger
+              delay={50}
+              closeDelay={50}
               render={
                 <div
                   className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer p-1.5"

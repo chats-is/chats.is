@@ -11,6 +11,7 @@ import {
   ListFoundationModelsCommand
 } from '@aws-sdk/client-bedrock';
 import { GoogleGenAI } from '@google/genai';
+import type { JSONValue } from 'ai';
 import {
   APICallError,
   type ImageModel,
@@ -258,7 +259,7 @@ export function bindingsToFailoverProviders(
       type: ProviderType;
       apiKey?: string | null;
       baseUrl?: string | null;
-      apiOptions?: Record<string, unknown> | null;
+      apiOptions?: Record<string, JSONValue> | null;
     } | null;
   }>
 ): FailoverProvider[] {

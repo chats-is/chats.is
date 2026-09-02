@@ -21,6 +21,7 @@ import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 import { getArtifactLanguageLabel } from '@/lib/code-language';
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
 import { formatMediaTime } from '@/lib/utils';
+import { artifactQueries } from '@/server/fn/artifact';
 import type { LibraryItem } from '@/server/fn/library';
 import { libraryQueries } from '@/server/fn/library';
 import { Button } from '@/components/ui/button';
@@ -99,7 +100,7 @@ function LibraryLightbox({
   type: 'image' | 'video';
   src: string;
   alt?: string;
-  trigger: React.ReactNode;
+  trigger: React.ReactElement;
 }) {
   const title = alt || (type === 'image' ? 'Image preview' : 'Video preview');
 

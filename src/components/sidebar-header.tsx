@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { Link } from '@tanstack/react-router';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 

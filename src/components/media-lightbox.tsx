@@ -14,7 +14,7 @@ interface MediaLightboxProps {
   src: string;
   alt?: string;
   /** The clickable element shown inline (image thumbnail or a button). */
-  trigger: React.ReactNode;
+  trigger: React.ReactElement;
   className?: string;
 }
 
