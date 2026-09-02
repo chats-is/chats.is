@@ -64,7 +64,7 @@ export default function UsersPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
       await queryClient.invalidateQueries({
-        queryKey: userQueries.key.getStats()
+        queryKey: userQueries.key.stats()
       });
       setUpdatingRoleUserId(null);
     },
@@ -79,7 +79,7 @@ export default function UsersPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
       await queryClient.invalidateQueries({
-        queryKey: quotaQueries.key.getByUser()
+        queryKey: quotaQueries.key.byUser()
       });
       setUpdatingQuotaUserId(null);
       toast.success('Quota override updated');
@@ -95,7 +95,7 @@ export default function UsersPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
       await queryClient.invalidateQueries({
-        queryKey: quotaQueries.key.getByUser()
+        queryKey: quotaQueries.key.byUser()
       });
       setUpdatingQuotaUserId(null);
       toast.success('Quota override removed');

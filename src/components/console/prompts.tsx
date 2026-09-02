@@ -127,7 +127,7 @@ export default function PromptsPage() {
         queryKey: promptQueries.key.adminList()
       }),
       queryClient.invalidateQueries({
-        queryKey: promptQueries.key.listUsable()
+        queryKey: promptQueries.key.usable()
       })
     ]);
 

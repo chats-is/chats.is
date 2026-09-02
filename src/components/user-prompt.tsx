@@ -161,7 +161,7 @@ export const UserPrompt = () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: promptQueries.key.list() }),
       queryClient.invalidateQueries({
-        queryKey: promptQueries.key.listUsable()
+        queryKey: promptQueries.key.usable()
       })
     ]);
   };

@@ -1,3 +1,4 @@
+import type { InfiniteData } from '@tanstack/react-query';
 import {
   useInfiniteQuery,
   useMutation,
@@ -5,15 +6,20 @@ import {
 } from '@tanstack/react-query';
 
 import { type Chat } from '@/types';
-import { mutating } from '@/lib/mutation';
+import { type Input, mutating } from '@/lib/mutation';
 import {
   chatQueries,
   deleteAllChats,
   deleteChat,
+  listChats,
   updateChat
 } from '@/server/fn/chat';
 
 const LIMIT = 25;
+
+/** The one cache the sidebar reads and every edit below writes back into. */
+const historyQuery = () => chatQueries.infinite({ limit: LIMIT });
+type History = InfiniteData<Awaited<ReturnType<typeof listChats>>>;
 
 export function useChatsInfinite() {
   const {
@@ -25,12 +31,7 @@ export function useChatsInfinite() {
     isError,
     error
   } = useInfiniteQuery({
-    ...chatQueries.list({ limit: LIMIT }),
-    getNextPageParam: (lastPage, allPages) => {
-      if (!lastPage || lastPage.length < LIMIT) return undefined;
-      return allPages.length * LIMIT;
-    },
-    initialCursor: 0,
+    ...historyQuery(),
     refetchOnWindowFocus: false
   });
 
@@ -49,15 +50,35 @@ export function useChatsInfinite() {
 
 export function useChats() {
   const queryClient = useQueryClient();
+  const key = historyQuery().queryKey;
+
+  /**
+   * Each edit shows its result in the sidebar before the server has agreed,
+   * and puts the previous list back if it doesn't. Reading, writing and
+   * restoring all name the same key, so an optimistic edit cannot land in a
+   * cache nothing is reading.
+   */
+  const snapshot = async () => {
+    await queryClient.cancelQueries({ queryKey: key });
+    return queryClient.getQueryData<History>(key);
+  };
+
+  const restore = (previous: History | undefined) => {
+    queryClient.setQueryData(key, previous);
+  };
+
+  const settle = () => {
+    queryClient.invalidateQueries({ queryKey: chatQueries.key.infinite() });
+    queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
+  };
 
   const update = useMutation({
     mutationFn: mutating(updateChat),
-    onMutate: async newChat => {
-      await queryClient.cancelQueries({ queryKey: chatQueries.key.list() });
-      const previousChats = utils.chat.list.getInfiniteData();
+    onMutate: async (newChat: Input<typeof updateChat>) => {
+      const previousChats = await snapshot();
 
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, old => {
-        if (!old) return { pages: [], pageParams: [] };
+      queryClient.setQueryData<History>(key, old => {
+        if (!old) return old;
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -70,22 +91,17 @@ export function useChats() {
 
       return { previousChats };
     },
-    onError: (err, newChat, context) => {
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
-    }
+    onError: (_err, _newChat, context) => restore(context?.previousChats),
+    onSettled: settle
   });
 
   const remove = useMutation({
     mutationFn: mutating(deleteChat),
-    onMutate: async ({ id }) => {
-      await queryClient.cancelQueries({ queryKey: chatQueries.key.list() });
-      const previousChats = utils.chat.list.getInfiniteData();
+    onMutate: async ({ id }: Input<typeof deleteChat>) => {
+      const previousChats = await snapshot();
 
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, old => {
-        if (!old) return { pages: [], pageParams: [] };
+      queryClient.setQueryData<History>(key, old => {
+        if (!old) return old;
         return {
           ...old,
           pages: old.pages.map(page => page.filter(chat => chat.id !== id))
@@ -94,35 +110,27 @@ export function useChats() {
 
       return { previousChats };
     },
-    onError: (err, id, context) => {
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
-    }
+    onError: (_err, _vars, context) => restore(context?.previousChats),
+    onSettled: settle
   });
 
   const clear = useMutation({
-    mutationFn: mutating(deleteAllChats),
+    mutationFn: () => deleteAllChats(),
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: chatQueries.key.list() });
-      const previousChats = utils.chat.list.getInfiniteData();
-      utils.chat.list.setInfiniteData(
-        { limit: LIMIT },
-        { pages: [], pageParams: [] }
+      const previousChats = await snapshot();
+      queryClient.setQueryData<History>(key, old =>
+        old ? { ...old, pages: [], pageParams: [] } : old
       );
       return { previousChats };
     },
-    onError: (err, vars, context) => {
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
-    }
+    onError: (_err, _vars, context) => restore(context?.previousChats),
+    onSettled: settle
   });
 
   const refresh = () => {
-    return queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
+    return queryClient.invalidateQueries({
+      queryKey: chatQueries.key.infinite()
+    });
   };
 
   return {
