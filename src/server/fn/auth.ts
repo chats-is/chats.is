@@ -7,6 +7,6 @@ import { getUser } from '@/server/session';
  * answers rather than throwing: a guard decides where to send someone, and
  * that decision belongs in the route.
  */
-export const requireUser = createServerFn({ method: 'GET' }).handler(
-  async () => getUser()
+export const requireUser = createServerFn({ method: 'GET' }).handler(async () =>
+  getUser()
 );

@@ -1,7 +1,7 @@
 import { upload } from '@vercel/blob/client';
 
 import { type Attachment, type Result } from '@/types';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env.public';
 import { UPLOAD_CONFIG, type UploadType } from '@/lib/upload-config';
 import { generateUUID } from '@/lib/utils';
 
@@ -51,7 +51,7 @@ export const uploadFile = async (
     : (file.type.split('/')[1] ?? 'bin');
 
   const pathname = [
-    env.VITE_UPLOAD_PATH,
+    publicEnv.VITE_UPLOAD_PATH,
     UPLOAD_CONFIG[type].folder,
     options.userId,
     `${generateUUID()}.${ext}`

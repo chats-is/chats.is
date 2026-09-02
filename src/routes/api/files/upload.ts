@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env.public';
 import {
   isUploadType,
   maxSizeForPathname,
@@ -53,7 +53,7 @@ async function POST({ request: req }: { request: Request }) {
         }
 
         const prefix = [
-          env.VITE_UPLOAD_PATH,
+          publicEnv.VITE_UPLOAD_PATH,
           UPLOAD_CONFIG[type].folder,
           user.id
         ]

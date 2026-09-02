@@ -56,19 +56,9 @@ export const env = createEnv({
     UMAMI_SCRIPT_URL: z.string().optional(),
     UMAMI_WEBSITE_ID: z.string().optional()
   },
-  // Vite decides what reaches the browser by prefix, so the one public
-  // variable is named for that rather than for the framework that left.
-  clientPrefix: 'VITE_',
-  client: {
-    // The browser builds the path it uploads to, and the server checks that
-    // path against the session before signing a token for it. Public because
-    // it is already the first segment of every blob URL the app serves.
-    VITE_UPLOAD_PATH: z.string().default('uploads')
-  },
   // import.meta.env is what Vite fills in; process.env is what drizzle-kit and
   // the deployed function see. Reading both means one schema serves both.
   runtimeEnv: {
-    VITE_UPLOAD_PATH: import.meta.env?.VITE_UPLOAD_PATH,
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
     VERCEL_URL: process.env.VERCEL_URL,

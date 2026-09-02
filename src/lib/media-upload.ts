@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only';
 
 import { put } from '@vercel/blob';
 
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env.public';
 import { generateUUID } from '@/lib/utils';
 
 export type StoredMedia = {
@@ -29,7 +29,12 @@ export async function uploadGeneratedMedia(args: {
   // a filesystem access. Since the upload path is only known at runtime, the
   // tracer cannot resolve it and falls back to bundling the whole project root
   // into every function that reaches this file (.git and .env included).
-  const pathname = [env.VITE_UPLOAD_PATH, args.kind, args.userId, filename]
+  const pathname = [
+    publicEnv.VITE_UPLOAD_PATH,
+    args.kind,
+    args.userId,
+    filename
+  ]
     .filter(Boolean)
     .join('/');
   const data = await put(pathname, args.buffer, {
