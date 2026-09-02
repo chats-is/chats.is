@@ -1,27 +1,27 @@
-import { Code2, File, FileText, Image as ImageIcon, Table } from 'lucide-react'
+import { Code2, File, FileText, Image as ImageIcon, Table } from 'lucide-react';
 
-import { type Artifact } from '@/types'
-import { getArtifactKind, type ArtifactKind } from '@/lib/artifact'
-import { getArtifactLanguageLabel } from '@/lib/code-language'
-import { CodeBlock } from '@/components/codeblock'
-import { MessageMarkdown } from '@/components/message-markdown'
+import { type Artifact } from '@/types';
+import { getArtifactKind, type ArtifactKind } from '@/lib/artifact';
+import { getArtifactLanguageLabel } from '@/lib/code-language';
+import { CodeBlock } from '@/components/codeblock';
+import { MessageMarkdown } from '@/components/message-markdown';
 
-export { getArtifactLanguageLabel } from '@/lib/code-language'
-export { getArtifactKind, type ArtifactKind } from '@/lib/artifact'
+export { getArtifactLanguageLabel } from '@/lib/code-language';
+export { getArtifactKind, type ArtifactKind } from '@/lib/artifact';
 
 const isImageMime = (mimeType?: string | null) =>
-  !!mimeType && mimeType.startsWith('image/')
+  !!mimeType && mimeType.startsWith('image/');
 const isVideoMime = (mimeType?: string | null) =>
-  !!mimeType && mimeType.startsWith('video/')
+  !!mimeType && mimeType.startsWith('video/');
 const isAudioMime = (mimeType?: string | null) =>
-  !!mimeType && mimeType.startsWith('audio/')
-const isPdfMime = (mimeType?: string | null) => mimeType === 'application/pdf'
+  !!mimeType && mimeType.startsWith('audio/');
+const isPdfMime = (mimeType?: string | null) => mimeType === 'application/pdf';
 
 const formatCell = (value: unknown): string => {
-  if (value == null) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
+  if (value == null) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
 
 // The one shared "raw source" surface (also the streaming fallback for sheets),
 // so every source view renders identically.
@@ -34,56 +34,56 @@ const renderRawSource = (artifact: Artifact, language: string) => (
     wrapLongLines={true}
     bordered={false}
   />
-)
+);
 
 // Whether the source view should use the flush code surface (no padding) vs.
 // the bordered document card. Owned here so the viewer needs no per-type checks.
 export const artifactSourceUsesCodeChrome = (artifact: Artifact) => {
-  const kind = getArtifactKind(artifact)
-  return kind === 'code' || kind === 'sheet' || artifact.type === 'markdown'
-}
+  const kind = getArtifactKind(artifact);
+  return kind === 'code' || kind === 'sheet' || artifact.type === 'markdown';
+};
 
 // Renders a JSON ("sheet") artifact as a real table when the content is an
 // array of row objects/arrays; otherwise (incl. partial content while
 // streaming) falls back to syntax-highlighted JSON.
 function SheetContent({ artifact }: { artifact: Artifact }) {
-  const content = artifact.content ?? ''
+  const content = artifact.content ?? '';
 
-  let parsed: unknown = null
+  let parsed: unknown = null;
   try {
-    parsed = JSON.parse(content)
+    parsed = JSON.parse(content);
   } catch {
-    parsed = null
+    parsed = null;
   }
 
-  const rows = Array.isArray(parsed) ? parsed : null
-  const jsonFallback = renderRawSource(artifact, 'json')
+  const rows = Array.isArray(parsed) ? parsed : null;
+  const jsonFallback = renderRawSource(artifact, 'json');
 
   if (!rows || rows.length === 0) {
-    return jsonFallback
+    return jsonFallback;
   }
 
   const allObjects = rows.every(
-    (row) => row != null && typeof row === 'object' && !Array.isArray(row),
-  )
-  const allArrays = rows.every((row) => Array.isArray(row))
+    row => row != null && typeof row === 'object' && !Array.isArray(row)
+  );
+  const allArrays = rows.every(row => Array.isArray(row));
 
   if (!allObjects && !allArrays) {
-    return jsonFallback
+    return jsonFallback;
   }
 
   const columns = allObjects
     ? Array.from(
         new Set(
-          rows.flatMap((row) => Object.keys(row as Record<string, unknown>)),
-        ),
+          rows.flatMap(row => Object.keys(row as Record<string, unknown>))
+        )
       )
     : Array.from({
         length: rows.reduce(
           (max, row) => Math.max(max, (row as unknown[]).length),
-          0,
-        ),
-      })
+          0
+        )
+      });
 
   return (
     <div className="overflow-auto p-2">
@@ -107,7 +107,7 @@ function SheetContent({ artifact }: { artifact: Artifact }) {
                 >
                   {allObjects
                     ? formatCell(
-                        (row as Record<string, unknown>)[column as string],
+                        (row as Record<string, unknown>)[column as string]
                       )
                     : formatCell((row as unknown[])[columnIndex])}
                 </td>
@@ -117,7 +117,7 @@ function SheetContent({ artifact }: { artifact: Artifact }) {
         </tbody>
       </table>
     </div>
-  )
+  );
 }
 
 const renderImageContent = (artifact: Artifact) =>
@@ -131,7 +131,7 @@ const renderImageContent = (artifact: Artifact) =>
     <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
       Image URL unavailable.
     </div>
-  )
+  );
 
 const renderFileContent = (artifact: Artifact) => {
   if (artifact.fileUrl && isImageMime(artifact.mimeType)) {
@@ -141,7 +141,7 @@ const renderFileContent = (artifact: Artifact) => {
         src={artifact.fileUrl}
         alt={artifact.title}
       />
-    )
+    );
   }
 
   if (artifact.fileUrl && isVideoMime(artifact.mimeType)) {
@@ -151,11 +151,11 @@ const renderFileContent = (artifact: Artifact) => {
         controls
         src={artifact.fileUrl}
       />
-    )
+    );
   }
 
   if (artifact.fileUrl && isAudioMime(artifact.mimeType)) {
-    return <audio className="w-full" controls src={artifact.fileUrl} />
+    return <audio className="w-full" controls src={artifact.fileUrl} />;
   }
 
   if (artifact.fileUrl && isPdfMime(artifact.mimeType)) {
@@ -165,7 +165,7 @@ const renderFileContent = (artifact: Artifact) => {
         src={artifact.fileUrl}
         title={artifact.title}
       />
-    )
+    );
   }
 
   return (
@@ -190,83 +190,83 @@ const renderFileContent = (artifact: Artifact) => {
         </a>
       )}
     </div>
-  )
-}
+  );
+};
 
 export const artifactRegistry: Record<
   ArtifactKind,
   {
-    label: string
-    icon: typeof FileText
-    renderPreview: (artifact: Artifact) => React.ReactNode
-    renderContent: (artifact: Artifact) => React.ReactNode
+    label: string;
+    icon: typeof FileText;
+    renderPreview: (artifact: Artifact) => React.ReactNode;
+    renderContent: (artifact: Artifact) => React.ReactNode;
     /** Raw text form shown in the source view (media kinds reuse renderContent). */
-    renderSource: (artifact: Artifact) => React.ReactNode
+    renderSource: (artifact: Artifact) => React.ReactNode;
   }
 > = {
   text: {
     label: 'Text',
     icon: FileText,
-    renderPreview: (artifact) => (
+    renderPreview: artifact => (
       <div className="line-clamp-3 text-xs text-muted-foreground">
         {artifact.content ?? ''}
       </div>
     ),
-    renderContent: (artifact) => {
+    renderContent: artifact => {
       if (artifact.type === 'markdown') {
-        return <MessageMarkdown content={artifact.content ?? ''} />
+        return <MessageMarkdown content={artifact.content ?? ''} />;
       }
       return (
         <pre className="text-sm whitespace-pre-wrap">
           {artifact.content ?? ''}
         </pre>
-      )
+      );
     },
-    renderSource: (artifact) =>
+    renderSource: artifact =>
       artifact.type === 'markdown' ? (
         renderRawSource(artifact, 'markdown')
       ) : (
         <pre className="text-sm whitespace-pre-wrap">
           {artifact.content ?? ''}
         </pre>
-      ),
+      )
   },
   code: {
     label: 'Code',
     icon: Code2,
-    renderPreview: (artifact) => (
+    renderPreview: artifact => (
       <pre className="line-clamp-3 overflow-hidden font-mono text-xs whitespace-pre-wrap text-muted-foreground">
         {artifact.content ?? ''}
       </pre>
     ),
-    renderContent: (artifact) =>
+    renderContent: artifact =>
       renderRawSource(artifact, getArtifactLanguageLabel(artifact)),
-    renderSource: (artifact) =>
-      renderRawSource(artifact, getArtifactLanguageLabel(artifact)),
+    renderSource: artifact =>
+      renderRawSource(artifact, getArtifactLanguageLabel(artifact))
   },
   sheet: {
     label: 'Sheet',
     icon: Table,
-    renderPreview: (artifact) => {
+    renderPreview: artifact => {
       try {
-        const rows = JSON.parse(artifact.content ?? '[]')
+        const rows = JSON.parse(artifact.content ?? '[]');
         if (Array.isArray(rows)) {
           return (
             <div className="text-xs text-muted-foreground">
               {rows.length} rows
             </div>
-          )
+          );
         }
       } catch {}
-      return <div className="text-xs text-muted-foreground">Invalid JSON</div>
+      return <div className="text-xs text-muted-foreground">Invalid JSON</div>;
     },
-    renderContent: (artifact) => <SheetContent artifact={artifact} />,
-    renderSource: (artifact) => renderRawSource(artifact, 'json'),
+    renderContent: artifact => <SheetContent artifact={artifact} />,
+    renderSource: artifact => renderRawSource(artifact, 'json')
   },
   image: {
     label: 'Image',
     icon: ImageIcon,
-    renderPreview: (artifact) =>
+    renderPreview: artifact =>
       artifact.fileUrl ? (
         <img
           className="h-20 w-full rounded-md object-cover"
@@ -277,12 +277,12 @@ export const artifactRegistry: Record<
         <div className="text-xs text-muted-foreground">No image</div>
       ),
     renderContent: renderImageContent,
-    renderSource: renderImageContent,
+    renderSource: renderImageContent
   },
   file: {
     label: 'File',
     icon: File,
-    renderPreview: (artifact) => {
+    renderPreview: artifact => {
       if (artifact.fileUrl && isImageMime(artifact.mimeType)) {
         return (
           <img
@@ -290,16 +290,16 @@ export const artifactRegistry: Record<
             src={artifact.fileUrl}
             alt={artifact.title}
           />
-        )
+        );
       }
       return (
         <div className="text-xs text-muted-foreground">
           {artifact.fileName ||
             (artifact.fileUrl ? 'File' : 'File URL unavailable')}
         </div>
-      )
+      );
     },
     renderContent: renderFileContent,
-    renderSource: renderFileContent,
-  },
-}
+    renderSource: renderFileContent
+  }
+};

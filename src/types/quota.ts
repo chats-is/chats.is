@@ -1,5 +1,5 @@
 /** Which layer in the resolution chain produced the user's effective quota. */
-export type ResolvedSource = 'override' | 'plan' | 'default' | 'none'
+export type ResolvedSource = 'override' | 'plan' | 'default' | 'none';
 
 /**
  * The quota that applies to a specific user, with current per-window
@@ -14,10 +14,10 @@ export type ResolvedSource = 'override' | 'plan' | 'default' | 'none'
  * is configured; absent means "no limit for this window".
  */
 export type UserQuota = {
-  name: string | null
-  isUnlimited: boolean
-  source: ResolvedSource
-  plan: { id: string; name: string } | null
-  fiveHour?: { remainingPct: number; resetAt: Date | null }
-  sevenDay?: { remainingPct: number; resetAt: Date | null }
-}
+  name: string | null;
+  isUnlimited: boolean;
+  source: ResolvedSource;
+  plan: { id: string; name: string } | null;
+  fiveHour?: { remainingPct: number; resetAt: Date | null };
+  sevenDay?: { remainingPct: number; resetAt: Date | null };
+};

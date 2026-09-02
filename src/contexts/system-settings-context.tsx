@@ -1,31 +1,31 @@
-import { createContext, type ReactNode, useContext } from 'react'
+import { createContext, useContext, type ReactNode } from 'react';
 
-import { type SystemSettings } from '@/types'
+import { type SystemSettings } from '@/types';
 
-const SystemSettingsContext = createContext<SystemSettings | null>(null)
+const SystemSettingsContext = createContext<SystemSettings | null>(null);
 
 interface SystemSettingsProviderProps {
-  settings: SystemSettings
-  children: ReactNode
+  settings: SystemSettings;
+  children: ReactNode;
 }
 
 export function SystemSettingsProvider({
   settings,
-  children,
+  children
 }: SystemSettingsProviderProps) {
   return (
     <SystemSettingsContext.Provider value={settings}>
       {children}
     </SystemSettingsContext.Provider>
-  )
+  );
 }
 
 export function useSystemSettings() {
-  const context = useContext(SystemSettingsContext)
+  const context = useContext(SystemSettingsContext);
   if (!context) {
     throw new Error(
-      'useSystemSettings must be used within SystemSettingsProvider',
-    )
+      'useSystemSettings must be used within SystemSettingsProvider'
+    );
   }
-  return context
+  return context;
 }

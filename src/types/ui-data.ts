@@ -1,10 +1,10 @@
-import type { LanguageModelUsage } from 'ai'
-import type { UsageData } from 'tokenlens/helpers'
+import type { LanguageModelUsage } from 'ai';
+import type { UsageData } from 'tokenlens/helpers';
 
-import type { Artifact, ArtifactType } from './artifact'
+import type { Artifact, ArtifactType } from './artifact';
 
 // Server-merged usage: base usage + TokenLens summary + optional modelId
-export type Usage = LanguageModelUsage & UsageData & { modelId?: string }
+export type Usage = LanguageModelUsage & UsageData & { modelId?: string };
 
 /**
  * Why a turn was refused. Carried on the persisted error part so the UI can
@@ -22,11 +22,11 @@ export type ChatErrorKind =
   /** The model or its provider no longer resolves. */
   | 'model-unavailable'
   /** The stream failed part-way; whatever had been written is all there is. */
-  | 'incomplete'
+  | 'incomplete';
 
 export type CustomUIDataTypes = {
-  chat: { title: string }
-  usage: Usage
+  chat: { title: string };
+  usage: Usage;
   /**
    * A refusal, persisted as part of the assistant turn.
    *
@@ -34,60 +34,60 @@ export type CustomUIDataTypes = {
    * lands in `message.parts` and survives a reload — a refusal the user cannot
    * see afterwards leaves an unanswered message and no explanation.
    */
-  error: { kind: ChatErrorKind; message: string }
-  appendMessage: string
+  error: { kind: ChatErrorKind; message: string };
+  appendMessage: string;
   artifact: {
-    artifact: Artifact
-  }
+    artifact: Artifact;
+  };
   textDelta: {
-    id: string
-    delta: string
-    mode?: 'append' | 'replace'
-    status?: 'streaming' | 'done'
-    title?: string
-    artifactType: ArtifactType
-  }
+    id: string;
+    delta: string;
+    mode?: 'append' | 'replace';
+    status?: 'streaming' | 'done';
+    title?: string;
+    artifactType: ArtifactType;
+  };
   codeDelta: {
-    id: string
-    delta: string
-    mode?: 'append' | 'replace'
-    status?: 'streaming' | 'done'
-    title?: string
-    language?: string
-    artifactType: ArtifactType
-  }
+    id: string;
+    delta: string;
+    mode?: 'append' | 'replace';
+    status?: 'streaming' | 'done';
+    title?: string;
+    language?: string;
+    artifactType: ArtifactType;
+  };
   imageDelta: {
-    id: string
-    url: string
-    status?: 'streaming' | 'done'
-    title?: string
-    artifactType: ArtifactType
-  }
+    id: string;
+    url: string;
+    status?: 'streaming' | 'done';
+    title?: string;
+    artifactType: ArtifactType;
+  };
   fileDelta: {
-    id: string
-    url: string
-    status?: 'streaming' | 'done'
-    title?: string
-    fileName?: string | null
-    mimeType?: string | null
-    size?: number | null
-    artifactType: ArtifactType
-  }
-  messageId: string
-  id: string
+    id: string;
+    url: string;
+    status?: 'streaming' | 'done';
+    title?: string;
+    fileName?: string | null;
+    mimeType?: string | null;
+    size?: number | null;
+    artifactType: ArtifactType;
+  };
+  messageId: string;
+  id: string;
   title: {
-    id: string
-    title: string
-  }
+    id: string;
+    title: string;
+  };
   kind: {
-    id: string
-    kind: 'text' | 'code' | 'image' | 'sheet' | 'file'
-    artifactType: ArtifactType
-  }
+    id: string;
+    kind: 'text' | 'code' | 'image' | 'sheet' | 'file';
+    artifactType: ArtifactType;
+  };
   clear: {
-    id: string
-  }
+    id: string;
+  };
   finish: {
-    id: string
-  }
-}
+    id: string;
+  };
+};

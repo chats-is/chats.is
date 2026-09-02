@@ -1,38 +1,38 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { compareDesc } from 'date-fns'
-import { Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef } from 'react';
+import { compareDesc } from 'date-fns';
+import { Loader2 } from 'lucide-react';
 
-import { useChatsInfinite } from '@/hooks/use-chats'
+import { useChatsInfinite } from '@/hooks/use-chats';
 import {
   SidebarGroup,
   SidebarGroupContent,
-  SidebarMenu,
-} from '@/components/ui/sidebar'
-import { SidebarItem } from '@/components/sidebar-item'
+  SidebarMenu
+} from '@/components/ui/sidebar';
+import { SidebarItem } from '@/components/sidebar-item';
 
 export function SidebarList() {
-  const listRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null);
   const { chats, isLoading, isValidating, hasMore, isError, fetchNextPage } =
-    useChatsInfinite()
+    useChatsInfinite();
 
   const handleScroll = useCallback(() => {
-    const el = listRef.current
-    if (!el || isLoading || isValidating || !hasMore) return
+    const el = listRef.current;
+    if (!el || isLoading || isValidating || !hasMore) return;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
-      fetchNextPage()
+      fetchNextPage();
     }
-  }, [isLoading, isValidating, hasMore, fetchNextPage])
+  }, [isLoading, isValidating, hasMore, fetchNextPage]);
 
   useEffect(() => {
-    const el = listRef.current
-    if (!el) return
-    el.addEventListener('scroll', handleScroll)
-    return () => el.removeEventListener('scroll', handleScroll)
-  }, [handleScroll])
+    const el = listRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
 
   const sortedChats = chats
-    ?.filter((chat) => chat && chat.createdAt)
-    .sort((a, b) => compareDesc(new Date(a.createdAt), new Date(b.createdAt)))
+    ?.filter(chat => chat && chat.createdAt)
+    .sort((a, b) => compareDesc(new Date(a.createdAt), new Date(b.createdAt)));
 
   return (
     <div
@@ -61,7 +61,7 @@ export function SidebarList() {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {sortedChats.map((chat) => (
+                {sortedChats.map(chat => (
                   <SidebarItem key={chat.id} chat={chat} />
                 ))}
               </SidebarMenu>
@@ -75,5 +75,5 @@ export function SidebarList() {
         </>
       )}
     </div>
-  )
+  );
 }

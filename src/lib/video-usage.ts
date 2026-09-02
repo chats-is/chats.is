@@ -10,25 +10,25 @@
  * back to the requested duration.
  */
 export function extractVideoDurationSeconds(
-  providerMetadata: unknown,
+  providerMetadata: unknown
 ): number | undefined {
   if (!providerMetadata || typeof providerMetadata !== 'object') {
-    return undefined
+    return undefined;
   }
   for (const entry of Object.values(
-    providerMetadata as Record<string, unknown>,
+    providerMetadata as Record<string, unknown>
   )) {
-    if (!entry || typeof entry !== 'object') continue
+    if (!entry || typeof entry !== 'object') continue;
     const meta = entry as {
-      duration?: unknown
-      videos?: Array<{ duration?: unknown } | null> | null
-    }
-    const candidates = [meta.videos?.[0]?.duration, meta.duration]
+      duration?: unknown;
+      videos?: Array<{ duration?: unknown } | null> | null;
+    };
+    const candidates = [meta.videos?.[0]?.duration, meta.duration];
     for (const c of candidates) {
-      if (typeof c === 'number' && Number.isFinite(c) && c > 0) return c
+      if (typeof c === 'number' && Number.isFinite(c) && c > 0) return c;
     }
   }
-  return undefined
+  return undefined;
 }
 
 /**
@@ -39,11 +39,11 @@ export function extractVideoDurationSeconds(
  */
 export function resolveVideoSeconds(
   providerMetadata: unknown,
-  requestedDuration: unknown,
+  requestedDuration: unknown
 ): number | undefined {
-  const actual = extractVideoDurationSeconds(providerMetadata)
-  if (actual !== undefined) return actual
+  const actual = extractVideoDurationSeconds(providerMetadata);
+  if (actual !== undefined) return actual;
   return typeof requestedDuration === 'number' && requestedDuration > 0
     ? requestedDuration
-    : undefined
+    : undefined;
 }

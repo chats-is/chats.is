@@ -1,5 +1,5 @@
-import type { UsageRowLike } from '@/types'
-import { parseNumber } from '@/lib/utils'
+import type { UsageRowLike } from '@/types';
+import { parseNumber } from '@/lib/utils';
 
 /**
  * Capability-aware "Unit Price" cell for usage log tables. Returns a single
@@ -12,30 +12,30 @@ import { parseNumber } from '@/lib/utils'
  */
 
 const has = (v: string | null | undefined): boolean =>
-  v !== null && v !== undefined && v !== ''
+  v !== null && v !== undefined && v !== '';
 
 /** Token rate, stored per 1M tokens. */
 const per1M = (v: string | null | undefined): string =>
-  `$${parseNumber(v) ?? 0}/1M`
+  `$${parseNumber(v) ?? 0}/1M`;
 /** Per-unit rate (image / video / second). */
 const perUnit = (v: string | null | undefined, unit: string): string =>
-  `$${parseNumber(v) ?? 0}/${unit}`
+  `$${parseNumber(v) ?? 0}/${unit}`;
 
 export function UsageUnitPrice({ row }: { row: UsageRowLike }) {
   if (row.capability === 'chat') {
-    const top: Pair[] = []
+    const top: Pair[] = [];
     if (has(row.inputPrice))
-      top.push({ label: 'Input', value: per1M(row.inputPrice) })
+      top.push({ label: 'Input', value: per1M(row.inputPrice) });
     if (has(row.outputPrice))
-      top.push({ label: 'Output', value: per1M(row.outputPrice) })
+      top.push({ label: 'Output', value: per1M(row.outputPrice) });
     if (has(row.reasoningPrice))
-      top.push({ label: 'Reasoning', value: per1M(row.reasoningPrice) })
+      top.push({ label: 'Reasoning', value: per1M(row.reasoningPrice) });
 
-    const bottom: Pair[] = []
+    const bottom: Pair[] = [];
     if (has(row.cacheReadPrice))
-      bottom.push({ label: 'Cache Read', value: per1M(row.cacheReadPrice) })
+      bottom.push({ label: 'Cache Read', value: per1M(row.cacheReadPrice) });
     if (has(row.cacheWritePrice))
-      bottom.push({ label: 'Cache Write', value: per1M(row.cacheWritePrice) })
+      bottom.push({ label: 'Cache Write', value: per1M(row.cacheWritePrice) });
 
     return (
       <td className="p-2 text-left align-middle font-mono text-xs">
@@ -43,61 +43,61 @@ export function UsageUnitPrice({ row }: { row: UsageRowLike }) {
         {bottom.length > 0 && <div>{renderPairs(bottom)}</div>}
         {top.length === 0 && bottom.length === 0 && '—'}
       </td>
-    )
+    );
   }
 
   if (row.capability === 'image') {
     // Per-image model → per-image rate; token-billed model → input/output.
-    const items: Pair[] = []
+    const items: Pair[] = [];
     if (has(row.imagePrice)) {
-      items.push({ label: 'Image', value: perUnit(row.imagePrice, 'image') })
+      items.push({ label: 'Image', value: perUnit(row.imagePrice, 'image') });
     } else {
       if (has(row.inputPrice))
-        items.push({ label: 'Input', value: per1M(row.inputPrice) })
+        items.push({ label: 'Input', value: per1M(row.inputPrice) });
       if (has(row.outputPrice))
-        items.push({ label: 'Output', value: per1M(row.outputPrice) })
+        items.push({ label: 'Output', value: per1M(row.outputPrice) });
     }
     return (
       <td className="p-2 text-left font-mono text-xs">
         {items.length ? renderPairs(items) : '—'}
       </td>
-    )
+    );
   }
 
   if (row.capability === 'video') {
-    const items: Pair[] = []
+    const items: Pair[] = [];
     if (has(row.videoPrice))
-      items.push({ label: 'Video', value: perUnit(row.videoPrice, 'video') })
+      items.push({ label: 'Video', value: perUnit(row.videoPrice, 'video') });
     if (has(row.videoSecondsPrice))
       items.push({
         label: 'Per sec',
-        value: perUnit(row.videoSecondsPrice, 's'),
-      })
+        value: perUnit(row.videoSecondsPrice, 's')
+      });
     return (
       <td className="p-2 text-left font-mono text-xs">
         {items.length ? renderPairs(items) : '—'}
       </td>
-    )
+    );
   }
 
   // audio — per-character (classic TTS) or per-token (gpt-4o-mini-tts, omni)
-  const items: Pair[] = []
+  const items: Pair[] = [];
   if (has(row.audioCharactersPrice)) {
-    items.push({ label: 'Chars', value: per1M(row.audioCharactersPrice) })
+    items.push({ label: 'Chars', value: per1M(row.audioCharactersPrice) });
   } else {
     if (has(row.audioInputPrice))
-      items.push({ label: 'In', value: per1M(row.audioInputPrice) })
+      items.push({ label: 'In', value: per1M(row.audioInputPrice) });
     if (has(row.audioOutputPrice))
-      items.push({ label: 'Out', value: per1M(row.audioOutputPrice) })
+      items.push({ label: 'Out', value: per1M(row.audioOutputPrice) });
   }
   return (
     <td className="p-2 text-left font-mono text-xs">
       {items.length ? renderPairs(items) : '—'}
     </td>
-  )
+  );
 }
 
-type Pair = { label: string; value: string }
+type Pair = { label: string; value: string };
 
 /** Render label-value pairs joined by " / " separator. Label and separator
  *  muted, value gets default foreground for contrast. */
@@ -108,5 +108,5 @@ function renderPairs(pairs: Pair[]): React.ReactNode {
       <span className="text-muted-foreground">{p.label} </span>
       <span>{p.value}</span>
     </span>
-  ))
+  ));
 }

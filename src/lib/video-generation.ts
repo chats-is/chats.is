@@ -1,17 +1,17 @@
-import { experimental_generateVideo as generateVideo } from 'ai'
-import OpenAI, { AzureOpenAI } from 'openai'
+import { experimental_generateVideo as generateVideo } from 'ai';
+import OpenAI, { AzureOpenAI } from 'openai';
 
-import type { Model, ProviderConfig } from '@/types'
-import { decrypt } from '@/lib/crypto'
-import { resolveAutoOption } from '@/lib/media-options'
-import { type StoredMedia, uploadGeneratedMedia } from '@/lib/media-upload'
+import type { Model, ProviderConfig } from '@/types';
+import { decrypt } from '@/lib/crypto';
+import { resolveAutoOption } from '@/lib/media-options';
+import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
-  type FailoverProvider,
   getVideoModel,
   isRetryableProviderError,
   runWithProviderFailover,
-} from '@/lib/provider'
-import { resolveVideoSeconds } from '@/lib/video-usage'
+  type FailoverProvider
+} from '@/lib/provider';
+import { resolveVideoSeconds } from '@/lib/video-usage';
 
 /**
  * Raised when we stop waiting on a render — our own deadline, not a provider
@@ -22,12 +22,12 @@ import { resolveVideoSeconds } from '@/lib/video-usage'
  */
 export class VideoTimeoutError extends Error {
   constructor(message: string) {
-    super(message)
-    this.name = 'VideoTimeoutError'
+    super(message);
+    this.name = 'VideoTimeoutError';
   }
 }
 
-const POLL_INTERVAL_MS = 5000
+const POLL_INTERVAL_MS = 5000;
 
 /**
  * How long we wait for a render before giving up, for every video path.
@@ -39,10 +39,10 @@ const POLL_INTERVAL_MS = 5000
  * up early loses slow renders, but the failure becomes a real tool result the
  * user can act on.
  */
-const VIDEO_DEADLINE_MS = 150_000
+const VIDEO_DEADLINE_MS = 150_000;
 
 /** Sora polls on a fixed interval, so its ceiling is the deadline in ticks. */
-const MAX_POLL_ATTEMPTS = VIDEO_DEADLINE_MS / POLL_INTERVAL_MS
+const MAX_POLL_ATTEMPTS = VIDEO_DEADLINE_MS / POLL_INTERVAL_MS;
 
 /**
  * A signal that aborts after `ms`. Built on an explicit timer rather than
@@ -50,20 +50,20 @@ const MAX_POLL_ATTEMPTS = VIDEO_DEADLINE_MS / POLL_INTERVAL_MS
  * instead of leaving a live timer behind on every successful generation.
  */
 function deadlineSignal(ms: number): {
-  signal: AbortSignal
-  cancel: () => void
+  signal: AbortSignal;
+  cancel: () => void;
 } {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), ms)
-  return { signal: controller.signal, cancel: () => clearTimeout(timer) }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, cancel: () => clearTimeout(timer) };
 }
 
 export type VideoGenerationResult = {
-  buffer: Buffer
-  mediaType: string
+  buffer: Buffer;
+  mediaType: string;
   /** The duration Sora actually generated (request is bucketed to 4/8/12s). */
-  seconds: number
-}
+  seconds: number;
+};
 
 /**
  * Create an OpenAI-compatible client for the Sora video API.
@@ -73,29 +73,29 @@ export type VideoGenerationResult = {
  * as direct OpenAI — so the whole create/poll/download flow below is shared.
  */
 function createOpenAIClient(provider: ProviderConfig): OpenAI {
-  const apiKey = provider.apiKey ? decrypt(provider.apiKey) : undefined
+  const apiKey = provider.apiKey ? decrypt(provider.apiKey) : undefined;
 
   if (provider.type === 'azure') {
     if (!provider.baseUrl) {
-      throw new Error('Azure OpenAI Sora requires the provider endpoint URL')
+      throw new Error('Azure OpenAI Sora requires the provider endpoint URL');
     }
     // The video API is only available on Azure's next-gen v1 API surface,
     // which is selected by a 'preview' (or dated v1) api-version.
     const apiVersion =
       typeof provider.apiOptions?.apiVersion === 'string'
         ? (provider.apiOptions.apiVersion as string)
-        : 'preview'
+        : 'preview';
     return new AzureOpenAI({
       apiKey,
       endpoint: provider.baseUrl,
-      apiVersion,
-    })
+      apiVersion
+    });
   }
 
   return new OpenAI({
     apiKey,
-    baseURL: provider.baseUrl || undefined,
-  })
+    baseURL: provider.baseUrl || undefined
+  });
 }
 
 /**
@@ -109,18 +109,18 @@ export async function generateWithSora(
   aspectRatio?: `${number}:${number}`,
   resolution?: string,
   duration?: number,
-  abortSignal?: AbortSignal,
+  abortSignal?: AbortSignal
 ): Promise<VideoGenerationResult> {
-  const openai = createOpenAIClient(provider)
+  const openai = createOpenAIClient(provider);
 
   // Determine video size based on aspect ratio
   // Sora 2 supports: 720x1280, 1280x720, 1024x1792, 1792x1024
-  const size = aspectRatio === '9:16' ? '720x1280' : '1280x720'
+  const size = aspectRatio === '9:16' ? '720x1280' : '1280x720';
 
   // Determine duration in seconds (4, 8, or 12). This bucketed value is the
   // billable duration — the raw request may be shorter or absent.
   const seconds: '4' | '8' | '12' =
-    duration && duration <= 4 ? '4' : duration && duration <= 8 ? '8' : '12'
+    duration && duration <= 4 ? '4' : duration && duration <= 8 ? '8' : '12';
 
   // Create video generation request
   const video = await openai.videos.create({
@@ -128,23 +128,23 @@ export async function generateWithSora(
     prompt,
     size: size as any,
     seconds,
-    ...(resolution && { resolution: resolution as any }),
-  })
+    ...(resolution && { resolution: resolution as any })
+  });
 
   // Poll for completion if not already completed.
   if (video.status !== 'completed') {
-    await pollSoraJob(openai, video.id, MAX_POLL_ATTEMPTS, abortSignal)
+    await pollSoraJob(openai, video.id, MAX_POLL_ATTEMPTS, abortSignal);
   }
 
   // Download video content using the SDK
-  const videoResponse = await openai.videos.downloadContent(video.id)
-  const videoBuffer = Buffer.from(await videoResponse.arrayBuffer())
+  const videoResponse = await openai.videos.downloadContent(video.id);
+  const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
 
   return {
     buffer: videoBuffer,
     mediaType: 'video/mp4',
-    seconds: Number(seconds),
-  }
+    seconds: Number(seconds)
+  };
 }
 
 /**
@@ -154,35 +154,35 @@ async function pollSoraJob(
   openai: OpenAI,
   jobId: string,
   maxAttempts = MAX_POLL_ATTEMPTS,
-  abortSignal?: AbortSignal,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    abortSignal?.throwIfAborted()
+    abortSignal?.throwIfAborted();
 
     // Retrieve video status
-    const video = await openai.videos.retrieve(jobId)
+    const video = await openai.videos.retrieve(jobId);
 
     if (video.status === 'completed') {
-      return
+      return;
     } else if (video.status === 'failed') {
       throw new Error(
-        `Sora video generation failed: ${video.error?.message || 'Unknown error'}`,
-      )
+        `Sora video generation failed: ${video.error?.message || 'Unknown error'}`
+      );
     }
 
     // Wait 5 seconds before next poll
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
   throw new VideoTimeoutError(
-    `Sora video generation timed out after ${(maxAttempts * POLL_INTERVAL_MS) / 1000}s`,
-  )
+    `Sora video generation timed out after ${(maxAttempts * POLL_INTERVAL_MS) / 1000}s`
+  );
 }
 
 export type VideoGenerationOutput = StoredMedia & {
-  videoSeconds?: number
-  provider: FailoverProvider
-}
+  videoSeconds?: number;
+  provider: FailoverProvider;
+};
 
 /**
  * Generate a video with provider failover and upload it to Vercel Blob.
@@ -190,18 +190,18 @@ export type VideoGenerationOutput = StoredMedia & {
  * tool. Keeps the Sora custom path (no AI SDK support yet) inside.
  */
 export async function generateAndStoreVideo(args: {
-  userId: string
-  prompt: string
-  dbModel: Model
-  candidates: FailoverProvider[]
-  aspectRatio?: `${number}:${number}`
-  resolution?: string
-  duration?: number
+  userId: string;
+  prompt: string;
+  dbModel: Model;
+  candidates: FailoverProvider[];
+  aspectRatio?: `${number}:${number}`;
+  resolution?: string;
+  duration?: number;
   /** Animate this image instead of generating from the text alone. */
-  inputImage?: { data: Uint8Array; mediaType: string }
+  inputImage?: { data: Uint8Array; mediaType: string };
   /** Edit this video instead of generating a new one. */
-  inputVideoUrl?: string
-  abortSignal?: AbortSignal
+  inputVideoUrl?: string;
+  abortSignal?: AbortSignal;
 }): Promise<VideoGenerationOutput> {
   const {
     userId,
@@ -211,21 +211,21 @@ export async function generateAndStoreVideo(args: {
     duration,
     inputImage,
     inputVideoUrl,
-    abortSignal,
-  } = args
+    abortSignal
+  } = args;
   // 'auto' (admin-configurable option) means: let the provider decide.
-  const aspectRatio = resolveAutoOption(args.aspectRatio)
-  const resolution = resolveAutoOption(args.resolution)
-  const modelId = dbModel.modelId
+  const aspectRatio = resolveAutoOption(args.aspectRatio);
+  const resolution = resolveAutoOption(args.resolution);
+  const modelId = dbModel.modelId;
 
   const { result, provider: usedProvider } = await runWithProviderFailover(
     candidates,
-    async (provider) => {
-      let videoBuffer: Buffer
-      let videoMediaType: string
+    async provider => {
+      let videoBuffer: Buffer;
+      let videoMediaType: string;
       // Billable duration in seconds — actual generated length when the
       // provider reports it, else the requested duration.
-      let videoSeconds: number | undefined
+      let videoSeconds: number | undefined;
 
       // Sora has no AI SDK support yet — use the custom path. Azure exposes
       // video only through its OpenAI-compatible API (no AI SDK support
@@ -233,15 +233,15 @@ export async function generateAndStoreVideo(args: {
       if (modelId.includes('sora') || provider.type === 'azure') {
         if (inputVideoUrl) {
           throw new Error(
-            `${dbModel.name} cannot edit a video; it generates from text only.`,
-          )
+            `${dbModel.name} cannot edit a video; it generates from text only.`
+          );
         }
         if (inputImage) {
           // The custom Sora path sends a prompt and nothing else, so an image
           // here would be dropped without a word — say so instead.
           throw new Error(
-            `${dbModel.name} cannot animate an image; it generates from text only.`,
-          )
+            `${dbModel.name} cannot animate an image; it generates from text only.`
+          );
         }
         const soraResult = await generateWithSora(
           modelId,
@@ -250,13 +250,13 @@ export async function generateAndStoreVideo(args: {
           aspectRatio,
           resolution,
           duration,
-          abortSignal,
-        )
-        videoBuffer = soraResult.buffer
-        videoMediaType = soraResult.mediaType
+          abortSignal
+        );
+        videoBuffer = soraResult.buffer;
+        videoMediaType = soraResult.mediaType;
         // Sora returns no duration metadata — bill the bucketed duration the
         // request actually used (4/8/12s), not the raw client input.
-        videoSeconds = soraResult.seconds
+        videoSeconds = soraResult.seconds;
       } else {
         // Editing a video is provider-specific: the AI SDK has no standard
         // parameter for it, and xAI takes the source as a URL in its own
@@ -265,8 +265,8 @@ export async function generateAndStoreVideo(args: {
         // video the user did not ask for.
         if (inputVideoUrl && provider.type !== 'xai') {
           throw new Error(
-            `${dbModel.name} cannot edit a video through ${provider.type}.`,
-          )
+            `${dbModel.name} cannot edit a video through ${provider.type}.`
+          );
         }
 
         const providerOpts = {
@@ -274,21 +274,21 @@ export async function generateAndStoreVideo(args: {
           // Duration, aspect ratio and resolution are inherited from the source
           // when editing, so the provider ignores them — don't send one.
           ...(resolution && !inputVideoUrl && { resolution }),
-          ...(inputVideoUrl && { videoUrl: inputVideoUrl }),
-        }
+          ...(inputVideoUrl && { videoUrl: inputVideoUrl })
+        };
         // The AI SDK polls the provider internally with no ceiling of its
         // own, so the deadline has to be imposed from out here. Kept as its
         // own signal (rather than only the combined one) so the catch can tell
         // our deadline apart from the user cancelling the request.
-        const deadline = deadlineSignal(VIDEO_DEADLINE_MS)
+        const deadline = deadlineSignal(VIDEO_DEADLINE_MS);
         const signal = abortSignal
           ? AbortSignal.any([abortSignal, deadline.signal])
-          : deadline.signal
+          : deadline.signal;
 
-        let video
-        let providerMetadata
+        let video;
+        let providerMetadata;
         try {
-          ;({ video, providerMetadata } = await generateVideo({
+          ({ video, providerMetadata } = await generateVideo({
             model: getVideoModel(provider, modelId),
             // An image turns this into image-to-video: the picture is the
             // opening frame and the text says what happens from there.
@@ -299,49 +299,48 @@ export async function generateAndStoreVideo(args: {
             abortSignal: signal,
             ...(Object.keys(providerOpts).length > 0 && {
               providerOptions: {
-                [provider.type]: providerOpts,
-              } as any,
-            }),
-          }))
+                [provider.type]: providerOpts
+              } as any
+            })
+          }));
         } catch (err) {
           if (deadline.signal.aborted && !abortSignal?.aborted) {
             throw new VideoTimeoutError(
-              `${modelId} video generation timed out after ${VIDEO_DEADLINE_MS / 1000}s`,
-            )
+              `${modelId} video generation timed out after ${VIDEO_DEADLINE_MS / 1000}s`
+            );
           }
-          throw err
+          throw err;
         } finally {
-          deadline.cancel()
+          deadline.cancel();
         }
 
-        videoBuffer = Buffer.from(video.uint8Array)
-        videoMediaType = 'video/mp4'
-        videoSeconds = resolveVideoSeconds(providerMetadata, duration)
+        videoBuffer = Buffer.from(video.uint8Array);
+        videoMediaType = 'video/mp4';
+        videoSeconds = resolveVideoSeconds(providerMetadata, duration);
       }
 
-      return { videoBuffer, videoMediaType, videoSeconds }
+      return { videoBuffer, videoMediaType, videoSeconds };
     },
     {
       // Our own deadline is not a provider fault: the default classifier treats
       // any /timed out/ message as retryable, which would start a fresh render
       // on the next provider and spend the rest of the request budget on it.
-      shouldRetry: (error) =>
-        !(error instanceof VideoTimeoutError) &&
-        isRetryableProviderError(error),
-    },
-  )
+      shouldRetry: error =>
+        !(error instanceof VideoTimeoutError) && isRetryableProviderError(error)
+    }
+  );
 
   const stored = await uploadGeneratedMedia({
     userId,
     kind: 'generate-videos',
     buffer: result.videoBuffer,
     mediaType: result.videoMediaType,
-    ext: 'mp4',
-  })
+    ext: 'mp4'
+  });
 
   return {
     ...stored,
     videoSeconds: result.videoSeconds,
-    provider: usedProvider,
-  }
+    provider: usedProvider
+  };
 }

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { usePreferences } from '@/contexts/preferences-context'
-import { useSystemSettings } from '@/contexts/system-settings-context'
-import { type UseChatHelpers } from '@ai-sdk/react'
+import { useCallback, useEffect, useState } from 'react';
+import { usePreferences } from '@/contexts/preferences-context';
+import { useSystemSettings } from '@/contexts/system-settings-context';
+import { type UseChatHelpers } from '@ai-sdk/react';
 import {
   AudioLines,
   Captions,
@@ -10,23 +10,23 @@ import {
   ImagePlay,
   Pencil,
   Scissors,
-  Settings2,
-} from 'lucide-react'
+  Settings2
+} from 'lucide-react';
 
-import { type ChatMessage } from '@/types'
-import { Button } from '@/components/ui/button'
+import { type ChatMessage } from '@/types';
+import { Button } from '@/components/ui/button';
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import { Skeleton } from '@/components/ui/skeleton'
+  PopoverTrigger
+} from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { ModelMenu, type ModelOptions } from '@/components/model-menu'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
+import { ModelMenu, type ModelOptions } from '@/components/model-menu';
 
 export interface MediaSettingsMenuProps extends Pick<
   UseChatHelpers<ChatMessage>,
@@ -35,17 +35,17 @@ export interface MediaSettingsMenuProps extends Pick<
 
 function SectionLabel({
   icon,
-  children,
+  children
 }: {
-  icon: React.ReactNode
-  children: React.ReactNode
+  icon: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
       {icon}
       {children}
     </div>
-  )
+  );
 }
 
 /**
@@ -64,70 +64,71 @@ function SectionLabel({
  */
 export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   // Prevent hydration mismatch with the Radix popover.
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  const { imageModels, videoModels, ttsModels, sttModels } = useSystemSettings()
-  const { preferences, setPreference } = usePreferences()
+  const { imageModels, videoModels, ttsModels, sttModels } =
+    useSystemSettings();
+  const { preferences, setPreference } = usePreferences();
 
   const handleImageOptionsChange = useCallback(
     (options: ModelOptions) => {
       if (options.size !== undefined) {
-        setPreference('imageSize', options.size)
+        setPreference('imageSize', options.size);
       }
       if (options.aspectRatio !== undefined) {
-        setPreference('imageAspectRatio', options.aspectRatio)
+        setPreference('imageAspectRatio', options.aspectRatio);
       }
     },
-    [setPreference],
-  )
+    [setPreference]
+  );
 
   const handleVideoOptionsChange = useCallback(
     (options: ModelOptions) => {
       if (options.aspectRatio !== undefined) {
-        setPreference('videoAspectRatio', options.aspectRatio)
+        setPreference('videoAspectRatio', options.aspectRatio);
       }
       if (options.resolution !== undefined) {
-        setPreference('videoResolution', options.resolution)
+        setPreference('videoResolution', options.resolution);
       }
       if (options.duration !== undefined) {
-        setPreference('videoDuration', options.duration)
+        setPreference('videoDuration', options.duration);
       }
     },
-    [setPreference],
-  )
+    [setPreference]
+  );
 
   const handleAudioOptionsChange = useCallback(
     (options: ModelOptions) => {
       if (options.voice !== undefined) {
-        setPreference('audioVoice', options.voice)
+        setPreference('audioVoice', options.voice);
       }
     },
-    [setPreference],
-  )
+    [setPreference]
+  );
 
-  const hasImageModels = !!imageModels?.length
+  const hasImageModels = !!imageModels?.length;
   // Editing is a per-model capability, and few models have it — so which model
   // edits is its own choice rather than a consequence of the generator.
   const editModels =
-    imageModels?.filter((model) => model.supportsImageEdit) ?? []
-  const hasVideoModels = !!videoModels?.length
+    imageModels?.filter(model => model.supportsImageEdit) ?? [];
+  const hasVideoModels = !!videoModels?.length;
   // Taking an image as the opening frame is a per-model capability too.
   const animateModels =
-    videoModels?.filter((model) => model.supportsImageToVideo) ?? []
+    videoModels?.filter(model => model.supportsImageToVideo) ?? [];
   // Editing a video is separate again — a model that animates an image cannot
   // necessarily change one that already exists.
   const videoEditModels =
-    videoModels?.filter((model) => model.supportsVideoEdit) ?? []
-  const hasTtsModels = !!ttsModels?.length
-  const hasSttModels = !!sttModels?.length
+    videoModels?.filter(model => model.supportsVideoEdit) ?? [];
+  const hasTtsModels = !!ttsModels?.length;
+  const hasSttModels = !!sttModels?.length;
 
   if (!hasImageModels && !hasVideoModels && !hasTtsModels && !hasSttModels) {
-    return null
+    return null;
   }
 
   if (!mounted) {
-    return <Skeleton className="size-9 rounded-full" />
+    return <Skeleton className="size-9 rounded-full" />;
   }
 
   return (
@@ -169,9 +170,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               modelId={preferences.imageModelId}
               size={preferences.imageSize}
               aspectRatio={preferences.imageAspectRatio}
-              onModelChange={(modelId) =>
-                setPreference('imageModelId', modelId)
-              }
+              onModelChange={modelId => setPreference('imageModelId', modelId)}
               onOptionsChange={handleImageOptionsChange}
             />
           </div>
@@ -186,7 +185,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               models={editModels}
               status={status}
               modelId={preferences.imageEditModelId}
-              onModelChange={(modelId) =>
+              onModelChange={modelId =>
                 setPreference('imageEditModelId', modelId)
               }
             />
@@ -205,9 +204,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               aspectRatio={preferences.videoAspectRatio}
               resolution={preferences.videoResolution}
               duration={preferences.videoDuration}
-              onModelChange={(modelId) =>
-                setPreference('videoModelId', modelId)
-              }
+              onModelChange={modelId => setPreference('videoModelId', modelId)}
               onOptionsChange={handleVideoOptionsChange}
             />
           </div>
@@ -227,7 +224,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               models={animateModels}
               status={status}
               modelId={preferences.videoImageModelId}
-              onModelChange={(modelId) =>
+              onModelChange={modelId =>
                 setPreference('videoImageModelId', modelId)
               }
             />
@@ -243,7 +240,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               models={videoEditModels}
               status={status}
               modelId={preferences.videoEditModelId}
-              onModelChange={(modelId) =>
+              onModelChange={modelId =>
                 setPreference('videoEditModelId', modelId)
               }
             />
@@ -260,9 +257,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               status={status}
               modelId={preferences.audioModelId}
               voice={preferences.audioVoice}
-              onModelChange={(modelId) =>
-                setPreference('audioModelId', modelId)
-              }
+              onModelChange={modelId => setPreference('audioModelId', modelId)}
               onOptionsChange={handleAudioOptionsChange}
             />
           </div>
@@ -277,11 +272,11 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
               models={sttModels}
               status={status}
               modelId={preferences.sttModelId}
-              onModelChange={(modelId) => setPreference('sttModelId', modelId)}
+              onModelChange={modelId => setPreference('sttModelId', modelId)}
             />
           </div>
         )}
       </PopoverContent>
     </Popover>
-  )
+  );
 }

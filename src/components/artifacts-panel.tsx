@@ -1,26 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
-import { PanelBottomClose, PanelBottomOpen, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react';
+import { PanelBottomClose, PanelBottomOpen, X } from 'lucide-react';
 
-import { type Artifact } from '@/types'
-import { cn } from '@/lib/utils'
-import { useMediaQuery } from '@/hooks/use-media-query'
-import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { type Artifact } from '@/types';
+import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/use-media-query';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { ArtifactViewer } from '@/components/artifact-viewer'
-import { isReactCodePreview } from '@/components/artifacts/runtime-preview'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
+import { ArtifactViewer } from '@/components/artifact-viewer';
+import { isReactCodePreview } from '@/components/artifacts/runtime-preview';
 
 interface ArtifactsPanelProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  artifacts: Artifact[]
-  selectedId?: string | null
-  onSelect: (id: string) => void
-  desktopContainerClassName?: string
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  artifacts: Artifact[];
+  selectedId?: string | null;
+  onSelect: (id: string) => void;
+  desktopContainerClassName?: string;
 }
 
 export function ArtifactsPanel({
@@ -29,45 +29,45 @@ export function ArtifactsPanel({
   artifacts,
   selectedId,
   onSelect,
-  desktopContainerClassName,
+  desktopContainerClassName
 }: ArtifactsPanelProps) {
   // The source/preview choice is a persistent preference: switching artifacts
   // keeps the current view (a JSON/code artifact viewed as source stays source
   // after switching) instead of snapping back to a per-artifact default.
-  const [viewMode, setViewMode] = useState<'source' | 'preview'>('preview')
-  const [consoleOpen, setConsoleOpen] = useState(false)
-  const isDesktop = useMediaQuery('(min-width: 768px)')
+  const [viewMode, setViewMode] = useState<'source' | 'preview'>('preview');
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   // Newest first, so the artifact switcher and default selection favour the most
   // recent artifact.
   const sortedArtifacts = useMemo(
     () =>
       [...artifacts].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       ),
-    [artifacts],
-  )
+    [artifacts]
+  );
   const selected =
-    sortedArtifacts.find((artifact) => artifact.id === selectedId) ??
-    sortedArtifacts[0]
-  const isStreaming = selected?.status === 'streaming'
+    sortedArtifacts.find(artifact => artifact.id === selectedId) ??
+    sortedArtifacts[0];
+  const isStreaming = selected?.status === 'streaming';
 
   // Streaming always shows source (watch the code stream); otherwise the user's
   // persistent choice. Non-previewable artifacts fall back to source in the
   // viewer itself.
   const effectiveViewMode: 'source' | 'preview' = isStreaming
     ? 'source'
-    : viewMode
+    : viewMode;
 
   // Console is per-artifact; reset it when the artifact changes.
   useEffect(() => {
-    setConsoleOpen(false)
-  }, [selected?.id])
+    setConsoleOpen(false);
+  }, [selected?.id]);
 
   const showConsole =
     effectiveViewMode === 'preview' &&
     !!selected &&
-    isReactCodePreview(selected)
+    isReactCodePreview(selected);
   const consoleButton = showConsole ? (
     <Tooltip>
       <TooltipTrigger
@@ -77,9 +77,9 @@ export function ArtifactsPanel({
             size="icon"
             className={cn(
               'size-7 text-muted-foreground',
-              consoleOpen && 'text-foreground',
+              consoleOpen && 'text-foreground'
             )}
-            onClick={() => setConsoleOpen((o) => !o)}
+            onClick={() => setConsoleOpen(o => !o)}
           >
             {consoleOpen ? (
               <PanelBottomClose className="size-4" />
@@ -92,10 +92,10 @@ export function ArtifactsPanel({
       />
       <TooltipContent>Console</TooltipContent>
     </Tooltip>
-  ) : null
+  ) : null;
 
   if (!open) {
-    return null
+    return null;
   }
 
   const content =
@@ -149,7 +149,7 @@ export function ArtifactsPanel({
           />
         </div>
       </div>
-    )
+    );
 
   return (
     <>
@@ -157,7 +157,7 @@ export function ArtifactsPanel({
         <div
           className={cn(
             'h-full w-[min(56vw,760px)] max-w-[820px] min-w-[440px] flex-col border-l bg-background md:flex',
-            desktopContainerClassName,
+            desktopContainerClassName
           )}
         >
           <div className="min-h-0 flex-1">{content}</div>
@@ -177,5 +177,5 @@ export function ArtifactsPanel({
         </Sheet>
       )}
     </>
-  )
+  );
 }

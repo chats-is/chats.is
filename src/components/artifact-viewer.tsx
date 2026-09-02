@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
   CodeXml,
@@ -6,53 +6,53 @@ import {
   Download,
   Eye,
   LoaderCircle,
-  X,
-} from 'lucide-react'
-import { toast } from 'sonner'
+  X
+} from 'lucide-react';
+import { toast } from 'sonner';
 
-import { type Artifact } from '@/types'
-import { cn } from '@/lib/utils'
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import { Button } from '@/components/ui/button'
+import { type Artifact } from '@/types';
+import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  SelectValue
+} from '@/components/ui/select';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import {
   artifactRegistry,
   artifactSourceUsesCodeChrome,
   getArtifactKind,
-  getArtifactLanguageLabel,
-} from '@/components/artifacts/registry'
+  getArtifactLanguageLabel
+} from '@/components/artifacts/registry';
 import {
   ArtifactRuntimePreview,
-  supportsArtifactRuntimePreview,
-} from '@/components/artifacts/runtime-preview'
+  supportsArtifactRuntimePreview
+} from '@/components/artifacts/runtime-preview';
 
 interface ArtifactViewerProps {
-  artifact?: Artifact
-  artifacts?: Artifact[]
-  onSelectArtifact?: (id: string) => void
-  onClose?: () => void
-  hideHeader?: boolean
-  hideContent?: boolean
-  viewMode?: 'source' | 'preview'
-  onViewModeChange?: (mode: 'source' | 'preview') => void
-  extraActions?: React.ReactNode
-  consoleOpen?: boolean
-  onConsoleOpenChange?: (open: boolean) => void
+  artifact?: Artifact;
+  artifacts?: Artifact[];
+  onSelectArtifact?: (id: string) => void;
+  onClose?: () => void;
+  hideHeader?: boolean;
+  hideContent?: boolean;
+  viewMode?: 'source' | 'preview';
+  onViewModeChange?: (mode: 'source' | 'preview') => void;
+  extraActions?: React.ReactNode;
+  consoleOpen?: boolean;
+  onConsoleOpenChange?: (open: boolean) => void;
 }
 
 const isFileArtifact = (artifact?: Artifact) =>
-  artifact?.type === 'image' || artifact?.type === 'file'
+  artifact?.type === 'image' || artifact?.type === 'file';
 
 export function ArtifactViewer({
   artifact,
@@ -65,55 +65,57 @@ export function ArtifactViewer({
   onViewModeChange,
   extraActions,
   consoleOpen,
-  onConsoleOpenChange,
+  onConsoleOpenChange
 }: ArtifactViewerProps) {
-  const { copyToClipboard } = useCopyToClipboard()
+  const { copyToClipboard } = useCopyToClipboard();
   const [uncontrolledViewMode, setUncontrolledViewMode] = useState<
     'source' | 'preview'
-  >('source')
-  const contentRef = useRef<HTMLDivElement>(null)
-  const viewMode = controlledViewMode ?? uncontrolledViewMode
+  >('source');
+  const contentRef = useRef<HTMLDivElement>(null);
+  const viewMode = controlledViewMode ?? uncontrolledViewMode;
 
-  const status = artifact?.status
-  const artifactId = artifact?.id
-  const artifactContent = artifact?.content
-  const artifactFileUrl = artifact?.fileUrl
+  const status = artifact?.status;
+  const artifactId = artifact?.id;
+  const artifactContent = artifact?.content;
+  const artifactFileUrl = artifact?.fileUrl;
 
   // Keep the streaming/done view scrolled to the bottom. Declared before the
   // early return below so the hook order stays stable when `artifact` toggles
   // between defined and undefined (Rules of Hooks).
   useEffect(() => {
-    if (hideContent) return
-    if (!contentRef.current) return
-    if (status !== 'streaming' && status !== 'done') return
+    if (hideContent) return;
+    if (!contentRef.current) return;
+    if (status !== 'streaming' && status !== 'done') return;
 
     requestAnimationFrame(() => {
-      if (!contentRef.current) return
-      contentRef.current.scrollTop = contentRef.current.scrollHeight
-    })
-  }, [artifactContent, artifactFileUrl, artifactId, hideContent, status])
+      if (!contentRef.current) return;
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    });
+  }, [artifactContent, artifactFileUrl, artifactId, hideContent, status]);
 
   if (!artifact) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         Select an artifact to view.
       </div>
-    )
+    );
   }
 
-  const isFile = isFileArtifact(artifact)
-  const canCopyContent = !isFile && !!(artifact.content ?? '').trim()
-  const kind = getArtifactKind(artifact)
-  const registry = artifactRegistry[kind]
-  const isStreaming = artifact.status === 'streaming'
-  const isDone = artifact.status === 'done'
+  const isFile = isFileArtifact(artifact);
+  const canCopyContent = !isFile && !!(artifact.content ?? '').trim();
+  const kind = getArtifactKind(artifact);
+  const registry = artifactRegistry[kind];
+  const isStreaming = artifact.status === 'streaming';
+  const isDone = artifact.status === 'done';
   const supportsPreview =
-    !isStreaming && supportsArtifactRuntimePreview(artifact)
+    !isStreaming && supportsArtifactRuntimePreview(artifact);
   const languageLabel =
-    kind === 'code' || kind === 'text' ? getArtifactLanguageLabel(artifact) : ''
-  const headerActionButtonClassName = 'size-7 text-muted-foreground'
-  const isHeaderActionDisabled = isStreaming
-  const canDownload = Boolean(artifact.fileUrl || artifact.content)
+    kind === 'code' || kind === 'text'
+      ? getArtifactLanguageLabel(artifact)
+      : '';
+  const headerActionButtonClassName = 'size-7 text-muted-foreground';
+  const isHeaderActionDisabled = isStreaming;
+  const canDownload = Boolean(artifact.fileUrl || artifact.content);
 
   const statusIndicator = isStreaming ? (
     <span className="inline-flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
@@ -125,7 +127,7 @@ export function ArtifactViewer({
       <CheckCircle2 className="size-3" />
       Done
     </span>
-  ) : null
+  ) : null;
 
   // Source view = the registry's raw text form; preview view = the runtime
   // preview (iframe / markdown / sheet table). The registry owns both per kind,
@@ -135,12 +137,12 @@ export function ArtifactViewer({
       ref={contentRef}
       className={cn(
         'h-full min-h-0 overflow-auto rounded-md bg-background',
-        artifactSourceUsesCodeChrome(artifact) ? 'p-0' : 'border p-4',
+        artifactSourceUsesCodeChrome(artifact) ? 'p-0' : 'border p-4'
       )}
     >
       {registry.renderSource(artifact)}
     </div>
-  )
+  );
 
   const previewContent = (
     <div className="h-full min-h-0 overflow-auto rounded-md bg-background">
@@ -150,29 +152,29 @@ export function ArtifactViewer({
         onConsoleOpenChange={onConsoleOpenChange}
       />
     </div>
-  )
+  );
 
   const content = !supportsPreview
     ? sourceContent
     : viewMode === 'preview'
       ? previewContent
-      : sourceContent
+      : sourceContent;
 
   const handleDownload = () => {
     if (artifact.fileUrl) {
-      const link = document.createElement('a')
-      link.href = artifact.fileUrl
-      link.target = '_blank'
-      link.download = artifact.fileName || artifact.title
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      return
+      const link = document.createElement('a');
+      link.href = artifact.fileUrl;
+      link.target = '_blank';
+      link.download = artifact.fileName || artifact.title;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
     }
 
     if (!artifact.content) {
-      toast.error('Nothing to download')
-      return
+      toast.error('Nothing to download');
+      return;
     }
 
     const extension =
@@ -182,26 +184,26 @@ export function ArtifactViewer({
           ? 'html'
           : artifact.type === 'markdown'
             ? 'md'
-            : artifact.language || 'txt'
+            : artifact.language || 'txt';
     const blob = new Blob([artifact.content], {
-      type: 'text/plain;charset=utf-8',
-    })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${artifact.title}.${extension}`.replace(/\s+/g, '-')
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }
+      type: 'text/plain;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${artifact.title}.${extension}`.replace(/\s+/g, '-');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const viewModeButtons = supportsPreview ? (
     <div className="relative flex shrink-0 items-center rounded-full border border-border/60 bg-transparent p-0.5">
       <div
         className={cn(
           'absolute inset-y-0.5 left-0.5 w-7 rounded-full bg-accent transition-transform',
-          viewMode === 'preview' ? 'translate-x-0' : 'translate-x-7',
+          viewMode === 'preview' ? 'translate-x-0' : 'translate-x-7'
         )}
       />
       <Button
@@ -210,13 +212,13 @@ export function ArtifactViewer({
         className={cn(
           'relative z-10 size-7 rounded-full bg-transparent text-muted-foreground hover:bg-transparent hover:text-accent-foreground',
           viewMode === 'preview' &&
-            'text-accent-foreground hover:text-accent-foreground',
+            'text-accent-foreground hover:text-accent-foreground'
         )}
         onClick={() => {
           if (controlledViewMode === undefined) {
-            setUncontrolledViewMode('preview')
+            setUncontrolledViewMode('preview');
           }
-          onViewModeChange?.('preview')
+          onViewModeChange?.('preview');
         }}
       >
         <Eye className="size-4" />
@@ -228,20 +230,20 @@ export function ArtifactViewer({
         className={cn(
           'relative z-10 size-7 rounded-full bg-transparent text-muted-foreground hover:bg-transparent hover:text-accent-foreground',
           viewMode === 'source' &&
-            'text-accent-foreground hover:text-accent-foreground',
+            'text-accent-foreground hover:text-accent-foreground'
         )}
         onClick={() => {
           if (controlledViewMode === undefined) {
-            setUncontrolledViewMode('source')
+            setUncontrolledViewMode('source');
           }
-          onViewModeChange?.('source')
+          onViewModeChange?.('source');
         }}
       >
         <CodeXml className="size-4" />
         <span className="sr-only">Code view</span>
       </Button>
     </div>
-  ) : null
+  ) : null;
 
   return (
     <div className="flex size-full min-h-0 flex-col justify-center gap-3">
@@ -252,7 +254,7 @@ export function ArtifactViewer({
             {artifacts.length > 1 ? (
               <Select
                 value={artifact.id}
-                onValueChange={(value) => onSelectArtifact?.(value)}
+                onValueChange={value => onSelectArtifact?.(value)}
                 disabled={isHeaderActionDisabled}
               >
                 <SelectTrigger className="h-6 w-fit max-w-full min-w-0 border-0 p-0 text-sm font-semibold shadow-none">
@@ -266,7 +268,7 @@ export function ArtifactViewer({
                   </div>
                 </SelectTrigger>
                 <SelectContent align="start">
-                  {artifacts.map((item) => (
+                  {artifacts.map(item => (
                     <SelectItem key={item.id} value={item.id}>
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate">{item.title}</span>
@@ -302,8 +304,8 @@ export function ArtifactViewer({
                       className={headerActionButtonClassName}
                       disabled={isHeaderActionDisabled}
                       onClick={async () => {
-                        await copyToClipboard(artifact.content ?? '')
-                        toast.success('Copied')
+                        await copyToClipboard(artifact.content ?? '');
+                        toast.success('Copied');
                       }}
                     >
                       <Copy className="size-4" />
@@ -355,5 +357,5 @@ export function ArtifactViewer({
       )}
       {!hideContent && content}
     </div>
-  )
+  );
 }

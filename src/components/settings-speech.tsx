@@ -1,61 +1,61 @@
-import { useEffect, useMemo } from 'react'
-import { usePreferences } from '@/contexts/preferences-context'
-import { useSystemSettings } from '@/contexts/system-settings-context'
+import { useEffect, useMemo } from 'react';
+import { usePreferences } from '@/contexts/preferences-context';
+import { useSystemSettings } from '@/contexts/system-settings-context';
 
-import { Label as UiLabel } from '@/components/ui/label'
+import { Label as UiLabel } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { ModelIcon } from '@/components/model-icon'
+  SelectValue
+} from '@/components/ui/select';
+import { ModelIcon } from '@/components/model-icon';
 
 export const SettingsSpeech = () => {
-  const { ttsModels } = useSystemSettings()
-  const { preferences, setPreference } = usePreferences()
+  const { ttsModels } = useSystemSettings();
+  const { preferences, setPreference } = usePreferences();
 
   // The same selection the chat's text-to-speech tool uses — reading a message
   // aloud and generating speech in a reply are one setting, not two.
-  const speechModel = preferences.audioModelId
-  const speechVoice = preferences.audioVoice
+  const speechModel = preferences.audioModelId;
+  const speechVoice = preferences.audioVoice;
 
   const selectedModel = useMemo(
-    () => ttsModels?.find((m) => m.modelId === speechModel),
-    [ttsModels, speechModel],
-  )
+    () => ttsModels?.find(m => m.modelId === speechModel),
+    [ttsModels, speechModel]
+  );
 
   // Get available voices from current model's uiOptions
   const availableVoices = useMemo(() => {
-    const voices = selectedModel?.uiOptions?.voices as string[] | undefined
-    return voices || []
-  }, [selectedModel])
+    const voices = selectedModel?.uiOptions?.voices as string[] | undefined;
+    return voices || [];
+  }, [selectedModel]);
 
   // Reset the voice when the selected model cannot speak it, preferring the
   // model's own default before the first available — the order the server's
   // `pickVoice` uses.
   useEffect(() => {
     if (availableVoices.length === 0 || availableVoices.includes(speechVoice)) {
-      return
+      return;
     }
 
-    const modelVoice = selectedModel?.uiOptions?.voice
+    const modelVoice = selectedModel?.uiOptions?.voice;
     setPreference(
       'audioVoice',
       modelVoice && availableVoices.includes(modelVoice)
         ? modelVoice
-        : availableVoices[0],
-    )
-  }, [availableVoices, speechVoice, selectedModel, setPreference])
+        : availableVoices[0]
+    );
+  }, [availableVoices, speechVoice, selectedModel, setPreference]);
 
   const handleModelChange = (value: string) => {
-    setPreference('audioModelId', value)
-  }
+    setPreference('audioModelId', value);
+  };
 
   const handleVoiceChange = (value: string) => {
-    setPreference('audioVoice', value)
-  }
+    setPreference('audioVoice', value);
+  };
 
   return (
     <div className="space-y-4">
@@ -78,7 +78,7 @@ export const SettingsSpeech = () => {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {ttsModels?.map((model) => (
+            {ttsModels?.map(model => (
               <SelectItem key={model.id} value={model.modelId}>
                 <div className="flex items-center">
                   <ModelIcon
@@ -110,7 +110,7 @@ export const SettingsSpeech = () => {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {availableVoices.map((voice) => (
+            {availableVoices.map(voice => (
               <SelectItem className="capitalize" key={voice} value={voice}>
                 {voice}
               </SelectItem>
@@ -119,5 +119,5 @@ export const SettingsSpeech = () => {
         </Select>
       </div>
     </div>
-  )
-}
+  );
+};

@@ -1,126 +1,126 @@
-import * as React from 'react'
-import { Loader2, Mail } from 'lucide-react'
-import { signIn } from 'next-auth/react'
+import * as React from 'react';
+import { Loader2, Mail } from 'lucide-react';
+import { signIn } from 'next-auth/react';
 
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   InputOTP,
   InputOTPGroup,
-  InputOTPSlot,
-} from '@/components/ui/input-otp'
+  InputOTPSlot
+} from '@/components/ui/input-otp';
 
 interface EmailLoginFormProps {
-  className?: string
-  isLoading?: string | null
-  setIsLoading?: (provider: string | null) => void
+  className?: string;
+  isLoading?: string | null;
+  setIsLoading?: (provider: string | null) => void;
 }
 
 export function EmailLoginForm({
   className,
   isLoading = null,
-  setIsLoading,
+  setIsLoading
 }: EmailLoginFormProps) {
-  const disabled = isLoading !== null && isLoading !== 'email'
-  const loading = isLoading === 'email'
-  const [step, setStep] = React.useState<'email' | 'code'>('email')
-  const [email, setEmail] = React.useState('')
-  const [code, setCode] = React.useState('')
-  const [error, setError] = React.useState<string | null>(null)
-  const [countdown, setCountdown] = React.useState(0)
+  const disabled = isLoading !== null && isLoading !== 'email';
+  const loading = isLoading === 'email';
+  const [step, setStep] = React.useState<'email' | 'code'>('email');
+  const [email, setEmail] = React.useState('');
+  const [code, setCode] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const [countdown, setCountdown] = React.useState(0);
 
   React.useEffect(() => {
     if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
-      return () => clearTimeout(timer)
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
     }
-  }, [countdown])
+  }, [countdown]);
 
   const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoading?.('email')
+    e.preventDefault();
+    setError(null);
+    setIsLoading?.('email');
 
     try {
       const response = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
+        body: JSON.stringify({ email })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Failed to send verification code')
-        setIsLoading?.(null)
-        return
+        setError(data.error || 'Failed to send verification code');
+        setIsLoading?.(null);
+        return;
       }
 
-      setStep('code')
-      setCountdown(60)
-      setIsLoading?.(null)
+      setStep('code');
+      setCountdown(60);
+      setIsLoading?.(null);
     } catch {
-      setError('An error occurred. Please try again.')
-      setIsLoading?.(null)
+      setError('An error occurred. Please try again.');
+      setIsLoading?.(null);
     }
-  }
+  };
 
   const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoading?.('email')
+    e.preventDefault();
+    setError(null);
+    setIsLoading?.('email');
 
     try {
       const result = await signIn('email-code', {
         email,
         code,
         callbackUrl: '/',
-        redirect: false,
-      })
+        redirect: false
+      });
 
       if (result?.error) {
-        setError('Invalid or expired verification code')
-        setIsLoading?.(null)
-        return
+        setError('Invalid or expired verification code');
+        setIsLoading?.(null);
+        return;
       }
 
       if (result?.ok) {
-        window.location.href = '/'
+        window.location.href = '/';
       }
     } catch {
-      setError('An error occurred. Please try again.')
-      setIsLoading?.(null)
+      setError('An error occurred. Please try again.');
+      setIsLoading?.(null);
     }
-  }
+  };
 
   const handleResendCode = async () => {
-    if (countdown > 0) return
-    setError(null)
-    setIsLoading?.('email')
+    if (countdown > 0) return;
+    setError(null);
+    setIsLoading?.('email');
 
     try {
       const response = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
+        body: JSON.stringify({ email })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Failed to resend code')
-        setIsLoading?.(null)
-        return
+        setError(data.error || 'Failed to resend code');
+        setIsLoading?.(null);
+        return;
       }
 
-      setCountdown(60)
-      setIsLoading?.(null)
+      setCountdown(60);
+      setIsLoading?.(null);
     } catch {
-      setError('An error occurred. Please try again.')
-      setIsLoading?.(null)
+      setError('An error occurred. Please try again.');
+      setIsLoading?.(null);
     }
-  }
+  };
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -132,7 +132,7 @@ export function EmailLoginForm({
               type="email"
               placeholder="Email address"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               className="pl-10"
               required
               disabled={disabled || loading}
@@ -194,10 +194,10 @@ export function EmailLoginForm({
             <button
               type="button"
               onClick={() => {
-                setStep('email')
-                setCode('')
-                setError(null)
-                setIsLoading?.(null)
+                setStep('email');
+                setCode('');
+                setError(null);
+                setIsLoading?.(null);
               }}
               className="text-muted-foreground hover:text-foreground"
             >
@@ -209,7 +209,7 @@ export function EmailLoginForm({
               disabled={countdown > 0 || loading}
               className={cn(
                 'text-muted-foreground',
-                countdown > 0 ? 'cursor-not-allowed' : 'hover:text-foreground',
+                countdown > 0 ? 'cursor-not-allowed' : 'hover:text-foreground'
               )}
             >
               {countdown > 0 ? `Resend in ${countdown}s` : 'Resend code'}
@@ -218,5 +218,5 @@ export function EmailLoginForm({
         </form>
       )}
     </div>
-  )
+  );
 }

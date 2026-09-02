@@ -1,96 +1,96 @@
-import { Fragment, useMemo, useState } from 'react'
-import { ChevronDown, Loader2, Pencil, RefreshCw, Search } from 'lucide-react'
-import { toast } from 'sonner'
+import { Fragment, useMemo, useState } from 'react';
+import { api } from '@/trpc/react';
+import { ChevronDown, Loader2, Pencil, RefreshCw, Search } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { CAPABILITIES } from '@/lib/constant'
-import { formatUsd } from '@/lib/utils'
-import { api } from '@/trpc/react'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { CAPABILITIES } from '@/lib/constant';
+import { formatUsd } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  DialogTitle
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+  PopoverTrigger
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { ModelIcon } from '@/components/model-icon'
+  SelectValue
+} from '@/components/ui/select';
+import { ModelIcon } from '@/components/model-icon';
 
-type PricingSource = 'models.dev' | 'llm-metadata'
-const ALL_SOURCES: PricingSource[] = ['models.dev', 'llm-metadata']
+type PricingSource = 'models.dev' | 'llm-metadata';
+const ALL_SOURCES: PricingSource[] = ['models.dev', 'llm-metadata'];
 
 type RemoteCost = {
-  input?: number
-  output?: number
-  cache_read?: number
-  cache_write?: number
-}
+  input?: number;
+  output?: number;
+  cache_read?: number;
+  cache_write?: number;
+};
 
 type LocalCost = {
-  input?: number
-  output?: number
-  cacheRead?: number
-  cacheWrite?: number
-}
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+};
 
 type PreviewRow = {
-  modelDbId: string
-  modelId: string
-  modelName: string
-  current: LocalCost | null
+  modelDbId: string;
+  modelId: string;
+  modelName: string;
+  current: LocalCost | null;
   sources: Record<
     PricingSource,
     { matched: boolean; remote: RemoteCost | null }
-  >
-}
+  >;
+};
 
 type EditState = {
-  modelDbId: string
-  modelName: string
-  modelId: string
-  capability: 'chat' | 'image' | 'video' | 'audio'
-  input: string
-  output: string
-  cacheRead: string
-  cacheWrite: string
-  reasoning: string
-  image: string
-  video: string
-  videoSeconds: string
-  audioInput: string
-  audioOutput: string
-  audioCharacters: string
-  audioSeconds: string
-}
+  modelDbId: string;
+  modelName: string;
+  modelId: string;
+  capability: 'chat' | 'image' | 'video' | 'audio';
+  input: string;
+  output: string;
+  cacheRead: string;
+  cacheWrite: string;
+  reasoning: string;
+  image: string;
+  video: string;
+  videoSeconds: string;
+  audioInput: string;
+  audioOutput: string;
+  audioCharacters: string;
+  audioSeconds: string;
+};
 
 const fromNum = (v: string | null | undefined) =>
-  v === null || v === undefined || v === '' ? '' : String(v)
+  v === null || v === undefined || v === '' ? '' : String(v);
 
 const numOrDash = (v: number | null | undefined) =>
-  v === undefined || v === null ? '—' : formatUsd(v)
+  v === undefined || v === null ? '—' : formatUsd(v);
 
 /** Like `formatUsd` but returns `null` for unset values so callers can skip
  *  empty pricing lines (used by `summarizePricing`). */
 const fmt = (v: string | null | undefined): string | null => {
   if (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)))
-    return null
-  return formatUsd(v)
-}
+    return null;
+  return formatUsd(v);
+};
 
 /**
  * Capability-aware list of pricing lines for the table. Each entry is
@@ -108,121 +108,121 @@ function summarizePricing(
   capability: string,
   pricing:
     | {
-        input?: string | null
-        output?: string | null
-        cacheRead?: string | null
-        cacheWrite?: string | null
-        reasoning?: string | null
-        image?: string | null
-        video?: string | null
-        videoSeconds?: string | null
-        audioInput?: string | null
-        audioOutput?: string | null
-        audioCharacters?: string | null
-        audioSeconds?: string | null
+        input?: string | null;
+        output?: string | null;
+        cacheRead?: string | null;
+        cacheWrite?: string | null;
+        reasoning?: string | null;
+        image?: string | null;
+        video?: string | null;
+        videoSeconds?: string | null;
+        audioInput?: string | null;
+        audioOutput?: string | null;
+        audioCharacters?: string | null;
+        audioSeconds?: string | null;
       }
     | null
-    | undefined,
+    | undefined
 ): string[] {
-  if (!pricing) return []
-  const lines: string[] = []
+  if (!pricing) return [];
+  const lines: string[] = [];
   // `unit` is the pricing basis suffix (e.g. /1M, /image) appended after the
   // dollar amount so each line reads like "Input: $10/1M".
   const push = (label: string, v: string | null | undefined, unit: string) => {
-    const f = fmt(v)
-    if (f) lines.push(`${label}: ${f}${unit}`)
-  }
+    const f = fmt(v);
+    if (f) lines.push(`${label}: ${f}${unit}`);
+  };
   switch (capability) {
     case 'chat': {
-      push('Input', pricing.input, '/1M')
-      push('Output', pricing.output, '/1M')
-      push('Cache Read', pricing.cacheRead, '/1M')
-      push('Cache Write', pricing.cacheWrite, '/1M')
-      push('Reasoning', pricing.reasoning, '/1M')
-      break
+      push('Input', pricing.input, '/1M');
+      push('Output', pricing.output, '/1M');
+      push('Cache Read', pricing.cacheRead, '/1M');
+      push('Cache Write', pricing.cacheWrite, '/1M');
+      push('Reasoning', pricing.reasoning, '/1M');
+      break;
     }
     case 'image': {
       // Per-image OR token-based (gpt-image-1) — show whichever is set.
-      push('Image', pricing.image, '/image')
-      push('Input', pricing.input, '/1M')
-      push('Output', pricing.output, '/1M')
-      break
+      push('Image', pricing.image, '/image');
+      push('Input', pricing.input, '/1M');
+      push('Output', pricing.output, '/1M');
+      break;
     }
     case 'video': {
-      push('Video', pricing.video, '/video')
-      push('Per sec', pricing.videoSeconds, '/s')
-      break
+      push('Video', pricing.video, '/video');
+      push('Per sec', pricing.videoSeconds, '/s');
+      break;
     }
     case 'audio': {
       // Per-character (TTS), token-based (TTS), or per-second (STT) — show
       // whichever is set.
-      push('Per 1M chars', pricing.audioCharacters, '')
-      push('Input', pricing.audioInput, '/1M')
-      push('Output', pricing.audioOutput, '/1M')
-      push('Per sec', pricing.audioSeconds, '/s')
-      break
+      push('Per 1M chars', pricing.audioCharacters, '');
+      push('Input', pricing.audioInput, '/1M');
+      push('Output', pricing.audioOutput, '/1M');
+      push('Per sec', pricing.audioSeconds, '/s');
+      break;
     }
   }
-  return lines
+  return lines;
 }
 
 export default function PricingPage() {
-  const utils = api.useUtils()
-  const [filterCapability, setFilterCapability] = useState<string>('all')
-  const [search, setSearch] = useState('')
-  const [edit, setEdit] = useState<EditState | null>(null)
+  const utils = api.useUtils();
+  const [filterCapability, setFilterCapability] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [edit, setEdit] = useState<EditState | null>(null);
 
   // Source selection — held in the popover before opening preview.
-  const [popoverOpen, setPopoverOpen] = useState(false)
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [selectedSources, setSelectedSources] = useState<PricingSource[]>([
     'models.dev',
-    'llm-metadata',
-  ])
+    'llm-metadata'
+  ]);
 
-  const { data: rows, isLoading } = api.pricing.listWithModels.useQuery()
+  const { data: rows, isLoading } = api.pricing.listWithModels.useQuery();
 
   const upsertMutation = api.pricing.upsert.useMutation({
     onSuccess: () => {
-      utils.pricing.listWithModels.invalidate()
-      setEdit(null)
-      toast.success('Pricing saved')
+      utils.pricing.listWithModels.invalidate();
+      setEdit(null);
+      toast.success('Pricing saved');
     },
-    onError: (e) => toast.error(e.message),
-  })
+    onError: e => toast.error(e.message)
+  });
 
   // Two mutation instances so we can fire them in parallel without state
   // collision on a single hook.
-  const previewMd = api.pricing.previewSync.useMutation()
-  const previewLm = api.pricing.previewSync.useMutation()
-  const previewLoading = previewMd.isPending || previewLm.isPending
+  const previewMd = api.pricing.previewSync.useMutation();
+  const previewLm = api.pricing.previewSync.useMutation();
+  const previewLoading = previewMd.isPending || previewLm.isPending;
 
   const syncMutation = api.pricing.sync.useMutation({
-    onError: (e) => toast.error(e.message),
-  })
+    onError: e => toast.error(e.message)
+  });
 
   // Preview state (after Compare is clicked).
-  const [previewOpen, setPreviewOpen] = useState(false)
-  const [previewSources, setPreviewSources] = useState<PricingSource[]>([])
-  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([])
-  const [previewSearch, setPreviewSearch] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSources, setPreviewSources] = useState<PricingSource[]>([]);
+  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
+  const [previewSearch, setPreviewSearch] = useState('');
   // For 1-source mode: a Set of modelDbIds (checked rows).
   // For 2-source mode: per-row pick (modelDbId → source picked, or absent = skip).
-  const [picks, setPicks] = useState<Map<string, PricingSource>>(new Map())
+  const [picks, setPicks] = useState<Map<string, PricingSource>>(new Map());
 
   const filtered = useMemo(() => {
-    if (!rows) return []
-    const q = search.toLowerCase().trim()
-    return rows.filter((r) => {
+    if (!rows) return [];
+    const q = search.toLowerCase().trim();
+    return rows.filter(r => {
       if (filterCapability !== 'all' && r.capability !== filterCapability)
-        return false
-      if (!q) return true
+        return false;
+      if (!q) return true;
       return (
         r.name.toLowerCase().includes(q) ||
         r.modelId.toLowerCase().includes(q) ||
         r.provider?.name.toLowerCase().includes(q)
-      )
-    })
-  }, [rows, search, filterCapability])
+      );
+    });
+  }, [rows, search, filterCapability]);
 
   const openEdit = (row: NonNullable<typeof rows>[number]) => {
     setEdit({
@@ -241,12 +241,12 @@ export default function PricingPage() {
       audioInput: fromNum(row.pricing?.audioInput),
       audioOutput: fromNum(row.pricing?.audioOutput),
       audioCharacters: fromNum(row.pricing?.audioCharacters),
-      audioSeconds: fromNum(row.pricing?.audioSeconds),
-    })
-  }
+      audioSeconds: fromNum(row.pricing?.audioSeconds)
+    });
+  };
 
   const submit = () => {
-    if (!edit) return
+    if (!edit) return;
     upsertMutation.mutate({
       modelDbId: edit.modelDbId,
       input: edit.input || null,
@@ -261,32 +261,32 @@ export default function PricingPage() {
       audioOutput: edit.audioOutput || null,
       audioCharacters: edit.audioCharacters || null,
       audioSeconds: edit.audioSeconds || null,
-      source: 'manual',
-    })
-  }
+      source: 'manual'
+    });
+  };
 
   const toggleSource = (src: PricingSource, on: boolean) => {
-    setSelectedSources((prev) => {
-      if (on) return Array.from(new Set([...prev, src]))
-      return prev.filter((s) => s !== src)
-    })
-  }
+    setSelectedSources(prev => {
+      if (on) return Array.from(new Set([...prev, src]));
+      return prev.filter(s => s !== src);
+    });
+  };
 
   const compare = async () => {
-    if (selectedSources.length === 0) return
-    const sources = [...selectedSources]
-    setPopoverOpen(false)
+    if (selectedSources.length === 0) return;
+    const sources = [...selectedSources];
+    setPopoverOpen(false);
     try {
       const results = await Promise.all(
-        sources.map((src) => {
-          const m = src === 'models.dev' ? previewMd : previewLm
+        sources.map(src => {
+          const m = src === 'models.dev' ? previewMd : previewLm;
           return m
             .mutateAsync({ source: src })
-            .then((rows) => ({ source: src, rows }))
-        }),
-      )
+            .then(rows => ({ source: src, rows }));
+        })
+      );
       // Merge by modelDbId. All sources should return the same models.
-      const merged = new Map<string, PreviewRow>()
+      const merged = new Map<string, PreviewRow>();
       for (const { source, rows } of results) {
         for (const r of rows) {
           const entry =
@@ -298,72 +298,72 @@ export default function PricingPage() {
               current: r.current,
               sources: {
                 'models.dev': { matched: false, remote: null },
-                'llm-metadata': { matched: false, remote: null },
-              },
-            } as PreviewRow)
-          entry.sources[source] = { matched: r.matched, remote: r.remote }
+                'llm-metadata': { matched: false, remote: null }
+              }
+            } as PreviewRow);
+          entry.sources[source] = { matched: r.matched, remote: r.remote };
           // Keep latest current (they should be the same).
-          entry.current = r.current
-          merged.set(r.modelDbId, entry)
+          entry.current = r.current;
+          merged.set(r.modelDbId, entry);
         }
       }
-      setPreviewSources(sources)
-      setPreviewRows(Array.from(merged.values()))
-      setPicks(new Map())
-      setPreviewSearch('')
-      setPreviewOpen(true)
+      setPreviewSources(sources);
+      setPreviewRows(Array.from(merged.values()));
+      setPicks(new Map());
+      setPreviewSearch('');
+      setPreviewOpen(true);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Failed to load remote prices',
-      )
+        err instanceof Error ? err.message : 'Failed to load remote prices'
+      );
     }
-  }
+  };
 
   // For 1-source mode, a row is "picked" when picks has it set to the lone source.
   // For 2-source mode, a row is "picked" when picks has it set to either source.
-  const pickCount = picks.size
-  const applyDisabled = syncMutation.isPending || pickCount === 0
+  const pickCount = picks.size;
+  const applyDisabled = syncMutation.isPending || pickCount === 0;
 
   const apply = async () => {
-    if (pickCount === 0) return
+    if (pickCount === 0) return;
     const groups: Record<PricingSource, string[]> = {
       'models.dev': [],
-      'llm-metadata': [],
-    }
+      'llm-metadata': []
+    };
     for (const [modelDbId, src] of picks.entries()) {
-      groups[src].push(modelDbId)
+      groups[src].push(modelDbId);
     }
     try {
-      let created = 0
-      let updated = 0
-      let unchanged = 0
+      let created = 0;
+      let updated = 0;
+      let unchanged = 0;
       for (const source of previewSources) {
-        const ids = groups[source]
-        if (ids.length === 0) continue
+        const ids = groups[source];
+        if (ids.length === 0) continue;
         const result = await syncMutation.mutateAsync({
           source,
-          modelDbIds: ids,
-        })
-        created += result.created
-        updated += result.updated
-        unchanged += result.unchanged
+          modelDbIds: ids
+        });
+        created += result.created;
+        updated += result.updated;
+        unchanged += result.unchanged;
       }
-      utils.pricing.listWithModels.invalidate()
-      setPreviewOpen(false)
+      utils.pricing.listWithModels.invalidate();
+      setPreviewOpen(false);
       toast.success(
-        `Applied: ${created} new, ${updated} updated${unchanged ? `, ${unchanged} unchanged` : ''}`,
-      )
+        `Applied: ${created} new, ${updated} updated${unchanged ? `, ${unchanged} unchanged` : ''}`
+      );
     } catch {
       // Toast already shown in onError.
     }
-  }
+  };
 
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         Loading...
       </div>
-    )
+    );
   }
 
   return (
@@ -375,7 +375,7 @@ export default function PricingPage() {
             <Input
               placeholder="Search models..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={e => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -385,7 +385,7 @@ export default function PricingPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Capabilities</SelectItem>
-              {CAPABILITIES.map((cap) => (
+              {CAPABILITIES.map(cap => (
                 <SelectItem key={cap.value} value={cap.value}>
                   {cap.label}
                 </SelectItem>
@@ -416,14 +416,14 @@ export default function PricingPage() {
             <div className="space-y-3">
               <Label className="text-sm">Choose sources to sync</Label>
               <div className="space-y-2">
-                {ALL_SOURCES.map((src) => (
+                {ALL_SOURCES.map(src => (
                   <label
                     key={src}
                     className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-muted/50"
                   >
                     <Checkbox
                       checked={selectedSources.includes(src)}
-                      onCheckedChange={(c) => toggleSource(src, c === true)}
+                      onCheckedChange={c => toggleSource(src, c === true)}
                     />
                     <span className="font-mono text-sm">{src}</span>
                   </label>
@@ -470,7 +470,7 @@ export default function PricingPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row) => (
+            {filtered.map(row => (
               <tr
                 key={row.id}
                 className="border-b transition-colors hover:bg-muted/30"
@@ -496,15 +496,15 @@ export default function PricingPage() {
                 </td>
                 <td className="p-3 font-mono text-xs text-muted-foreground">
                   {(() => {
-                    const lines = summarizePricing(row.capability, row.pricing)
-                    if (lines.length === 0) return '—'
+                    const lines = summarizePricing(row.capability, row.pricing);
+                    if (lines.length === 0) return '—';
                     return (
                       <div className="space-y-0.5">
-                        {lines.map((line) => (
+                        {lines.map(line => (
                           <div key={line}>{line}</div>
                         ))}
                       </div>
-                    )
+                    );
                   })()}
                 </td>
                 <td className="p-3 text-right text-xs text-muted-foreground">
@@ -535,7 +535,7 @@ export default function PricingPage() {
         </table>
       </div>
 
-      <Dialog open={!!edit} onOpenChange={(open) => !open && setEdit(null)}>
+      <Dialog open={!!edit} onOpenChange={open => !open && setEdit(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Pricing — {edit?.modelName}</DialogTitle>
@@ -550,27 +550,27 @@ export default function PricingPage() {
                   <Field
                     label="Input / 1M tokens"
                     value={edit.input}
-                    onChange={(v) => setEdit({ ...edit, input: v })}
+                    onChange={v => setEdit({ ...edit, input: v })}
                   />
                   <Field
                     label="Output / 1M tokens"
                     value={edit.output}
-                    onChange={(v) => setEdit({ ...edit, output: v })}
+                    onChange={v => setEdit({ ...edit, output: v })}
                   />
                   <Field
                     label="Cache read / 1M tokens"
                     value={edit.cacheRead}
-                    onChange={(v) => setEdit({ ...edit, cacheRead: v })}
+                    onChange={v => setEdit({ ...edit, cacheRead: v })}
                   />
                   <Field
                     label="Cache write / 1M tokens"
                     value={edit.cacheWrite}
-                    onChange={(v) => setEdit({ ...edit, cacheWrite: v })}
+                    onChange={v => setEdit({ ...edit, cacheWrite: v })}
                   />
                   <Field
                     label="Reasoning / 1M tokens"
                     value={edit.reasoning}
-                    onChange={(v) => setEdit({ ...edit, reasoning: v })}
+                    onChange={v => setEdit({ ...edit, reasoning: v })}
                     placeholder="defaults to output rate"
                   />
                 </>
@@ -582,7 +582,7 @@ export default function PricingPage() {
                   <Field
                     label="Per image"
                     value={edit.image}
-                    onChange={(v) =>
+                    onChange={v =>
                       setEdit({ ...edit, image: v, input: '', output: '' })
                     }
                     placeholder="per-image (DALL-E, imagen)"
@@ -595,13 +595,13 @@ export default function PricingPage() {
                   <Field
                     label="Input / 1M tokens"
                     value={edit.input}
-                    onChange={(v) => setEdit({ ...edit, input: v, image: '' })}
+                    onChange={v => setEdit({ ...edit, input: v, image: '' })}
                     disabled={!!edit.image}
                   />
                   <Field
                     label="Output / 1M tokens"
                     value={edit.output}
-                    onChange={(v) => setEdit({ ...edit, output: v, image: '' })}
+                    onChange={v => setEdit({ ...edit, output: v, image: '' })}
                     disabled={!!edit.image}
                   />
                 </>
@@ -613,7 +613,7 @@ export default function PricingPage() {
                   <Field
                     label="Per video"
                     value={edit.video}
-                    onChange={(v) =>
+                    onChange={v =>
                       setEdit({ ...edit, video: v, videoSeconds: '' })
                     }
                     placeholder="flat per clip (Kling, Sora base)"
@@ -622,7 +622,7 @@ export default function PricingPage() {
                   <Field
                     label="Video / second"
                     value={edit.videoSeconds}
-                    onChange={(v) =>
+                    onChange={v =>
                       setEdit({ ...edit, videoSeconds: v, video: '' })
                     }
                     placeholder="per second (Sora, Veo, Runway)"
@@ -637,13 +637,13 @@ export default function PricingPage() {
                   <Field
                     label="Per 1M characters"
                     value={edit.audioCharacters}
-                    onChange={(v) =>
+                    onChange={v =>
                       setEdit({
                         ...edit,
                         audioCharacters: v,
                         audioInput: '',
                         audioOutput: '',
-                        audioSeconds: '',
+                        audioSeconds: ''
                       })
                     }
                     placeholder="classic TTS (tts-1, ElevenLabs)"
@@ -660,12 +660,12 @@ export default function PricingPage() {
                   <Field
                     label="Audio input / 1M tokens"
                     value={edit.audioInput}
-                    onChange={(v) =>
+                    onChange={v =>
                       setEdit({
                         ...edit,
                         audioInput: v,
                         audioCharacters: '',
-                        audioSeconds: '',
+                        audioSeconds: ''
                       })
                     }
                     disabled={!!edit.audioCharacters || !!edit.audioSeconds}
@@ -673,12 +673,12 @@ export default function PricingPage() {
                   <Field
                     label="Audio output / 1M tokens"
                     value={edit.audioOutput}
-                    onChange={(v) =>
+                    onChange={v =>
                       setEdit({
                         ...edit,
                         audioOutput: v,
                         audioCharacters: '',
-                        audioSeconds: '',
+                        audioSeconds: ''
                       })
                     }
                     disabled={!!edit.audioCharacters || !!edit.audioSeconds}
@@ -690,13 +690,13 @@ export default function PricingPage() {
                   <Field
                     label="Audio / second"
                     value={edit.audioSeconds}
-                    onChange={(v) =>
+                    onChange={v =>
                       setEdit({
                         ...edit,
                         audioSeconds: v,
                         audioCharacters: '',
                         audioInput: '',
-                        audioOutput: '',
+                        audioOutput: ''
                       })
                     }
                     placeholder="per second of input audio (whisper-1: 0.0001)"
@@ -746,7 +746,7 @@ export default function PricingPage() {
         onApply={apply}
       />
     </div>
-  )
+  );
 }
 
 function PreviewDialog({
@@ -760,65 +760,65 @@ function PreviewDialog({
   setPicks,
   applyDisabled,
   applyPending,
-  onApply,
+  onApply
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  sources: PricingSource[]
-  rows: PreviewRow[]
-  search: string
-  setSearch: (v: string) => void
-  picks: Map<string, PricingSource>
-  setPicks: React.Dispatch<React.SetStateAction<Map<string, PricingSource>>>
-  applyDisabled: boolean
-  applyPending: boolean
-  onApply: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sources: PricingSource[];
+  rows: PreviewRow[];
+  search: string;
+  setSearch: (v: string) => void;
+  picks: Map<string, PricingSource>;
+  setPicks: React.Dispatch<React.SetStateAction<Map<string, PricingSource>>>;
+  applyDisabled: boolean;
+  applyPending: boolean;
+  onApply: () => void;
 }) {
-  const q = search.toLowerCase().trim()
+  const q = search.toLowerCase().trim();
   const visibleRows = q
     ? rows.filter(
-        (r) =>
+        r =>
           r.modelName.toLowerCase().includes(q) ||
-          r.modelId.toLowerCase().includes(q),
+          r.modelId.toLowerCase().includes(q)
       )
-    : rows
+    : rows;
 
-  const isSingle = sources.length === 1
+  const isSingle = sources.length === 1;
 
   const togglePick = (modelDbId: string, source: PricingSource | null) => {
-    setPicks((prev) => {
-      const next = new Map(prev)
-      if (source === null) next.delete(modelDbId)
-      else next.set(modelDbId, source)
-      return next
-    })
-  }
+    setPicks(prev => {
+      const next = new Map(prev);
+      if (source === null) next.delete(modelDbId);
+      else next.set(modelDbId, source);
+      return next;
+    });
+  };
 
   // For each source, are all matched visible rows currently picked from THAT source?
   const matchedVisibleBySource: Record<PricingSource, PreviewRow[]> = {
     'models.dev': [],
-    'llm-metadata': [],
-  }
+    'llm-metadata': []
+  };
   for (const r of visibleRows) {
     for (const src of sources) {
-      if (r.sources[src].matched) matchedVisibleBySource[src].push(r)
+      if (r.sources[src].matched) matchedVisibleBySource[src].push(r);
     }
   }
   const allMatchedFor = (src: PricingSource) => {
-    const list = matchedVisibleBySource[src]
-    return list.length > 0 && list.every((r) => picks.get(r.modelDbId) === src)
-  }
+    const list = matchedVisibleBySource[src];
+    return list.length > 0 && list.every(r => picks.get(r.modelDbId) === src);
+  };
   const togglePickAllFor = (src: PricingSource, on: boolean) => {
-    const ids = matchedVisibleBySource[src].map((r) => r.modelDbId)
-    setPicks((prev) => {
-      const next = new Map(prev)
+    const ids = matchedVisibleBySource[src].map(r => r.modelDbId);
+    setPicks(prev => {
+      const next = new Map(prev);
       for (const id of ids) {
-        if (on) next.set(id, src)
-        else if (next.get(id) === src) next.delete(id)
+        if (on) next.set(id, src);
+        else if (next.get(id) === src) next.delete(id);
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -836,7 +836,7 @@ function PreviewDialog({
           <Input
             placeholder="Search by model name or id..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -856,7 +856,7 @@ function PreviewDialog({
                 >
                   Current
                 </th>
-                {sources.map((src) => (
+                {sources.map(src => (
                   <th
                     key={src}
                     colSpan={4}
@@ -881,15 +881,13 @@ function PreviewDialog({
                   </div>
                 </th>
                 {/* Per-source sub-headers */}
-                {sources.flatMap((src) => [
+                {sources.flatMap(src => [
                   <th key={`${src}-cb`} className="border-l p-3">
                     <div className="flex items-center justify-center">
                       <Checkbox
                         checked={allMatchedFor(src)}
                         disabled={matchedVisibleBySource[src].length === 0}
-                        onCheckedChange={(c) =>
-                          togglePickAllFor(src, c === true)
-                        }
+                        onCheckedChange={c => togglePickAllFor(src, c === true)}
                       />
                     </div>
                   </th>,
@@ -916,7 +914,7 @@ function PreviewDialog({
                     className="px-2 py-3 text-right text-xs font-normal text-muted-foreground"
                   >
                     Status
-                  </th>,
+                  </th>
                 ])}
               </tr>
             </thead>
@@ -925,12 +923,12 @@ function PreviewDialog({
           {/* Body table — scrolls. Hide the scrollbar entirely so the body
               table fills 100% width and lines up with the header columns.
               Scrolling still works via wheel / touch / keyboard. */}
-          <div className="max-h-[55vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="max-h-[55vh] [scrollbar-width:none] overflow-y-auto [&::-webkit-scrollbar]:hidden">
             <table className="w-full table-fixed">
               <PreviewColgroup sources={sources} />
               <tbody>
-                {visibleRows.map((r) => {
-                  const pick = picks.get(r.modelDbId)
+                {visibleRows.map(r => {
+                  const pick = picks.get(r.modelDbId);
                   return (
                     <tr
                       key={r.modelDbId}
@@ -951,10 +949,10 @@ function PreviewDialog({
                           bottom={r.current?.cacheWrite}
                         />
                       </td>
-                      {sources.flatMap((src) => {
-                        const s = r.sources[src]
-                        const status = classify(r, src)
-                        const isPicked = pick === src
+                      {sources.flatMap(src => {
+                        const s = r.sources[src];
+                        const status = classify(r, src);
+                        const isPicked = pick === src;
                         return [
                           <td
                             key={`${src}-cb`}
@@ -964,10 +962,10 @@ function PreviewDialog({
                               <Checkbox
                                 checked={isPicked}
                                 disabled={!s.matched}
-                                onCheckedChange={(c) => {
-                                  if (c) togglePick(r.modelDbId, src)
+                                onCheckedChange={c => {
+                                  if (c) togglePick(r.modelDbId, src);
                                   else if (isPicked)
-                                    togglePick(r.modelDbId, null)
+                                    togglePick(r.modelDbId, null);
                                 }}
                               />
                             </div>
@@ -995,11 +993,11 @@ function PreviewDialog({
                             className="px-2 py-2 text-right align-middle text-xs"
                           >
                             <StatusBadge kind={status} />
-                          </td>,
-                        ]
+                          </td>
+                        ];
                       })}
                     </tr>
-                  )
+                  );
                 })}
                 {visibleRows.length === 0 && (
                   <tr>
@@ -1033,23 +1031,23 @@ function PreviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function classify(
   row: PreviewRow,
-  source: PricingSource,
+  source: PricingSource
 ): 'new' | 'diff' | 'same' | 'missing' {
-  const s = row.sources[source]
-  if (!s.matched || !s.remote) return 'missing'
-  if (!row.current) return 'new'
-  const c = row.current
+  const s = row.sources[source];
+  if (!s.matched || !s.remote) return 'missing';
+  if (!row.current) return 'new';
+  const c = row.current;
   const same =
     s.remote.input === c.input &&
     s.remote.output === c.output &&
     s.remote.cache_read === c.cacheRead &&
-    s.remote.cache_write === c.cacheWrite
-  return same ? 'same' : 'diff'
+    s.remote.cache_write === c.cacheWrite;
+  return same ? 'same' : 'diff';
 }
 
 /** A stacked cell: two related values vertically inside the same table cell.
@@ -1057,17 +1055,17 @@ function classify(
  *  column 2 holds Cache R/Cache W. */
 function StackedPrice({
   top,
-  bottom,
+  bottom
 }: {
-  top?: number | null
-  bottom?: number | null
+  top?: number | null;
+  bottom?: number | null;
 }) {
   return (
     <div className="flex flex-col items-end gap-0.5 font-mono text-xs">
       <span>{numOrDash(top)}</span>
       <span>{numOrDash(bottom)}</span>
     </div>
-  )
+  );
 }
 
 function PreviewColgroup({ sources }: { sources: PricingSource[] }) {
@@ -1079,7 +1077,7 @@ function PreviewColgroup({ sources }: { sources: PricingSource[] }) {
       <col />
       <col style={{ width: '92px' }} />
       <col style={{ width: '92px' }} />
-      {sources.map((src) => (
+      {sources.map(src => (
         <Fragment key={src}>
           <col style={{ width: '40px' }} />
           <col style={{ width: '92px' }} />
@@ -1088,7 +1086,7 @@ function PreviewColgroup({ sources }: { sources: PricingSource[] }) {
         </Fragment>
       ))}
     </colgroup>
-  )
+  );
 }
 
 function Field({
@@ -1096,13 +1094,13 @@ function Field({
   value,
   onChange,
   placeholder = '0.00',
-  disabled = false,
+  disabled = false
 }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  disabled?: boolean
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -1114,14 +1112,14 @@ function Field({
         <Input
           inputMode="decimal"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
           className="pl-7"
         />
       </div>
     </div>
-  )
+  );
 }
 
 const STATUS_STYLES = {
@@ -1129,29 +1127,29 @@ const STATUS_STYLES = {
     label: 'Same',
     title: 'No change between remote and local — safest',
     className:
-      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
   },
   new: {
     label: 'New',
     title: 'New price (no local pricing yet)',
     className:
-      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
   },
   diff: {
     label: 'Diff',
     title: 'Remote price differs — sync will overwrite your local value',
     className:
-      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
   },
   missing: {
     label: 'Missing',
     title: 'Not found in this remote source — cannot be synced',
-    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  },
-} as const
+    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+  }
+} as const;
 
 function StatusBadge({ kind }: { kind: keyof typeof STATUS_STYLES }) {
-  const s = STATUS_STYLES[kind]
+  const s = STATUS_STYLES[kind];
   return (
     <span
       title={s.title}
@@ -1159,5 +1157,5 @@ function StatusBadge({ kind }: { kind: keyof typeof STATUS_STYLES }) {
     >
       {s.label}
     </span>
-  )
+  );
 }

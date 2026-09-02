@@ -1,16 +1,16 @@
-import * as React from 'react'
-import { Loader2 } from 'lucide-react'
-import { signIn } from 'next-auth/react'
+import * as React from 'react';
+import { Loader2 } from 'lucide-react';
+import { signIn } from 'next-auth/react';
 
-import { Button } from '@/components/ui/button'
-import { IconGoogle } from '@/components/icons'
+import { Button } from '@/components/ui/button';
+import { IconGoogle } from '@/components/icons';
 
 interface GoogleLoginButtonProps extends Omit<
   React.ComponentProps<typeof Button>,
   'children' | 'disabled' | 'onClick'
 > {
-  isLoading?: string | null
-  setIsLoading?: (provider: string | null) => void
+  isLoading?: string | null;
+  setIsLoading?: (provider: string | null) => void;
 }
 
 export function GoogleLoginButton({
@@ -18,12 +18,12 @@ export function GoogleLoginButton({
   setIsLoading,
   ...buttonProps
 }: GoogleLoginButtonProps) {
-  const disabled = isLoading !== null
+  const disabled = isLoading !== null;
 
   const handleSignIn = () => {
-    setIsLoading?.('google')
-    signIn('google', { callbackUrl: '/' })
-  }
+    setIsLoading?.('google');
+    signIn('google', { callbackUrl: '/' });
+  };
 
   return (
     <Button
@@ -41,5 +41,5 @@ export function GoogleLoginButton({
       )}
       <span className="ml-2">Continue with Google</span>
     </Button>
-  )
+  );
 }

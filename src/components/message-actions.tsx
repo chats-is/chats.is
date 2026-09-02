@@ -1,7 +1,8 @@
-import * as React from 'react'
-import { usePreferences } from '@/contexts/preferences-context'
-import { useSystemSettings } from '@/contexts/system-settings-context'
-import { type UseChatHelpers } from '@ai-sdk/react'
+import * as React from 'react';
+import { usePreferences } from '@/contexts/preferences-context';
+import { useSystemSettings } from '@/contexts/system-settings-context';
+import { api } from '@/trpc/react';
+import { type UseChatHelpers } from '@ai-sdk/react';
 import {
   CheckCircle,
   Copy,
@@ -11,15 +12,14 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
-  Volume2,
-} from 'lucide-react'
-import { toast } from 'sonner'
+  Volume2
+} from 'lucide-react';
+import { toast } from 'sonner';
 
-import { type ChatMessage } from '@/types'
-import { createSpeech } from '@/lib/api'
-import { cn } from '@/lib/utils'
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import { api } from '@/trpc/react'
+import { type ChatMessage } from '@/types';
+import { createSpeech } from '@/lib/api';
+import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,32 +28,32 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
+  DialogTitle
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
 interface MessageActionsProps extends Partial<
   Pick<UseChatHelpers<ChatMessage>, 'status' | 'setMessages'>
 > {
-  modelId: string
-  message: ChatMessage
-  reload?: (message: ChatMessage) => void
-  isReadonly?: boolean
-  isLastMessage?: boolean
+  modelId: string;
+  message: ChatMessage;
+  reload?: (message: ChatMessage) => void;
+  isReadonly?: boolean;
+  isLastMessage?: boolean;
 }
 
 export function MessageActions({
@@ -63,161 +63,161 @@ export function MessageActions({
   message,
   setMessages,
   isReadonly,
-  isLastMessage,
+  isLastMessage
 }: MessageActionsProps) {
-  const { ttsModels, speechEnabled } = useSystemSettings()
-  const isSpeechAvailable = (ttsModels?.length ?? 0) > 0 && speechEnabled
-  const { preferences } = usePreferences()
+  const { ttsModels, speechEnabled } = useSystemSettings();
+  const isSpeechAvailable = (ttsModels?.length ?? 0) > 0 && speechEnabled;
+  const { preferences } = usePreferences();
   // The same text-to-speech selection the chat tool uses: reading a message
   // aloud and generating speech in a reply are one setting, not two.
-  const speechModel = preferences.audioModelId
-  const speechVoice = preferences.audioVoice
-  const { isCopied, copyToClipboard } = useCopyToClipboard()
-  const [draftContent, setDraftContent] = React.useState('')
-  const [editDialogOpen, setEditDialogOpen] = React.useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
-  const [isPlaying, setIsPlaying] = React.useState(false)
+  const speechModel = preferences.audioModelId;
+  const speechVoice = preferences.audioVoice;
+  const { isCopied, copyToClipboard } = useCopyToClipboard();
+  const [draftContent, setDraftContent] = React.useState('');
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [isPlaying, setIsPlaying] = React.useState(false);
 
-  const updateMutation = api.message.update.useMutation()
-  const deleteMutation = api.message.delete.useMutation()
-  const [isLoadingAudio, setIsLoadingAudio] = React.useState(false)
-  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  const updateMutation = api.message.update.useMutation();
+  const deleteMutation = api.message.delete.useMutation();
+  const [isLoadingAudio, setIsLoadingAudio] = React.useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   const textParts = message.parts
-    ?.filter((part) => part.type === 'text')
-    .map((part) => part.text)
+    ?.filter(part => part.type === 'text')
+    .map(part => part.text)
     .join('\n')
-    .trim()
+    .trim();
 
   // Check if message contains file content (image, audio, video)
   const hasFileContent = message.parts?.some(
-    (part) =>
+    part =>
       part.type === 'file' &&
       (part.mediaType.startsWith('image/') ||
         part.mediaType.startsWith('audio/') ||
-        part.mediaType.startsWith('video/')),
-  )
+        part.mediaType.startsWith('video/'))
+  );
 
   React.useEffect(() => {
-    setDraftContent(textParts)
-  }, [textParts])
+    setDraftContent(textParts);
+  }, [textParts]);
 
   const onCopy = async () => {
-    if (isCopied) return
+    if (isCopied) return;
 
     // If message contains file, copy file URL
     if (hasFileContent) {
       const filePart = message.parts?.find(
-        (part) =>
+        part =>
           part.type === 'file' &&
           (part.mediaType.startsWith('image/') ||
             part.mediaType.startsWith('audio/') ||
-            part.mediaType.startsWith('video/')),
-      )
+            part.mediaType.startsWith('video/'))
+      );
 
       if (filePart && filePart.type === 'file') {
-        await copyToClipboard(filePart.url)
-        return
+        await copyToClipboard(filePart.url);
+        return;
       }
     }
 
     // Otherwise copy text
     if (!textParts) {
-      toast.error("There's no text to copy!")
-      return
+      toast.error("There's no text to copy!");
+      return;
     }
 
-    await copyToClipboard(textParts)
-  }
+    await copyToClipboard(textParts);
+  };
 
   const onDownload = async () => {
-    if (!hasFileContent) return
+    if (!hasFileContent) return;
 
     const filePart = message.parts?.find(
-      (part) =>
+      part =>
         part.type === 'file' &&
         (part.mediaType.startsWith('image/') ||
           part.mediaType.startsWith('audio/') ||
-          part.mediaType.startsWith('video/')),
-    )
+          part.mediaType.startsWith('video/'))
+    );
 
     if (filePart && filePart.type === 'file') {
       try {
         // Get file extension
-        const extension = filePart.mediaType.split('/')[1]
-        const fileName = `${message.id}.${extension}`
+        const extension = filePart.mediaType.split('/')[1];
+        const fileName = `${message.id}.${extension}`;
 
         // Create temporary link and trigger download
-        const link = document.createElement('a')
-        link.href = filePart.url
-        link.download = fileName
-        link.target = '_blank'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        const link = document.createElement('a');
+        link.href = filePart.url;
+        link.download = fileName;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-        toast.success('Download started')
+        toast.success('Download started');
       } catch {
-        toast.error('Failed to download file')
+        toast.error('Failed to download file');
       }
     }
-  }
+  };
 
   const onRead = async () => {
     // A voice is optional: unset means the user never picked one, and the
     // model's own default speaks. Requiring one here made the button do
     // nothing at all, silently, for anyone who had not been into the settings.
     if (isSpeechAvailable && speechModel) {
-      setIsLoadingAudio(true)
+      setIsLoadingAudio(true);
       const result = await createSpeech(
         speechModel,
         speechVoice || undefined,
-        textParts,
-      )
-      setIsLoadingAudio(false)
+        textParts
+      );
+      setIsLoadingAudio(false);
 
       if (result && 'error' in result) {
-        toast.error(result.error)
-        setIsPlaying(false)
-        return
+        toast.error(result.error);
+        setIsPlaying(false);
+        return;
       }
 
       if (result.audio) {
-        const audio = new Audio(result.audio)
-        audioRef.current = audio
-        audio.volume = 1
-        audio.play()
-        setIsPlaying(true)
+        const audio = new Audio(result.audio);
+        audioRef.current = audio;
+        audio.volume = 1;
+        audio.play();
+        setIsPlaying(true);
 
         audio.onended = () => {
-          setIsPlaying(false)
-        }
+          setIsPlaying(false);
+        };
       }
     }
-  }
+  };
 
   const togglePlayPause = () => {
     if (isPlaying) {
       if (audioRef.current) {
-        audioRef.current.pause()
+        audioRef.current.pause();
       }
-      setIsPlaying(false)
+      setIsPlaying(false);
     } else {
       if (audioRef.current) {
-        audioRef.current.play()
+        audioRef.current.play();
       } else {
-        onRead()
+        onRead();
       }
-      setIsPlaying(true)
+      setIsPlaying(true);
     }
-  }
+  };
 
   return (
     <div
       className={cn(
         'mt-2 flex items-center gap-1 lg:group-focus-within:visible lg:group-hover:visible',
         message.role === 'user' ? 'mr-12 justify-end' : 'ml-12',
-        isLastMessage ? 'lg:visible' : 'lg:invisible',
+        isLastMessage ? 'lg:visible' : 'lg:invisible'
       )}
     >
       {isSpeechAvailable && !hasFileContent && textParts && (
@@ -317,7 +317,7 @@ export function MessageActions({
                     <Textarea
                       className="min-h-32"
                       defaultValue={draftContent}
-                      onChange={(e) => setDraftContent(e.target.value)}
+                      onChange={e => setDraftContent(e.target.value)}
                       required
                     />
                   </div>
@@ -331,37 +331,37 @@ export function MessageActions({
                           const updated = {
                             ...message,
                             content: draftContent,
-                            parts: message.parts.map((part) =>
+                            parts: message.parts.map(part =>
                               part.type === 'text'
                                 ? {
                                     type: 'text' as const,
-                                    text: draftContent,
+                                    text: draftContent
                                   }
-                                : part,
-                            ),
-                          }
+                                : part
+                            )
+                          };
 
                           try {
                             await updateMutation.mutateAsync({
                               id: message.id,
-                              message: updated,
-                            })
-                            toast.success('Message saved', { duration: 2000 })
+                              message: updated
+                            });
+                            toast.success('Message saved', { duration: 2000 });
 
                             setMessages((messages: ChatMessage[]) => {
                               return messages.map((m: ChatMessage) =>
-                                m.id === message.id ? updated : m,
-                              )
-                            })
-                            setEditDialogOpen(false)
+                                m.id === message.id ? updated : m
+                              );
+                            });
+                            setEditDialogOpen(false);
 
                             if (message.role === 'user') {
-                              reload(updated)
+                              reload(updated);
                             }
                           } catch (error: any) {
                             toast.error(
-                              error.message || 'Failed to save message',
-                            )
+                              error.message || 'Failed to save message'
+                            );
                           }
                         }
                       }}
@@ -415,29 +415,29 @@ export function MessageActions({
                 </AlertDialogCancel>
                 <AlertDialogAction
                   disabled={deleteMutation.isPending}
-                  onClick={async (e) => {
-                    e.preventDefault()
+                  onClick={async e => {
+                    e.preventDefault();
                     try {
-                      await deleteMutation.mutateAsync({ id: message.id })
-                      toast.success('Message deleted', { duration: 2000 })
+                      await deleteMutation.mutateAsync({ id: message.id });
+                      toast.success('Message deleted', { duration: 2000 });
                       setMessages((messages: ChatMessage[]) => {
                         // If deleting user message, also delete all AI messages with it as parentId
                         if (message.role === 'user') {
                           return messages.filter(
                             (m: ChatMessage) =>
                               m.id !== message.id &&
-                              m.metadata?.parentId !== message.id,
-                          )
+                              m.metadata?.parentId !== message.id
+                          );
                         }
 
                         // If deleting AI message, only delete itself
                         return messages.filter(
-                          (m: ChatMessage) => m.id !== message.id,
-                        )
-                      })
-                      setDeleteDialogOpen(false)
+                          (m: ChatMessage) => m.id !== message.id
+                        );
+                      });
+                      setDeleteDialogOpen(false);
                     } catch (error: any) {
-                      toast.error(error.message || 'Failed to delete message')
+                      toast.error(error.message || 'Failed to delete message');
                     }
                   }}
                 >
@@ -456,5 +456,5 @@ export function MessageActions({
         </>
       )}
     </div>
-  )
+  );
 }

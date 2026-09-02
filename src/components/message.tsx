@@ -1,38 +1,38 @@
-import React, { useMemo } from 'react'
-import { type UseChatHelpers } from '@ai-sdk/react'
-import { User } from 'lucide-react'
+import React, { useMemo } from 'react';
+import { type UseChatHelpers } from '@ai-sdk/react';
+import { User } from 'lucide-react';
 
-import { type Artifact, type ChatMessage } from '@/types'
-import { cn } from '@/lib/utils'
-import { IconLoading } from '@/components/icons'
-import { DocumentPreview } from '@/components/artifacts/document-preview'
-import { AudioPlayer } from '@/components/audio-player'
-import { MediaLightbox } from '@/components/media-lightbox'
+import { type Artifact, type ChatMessage } from '@/types';
+import { cn } from '@/lib/utils';
+import { DocumentPreview } from '@/components/artifacts/document-preview';
+import { AudioPlayer } from '@/components/audio-player';
+import { IconLoading } from '@/components/icons';
+import { MediaLightbox } from '@/components/media-lightbox';
 import {
   isMediaToolPart,
   isTranscribeToolPart,
   MediaToolPart,
-  TranscribeToolPart,
-} from '@/components/media-tool-part'
-import { MessageIncomplete } from '@/components/message-error'
-import { MessageMarkdown } from '@/components/message-markdown'
-import { MessageReasoning } from '@/components/message-reasoning'
-import { ModelIcon } from '@/components/model-icon'
-import { VideoPlayer } from '@/components/video-player'
+  TranscribeToolPart
+} from '@/components/media-tool-part';
+import { MessageIncomplete } from '@/components/message-error';
+import { MessageMarkdown } from '@/components/message-markdown';
+import { MessageReasoning } from '@/components/message-reasoning';
+import { ModelIcon } from '@/components/model-icon';
+import { VideoPlayer } from '@/components/video-player';
 
 export interface MessageProps extends Partial<
   Pick<UseChatHelpers<ChatMessage>, 'status'>
 > {
-  message: ChatMessage
-  image?: string | null
-  isLastMessage?: boolean
-  supportsReasoning?: boolean | null
-  hasVisibleArtifacts?: boolean
+  message: ChatMessage;
+  image?: string | null;
+  isLastMessage?: boolean;
+  supportsReasoning?: boolean | null;
+  hasVisibleArtifacts?: boolean;
   // Artifacts this message produced, rendered inline at the position of their
   // create_artifact tool call.
-  artifacts?: Artifact[]
-  onSelectArtifact?: (id: string) => void
-  children: React.ReactNode
+  artifacts?: Artifact[];
+  onSelectArtifact?: (id: string) => void;
+  children: React.ReactNode;
 }
 
 export function Message({
@@ -44,52 +44,53 @@ export function Message({
   hasVisibleArtifacts = false,
   artifacts,
   onSelectArtifact,
-  children,
+  children
 }: MessageProps) {
   const hasVisibleTextContent = message.parts.some(
-    (part) =>
+    part =>
       part.type === 'text' &&
-      (part.text.trim().length > 0 || part.state === 'streaming'),
-  )
+      (part.text.trim().length > 0 || part.state === 'streaming')
+  );
   const reasoningParts = message.parts.filter(
-    (part) => part.type === 'reasoning',
-  )
-  const hasReasoningPart = reasoningParts.length > 0
-  const hasFilePart = message.parts.some((part) => part.type === 'file')
+    part => part.type === 'reasoning'
+  );
+  const hasReasoningPart = reasoningParts.length > 0;
+  const hasFilePart = message.parts.some(part => part.type === 'file');
   const hasMediaToolPart = message.parts.some(
-    (part) => isMediaToolPart(part) || isTranscribeToolPart(part),
-  )
+    part => isMediaToolPart(part) || isTranscribeToolPart(part)
+  );
   const firstReasoningIndex = message.parts.findIndex(
-    (part) => part.type === 'reasoning',
-  )
+    part => part.type === 'reasoning'
+  );
   const lastReasoningIndex = (() => {
     for (let index = message.parts.length - 1; index >= 0; index -= 1) {
       if (message.parts[index]?.type === 'reasoning') {
-        return index
+        return index;
       }
     }
 
-    return -1
-  })()
+    return -1;
+  })();
   const mergedReasoningText = reasoningParts
-    .map((part) => part.text || (part as any).reasoning || '')
+    .map(part => part.text || (part as any).reasoning || '')
     .join('\n')
-    .trim()
+    .trim();
   const mergedReasoningPart = hasReasoningPart
     ? ({
         ...reasoningParts[0],
         text: mergedReasoningText,
-        state: reasoningParts.some((part) => part.state === 'streaming')
+        state: reasoningParts.some(part => part.state === 'streaming')
           ? 'streaming'
-          : 'done',
+          : 'done'
       } as any)
-    : null
+    : null;
   const showReasoningLoading =
     isLastMessage === true &&
     lastReasoningIndex === message.parts.length - 1 &&
-    !hasVisibleArtifacts
+    !hasVisibleArtifacts;
   const hasVisibleReasoningDisplay =
-    hasReasoningPart && (mergedReasoningText.length > 0 || showReasoningLoading)
+    hasReasoningPart &&
+    (mergedReasoningText.length > 0 || showReasoningLoading);
   const showSubmittedAssistantLoading =
     message.role === 'assistant' &&
     status === 'submitted' &&
@@ -98,7 +99,7 @@ export function Message({
     !hasVisibleReasoningDisplay &&
     !hasVisibleTextContent &&
     !hasFilePart &&
-    !hasMediaToolPart
+    !hasMediaToolPart;
 
   // Match each create_artifact tool call (by its position in `parts`) to the
   // artifact it produced, so the card renders inline exactly where the model
@@ -108,43 +109,43 @@ export function Message({
   // can't shift a sibling onto the wrong call. Memoized: this runs for every
   // mounted message on each streaming delta.
   const { partArtifact, unpositionedArtifacts } = useMemo(() => {
-    const messageArtifacts = artifacts ?? []
-    const artifactsById = new Map(messageArtifacts.map((a) => [a.id, a]))
+    const messageArtifacts = artifacts ?? [];
+    const artifactsById = new Map(messageArtifacts.map(a => [a.id, a]));
     const orderedArtifacts = [...messageArtifacts].sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-    )
-    const matched = new Map<number, Artifact>()
-    const usedArtifactIds = new Set<string>()
-    const fallbackPartIndexes: number[] = []
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+    );
+    const matched = new Map<number, Artifact>();
+    const usedArtifactIds = new Set<string>();
+    const fallbackPartIndexes: number[] = [];
 
     message.parts.forEach((part, index) => {
-      if (part.type !== 'tool-create_artifact') return
-      const outputId = (part as any).output?.id as string | undefined
-      const artifact = outputId ? artifactsById.get(outputId) : undefined
+      if (part.type !== 'tool-create_artifact') return;
+      const outputId = (part as any).output?.id as string | undefined;
+      const artifact = outputId ? artifactsById.get(outputId) : undefined;
       if (artifact && !usedArtifactIds.has(artifact.id)) {
-        matched.set(index, artifact)
-        usedArtifactIds.add(artifact.id)
+        matched.set(index, artifact);
+        usedArtifactIds.add(artifact.id);
       } else {
-        fallbackPartIndexes.push(index)
+        fallbackPartIndexes.push(index);
       }
-    })
+    });
 
-    const remaining = orderedArtifacts.filter((a) => !usedArtifactIds.has(a.id))
+    const remaining = orderedArtifacts.filter(a => !usedArtifactIds.has(a.id));
     fallbackPartIndexes.forEach((partIndex, i) => {
-      const artifact = remaining[i]
+      const artifact = remaining[i];
       if (artifact) {
-        matched.set(partIndex, artifact)
-        usedArtifactIds.add(artifact.id)
+        matched.set(partIndex, artifact);
+        usedArtifactIds.add(artifact.id);
       }
-    })
+    });
 
     return {
       partArtifact: matched,
       unpositionedArtifacts: orderedArtifacts.filter(
-        (a) => !usedArtifactIds.has(a.id),
-      ),
-    }
-  }, [message.parts, artifacts])
+        a => !usedArtifactIds.has(a.id)
+      )
+    };
+  }, [message.parts, artifacts]);
 
   const renderArtifactCard = (artifact: Artifact) => (
     <div className="my-2">
@@ -154,7 +155,7 @@ export function Message({
         showDownloadButton={true}
       />
     </div>
-  )
+  );
 
   return (
     <div
@@ -163,7 +164,7 @@ export function Message({
     >
       <div
         className={cn('flex items-start', {
-          'flex-row-reverse': message.role === 'user',
+          'flex-row-reverse': message.role === 'user'
         })}
       >
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted select-none">
@@ -173,44 +174,44 @@ export function Message({
         <div
           className={cn(
             'flex min-h-9 flex-1 flex-col justify-center overflow-hidden px-1',
-            message.role === 'user' ? 'mr-3 items-end' : 'ml-3 items-start',
+            message.role === 'user' ? 'mr-3 items-end' : 'ml-3 items-start'
           )}
         >
           <div
             className={cn(
               message.role === 'user'
                 ? 'ml-12 rounded-2xl bg-muted px-3 py-1.5'
-                : 'w-full pr-12',
+                : 'w-full pr-12'
             )}
           >
             {message.parts.map((part, index) => {
               if (isMediaToolPart(part)) {
-                return <MediaToolPart key={index} part={part} />
+                return <MediaToolPart key={index} part={part} />;
               }
 
               if (isTranscribeToolPart(part)) {
-                return <TranscribeToolPart key={index} part={part} />
+                return <TranscribeToolPart key={index} part={part} />;
               }
 
               // A turn that failed — refused before it began, or cut off part
               // way. The reason was shown while it happened; what is left in
               // the thread is that nothing came back.
               if (part.type === 'data-error') {
-                return <MessageIncomplete key={index} />
+                return <MessageIncomplete key={index} />;
               }
 
               if (part.type === 'tool-create_artifact') {
-                const artifact = partArtifact.get(index)
+                const artifact = partArtifact.get(index);
                 return artifact ? (
                   <React.Fragment key={index}>
                     {renderArtifactCard(artifact)}
                   </React.Fragment>
-                ) : null
+                ) : null;
               }
 
               if (part.type === 'reasoning') {
                 if (index !== firstReasoningIndex || !mergedReasoningPart) {
-                  return null
+                  return null;
                 }
 
                 return (
@@ -220,7 +221,7 @@ export function Message({
                     reasonDuration={message.metadata?.reasonDuration}
                     isLoading={showReasoningLoading}
                   />
-                )
+                );
               }
 
               if (part.type === 'text') {
@@ -235,7 +236,7 @@ export function Message({
                   </p>
                 ) : (
                   <MessageMarkdown key={index} content={part.text} />
-                )
+                );
               }
 
               if (part.type === 'file') {
@@ -256,7 +257,7 @@ export function Message({
                         }
                       />
                     </div>
-                  )
+                  );
                 }
 
                 // Render audio
@@ -265,7 +266,7 @@ export function Message({
                     <div key={index} className="my-2 w-80 max-w-full">
                       <AudioPlayer src={part.url} />
                     </div>
-                  )
+                  );
                 }
 
                 // Render video
@@ -274,7 +275,7 @@ export function Message({
                     <div key={index} className="my-2 max-w-80">
                       <VideoPlayer src={part.url} />
                     </div>
-                  )
+                  );
                 }
 
                 // Display download link for other file types
@@ -289,10 +290,10 @@ export function Message({
                   >
                     Download file
                   </a>
-                )
+                );
               }
             })}
-            {unpositionedArtifacts.map((artifact) => (
+            {unpositionedArtifacts.map(artifact => (
               <React.Fragment key={artifact.id}>
                 {renderArtifactCard(artifact)}
               </React.Fragment>
@@ -338,5 +339,5 @@ export function Message({
       </div>
       {children}
     </div>
-  )
+  );
 }

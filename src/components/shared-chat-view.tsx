@@ -1,39 +1,39 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react';
 
-import { type Artifact, type ChatMessage } from '@/types'
-import { useMediaQuery } from '@/hooks/use-media-query'
+import { type Artifact, type ChatMessage } from '@/types';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import {
   ResizableHandle,
   ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable'
-import { ArtifactsPanel } from '@/components/artifacts-panel'
-import { Messages } from '@/components/messages'
+  ResizablePanelGroup
+} from '@/components/ui/resizable';
+import { ArtifactsPanel } from '@/components/artifacts-panel';
+import { Messages } from '@/components/messages';
 
 interface SharedChatViewProps {
-  modelId: string
-  messages: ChatMessage[]
-  artifacts: Artifact[]
-  className?: string
+  modelId: string;
+  messages: ChatMessage[];
+  artifacts: Artifact[];
+  className?: string;
 }
 
 export function SharedChatView({
   modelId,
   messages,
   artifacts,
-  className,
+  className
 }: SharedChatViewProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const isDesktop = useMediaQuery('(min-width: 768px)')
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   const artifactList = useMemo(
     () =>
       [...artifacts].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       ),
-    [artifacts],
-  )
+    [artifacts]
+  );
 
   return (
     <div className="flex min-h-0 w-full">
@@ -53,9 +53,9 @@ export function SharedChatView({
                 modelId={modelId}
                 messages={messages}
                 artifacts={artifactList}
-                onSelectArtifact={(artifactId) => {
-                  setSelectedId(artifactId)
-                  setPanelOpen(true)
+                onSelectArtifact={artifactId => {
+                  setSelectedId(artifactId);
+                  setPanelOpen(true);
                 }}
                 isReadonly={true}
               />
@@ -86,9 +86,9 @@ export function SharedChatView({
               modelId={modelId}
               messages={messages}
               artifacts={artifactList}
-              onSelectArtifact={(artifactId) => {
-                setSelectedId(artifactId)
-                setPanelOpen(true)
+              onSelectArtifact={artifactId => {
+                setSelectedId(artifactId);
+                setPanelOpen(true);
               }}
               isReadonly={true}
             />
@@ -103,5 +103,5 @@ export function SharedChatView({
         </>
       )}
     </div>
-  )
+  );
 }

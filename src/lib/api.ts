@@ -1,32 +1,32 @@
-import { upload } from '@vercel/blob/client'
+import { upload } from '@vercel/blob/client';
 
-import { type Attachment, type Result } from '@/types'
-import { env } from '@/lib/env'
-import { UPLOAD_CONFIG, type UploadType } from '@/lib/upload-config'
-import { generateUUID } from '@/lib/utils'
+import { type Attachment, type Result } from '@/types';
+import { env } from '@/lib/env';
+import { UPLOAD_CONFIG, type UploadType } from '@/lib/upload-config';
+import { generateUUID } from '@/lib/utils';
 
 export const createSpeech = async (
   modelId: string,
   /** Omitted when the user has picked none — the model's own default applies. */
   voice: string | undefined,
-  text: string,
+  text: string
 ) => {
   const res = await fetch('/api/speech', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ modelId, voice, text }),
-  })
+    body: JSON.stringify({ modelId, voice, text })
+  });
 
   if (!res.ok) {
-    const result = await res.json()
-    return { error: result.error } as Result
+    const result = await res.json();
+    return { error: result.error } as Result;
   }
 
-  const json = await res.json()
-  return json as { audio: string }
-}
+  const json = await res.json();
+  return json as { audio: string };
+};
 
 /**
  * Send a file straight from the browser to blob storage.
@@ -43,47 +43,47 @@ export const createSpeech = async (
  */
 export const uploadFile = async (
   file: File,
-  options: { userId: string; type?: UploadType },
+  options: { userId: string; type?: UploadType }
 ): Promise<Attachment | Result> => {
-  const type = options.type ?? 'attachment'
+  const type = options.type ?? 'attachment';
   const ext = file.name.includes('.')
     ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase()
-    : (file.type.split('/')[1] ?? 'bin')
+    : (file.type.split('/')[1] ?? 'bin');
 
   const pathname = [
     env.VITE_UPLOAD_PATH,
     UPLOAD_CONFIG[type].folder,
     options.userId,
-    `${generateUUID()}.${ext}`,
+    `${generateUUID()}.${ext}`
   ]
     .filter(Boolean)
-    .join('/')
+    .join('/');
 
   try {
     const blob = await upload(pathname, file, {
       access: 'public',
       contentType: file.type,
       handleUploadUrl: '/api/files/upload',
-      clientPayload: type,
-    })
+      clientPayload: type
+    });
 
     return {
       url: blob.url,
       name: file.name,
-      contentType: blob.contentType || file.type,
-    }
+      contentType: blob.contentType || file.type
+    };
   } catch (error) {
-    return { error: (error as Error).message } as Result
+    return { error: (error as Error).message } as Result;
   }
-}
+};
 
 export const deleteFile = async (url: string) => {
   const res = await fetch(`/api/files?url=${encodeURIComponent(url)}`, {
-    method: 'DELETE',
-  })
+    method: 'DELETE'
+  });
 
   if (!res.ok) {
-    const result = await res.json()
-    return { error: result.error } as Result
+    const result = await res.json();
+    return { error: result.error } as Result;
   }
-}
+};

@@ -1,14 +1,14 @@
-import { useState, type ChangeEvent } from 'react'
-import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState, type ChangeEvent } from 'react';
+import { api } from '@/trpc/react';
+import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import type {
   ProviderType,
   VertexAuthMode,
-  VertexServiceAccountKey,
-} from '@/types'
-import { ProviderTypes } from '@/lib/constant'
-import { api } from '@/trpc/react'
+  VertexServiceAccountKey
+} from '@/types';
+import { ProviderTypes } from '@/lib/constant';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,82 +17,82 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
+  SelectValue
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { IconPicker } from '@/components/console/icon-picker'
-import { ProviderModelSyncDialog } from '@/components/console/provider-model-sync-dialog'
-import { ModelIcon } from '@/components/model-icon'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
+import { IconPicker } from '@/components/console/icon-picker';
+import { ProviderModelSyncDialog } from '@/components/console/provider-model-sync-dialog';
+import { ModelIcon } from '@/components/model-icon';
 
 export default function ProvidersPage() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [vertexMaskedApiKey, setVertexMaskedApiKey] = useState('')
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [vertexMaskedApiKey, setVertexMaskedApiKey] = useState('');
   const [modelSyncProviderId, setModelSyncProviderId] = useState<string | null>(
-    null,
-  )
+    null
+  );
 
-  const utils = api.useUtils()
-  const { data: providers, isLoading } = api.provider.list.useQuery()
+  const utils = api.useUtils();
+  const { data: providers, isLoading } = api.provider.list.useQuery();
 
   const createMutation = api.provider.create.useMutation({
     onSuccess: () => {
-      utils.provider.list.invalidate()
-      setIsOpen(false)
-      resetForm()
+      utils.provider.list.invalidate();
+      setIsOpen(false);
+      resetForm();
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const updateMutation = api.provider.update.useMutation({
     onSuccess: () => {
-      utils.provider.list.invalidate()
-      setIsOpen(false)
-      setEditingId(null)
-      resetForm()
+      utils.provider.list.invalidate();
+      setIsOpen(false);
+      setEditingId(null);
+      resetForm();
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const deleteMutation = api.provider.delete.useMutation({
     onSuccess: () => {
-      utils.provider.list.invalidate()
-      setDeleteId(null)
+      utils.provider.list.invalidate();
+      setDeleteId(null);
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const toggleMutation = api.provider.toggleEnabled.useMutation({
     onSuccess: () => {
-      utils.provider.list.invalidate()
+      utils.provider.list.invalidate();
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -103,8 +103,8 @@ export default function ProvidersPage() {
     image: '',
     baseUrl: '',
     isEnabled: true,
-    apiOptions: '',
-  })
+    apiOptions: ''
+  });
 
   const resetForm = () => {
     setFormData({
@@ -116,22 +116,22 @@ export default function ProvidersPage() {
       image: '',
       baseUrl: '',
       isEnabled: true,
-      apiOptions: '',
-    })
-    setVertexMaskedApiKey('')
-  }
+      apiOptions: ''
+    });
+    setVertexMaskedApiKey('');
+  };
 
   const modelSyncProvider = providers?.find(
-    (provider) => provider.id === modelSyncProviderId,
-  )
+    provider => provider.id === modelSyncProviderId
+  );
 
   const openModelSyncDialog = (providerId: string) => {
-    setModelSyncProviderId(providerId)
-  }
+    setModelSyncProviderId(providerId);
+  };
 
   const closeModelSyncDialog = () => {
-    setModelSyncProviderId(null)
-  }
+    setModelSyncProviderId(null);
+  };
 
   const handleEdit = (provider: any) => {
     const maskedVertexKey =
@@ -146,11 +146,11 @@ export default function ProvidersPage() {
         ? {
             location: provider.maskedKey.location,
             credentials: provider.maskedKey
-              .credentials as VertexServiceAccountKey['credentials'],
+              .credentials as VertexServiceAccountKey['credentials']
           }
-        : null
+        : null;
 
-    setEditingId(provider.id)
+    setEditingId(provider.id);
     setFormData({
       name: provider.name,
       type: provider.type,
@@ -162,20 +162,20 @@ export default function ProvidersPage() {
       isEnabled: provider.isEnabled,
       apiOptions: provider.apiOptions
         ? JSON.stringify(provider.apiOptions, null, 2)
-        : '',
-    })
+        : ''
+    });
     setVertexMaskedApiKey(
       maskedVertexKey
         ? JSON.stringify(maskedVertexKey.credentials, null, 2)
-        : '',
-    )
-    setIsOpen(true)
-  }
+        : ''
+    );
+    setIsOpen(true);
+  };
 
   const handleTypeChange = (value: string) => {
-    const nextType = value as ProviderType
+    const nextType = value as ProviderType;
 
-    setFormData((current) => ({
+    setFormData(current => ({
       ...current,
       type: nextType,
       apiKey:
@@ -184,60 +184,60 @@ export default function ProvidersPage() {
           : current.apiKey,
       vertexAuthMode:
         nextType === 'vertex' ? 'service_account' : current.vertexAuthMode,
-      vertexLocation: nextType === 'vertex' ? current.vertexLocation : '',
-    }))
-    setVertexMaskedApiKey('')
-  }
+      vertexLocation: nextType === 'vertex' ? current.vertexLocation : ''
+    }));
+    setVertexMaskedApiKey('');
+  };
 
   const handleVertexCredentialChange = async (
-    e: ChangeEvent<HTMLInputElement>,
+    e: ChangeEvent<HTMLInputElement>
   ) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
 
-    if (!file) return
+    if (!file) return;
 
     try {
-      const text = await file.text()
-      const parsed = JSON.parse(text) as unknown
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
 
       if (
         typeof parsed !== 'object' ||
         parsed === null ||
         Array.isArray(parsed)
       ) {
-        toast.error('Credential file must contain a JSON object')
-        return
+        toast.error('Credential file must contain a JSON object');
+        return;
       }
 
       const credentials = parsed as NonNullable<
         VertexServiceAccountKey['credentials']
-      >
+      >;
 
       if (
         typeof credentials.project_id !== 'string' ||
         !credentials.project_id.trim()
       ) {
-        toast.error('Credential file must include project_id')
-        return
+        toast.error('Credential file must include project_id');
+        return;
       }
 
-      setFormData((current) => ({
+      setFormData(current => ({
         ...current,
-        apiKey: JSON.stringify(credentials, null, 2),
-      }))
-      setVertexMaskedApiKey('')
+        apiKey: JSON.stringify(credentials, null, 2)
+      }));
+      setVertexMaskedApiKey('');
     } catch {
-      toast.error('Invalid credential JSON file')
+      toast.error('Invalid credential JSON file');
     } finally {
-      e.target.value = ''
+      e.target.value = '';
     }
-  }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    let apiKey = formData.apiKey.trim()
-    let apiOptions: Record<string, unknown> | null | undefined
-    const editingProvider = providers?.find((p) => p.id === editingId)
+    e.preventDefault();
+    let apiKey = formData.apiKey.trim();
+    let apiOptions: Record<string, unknown> | null | undefined;
+    const editingProvider = providers?.find(p => p.id === editingId);
     const editingVertexKey =
       editingProvider?.type === 'vertex' &&
       typeof editingProvider.maskedKey === 'object' &&
@@ -250,35 +250,35 @@ export default function ProvidersPage() {
         ? {
             location: editingProvider.maskedKey.location,
             credentials: editingProvider.maskedKey
-              .credentials as VertexServiceAccountKey['credentials'],
+              .credentials as VertexServiceAccountKey['credentials']
           }
-        : null
+        : null;
     const editingVertexAuthMode =
       editingProvider?.type === 'vertex'
         ? editingVertexKey
           ? 'service_account'
           : 'api_key'
-        : null
+        : null;
     const requiresJsonApiKey =
       (formData.type === 'vertex' &&
         formData.vertexAuthMode === 'service_account') ||
-      formData.type === 'bedrock'
-    const vertexLocation = formData.vertexLocation.trim()
+      formData.type === 'bedrock';
+    const vertexLocation = formData.vertexLocation.trim();
 
     if (requiresJsonApiKey && apiKey) {
       try {
-        const parsedApiKey = JSON.parse(apiKey) as unknown
+        const parsedApiKey = JSON.parse(apiKey) as unknown;
 
         if (
           typeof parsedApiKey !== 'object' ||
           parsedApiKey === null ||
           Array.isArray(parsedApiKey)
         ) {
-          throw new Error('Provider secret must be a JSON object')
+          throw new Error('Provider secret must be a JSON object');
         }
       } catch {
-        toast.error('API Key must be valid JSON for Vertex/Bedrock')
-        return
+        toast.error('API Key must be valid JSON for Vertex/Bedrock');
+        return;
       }
     }
 
@@ -287,33 +287,33 @@ export default function ProvidersPage() {
       formData.vertexAuthMode === 'service_account'
     ) {
       if (!vertexLocation) {
-        toast.error('Vertex location is required')
-        return
+        toast.error('Vertex location is required');
+        return;
       }
 
       if (!editingId && !apiKey) {
-        toast.error('Upload a Google Cloud credential JSON file')
-        return
+        toast.error('Upload a Google Cloud credential JSON file');
+        return;
       }
 
       if (editingId && !apiKey && editingVertexAuthMode !== 'service_account') {
-        toast.error('Upload a Google Vertex AI credential JSON file.')
-        return
+        toast.error('Upload a Google Vertex AI credential JSON file.');
+        return;
       }
 
       if (apiKey) {
         const credentials = JSON.parse(
-          apiKey,
-        ) as VertexServiceAccountKey['credentials']
+          apiKey
+        ) as VertexServiceAccountKey['credentials'];
 
         apiKey = JSON.stringify({
           location: vertexLocation,
-          credentials,
-        })
+          credentials
+        });
       } else if (editingId && editingVertexAuthMode === 'service_account') {
         apiKey = JSON.stringify({
-          location: vertexLocation,
-        })
+          location: vertexLocation
+        });
       }
     }
 
@@ -324,28 +324,28 @@ export default function ProvidersPage() {
       !apiKey &&
       editingVertexAuthMode !== 'api_key'
     ) {
-      toast.error('Enter a Google Cloud API Key')
-      return
+      toast.error('Enter a Google Cloud API Key');
+      return;
     }
 
     try {
       if (formData.apiOptions) {
-        apiOptions = JSON.parse(formData.apiOptions)
+        apiOptions = JSON.parse(formData.apiOptions);
         if (
           typeof apiOptions !== 'object' ||
           apiOptions === null ||
           Array.isArray(apiOptions)
         ) {
-          toast.error('API Options must be a JSON object')
-          return
+          toast.error('API Options must be a JSON object');
+          return;
         }
       } else {
         // create: omit the field (undefined); update: clear it (null)
-        apiOptions = editingId ? null : undefined
+        apiOptions = editingId ? null : undefined;
       }
     } catch {
-      toast.error('Invalid JSON format')
-      return
+      toast.error('Invalid JSON format');
+      return;
     }
 
     const {
@@ -353,42 +353,44 @@ export default function ProvidersPage() {
       vertexAuthMode: _vertexAuthMode,
       vertexLocation: _vertexLocation,
       ...providerData
-    } = formData
+    } = formData;
     const data = {
       ...providerData,
       ...(apiKey && { apiKey }),
-      apiOptions,
-    }
+      apiOptions
+    };
 
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...data })
+      updateMutation.mutate({ id: editingId, ...data });
     } else {
-      createMutation.mutate(data as Parameters<typeof createMutation.mutate>[0])
+      createMutation.mutate(
+        data as Parameters<typeof createMutation.mutate>[0]
+      );
     }
-  }
+  };
 
-  const isPending = createMutation.isPending || updateMutation.isPending
-  const isVertex = formData.type === 'vertex'
-  const isBedrock = formData.type === 'bedrock'
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isVertex = formData.type === 'vertex';
+  const isBedrock = formData.type === 'bedrock';
   const isVertexServiceAccount =
-    isVertex && formData.vertexAuthMode === 'service_account'
-  const isVertexApiKey = isVertex && formData.vertexAuthMode === 'api_key'
+    isVertex && formData.vertexAuthMode === 'service_account';
+  const isVertexApiKey = isVertex && formData.vertexAuthMode === 'api_key';
   const vertexCredentialValue =
     isVertexServiceAccount && !formData.apiKey && vertexMaskedApiKey
       ? vertexMaskedApiKey
-      : formData.apiKey
+      : formData.apiKey;
   const isMaskedVertexCredential =
-    isVertexServiceAccount && !formData.apiKey && !!vertexMaskedApiKey
+    isVertexServiceAccount && !formData.apiKey && !!vertexMaskedApiKey;
 
   const apiKeyPlaceholder = (() => {
-    const editingProvider = providers?.find((p) => p.id === editingId)
+    const editingProvider = providers?.find(p => p.id === editingId);
     const maskedKey =
       typeof editingProvider?.maskedKey === 'string'
         ? editingProvider.maskedKey
-        : undefined
+        : undefined;
 
     if (isVertexApiKey) {
-      return editingId ? maskedKey : 'Enter Google Cloud API Key'
+      return editingId ? maskedKey : 'Enter Google Cloud API Key';
     }
     if (isBedrock) {
       return `{
@@ -396,31 +398,31 @@ export default function ProvidersPage() {
   "accessKeyId": "AKIAxxxxxxxxxxxxxxxx",
   "secretAccessKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
   "sessionToken": "optional"
-}`
+}`;
     }
-    return editingId ? maskedKey : 'Enter API Key'
-  })()
+    return editingId ? maskedKey : 'Enter API Key';
+  })();
 
-  const requiresJsonApiKey = isVertexServiceAccount || isBedrock
+  const requiresJsonApiKey = isVertexServiceAccount || isBedrock;
 
   const apiKeyHelpText = isVertexApiKey
     ? 'Google Cloud API key for Gemini on Vertex AI.'
     : isBedrock
       ? 'Bedrock: paste JSON containing region and AWS credentials.'
-      : null
+      : null;
 
   const filteredProviders = providers?.filter(
-    (p) =>
+    p =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.type.toLowerCase().includes(search.toLowerCase()),
-  )
+      p.type.toLowerCase().includes(search.toLowerCase())
+  );
 
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         Loading...
       </div>
-    )
+    );
   }
 
   return (
@@ -432,7 +434,7 @@ export default function ProvidersPage() {
             <Input
               placeholder="Search providers..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={e => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -444,8 +446,8 @@ export default function ProvidersPage() {
               <Button
                 className="gap-2"
                 onClick={() => {
-                  setEditingId(null)
-                  resetForm()
+                  setEditingId(null);
+                  resetForm();
                 }}
               >
                 <Plus className="size-4" />
@@ -466,7 +468,7 @@ export default function ProvidersPage() {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({ ...formData, name: e.target.value })
                     }
                     placeholder="OpenAI"
@@ -485,7 +487,7 @@ export default function ProvidersPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {ProviderTypes.map((id) => (
+                      {ProviderTypes.map(id => (
                         <SelectItem key={id.value} value={id.value}>
                           {id.label}
                         </SelectItem>
@@ -499,11 +501,11 @@ export default function ProvidersPage() {
                       <Label htmlFor="vertexAuthMode">Authentication</Label>
                       <Select
                         value={formData.vertexAuthMode}
-                        onValueChange={(value) =>
-                          setFormData((current) => ({
+                        onValueChange={value =>
+                          setFormData(current => ({
                             ...current,
                             vertexAuthMode: value as VertexAuthMode,
-                            apiKey: '',
+                            apiKey: ''
                           }))
                         }
                         disabled={isPending}
@@ -539,7 +541,7 @@ export default function ProvidersPage() {
                       <Textarea
                         id="apiKey"
                         value={vertexCredentialValue}
-                        onChange={(e) =>
+                        onChange={e =>
                           setFormData({ ...formData, apiKey: e.target.value })
                         }
                         placeholder="{}"
@@ -561,7 +563,7 @@ export default function ProvidersPage() {
                         key="vertex-api-key-input"
                         id="apiKey"
                         value={formData.apiKey}
-                        onChange={(e) =>
+                        onChange={e =>
                           setFormData({ ...formData, apiKey: e.target.value })
                         }
                         placeholder={apiKeyPlaceholder}
@@ -580,7 +582,7 @@ export default function ProvidersPage() {
                       <Textarea
                         id="apiKey"
                         value={formData.apiKey}
-                        onChange={(e) =>
+                        onChange={e =>
                           setFormData({ ...formData, apiKey: e.target.value })
                         }
                         placeholder={apiKeyPlaceholder}
@@ -603,10 +605,10 @@ export default function ProvidersPage() {
                     <Input
                       id="vertexLocation"
                       value={formData.vertexLocation}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({
                           ...formData,
-                          vertexLocation: e.target.value,
+                          vertexLocation: e.target.value
                         })
                       }
                       placeholder="us-central1"
@@ -622,7 +624,7 @@ export default function ProvidersPage() {
                   <Input
                     id="baseUrl"
                     value={formData.baseUrl}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({ ...formData, baseUrl: e.target.value })
                     }
                     placeholder="https://"
@@ -642,7 +644,7 @@ export default function ProvidersPage() {
                     <Input
                       id="image"
                       value={formData.image}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({ ...formData, image: e.target.value })
                       }
                       placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
@@ -651,10 +653,10 @@ export default function ProvidersPage() {
                   </div>
                   <IconPicker
                     value={formData.image}
-                    onChange={(value) =>
+                    onChange={value =>
                       setFormData({
                         ...formData,
-                        image: value,
+                        image: value
                       })
                     }
                     disabled={isPending}
@@ -665,7 +667,7 @@ export default function ProvidersPage() {
                   <Textarea
                     id="apiOptions"
                     value={formData.apiOptions}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({ ...formData, apiOptions: e.target.value })
                     }
                     placeholder="{}"
@@ -678,7 +680,7 @@ export default function ProvidersPage() {
                   <Switch
                     id="isEnabled"
                     checked={formData.isEnabled}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={checked =>
                       setFormData({ ...formData, isEnabled: checked })
                     }
                     disabled={isPending}
@@ -727,7 +729,7 @@ export default function ProvidersPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredProviders?.map((provider) => (
+            {filteredProviders?.map(provider => (
               <tr
                 key={provider.id}
                 className="border-b transition-colors hover:bg-muted/30"
@@ -751,10 +753,10 @@ export default function ProvidersPage() {
                 <td className="p-3 text-center">
                   <Switch
                     checked={provider.isEnabled}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={checked =>
                       toggleMutation.mutate({
                         id: provider.id,
-                        isEnabled: checked,
+                        isEnabled: checked
                       })
                     }
                   />
@@ -795,7 +797,7 @@ export default function ProvidersPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
-                            setDeleteId(provider.id)
+                            setDeleteId(provider.id);
                           }}
                         >
                           <Trash2 className="size-4" />
@@ -825,7 +827,7 @@ export default function ProvidersPage() {
 
       <AlertDialog
         open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
+        onOpenChange={open => !open && setDeleteId(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -842,7 +844,7 @@ export default function ProvidersPage() {
             <AlertDialogAction
               onClick={() => {
                 if (deleteId) {
-                  deleteMutation.mutate({ id: deleteId })
+                  deleteMutation.mutate({ id: deleteId });
                 }
               }}
               disabled={deleteMutation.isPending}
@@ -862,12 +864,12 @@ export default function ProvidersPage() {
         open={!!modelSyncProviderId}
         providerId={modelSyncProviderId}
         providerName={modelSyncProvider?.name}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           if (!open) {
-            closeModelSyncDialog()
+            closeModelSyncDialog();
           }
         }}
       />
     </div>
-  )
+  );
 }

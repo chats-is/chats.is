@@ -4,11 +4,11 @@
  * (`/prompts` → `/`), so the content rides through `sessionStorage` rather than
  * shared React state. The value is consumed (and cleared) on the first read.
  */
-const PENDING_PROMPT_KEY = 'pending-prompt'
+const PENDING_PROMPT_KEY = 'pending-prompt';
 
 export function setPendingPrompt(content: string) {
   try {
-    sessionStorage.setItem(PENDING_PROMPT_KEY, content)
+    sessionStorage.setItem(PENDING_PROMPT_KEY, content);
   } catch {
     // sessionStorage may be unavailable (SSR / privacy mode) — fail silently.
   }
@@ -17,12 +17,12 @@ export function setPendingPrompt(content: string) {
 /** Returns the pending prompt and clears it, or null if none is queued. */
 export function takePendingPrompt(): string | null {
   try {
-    const content = sessionStorage.getItem(PENDING_PROMPT_KEY)
+    const content = sessionStorage.getItem(PENDING_PROMPT_KEY);
     if (content) {
-      sessionStorage.removeItem(PENDING_PROMPT_KEY)
+      sessionStorage.removeItem(PENDING_PROMPT_KEY);
     }
-    return content
+    return content;
   } catch {
-    return null
+    return null;
   }
 }

@@ -1,54 +1,59 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useArtifact } from '@/contexts/artifact-context'
-import { usePreferences } from '@/contexts/preferences-context'
-import { useSystemSettings } from '@/contexts/system-settings-context'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
-import { toast } from 'sonner'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useArtifact } from '@/contexts/artifact-context';
+import { usePreferences } from '@/contexts/preferences-context';
+import { useSystemSettings } from '@/contexts/system-settings-context';
+import { api } from '@/trpc/react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import { toast } from 'sonner';
 
-import { type Artifact, type Attachment, type ChatMessage, type CustomUIDataTypes } from '@/types'
-import { takePendingPrompt } from '@/lib/pending-prompt'
+import {
+  type Artifact,
+  type Attachment,
+  type ChatMessage,
+  type CustomUIDataTypes
+} from '@/types';
+import { takePendingPrompt } from '@/lib/pending-prompt';
 import {
   generateUUID,
   getMostRecentUserMessage,
-  modelMatchesId,
-} from '@/lib/utils'
-import { useChats } from '@/hooks/use-chats'
-import { api } from '@/trpc/react'
+  modelMatchesId
+} from '@/lib/utils';
+import { useChats } from '@/hooks/use-chats';
 import {
   ResizableHandle,
   ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable'
-import { useSidebar } from '@/components/ui/sidebar'
-import { ArtifactsPanel } from '@/components/artifacts-panel'
-import { ChatPanel } from '@/components/chat-panel'
-import { type ModelOptions } from '@/components/model-menu'
+  ResizablePanelGroup
+} from '@/components/ui/resizable';
+import { useSidebar } from '@/components/ui/sidebar';
+import { ArtifactsPanel } from '@/components/artifacts-panel';
+import { ChatPanel } from '@/components/chat-panel';
+import { type ModelOptions } from '@/components/model-menu';
 
 interface ChatUIProps {
-  id: string
-  initialChat?: { title: string; modelId?: string }
-  initialMessages?: ChatMessage[]
-  initialArtifacts?: Artifact[]
+  id: string;
+  initialChat?: { title: string; modelId?: string };
+  initialMessages?: ChatMessage[];
+  initialArtifacts?: Artifact[];
 }
 
 export function ChatUI({
   id,
   initialChat,
   initialMessages = [],
-  initialArtifacts = [],
+  initialArtifacts = []
 }: ChatUIProps) {
-  const { refreshChats } = useChats()
+  const { refreshChats } = useChats();
 
   // Get from contexts
-  const { chatModels } = useSystemSettings()
-  const { preferences, setPreference } = usePreferences()
-  const { isMobile, setOpen, setOpenMobile } = useSidebar()
+  const { chatModels } = useSystemSettings();
+  const { preferences, setPreference } = usePreferences();
+  const { isMobile, setOpen, setOpenMobile } = useSidebar();
 
-  const initialTitle = initialChat?.title
+  const initialTitle = initialChat?.title;
 
-  const [input, setInput] = useState('')
-  const [title, setTitle] = useState(initialTitle)
+  const [input, setInput] = useState('');
+  const [title, setTitle] = useState(initialTitle);
   const {
     artifacts,
     activeId,
@@ -56,54 +61,54 @@ export function ChatUI({
     openArtifact,
     setPanelOpen,
     handleStreamPart,
-    setArtifactsFromServer,
-  } = useArtifact()
+    setArtifactsFromServer
+  } = useArtifact();
 
   // Track the current model (for next submission)
   // Priority: initialChat.modelId (if valid) > preferences
   const [currentModelId, setCurrentModelId] = useState(
-    initialChat?.modelId || preferences.chatModelId,
-  )
+    initialChat?.modelId || preferences.chatModelId
+  );
 
   // Track the display model (for showing in Messages)
   const [displayModelId, setDisplayModelId] = useState(
-    initialChat?.modelId || preferences.chatModelId,
-  )
+    initialChat?.modelId || preferences.chatModelId
+  );
 
   // Track previous model for rollback on error
-  const previousModelRef = useRef<string | null>(null)
-  const previousPanelOpenRef = useRef(isPanelOpen)
-  const streamStatusRef = useRef('ready')
+  const previousModelRef = useRef<string | null>(null);
+  const previousPanelOpenRef = useRef(isPanelOpen);
+  const streamStatusRef = useRef('ready');
 
   // Track isReasoning state
-  const [isReasoning, setIsReasoning] = useState(preferences.chatReasoning)
+  const [isReasoning, setIsReasoning] = useState(preferences.chatReasoning);
 
   // Find current model in database models (for API request options)
   const currentDbModel = useMemo(
-    () => chatModels?.find((m) => m.modelId === currentModelId),
-    [chatModels, currentModelId],
-  )
+    () => chatModels?.find(m => m.modelId === currentModelId),
+    [chatModels, currentModelId]
+  );
 
   // Find display model in database models (for showing in Messages)
   const displayDbModel = useMemo(
-    () => chatModels?.find((m) => m.modelId === displayModelId),
-    [chatModels, displayModelId],
-  )
+    () => chatModels?.find(m => m.modelId === displayModelId),
+    [chatModels, displayModelId]
+  );
 
   const displayImage = useMemo(
     () => displayDbModel?.image || displayDbModel?.provider?.image || null,
-    [displayDbModel],
-  )
+    [displayDbModel]
+  );
 
   const currentImage = useMemo(
     () => currentDbModel?.image || currentDbModel?.provider?.image || null,
-    [currentDbModel],
-  )
+    [currentDbModel]
+  );
 
   const supportsReasoning = useMemo(
     () => currentDbModel?.supportsReasoning,
-    [currentDbModel],
-  )
+    [currentDbModel]
+  );
 
   const chatRequestBody = useMemo(
     () => ({
@@ -116,7 +121,7 @@ export function ChatUI({
           ? {
               modelId: preferences.imageModelId,
               size: preferences.imageSize,
-              aspectRatio: preferences.imageAspectRatio,
+              aspectRatio: preferences.imageAspectRatio
             }
           : undefined,
         imageEdit: preferences.imageEditModelId
@@ -127,7 +132,7 @@ export function ChatUI({
               modelId: preferences.videoModelId,
               aspectRatio: preferences.videoAspectRatio,
               resolution: preferences.videoResolution,
-              duration: preferences.videoDuration,
+              duration: preferences.videoDuration
             }
           : undefined,
         videoImage: preferences.videoImageModelId
@@ -139,13 +144,13 @@ export function ChatUI({
         audio: preferences.audioModelId
           ? {
               modelId: preferences.audioModelId,
-              voice: preferences.audioVoice,
+              voice: preferences.audioVoice
             }
           : undefined,
         stt: preferences.sttModelId
           ? { modelId: preferences.sttModelId }
-          : undefined,
-      },
+          : undefined
+      }
     }),
     [
       currentModelId,
@@ -163,20 +168,20 @@ export function ChatUI({
       preferences.videoEditModelId,
       preferences.audioModelId,
       preferences.audioVoice,
-      preferences.sttModelId,
-    ],
-  )
-  const chatRequestBodyRef = useRef(chatRequestBody)
+      preferences.sttModelId
+    ]
+  );
+  const chatRequestBodyRef = useRef(chatRequestBody);
 
   // Keep ref in sync with the latest request body
   useEffect(() => {
-    chatRequestBodyRef.current = chatRequestBody
-  }, [chatRequestBody])
+    chatRequestBodyRef.current = chatRequestBody;
+  }, [chatRequestBody]);
 
   const artifactsQuery = api.artifact.list.useQuery(
     { chatId: id },
     {
-      initialData: initialArtifacts.map((artifact) => ({
+      initialData: initialArtifacts.map(artifact => ({
         id: artifact.id,
         chatId: artifact.chatId,
         messageId: artifact.messageId,
@@ -189,16 +194,16 @@ export function ChatUI({
         mimeType: artifact.mimeType ?? null,
         size: artifact.size ?? null,
         createdAt: artifact.createdAt,
-        updatedAt: artifact.updatedAt,
+        updatedAt: artifact.updatedAt
       })),
       // We invalidate these explicitly when a turn finishes; don't also refetch
       // on window focus (it churns artifacts/versions and the preview).
-      refetchOnWindowFocus: false,
-    },
-  )
+      refetchOnWindowFocus: false
+    }
+  );
 
-  const utils = api.useUtils()
-  const prevStatusRef = useRef<string | null>(null)
+  const utils = api.useUtils();
+  const prevStatusRef = useRef<string | null>(null);
 
   const {
     status,
@@ -207,7 +212,7 @@ export function ChatUI({
     regenerate,
     setMessages,
     sendMessage,
-    error,
+    error
   } = useChat<ChatMessage>({
     id,
     messages: initialMessages,
@@ -219,48 +224,48 @@ export function ChatUI({
     transport: new DefaultChatTransport({
       api: '/api/chat',
       prepareSendMessagesRequest({ messages, body }) {
-        const userMessage = getMostRecentUserMessage(messages)
+        const userMessage = getMostRecentUserMessage(messages);
         return {
           body: {
             id,
             userMessage,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             ...chatRequestBodyRef.current,
-            ...body,
-          },
-        }
+            ...body
+          }
+        };
       },
       // Resume hits the same route as a GET; pass the chat id as a query
       // param so the handler knows which stream to re-attach to.
       prepareReconnectToStreamRequest({ id, api }) {
-        return { api: `${api}?chatId=${id}` }
-      },
+        return { api: `${api}?chatId=${id}` };
+      }
     }),
-    onData: (dataPart) => {
+    onData: dataPart => {
       // A refused turn arrives as a normal 200 stream, so onError never runs.
       // Undo the optimistic model switch here instead — the request was often
       // refused *because* of the model that was just picked, and leaving the
       // selector on it says the opposite.
       if (dataPart.type === 'data-error') {
         if (previousModelRef.current) {
-          setDisplayModelId(previousModelRef.current)
-          previousModelRef.current = null
+          setDisplayModelId(previousModelRef.current);
+          previousModelRef.current = null;
         }
       }
 
       if (dataPart.type === 'data-chat' && dataPart.data) {
-        const chatData = dataPart.data as CustomUIDataTypes['chat']
+        const chatData = dataPart.data as CustomUIDataTypes['chat'];
         if (chatData.title) {
           if (!title) {
-            window.history.replaceState({}, '', `/chat/${id}`)
-            refreshChats()
+            window.history.replaceState({}, '', `/chat/${id}`);
+            refreshChats();
           }
-          setTitle(chatData.title)
+          setTitle(chatData.title);
         }
         // Clear previous model ref on success
-        previousModelRef.current = null
+        previousModelRef.current = null;
       }
-      handleStreamPart(dataPart, id)
+      handleStreamPart(dataPart, id);
     },
     onError: () => {
       // Not toasted: `error` is rendered in the thread by <Messages>, where it
@@ -268,26 +273,26 @@ export function ChatUI({
       // both would repeat one failure twice.
       // Revert displayModel on error
       if (previousModelRef.current) {
-        setDisplayModelId(previousModelRef.current)
-        previousModelRef.current = null
+        setDisplayModelId(previousModelRef.current);
+        previousModelRef.current = null;
       }
-      void artifactsQuery.refetch()
-    },
-  })
+      void artifactsQuery.refetch();
+    }
+  });
 
   useEffect(() => {
-    streamStatusRef.current = status
-  }, [status])
+    streamStatusRef.current = status;
+  }, [status]);
 
   // When a turn finishes, the server has persisted new artifacts; refresh so the
   // chat's artifact list reflects the latest state.
   useEffect(() => {
-    const prev = prevStatusRef.current
-    prevStatusRef.current = status
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
     if ((prev === 'streaming' || prev === 'submitted') && status === 'ready') {
-      void utils.artifact.list.invalidate({ chatId: id })
+      void utils.artifact.list.invalidate({ chatId: id });
     }
-  }, [status, id, utils])
+  }, [status, id, utils]);
 
   useEffect(() => {
     if (artifactsQuery.data) {
@@ -296,135 +301,135 @@ export function ChatUI({
           streamStatusRef.current === 'submitted' ||
           streamStatusRef.current === 'streaming'
             ? id
-            : null,
-      })
+            : null
+      });
     }
-  }, [artifactsQuery.data, id, setArtifactsFromServer])
+  }, [artifactsQuery.data, id, setArtifactsFromServer]);
 
   useEffect(() => {
-    setPanelOpen(false)
-  }, [id, setPanelOpen])
+    setPanelOpen(false);
+  }, [id, setPanelOpen]);
 
   // Seed the composer from a prompt picked on the Prompts page. Read after
   // mount (not during render) to avoid a hydration mismatch, and only for a
   // fresh chat so an in-progress conversation is never clobbered.
   useEffect(() => {
-    if (initialMessages.length > 0) return
-    const pending = takePendingPrompt()
-    if (pending) setInput(pending)
+    if (initialMessages.length > 0) return;
+    const pending = takePendingPrompt();
+    if (pending) setInput(pending);
     // Mount-only: consume the one-shot hand-off exactly once.
-  }, [])
+  }, []);
 
   useEffect(() => {
     if (status === 'ready') {
-      artifactsQuery.refetch()
+      artifactsQuery.refetch();
     }
-  }, [status, artifactsQuery.refetch])
+  }, [status, artifactsQuery.refetch]);
 
   useEffect(() => {
-    const wasPanelOpen = previousPanelOpenRef.current
-    previousPanelOpenRef.current = isPanelOpen
+    const wasPanelOpen = previousPanelOpenRef.current;
+    previousPanelOpenRef.current = isPanelOpen;
 
-    if (!isPanelOpen || wasPanelOpen) return
+    if (!isPanelOpen || wasPanelOpen) return;
 
     if (isMobile) {
-      setOpenMobile(false)
-      return
+      setOpenMobile(false);
+      return;
     }
 
-    setOpen(false)
-  }, [isMobile, isPanelOpen, setOpen, setOpenMobile])
+    setOpen(false);
+  }, [isMobile, isPanelOpen, setOpen, setOpenMobile]);
 
   const noChat = useMemo(
     () => !title && status === 'ready' && messages.length === 0,
-    [title, status, messages.length],
-  )
+    [title, status, messages.length]
+  );
 
   // Handle model change from ModelMenu
   const handleModelChange = useCallback(
     (newModelId: string) => {
-      setCurrentModelId(newModelId)
-      setPreference('chatModelId', newModelId)
+      setCurrentModelId(newModelId);
+      setPreference('chatModelId', newModelId);
     },
-    [setPreference],
-  )
+    [setPreference]
+  );
 
   // Handle options change from ModelMenu (like reasoning toggle)
   const handleOptionsChange = useCallback(
     (options: ModelOptions) => {
       if (options.isReasoning !== undefined) {
-        setIsReasoning(options.isReasoning)
-        setPreference('chatReasoning', options.isReasoning)
+        setIsReasoning(options.isReasoning);
+        setPreference('chatReasoning', options.isReasoning);
       }
     },
-    [setPreference],
-  )
+    [setPreference]
+  );
 
   // Helper to update displayModel optimistically
   const updateDisplayModelOptimistically = useCallback(() => {
     if (currentModelId !== displayModelId) {
-      previousModelRef.current = displayModelId
-      setDisplayModelId(currentModelId)
+      previousModelRef.current = displayModelId;
+      setDisplayModelId(currentModelId);
     }
-  }, [currentModelId, displayModelId])
+  }, [currentModelId, displayModelId]);
 
   const handleReload = useCallback(
     (message: ChatMessage) => {
-      updateDisplayModelOptimistically()
+      updateDisplayModelOptimistically();
       const parentMessageId =
-        message.role === 'assistant' ? message.metadata?.parentId : message.id
+        message.role === 'assistant' ? message.metadata?.parentId : message.id;
 
       regenerate({
         messageId: message.id,
-        ...(parentMessageId ? { body: { parentMessageId } } : {}),
-      })
+        ...(parentMessageId ? { body: { parentMessageId } } : {})
+      });
     },
-    [regenerate, updateDisplayModelOptimistically],
-  )
+    [regenerate, updateDisplayModelOptimistically]
+  );
 
   const handleSubmit = useCallback(
     (attachments?: Attachment[]) => {
-      if (!input.trim()) return false
+      if (!input.trim()) return false;
       // Last line of defence behind the form's own disabled state: an empty or
       // unresolvable model would only earn a 400 from /api/chat. Alias-aware,
       // because that is how the server resolves it — matching on modelId alone
       // would reject a chat stored under an older id.
-      if (!chatModels?.some((model) => modelMatchesId(model, currentModelId))) {
-        toast.error('Select a model before sending.')
-        return false
+      if (!chatModels?.some(model => modelMatchesId(model, currentModelId))) {
+        toast.error('Select a model before sending.');
+        return false;
       }
-      updateDisplayModelOptimistically()
+      updateDisplayModelOptimistically();
       sendMessage({
         text: input,
-        files: attachments?.map((attachment) => ({
+        files: attachments?.map(attachment => ({
           type: 'file',
           mediaType: attachment.contentType,
           filename: attachment.name,
-          url: attachment.url,
-        })),
-      })
-      return true
+          url: attachment.url
+        }))
+      });
+      return true;
     },
     [
       input,
       chatModels,
       currentModelId,
       sendMessage,
-      updateDisplayModelOptimistically,
-    ],
-  )
+      updateDisplayModelOptimistically
+    ]
+  );
 
   const handleArtifactSelect = useCallback(
     (artifactId: string) => {
-      openArtifact(artifactId)
+      openArtifact(artifactId);
     },
-    [openArtifact],
-  )
+    [openArtifact]
+  );
 
   const artifactList = useMemo<Artifact[]>(() => {
     return Object.values(artifacts)
-      .filter((artifact) => artifact.chatId === id && !!artifact.messageId)
-      .map((artifact) => {
+      .filter(artifact => artifact.chatId === id && !!artifact.messageId)
+      .map(artifact => {
         return {
           id: artifact.id,
           chatId: artifact.chatId,
@@ -439,26 +444,23 @@ export function ChatUI({
           size: artifact.size ?? null,
           status: artifact.status,
           createdAt: artifact.createdAt ?? new Date(),
-          updatedAt: artifact.updatedAt ?? new Date(),
-        }
-      })
-  }, [artifacts, id])
+          updatedAt: artifact.updatedAt ?? new Date()
+        };
+      });
+  }, [artifacts, id]);
 
   useEffect(() => {
-    if (!isPanelOpen) return
+    if (!isPanelOpen) return;
 
     if (artifactList.length === 0) {
-      setPanelOpen(false)
-      return
+      setPanelOpen(false);
+      return;
     }
 
-    if (
-      activeId &&
-      !artifactList.some((artifact) => artifact.id === activeId)
-    ) {
-      setPanelOpen(false)
+    if (activeId && !artifactList.some(artifact => artifact.id === activeId)) {
+      setPanelOpen(false);
     }
-  }, [activeId, artifactList, isPanelOpen, setPanelOpen])
+  }, [activeId, artifactList, isPanelOpen, setPanelOpen]);
 
   return (
     <div className="flex size-full overflow-hidden">
@@ -487,7 +489,7 @@ export function ChatUI({
               stop={stop}
               input={input}
               setInput={setInput}
-              onInputChange={(e) => setInput(e.target.value)}
+              onInputChange={e => setInput(e.target.value)}
               onSubmit={handleSubmit}
               onModelChange={handleModelChange}
               onOptionsChange={handleOptionsChange}
@@ -530,7 +532,7 @@ export function ChatUI({
             stop={stop}
             input={input}
             setInput={setInput}
-            onInputChange={(e) => setInput(e.target.value)}
+            onInputChange={e => setInput(e.target.value)}
             onSubmit={handleSubmit}
             onModelChange={handleModelChange}
             onOptionsChange={handleOptionsChange}
@@ -548,5 +550,5 @@ export function ChatUI({
         </div>
       )}
     </div>
-  )
+  );
 }

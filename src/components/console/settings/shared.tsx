@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { useEffect, useRef, useState } from 'react';
+import { api } from '@/trpc/react';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { api } from '@/trpc/react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
 
 /**
  * Descriptions persisted alongside each setting. Kept in one place because the
@@ -28,8 +28,8 @@ const SETTING_DESCRIPTIONS: Record<string, string> = {
   'speech.enabled': 'Enable or disable reading messages aloud',
   'default.chat.systemPrompt': 'Default system prompt for chat',
   'title.modelId': 'Model used for generating chat titles',
-  'default.quotaId': 'Quota id used for users without an assigned plan',
-}
+  'default.quotaId': 'Quota id used for users without an assigned plan'
+};
 
 /**
  * Load the settings a page owns, track edits, and save just those keys.
@@ -40,58 +40,58 @@ const SETTING_DESCRIPTIONS: Record<string, string> = {
  * given — so saving one section never clobbers another.
  */
 export function useSettingsForm(keys: readonly string[]) {
-  const utils = api.useUtils()
-  const { data: settings, isLoading } = api.settings.list.useQuery()
-  const [formData, setFormData] = useState<Record<string, string>>({})
-  const [hasChanges, setHasChanges] = useState(false)
+  const utils = api.useUtils();
+  const { data: settings, isLoading } = api.settings.list.useQuery();
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   // Read inside the hydrate effect without making it a dependency — depending
   // on it would re-run hydration on the very edit it is meant to protect.
-  const hasChangesRef = useRef(false)
-  hasChangesRef.current = hasChanges
+  const hasChangesRef = useRef(false);
+  hasChangesRef.current = hasChanges;
 
   useEffect(() => {
-    if (!settings) return
+    if (!settings) return;
     // `settings.list` refetches in the background (30s staleTime, and React
     // Query refetches on window focus by default), which would otherwise
     // overwrite whatever the user has typed — silently, since the same pass
     // would clear hasChanges and disable Save. Leave edits alone; the next
     // successful save re-hydrates from the server anyway.
-    if (hasChangesRef.current) return
+    if (hasChangesRef.current) return;
 
-    const data: Record<string, string> = {}
-    settings.forEach((setting) => {
-      data[setting.key] = setting.value || ''
-    })
+    const data: Record<string, string> = {};
+    settings.forEach(setting => {
+      data[setting.key] = setting.value || '';
+    });
     if (!data['speech.enabled']) {
-      data['speech.enabled'] = 'false'
+      data['speech.enabled'] = 'false';
     }
-    setFormData(data)
-    setHasChanges(false)
-  }, [settings])
+    setFormData(data);
+    setHasChanges(false);
+  }, [settings]);
 
   const mutation = api.settings.bulkUpdate.useMutation({
     onSuccess: () => {
-      utils.settings.list.invalidate()
-      setHasChanges(false)
-      toast.success('Settings saved successfully')
+      utils.settings.list.invalidate();
+      setHasChanges(false);
+      toast.success('Settings saved successfully');
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const handleChange = (key: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [key]: value }))
-    setHasChanges(true)
-  }
+    setFormData(prev => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
 
   const save = () => {
     mutation.mutate(
-      keys.map((key) => ({
+      keys.map(key => ({
         key,
         value: formData[key] || null,
-        description: SETTING_DESCRIPTIONS[key],
-      })),
-    )
-  }
+        description: SETTING_DESCRIPTIONS[key]
+      }))
+    );
+  };
 
   return {
     formData,
@@ -99,24 +99,24 @@ export function useSettingsForm(keys: readonly string[]) {
     save,
     hasChanges,
     isLoading,
-    isSaving: mutation.isPending,
-  }
+    isSaving: mutation.isPending
+  };
 }
 
 export function SettingsLoading() {
   return (
     <div className="flex h-[50vh] items-center justify-center">Loading...</div>
-  )
+  );
 }
 
 export function SettingsSaveBar({
   hasChanges,
   isSaving,
-  onSave,
+  onSave
 }: {
-  hasChanges: boolean
-  isSaving: boolean
-  onSave: () => void
+  hasChanges: boolean;
+  isSaving: boolean;
+  onSave: () => void;
 }) {
   return (
     <div className="flex items-center justify-start">
@@ -129,5 +129,5 @@ export function SettingsSaveBar({
         {isSaving ? 'Saving...' : 'Save Changes'}
       </Button>
     </div>
-  )
+  );
 }

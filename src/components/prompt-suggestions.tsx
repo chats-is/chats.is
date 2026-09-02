@@ -1,33 +1,32 @@
-import { useMemo } from 'react'
-
-import { api } from '@/trpc/react'
+import { useMemo } from 'react';
+import { api } from '@/trpc/react';
 
 /** One row's worth. Suggestions, not a browsable list — /prompts has the rest. */
-const SUGGESTION_COUNT = 4
+const SUGGESTION_COUNT = 4;
 
 interface PromptSuggestionsProps {
   /** Current composer text; a prompt is prepended rather than replacing it. */
-  currentValue: string
-  onInsert: (value: string) => void
-  disabled?: boolean
+  currentValue: string;
+  onInsert: (value: string) => void;
+  disabled?: boolean;
 }
 
 function prependPrompt(promptContent: string, currentValue: string) {
-  const content = promptContent.trim()
+  const content = promptContent.trim();
   if (!currentValue.trim()) {
-    return content
+    return content;
   }
 
-  return `${content}\n\n${currentValue.trimStart()}`
+  return `${content}\n\n${currentValue.trimStart()}`;
 }
 
 function pickRandom<T>(items: T[], count: number): T[] {
-  const pool = [...items]
+  const pool = [...items];
   for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, count)
+  return pool.slice(0, count);
 }
 
 /**
@@ -46,29 +45,29 @@ function pickRandom<T>(items: T[], count: number): T[] {
 export function PromptSuggestions({
   currentValue,
   onInsert,
-  disabled = false,
+  disabled = false
 }: PromptSuggestionsProps) {
   const { data: prompts } = api.prompt.listUsable.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  })
+    refetchOnWindowFocus: false
+  });
 
   // Shuffled once per query result rather than per render — re-picking as the
   // user types would shuffle the cards under their cursor.
   const suggestions = useMemo(
     () => pickRandom(prompts ?? [], SUGGESTION_COUNT),
-    [prompts],
-  )
+    [prompts]
+  );
 
   // Nothing renders until there is something to suggest, so there is no empty
   // frame to flash while the query is in flight.
   if (!suggestions.length) {
-    return null
+    return null;
   }
 
   return (
     <div className="mx-auto mt-4 w-full max-w-4xl">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {suggestions.map((prompt) => (
+        {suggestions.map(prompt => (
           <button
             key={prompt.id}
             type="button"
@@ -88,5 +87,5 @@ export function PromptSuggestions({
         ))}
       </div>
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router';
 import {
   ChevronsUpDown,
   ExternalLink,
@@ -6,31 +6,31 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  Shield,
-} from 'lucide-react'
-import { signOut } from 'next-auth/react'
+  Shield
+} from 'lucide-react';
+import { signOut } from 'next-auth/react';
 
-import { useCurrentUser } from '@/hooks/use-current-user'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
-} from '@/components/ui/sidebar'
-import { Skeleton } from '@/components/ui/skeleton'
+  useSidebar
+} from '@/components/ui/sidebar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function UserMenu() {
-  const { user, isLoading } = useCurrentUser()
-  const { isMobile, state } = useSidebar()
-  const isCollapsed = state === 'collapsed'
+  const { user, isLoading } = useCurrentUser();
+  const { isMobile, state } = useSidebar();
+  const isCollapsed = state === 'collapsed';
 
   if (isLoading) {
     return (
@@ -48,10 +48,10 @@ export function UserMenu() {
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
-    )
+    );
   }
 
-  if (!user) return null
+  if (!user) return null;
 
   return (
     <SidebarMenu className="my-1">
@@ -144,7 +144,7 @@ export function UserMenu() {
             <DropdownMenuItem
               onClick={() =>
                 signOut({
-                  callbackUrl: '/',
+                  callbackUrl: '/'
                 })
               }
               className="flex items-center gap-2"
@@ -156,5 +156,5 @@ export function UserMenu() {
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

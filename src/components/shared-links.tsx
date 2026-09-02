@@ -1,55 +1,55 @@
-import { useState } from 'react'
-import { format } from 'date-fns'
-import { Link, Loader2, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { Link, Loader2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { useSharedLinks } from '@/hooks/use-shared-links'
-import { Button } from '@/components/ui/button'
+import { useSharedLinks } from '@/hooks/use-shared-links';
+import { Button } from '@/components/ui/button';
 
-const LIMIT = 5
+const LIMIT = 5;
 
 export function SharedLinks() {
-  const [page, setPage] = useState(0)
-  const [isDeleting, setIsDeleting] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(0);
+  const [isDeleting, setIsDeleting] = useState<Set<string>>(new Set());
   const { sharedLinks, isLoading, deleteSharedLink } = useSharedLinks(
     page,
-    LIMIT,
-  )
+    LIMIT
+  );
 
   const handlePrevious = () => {
     if (page > 0) {
-      setPage((prev) => prev - 1)
+      setPage(prev => prev - 1);
     }
-  }
+  };
 
   const handleNext = () => {
     if (sharedLinks && sharedLinks.length === LIMIT) {
-      setPage((prev) => prev + 1)
+      setPage(prev => prev + 1);
     }
-  }
+  };
 
   const handleDelete = async (id: string) => {
     try {
-      setIsDeleting((prev) => new Set(prev).add(id))
-      await deleteSharedLink(id)
-      toast.success('Shared link deleted', { duration: 2000 })
+      setIsDeleting(prev => new Set(prev).add(id));
+      await deleteSharedLink(id);
+      toast.success('Shared link deleted', { duration: 2000 });
     } catch (err: any) {
-      toast.error(err.message)
+      toast.error(err.message);
     } finally {
-      setIsDeleting((prev) => {
-        const newSet = new Set(prev)
-        newSet.delete(id)
-        return newSet
-      })
+      setIsDeleting(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     }
-  }
+  };
 
   if (isLoading) {
     return (
       <div className="flex justify-center p-4">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
@@ -67,7 +67,7 @@ export function SharedLinks() {
               </tr>
             </thead>
             <tbody>
-              {sharedLinks.map((sharedLink) => (
+              {sharedLinks.map(sharedLink => (
                 <tr key={sharedLink.id} className="border-b">
                   <td className="p-3">
                     <a
@@ -129,5 +129,5 @@ export function SharedLinks() {
         </Button>
       </div>
     </div>
-  )
+  );
 }

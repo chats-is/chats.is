@@ -1,93 +1,93 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Download, Pause, Play } from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Download, Pause, Play } from 'lucide-react';
 
-import { cn, formatMediaTime } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
+import { cn, formatMediaTime } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface AudioPlayerProps {
-  src: string
-  className?: string
+  src: string;
+  className?: string;
 }
 
 export function AudioPlayer({ src, className }: AudioPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   useEffect(() => {
-    const audio = audioRef.current
-    if (!audio) return
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime)
-    const updateDuration = () => setDuration(audio.duration)
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => {
-      setIsPlaying(false)
-      setCurrentTime(0)
-      if (audio) audio.currentTime = 0
-    }
-    const handlePlay = () => setIsPlaying(true)
-    const handlePause = () => setIsPlaying(false)
+      setIsPlaying(false);
+      setCurrentTime(0);
+      if (audio) audio.currentTime = 0;
+    };
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
 
-    audio.addEventListener('timeupdate', updateTime)
-    audio.addEventListener('loadedmetadata', updateDuration)
-    audio.addEventListener('ended', handleEnded)
-    audio.addEventListener('play', handlePlay)
-    audio.addEventListener('pause', handlePause)
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
 
     return () => {
-      audio.removeEventListener('timeupdate', updateTime)
-      audio.removeEventListener('loadedmetadata', updateDuration)
-      audio.removeEventListener('ended', handleEnded)
-      audio.removeEventListener('play', handlePlay)
-      audio.removeEventListener('pause', handlePause)
-    }
-  }, [])
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+    };
+  }, []);
 
   const togglePlay = useCallback(() => {
-    const audio = audioRef.current
-    if (!audio) return
+    const audio = audioRef.current;
+    if (!audio) return;
 
     if (isPlaying) {
-      audio.pause()
+      audio.pause();
     } else {
-      audio.play()
+      audio.play();
     }
-  }, [isPlaying])
+  }, [isPlaying]);
 
   const handleSeek = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      const audio = audioRef.current
-      if (!audio || !duration) return
+      const audio = audioRef.current;
+      if (!audio || !duration) return;
 
-      const rect = e.currentTarget.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const percentage = x / rect.width
-      const newTime = percentage * duration
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percentage = x / rect.width;
+      const newTime = percentage * duration;
 
-      audio.currentTime = newTime
-      setCurrentTime(newTime)
+      audio.currentTime = newTime;
+      setCurrentTime(newTime);
     },
-    [duration],
-  )
+    [duration]
+  );
 
   const handleDownload = useCallback(() => {
-    const link = document.createElement('a')
-    link.href = src
-    link.download = 'audio.mp3'
-    link.target = '_blank'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }, [src])
+    const link = document.createElement('a');
+    link.href = src;
+    link.download = 'audio.mp3';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [src]);
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div
       className={cn(
         'flex items-center gap-3 rounded-full bg-muted/50 py-2 pr-4 pl-2',
-        className,
+        className
       )}
     >
       <audio ref={audioRef} src={src} preload="metadata" />
@@ -137,5 +137,5 @@ export function AudioPlayer({ src, className }: AudioPlayerProps) {
         <Download className="size-4" />
       </Button>
     </div>
-  )
+  );
 }

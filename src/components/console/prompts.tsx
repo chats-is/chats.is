@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
-import { Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { useMemo, useState } from 'react';
+import { api, RouterOutputs } from '@/trpc/react';
+import { Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { uploadFile } from '@/lib/api'
-import { useCurrentUser } from '@/hooks/use-current-user'
-import { api, RouterOutputs } from '@/trpc/react'
+import { uploadFile } from '@/lib/api';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,45 +13,45 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+  SelectValue
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
-type AdminPrompt = RouterOutputs['prompt']['adminList'][number]
-type Visibility = 'private' | 'public'
+type AdminPrompt = RouterOutputs['prompt']['adminList'][number];
+type Visibility = 'private' | 'public';
 
 type PromptFormData = {
-  name: string
-  content: string
-  image: string
-  tags: string
-  providers: string
-  models: string[]
-  visibility: Visibility
-}
+  name: string;
+  content: string;
+  image: string;
+  tags: string;
+  providers: string;
+  models: string[];
+  visibility: Visibility;
+};
 
 // Admin-created prompts default to public (available to all users).
 const EMPTY_FORM: PromptFormData = {
@@ -61,107 +61,107 @@ const EMPTY_FORM: PromptFormData = {
   tags: '',
   providers: '',
   models: [],
-  visibility: 'public',
-}
+  visibility: 'public'
+};
 
 const parseList = (value: string) =>
   value
     .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+    .map(item => item.trim())
+    .filter(Boolean);
 
-const joinList = (value?: string[] | null) => (value ?? []).join(', ')
+const joinList = (value?: string[] | null) => (value ?? []).join(', ');
 
 const LabelBadges = ({
   values,
-  className,
+  className
 }: {
-  values?: string[] | null
-  className: string
+  values?: string[] | null;
+  className: string;
 }) => {
-  if (!values?.length) return null
+  if (!values?.length) return null;
   return (
     <div className="flex flex-wrap gap-1">
-      {values.map((value) => (
+      {values.map(value => (
         <span key={value} className={className}>
           {value}
         </span>
       ))}
     </div>
-  )
-}
+  );
+};
 
 export default function PromptsPage() {
-  const { user } = useCurrentUser()
+  const { user } = useCurrentUser();
 
-  const [isOpen, setIsOpen] = useState(false)
-  const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null)
-  const [deletePrompt, setDeletePrompt] = useState<AdminPrompt | null>(null)
-  const [search, setSearch] = useState('')
-  const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM)
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null);
+  const [deletePrompt, setDeletePrompt] = useState<AdminPrompt | null>(null);
+  const [search, setSearch] = useState('');
+  const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
 
-  const utils = api.useUtils()
-  const { data: prompts, isLoading } = api.prompt.adminList.useQuery()
-  const { data: models } = api.model.list.useQuery()
+  const utils = api.useUtils();
+  const { data: prompts, isLoading } = api.prompt.adminList.useQuery();
+  const { data: models } = api.model.list.useQuery();
 
   const modelName = (modelId: string) =>
-    models?.find((m) => m.modelId === modelId)?.name ?? modelId
+    models?.find(m => m.modelId === modelId)?.name ?? modelId;
 
   const resetForm = () => {
-    setEditingPrompt(null)
-    setFormData(EMPTY_FORM)
-  }
+    setEditingPrompt(null);
+    setFormData(EMPTY_FORM);
+  };
 
   const invalidate = () =>
     Promise.all([
       utils.prompt.adminList.invalidate(),
-      utils.prompt.listUsable.invalidate(),
-    ])
+      utils.prompt.listUsable.invalidate()
+    ]);
 
   const adminCreateMutation = api.prompt.adminCreate.useMutation({
     onSuccess: async () => {
-      await invalidate()
-      setIsOpen(false)
-      resetForm()
-      toast.success('Prompt created')
+      await invalidate();
+      setIsOpen(false);
+      resetForm();
+      toast.success('Prompt created');
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const adminUpdateMutation = api.prompt.adminUpdate.useMutation({
     onSuccess: async () => {
-      await invalidate()
-      setIsOpen(false)
-      resetForm()
-      toast.success('Prompt updated')
+      await invalidate();
+      setIsOpen(false);
+      resetForm();
+      toast.success('Prompt updated');
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const adminDeleteMutation = api.prompt.adminDelete.useMutation({
     onSuccess: async () => {
-      await invalidate()
-      setDeletePrompt(null)
-      toast.success('Prompt deleted')
+      await invalidate();
+      setDeletePrompt(null);
+      toast.success('Prompt deleted');
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
   const isPending =
-    adminCreateMutation.isPending || adminUpdateMutation.isPending
+    adminCreateMutation.isPending || adminUpdateMutation.isPending;
 
   const filteredPrompts = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-    if (!keyword) return prompts ?? []
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return prompts ?? [];
     return (prompts ?? []).filter(
-      (prompt) =>
+      prompt =>
         prompt.name.toLowerCase().includes(keyword) ||
-        prompt.content.toLowerCase().includes(keyword),
-    )
-  }, [prompts, search])
+        prompt.content.toLowerCase().includes(keyword)
+    );
+  }, [prompts, search]);
 
   const handleEdit = (prompt: AdminPrompt) => {
-    setEditingPrompt(prompt)
+    setEditingPrompt(prompt);
     setFormData({
       name: prompt.name,
       content: prompt.content,
@@ -169,23 +169,23 @@ export default function PromptsPage() {
       tags: joinList(prompt.tags),
       providers: joinList(prompt.providers),
       models: prompt.models || [],
-      visibility: prompt.visibility,
-    })
-    setIsOpen(true)
-  }
+      visibility: prompt.visibility
+    });
+    setIsOpen(true);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    const name = formData.name.trim()
-    const content = formData.content.trim()
+    const name = formData.name.trim();
+    const content = formData.content.trim();
     if (!name || !content) {
-      toast.error('Name and content are required')
-      return
+      toast.error('Name and content are required');
+      return;
     }
 
-    const tags = parseList(formData.tags)
-    const providers = parseList(formData.providers)
+    const tags = parseList(formData.tags);
+    const providers = parseList(formData.providers);
     const payload = {
       name,
       content,
@@ -193,31 +193,31 @@ export default function PromptsPage() {
       tags: tags.length > 0 ? tags : null,
       providers: providers.length > 0 ? providers : null,
       models: formData.models.length > 0 ? formData.models : null,
-      visibility: formData.visibility,
-    }
+      visibility: formData.visibility
+    };
 
     if (editingPrompt) {
-      adminUpdateMutation.mutate({ id: editingPrompt.id, ...payload })
+      adminUpdateMutation.mutate({ id: editingPrompt.id, ...payload });
     } else {
-      adminCreateMutation.mutate(payload)
+      adminCreateMutation.mutate(payload);
     }
-  }
+  };
 
   const toggleModel = (modelId: string) => {
-    setFormData((current) => ({
+    setFormData(current => ({
       ...current,
       models: current.models.includes(modelId)
-        ? current.models.filter((item) => item !== modelId)
-        : [...current.models, modelId],
-    }))
-  }
+        ? current.models.filter(item => item !== modelId)
+        : [...current.models, modelId]
+    }));
+  };
 
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
@@ -227,7 +227,7 @@ export default function PromptsPage() {
           <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or content"
             className="pl-9"
           />
@@ -235,9 +235,9 @@ export default function PromptsPage() {
 
         <Dialog
           open={isOpen}
-          onOpenChange={(open) => {
-            setIsOpen(open)
-            if (!open) resetForm()
+          onOpenChange={open => {
+            setIsOpen(open);
+            if (!open) resetForm();
           }}
         >
           <DialogTrigger
@@ -261,7 +261,7 @@ export default function PromptsPage() {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({ ...formData, name: e.target.value })
                     }
                     placeholder="Research prompt"
@@ -275,7 +275,7 @@ export default function PromptsPage() {
                   <Textarea
                     id="content"
                     value={formData.content}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({ ...formData, content: e.target.value })
                     }
                     rows={6}
@@ -291,7 +291,7 @@ export default function PromptsPage() {
                     <Input
                       id="tags"
                       value={formData.tags}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({ ...formData, tags: e.target.value })
                       }
                       placeholder="writing, english"
@@ -306,7 +306,7 @@ export default function PromptsPage() {
                     <Input
                       id="providers"
                       value={formData.providers}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({ ...formData, providers: e.target.value })
                       }
                       placeholder="openai, anthropic"
@@ -322,7 +322,7 @@ export default function PromptsPage() {
                   <Label>Models</Label>
                   <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2.5">
                     {models?.length ? (
-                      models.map((model) => (
+                      models.map(model => (
                         <label
                           key={model.id}
                           className="flex items-center gap-2 text-sm"
@@ -374,24 +374,24 @@ export default function PromptsPage() {
                           accept="image/jpeg,image/png,image/gif,image/webp"
                           className="hidden"
                           disabled={isPending}
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0]
-                            if (!file) return
+                          onChange={async e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
 
                             if (!user?.id) {
-                              toast.error('Please sign in again to upload')
-                              return
+                              toast.error('Please sign in again to upload');
+                              return;
                             }
 
                             const result = await uploadFile(file, {
                               userId: user.id,
-                              type: 'prompts',
-                            })
+                              type: 'prompts'
+                            });
                             if ('error' in result) {
-                              toast.error(result.error || 'Upload failed')
-                              return
+                              toast.error(result.error || 'Upload failed');
+                              return;
                             }
-                            setFormData({ ...formData, image: result.url })
+                            setFormData({ ...formData, image: result.url });
                           }}
                         />
                         <Plus className="size-6 text-muted-foreground" />
@@ -410,10 +410,10 @@ export default function PromptsPage() {
                   <Label htmlFor="visibility">Visibility</Label>
                   <Select
                     value={formData.visibility}
-                    onValueChange={(value) =>
+                    onValueChange={value =>
                       setFormData({
                         ...formData,
-                        visibility: value as Visibility,
+                        visibility: value as Visibility
                       })
                     }
                     disabled={isPending}
@@ -438,8 +438,8 @@ export default function PromptsPage() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    setIsOpen(false)
-                    resetForm()
+                    setIsOpen(false);
+                    resetForm();
                   }}
                   disabled={isPending}
                 >
@@ -473,7 +473,7 @@ export default function PromptsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredPrompts.map((prompt) => (
+            {filteredPrompts.map(prompt => (
               <tr
                 key={prompt.id}
                 className="border-b transition-colors hover:bg-muted/30"
@@ -563,8 +563,8 @@ export default function PromptsPage() {
 
       <AlertDialog
         open={!!deletePrompt}
-        onOpenChange={(open) => {
-          if (!open && !adminDeleteMutation.isPending) setDeletePrompt(null)
+        onOpenChange={open => {
+          if (!open && !adminDeleteMutation.isPending) setDeletePrompt(null);
         }}
       >
         <AlertDialogContent size="sm">
@@ -583,10 +583,10 @@ export default function PromptsPage() {
             <AlertDialogAction
               variant="destructive"
               disabled={adminDeleteMutation.isPending}
-              onClick={(event) => {
-                event.preventDefault()
+              onClick={event => {
+                event.preventDefault();
                 if (deletePrompt) {
-                  adminDeleteMutation.mutate({ id: deletePrompt.id })
+                  adminDeleteMutation.mutate({ id: deletePrompt.id });
                 }
               }}
             >
@@ -599,5 +599,5 @@ export default function PromptsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
-import type { UseChatHelpers } from '@ai-sdk/react'
-import { ArrowDown } from 'lucide-react'
-import { useScrollToBottom, useSticky } from 'react-scroll-to-bottom'
+import { useEffect } from 'react';
+import type { UseChatHelpers } from '@ai-sdk/react';
+import { ArrowDown } from 'lucide-react';
+import { useScrollToBottom, useSticky } from 'react-scroll-to-bottom';
 
-import type { ChatMessage } from '@/types'
-import { Button } from '@/components/ui/button'
+import type { ChatMessage } from '@/types';
+import { Button } from '@/components/ui/button';
 
 interface ButtonScrollToBottomProps
   extends
@@ -13,16 +13,16 @@ interface ButtonScrollToBottomProps
 
 export function ButtonScrollToBottom({
   status,
-  messages,
+  messages
 }: ButtonScrollToBottomProps) {
-  const [sticky] = useSticky()
-  const scrollToBottom = useScrollToBottom()
+  const [sticky] = useSticky();
+  const scrollToBottom = useScrollToBottom();
 
   useEffect(() => {
     if (status === 'submitted' || status === 'streaming') {
-      scrollToBottom({ behavior: 'smooth' })
+      scrollToBottom({ behavior: 'smooth' });
     }
-  }, [status, messages, scrollToBottom])
+  }, [status, messages, scrollToBottom]);
 
   return (
     <Button
@@ -35,5 +35,5 @@ export function ButtonScrollToBottom({
       <ArrowDown className="text-muted-foreground" />
       <span className="sr-only">Scroll to bottom</span>
     </Button>
-  )
+  );
 }

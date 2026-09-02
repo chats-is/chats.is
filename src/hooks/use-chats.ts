@@ -1,7 +1,8 @@
-import { type Chat } from '@/types'
-import { api } from '@/trpc/react'
+import { api } from '@/trpc/react';
 
-const LIMIT = 25
+import { type Chat } from '@/types';
+
+const LIMIT = 25;
 
 export function useChatsInfinite() {
   const {
@@ -11,20 +12,20 @@ export function useChatsInfinite() {
     fetchNextPage,
     hasNextPage,
     isError,
-    error,
+    error
   } = api.chat.list.useInfiniteQuery(
     { limit: LIMIT },
     {
       getNextPageParam: (lastPage, allPages) => {
-        if (!lastPage || lastPage.length < LIMIT) return undefined
-        return allPages.length * LIMIT
+        if (!lastPage || lastPage.length < LIMIT) return undefined;
+        return allPages.length * LIMIT;
       },
       initialCursor: 0,
-      refetchOnWindowFocus: false,
-    },
-  )
+      refetchOnWindowFocus: false
+    }
+  );
 
-  const chats = data ? data.pages.flat() : []
+  const chats = data ? data.pages.flat() : [];
 
   return {
     chats: chats as Chat[],
@@ -33,84 +34,84 @@ export function useChatsInfinite() {
     fetchNextPage,
     hasMore: hasNextPage,
     isError,
-    error,
-  }
+    error
+  };
 }
 
 export function useChats() {
-  const utils = api.useUtils()
+  const utils = api.useUtils();
 
   const update = api.chat.update.useMutation({
-    onMutate: async (newChat) => {
-      await utils.chat.list.cancel()
-      const previousChats = utils.chat.list.getInfiniteData()
+    onMutate: async newChat => {
+      await utils.chat.list.cancel();
+      const previousChats = utils.chat.list.getInfiniteData();
 
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, (old) => {
-        if (!old) return { pages: [], pageParams: [] }
+      utils.chat.list.setInfiniteData({ limit: LIMIT }, old => {
+        if (!old) return { pages: [], pageParams: [] };
         return {
           ...old,
-          pages: old.pages.map((page) =>
-            page.map((chat) =>
-              chat.id === newChat.id ? { ...chat, ...newChat } : chat,
-            ),
-          ),
-        }
-      })
+          pages: old.pages.map(page =>
+            page.map(chat =>
+              chat.id === newChat.id ? { ...chat, ...newChat } : chat
+            )
+          )
+        };
+      });
 
-      return { previousChats }
+      return { previousChats };
     },
     onError: (err, newChat, context) => {
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats)
+      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
     },
     onSettled: () => {
-      utils.chat.list.invalidate()
-    },
-  })
+      utils.chat.list.invalidate();
+    }
+  });
 
   const remove = api.chat.delete.useMutation({
     onMutate: async ({ id }) => {
-      await utils.chat.list.cancel()
-      const previousChats = utils.chat.list.getInfiniteData()
+      await utils.chat.list.cancel();
+      const previousChats = utils.chat.list.getInfiniteData();
 
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, (old) => {
-        if (!old) return { pages: [], pageParams: [] }
+      utils.chat.list.setInfiniteData({ limit: LIMIT }, old => {
+        if (!old) return { pages: [], pageParams: [] };
         return {
           ...old,
-          pages: old.pages.map((page) => page.filter((chat) => chat.id !== id)),
-        }
-      })
+          pages: old.pages.map(page => page.filter(chat => chat.id !== id))
+        };
+      });
 
-      return { previousChats }
+      return { previousChats };
     },
     onError: (err, id, context) => {
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats)
+      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
     },
     onSettled: () => {
-      utils.chat.list.invalidate()
-    },
-  })
+      utils.chat.list.invalidate();
+    }
+  });
 
   const clear = api.chat.deleteAll.useMutation({
     onMutate: async () => {
-      await utils.chat.list.cancel()
-      const previousChats = utils.chat.list.getInfiniteData()
+      await utils.chat.list.cancel();
+      const previousChats = utils.chat.list.getInfiniteData();
       utils.chat.list.setInfiniteData(
         { limit: LIMIT },
-        { pages: [], pageParams: [] },
-      )
-      return { previousChats }
+        { pages: [], pageParams: [] }
+      );
+      return { previousChats };
     },
     onError: (err, vars, context) => {
-      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats)
+      utils.chat.list.setInfiniteData({ limit: LIMIT }, context?.previousChats);
     },
     onSettled: () => {
-      utils.chat.list.invalidate()
-    },
-  })
+      utils.chat.list.invalidate();
+    }
+  });
 
   const refresh = () => {
-    return utils.chat.list.invalidate()
-  }
+    return utils.chat.list.invalidate();
+  };
 
   return {
     refreshChats: refresh,
@@ -119,6 +120,6 @@ export function useChats() {
     clearChats: clear.mutateAsync,
     isUpdating: update.isPending,
     isDeleting: remove.isPending,
-    isClearing: clear.isPending,
-  }
+    isClearing: clear.isPending
+  };
 }

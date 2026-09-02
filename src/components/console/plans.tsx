@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { useEffect, useState } from 'react';
+import { api } from '@/trpc/react';
+import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { api } from '@/trpc/react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,9 +11,9 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -21,125 +21,125 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+  SelectValue
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
 type FormState = {
-  name: string
-  description: string
-  quotaId: string
-  displayOrder: string
-}
+  name: string;
+  description: string;
+  quotaId: string;
+  displayOrder: string;
+};
 
 const emptyForm: FormState = {
   name: '',
   description: '',
   quotaId: '',
-  displayOrder: '0',
-}
+  displayOrder: '0'
+};
 
 export default function PlansPage() {
-  const utils = api.useUtils()
-  const { data: plans, isLoading } = api.plan.list.useQuery()
-  const { data: quotaOptions } = api.quota.listForSelect.useQuery()
-  const [open, setOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>(emptyForm)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const utils = api.useUtils();
+  const { data: plans, isLoading } = api.plan.list.useQuery();
+  const { data: quotaOptions } = api.quota.listForSelect.useQuery();
+  const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const create = api.plan.create.useMutation({
     onSuccess: () => {
-      utils.plan.list.invalidate()
-      setOpen(false)
-      setForm(emptyForm)
-      toast.success('Plan created')
+      utils.plan.list.invalidate();
+      setOpen(false);
+      setForm(emptyForm);
+      toast.success('Plan created');
     },
-    onError: (e) => toast.error(e.message),
-  })
+    onError: e => toast.error(e.message)
+  });
 
   const update = api.plan.update.useMutation({
     onSuccess: () => {
-      utils.plan.list.invalidate()
-      setOpen(false)
-      setEditingId(null)
-      setForm(emptyForm)
-      toast.success('Plan saved')
+      utils.plan.list.invalidate();
+      setOpen(false);
+      setEditingId(null);
+      setForm(emptyForm);
+      toast.success('Plan saved');
     },
-    onError: (e) => toast.error(e.message),
-  })
+    onError: e => toast.error(e.message)
+  });
 
   const del = api.plan.delete.useMutation({
     onSuccess: () => {
-      utils.plan.list.invalidate()
-      utils.user.list.invalidate()
-      setDeleteId(null)
-      toast.success('Plan deleted')
+      utils.plan.list.invalidate();
+      utils.user.list.invalidate();
+      setDeleteId(null);
+      toast.success('Plan deleted');
     },
-    onError: (e) => toast.error(e.message),
-  })
+    onError: e => toast.error(e.message)
+  });
 
   useEffect(() => {
     if (!open) {
-      setEditingId(null)
-      setForm(emptyForm)
+      setEditingId(null);
+      setForm(emptyForm);
     }
-  }, [open])
+  }, [open]);
 
   const startEdit = (plan: NonNullable<typeof plans>[number]) => {
-    setEditingId(plan.id)
+    setEditingId(plan.id);
     setForm({
       name: plan.name,
       description: plan.description ?? '',
       quotaId: plan.quotaId,
-      displayOrder: plan.displayOrder.toString(),
-    })
-    setOpen(true)
-  }
+      displayOrder: plan.displayOrder.toString()
+    });
+    setOpen(true);
+  };
 
   const submit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!form.quotaId) {
-      toast.error('Please select a quota')
-      return
+      toast.error('Please select a quota');
+      return;
     }
-    const displayOrder = Number(form.displayOrder) || 0
+    const displayOrder = Number(form.displayOrder) || 0;
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       quotaId: form.quotaId,
-      displayOrder,
-    }
+      displayOrder
+    };
 
     if (editingId) {
-      update.mutate({ id: editingId, ...payload })
+      update.mutate({ id: editingId, ...payload });
     } else {
-      create.mutate(payload)
+      create.mutate(payload);
     }
-  }
+  };
 
-  const isPending = create.isPending || update.isPending
+  const isPending = create.isPending || update.isPending;
 
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         Loading...
       </div>
-    )
+    );
   }
 
   return (
@@ -174,9 +174,7 @@ export default function PlansPage() {
                     <Label>Name</Label>
                     <Input
                       value={form.name}
-                      onChange={(e) =>
-                        setForm({ ...form, name: e.target.value })
-                      }
+                      onChange={e => setForm({ ...form, name: e.target.value })}
                       placeholder="Pro"
                       required
                       disabled={isPending}
@@ -187,7 +185,7 @@ export default function PlansPage() {
                     <Input
                       type="number"
                       value={form.displayOrder}
-                      onChange={(e) =>
+                      onChange={e =>
                         setForm({ ...form, displayOrder: e.target.value })
                       }
                       disabled={isPending}
@@ -198,7 +196,7 @@ export default function PlansPage() {
                   <Label>Description (optional)</Label>
                   <Textarea
                     value={form.description}
-                    onChange={(e) =>
+                    onChange={e =>
                       setForm({ ...form, description: e.target.value })
                     }
                     rows={2}
@@ -209,14 +207,14 @@ export default function PlansPage() {
                   <Label>Quota</Label>
                   <Select
                     value={form.quotaId}
-                    onValueChange={(v) => setForm({ ...form, quotaId: v })}
+                    onValueChange={v => setForm({ ...form, quotaId: v })}
                     disabled={isPending}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a quota" />
                     </SelectTrigger>
                     <SelectContent>
-                      {quotaOptions?.map((q) => (
+                      {quotaOptions?.map(q => (
                         <SelectItem key={q.id} value={q.id}>
                           {q.name}
                           {q.isUnlimited ? ' (Unlimited)' : ''}
@@ -258,7 +256,7 @@ export default function PlansPage() {
             </tr>
           </thead>
           <tbody>
-            {plans?.map((plan) => (
+            {plans?.map(plan => (
               <tr
                 key={plan.id}
                 className="border-b transition-colors hover:bg-muted/30"
@@ -328,7 +326,7 @@ export default function PlansPage() {
 
       <AlertDialog
         open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
+        onOpenChange={open => !open && setDeleteId(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -354,5 +352,5 @@ export default function PlansPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

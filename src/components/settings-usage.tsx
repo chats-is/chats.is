@@ -1,42 +1,45 @@
-import { useMemo, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { useMemo, useState } from 'react';
+import { api } from '@/trpc/react';
+import { RefreshCw } from 'lucide-react';
 
-import { reportWindowStart } from '@/lib/utils'
-import { api } from '@/trpc/react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { reportWindowStart } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Countdown } from '@/components/usage-limit-alert'
+  SelectValue
+} from '@/components/ui/select';
+import { Countdown } from '@/components/usage-limit-alert';
 import {
   LimitsSkeleton,
   UsageModule,
-  UsageModuleSkeleton,
-} from '@/components/usage-module'
+  UsageModuleSkeleton
+} from '@/components/usage-module';
 
 export function SettingsUsage() {
-  const utils = api.useUtils()
-  const [days, setDays] = useState(7)
-  const [refreshing, setRefreshing] = useState(false)
-  const from = useMemo(() => reportWindowStart(days), [days])
-  const { data: quota, isLoading: quotaLoading } = api.quota.me.useQuery()
-  const { data: usage, isLoading } = api.usage.me.useQuery({ from })
+  const utils = api.useUtils();
+  const [days, setDays] = useState(7);
+  const [refreshing, setRefreshing] = useState(false);
+  const from = useMemo(() => reportWindowStart(days), [days]);
+  const { data: quota, isLoading: quotaLoading } = api.quota.me.useQuery();
+  const { data: usage, isLoading } = api.usage.me.useQuery({ from });
 
   const handleRefresh = async () => {
-    setRefreshing(true)
+    setRefreshing(true);
     try {
-      await Promise.all([utils.usage.invalidate(), utils.quota.me.invalidate()])
+      await Promise.all([
+        utils.usage.invalidate(),
+        utils.quota.me.invalidate()
+      ]);
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
-  }
+  };
 
-  const hasLimits = !!(quota?.fiveHour || quota?.sevenDay)
+  const hasLimits = !!(quota?.fiveHour || quota?.sevenDay);
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -88,10 +91,7 @@ export function SettingsUsage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">Stats</h2>
-          <Select
-            value={String(days)}
-            onValueChange={(v) => setDays(Number(v))}
-          >
+          <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -110,7 +110,7 @@ export function SettingsUsage() {
         ) : null}
       </section>
     </div>
-  )
+  );
 }
 
 /**
@@ -121,14 +121,14 @@ export function SettingsUsage() {
  */
 function QuotaSnapshotCard({
   label,
-  window,
+  window
 }: {
-  label: string
-  window: { remainingPct: number; resetAt: Date | string | null }
+  label: string;
+  window: { remainingPct: number; resetAt: Date | string | null };
 }) {
-  const pct = window.remainingPct
+  const pct = window.remainingPct;
   const barColor =
-    pct <= 10 ? 'bg-destructive' : pct <= 30 ? 'bg-amber-500' : 'bg-green-500'
+    pct <= 10 ? 'bg-destructive' : pct <= 30 ? 'bg-amber-500' : 'bg-green-500';
 
   return (
     <Card className="py-0">
@@ -149,5 +149,5 @@ function QuotaSnapshotCard({
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

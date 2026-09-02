@@ -1,64 +1,64 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from '@tanstack/react-router';
+import { api } from '@/trpc/react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 
-import { CAPABILITIES } from '@/lib/constant'
-import { formatUsd, reportWindowStart } from '@/lib/utils'
-import { api } from '@/trpc/react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { CAPABILITIES } from '@/lib/constant';
+import { formatUsd, reportWindowStart } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
+  SelectValue
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   LimitsSkeleton,
   UsageModule,
-  UsageModuleSkeleton,
-} from '@/components/usage-module'
-import { UsageQuantity } from '@/components/usage-quantity'
-import { UsageUnitPrice } from '@/components/usage-unit-price'
+  UsageModuleSkeleton
+} from '@/components/usage-module';
+import { UsageQuantity } from '@/components/usage-quantity';
+import { UsageUnitPrice } from '@/components/usage-unit-price';
 
 const fmtDate = (d: Date | string | null) =>
-  d ? new Date(d).toLocaleString() : '—'
+  d ? new Date(d).toLocaleString() : '—';
 
 const sourceLabel: Record<string, string> = {
   override: 'User override',
   plan: 'Plan',
   default: 'Default quota',
-  none: 'No quota',
-}
+  none: 'No quota'
+};
 
 export default function UserDetail({ userId }: { userId: string }) {
-  const utils = api.useUtils()
-  const [days, setDays] = useState(7)
-  const [refreshing, setRefreshing] = useState(false)
+  const utils = api.useUtils();
+  const [days, setDays] = useState(7);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const from = useMemo(() => reportWindowStart(days), [days])
+  const from = useMemo(() => reportWindowStart(days), [days]);
 
   const { data: user, isLoading: userLoading } = api.user.get.useQuery({
-    id: userId,
-  })
+    id: userId
+  });
   const { data: status, isLoading: statusLoading } =
-    api.quota.getByUser.useQuery({ userId })
-  const { data: usage } = api.usage.adminByUser.useQuery({ userId, from })
+    api.quota.getByUser.useQuery({ userId });
+  const { data: usage } = api.usage.adminByUser.useQuery({ userId, from });
 
   const handleRefresh = async () => {
-    setRefreshing(true)
+    setRefreshing(true);
     try {
       await Promise.all([
         utils.usage.invalidate(),
         utils.quota.getByUser.invalidate({ userId }),
-        utils.user.get.invalidate({ id: userId }),
-      ])
+        utils.user.get.invalidate({ id: userId })
+      ]);
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
-  }
+  };
 
   if (userLoading) {
     return (
@@ -74,7 +74,7 @@ export default function UserDetail({ userId }: { userId: string }) {
         <LimitsSkeleton />
         <UsageModuleSkeleton isAdmin />
       </div>
-    )
+    );
   }
 
   if (!user) {
@@ -89,7 +89,7 @@ export default function UserDetail({ userId }: { userId: string }) {
         </Link>
         <div className="text-sm text-muted-foreground">User not found.</div>
       </div>
-    )
+    );
   }
 
   return (
@@ -197,10 +197,7 @@ export default function UserDetail({ userId }: { userId: string }) {
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">Stats</h2>
-          <Select
-            value={String(days)}
-            onValueChange={(v) => setDays(Number(v))}
-          >
+          <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -221,20 +218,20 @@ export default function UserDetail({ userId }: { userId: string }) {
         <UserLogs userId={userId} days={days} />
       </section>
     </div>
-  )
+  );
 }
 
 function UserLogs({ userId, days }: { userId: string; days: number }) {
-  const [modelId, setModelId] = useState<string>('')
-  const [capability, setCapability] = useState<string>('')
-  const [page, setPage] = useState(1)
-  const pageSize = 50
+  const [modelId, setModelId] = useState<string>('');
+  const [capability, setCapability] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
   useEffect(() => {
-    setPage(1)
-  }, [days, userId])
+    setPage(1);
+  }, [days, userId]);
 
-  const from = useMemo(() => reportWindowStart(days), [days])
+  const from = useMemo(() => reportWindowStart(days), [days]);
 
   const { data, isLoading } = api.usage.adminLog.useQuery({
     userId,
@@ -244,15 +241,15 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
       ? (capability as 'chat' | 'image' | 'video' | 'audio')
       : undefined,
     page,
-    pageSize,
-  })
+    pageSize
+  });
 
-  const { data: userModels } = api.usage.adminUserModels.useQuery({ userId })
+  const { data: userModels } = api.usage.adminUserModels.useQuery({ userId });
 
   const totalPages = useMemo(() => {
-    if (!data) return 1
-    return Math.max(1, Math.ceil(data.total / pageSize))
-  }, [data])
+    if (!data) return 1;
+    return Math.max(1, Math.ceil(data.total / pageSize));
+  }, [data]);
 
   return (
     <Card className="py-0">
@@ -261,9 +258,9 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
             value={modelId || '__all__'}
-            onValueChange={(v) => {
-              setModelId(v === '__all__' ? '' : v)
-              setPage(1)
+            onValueChange={v => {
+              setModelId(v === '__all__' ? '' : v);
+              setPage(1);
             }}
           >
             <SelectTrigger className="w-56">
@@ -271,7 +268,7 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All models</SelectItem>
-              {userModels?.map((m) => (
+              {userModels?.map(m => (
                 <SelectItem key={m} value={m}>
                   {m}
                 </SelectItem>
@@ -280,9 +277,9 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
           </Select>
           <Select
             value={capability || '__all__'}
-            onValueChange={(v) => {
-              setCapability(v === '__all__' ? '' : v)
-              setPage(1)
+            onValueChange={v => {
+              setCapability(v === '__all__' ? '' : v);
+              setPage(1);
             }}
           >
             <SelectTrigger className="w-40">
@@ -290,7 +287,7 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All capabilities</SelectItem>
-              {CAPABILITIES.map((c) => (
+              {CAPABILITIES.map(c => (
                 <SelectItem key={c.value} value={c.value}>
                   {c.label}
                 </SelectItem>
@@ -330,7 +327,7 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
                   </td>
                 </tr>
               ) : (
-                data?.rows.map((r) => (
+                data?.rows.map(r => (
                   <tr key={r.id} className="border-b last:border-0">
                     <td className="p-2 text-xs text-muted-foreground">
                       {new Date(r.createdAt).toLocaleString()}
@@ -342,8 +339,8 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setModelId(r.modelId ?? '')
-                          setPage(1)
+                          setModelId(r.modelId ?? '');
+                          setPage(1);
                         }}
                         className="block font-mono text-xs hover:text-primary"
                       >
@@ -372,7 +369,7 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
                 size="sm"
                 variant="outline"
                 disabled={data.page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
               >
                 Previous
               </Button>
@@ -380,7 +377,7 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
                 size="sm"
                 variant="outline"
                 disabled={data.page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => setPage(p => p + 1)}
               >
                 Next
               </Button>
@@ -389,23 +386,23 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function QuotaCard({
   label,
-  stat,
+  stat
 }: {
-  label: string
-  stat: { remainingPct: number; resetAt: Date | string | null }
+  label: string;
+  stat: { remainingPct: number; resetAt: Date | string | null };
 }) {
-  const remainingPct = stat.remainingPct
+  const remainingPct = stat.remainingPct;
   const barColor =
     remainingPct <= 10
       ? 'bg-destructive'
       : remainingPct <= 30
         ? 'bg-amber-500'
-        : 'bg-green-500'
+        : 'bg-green-500';
   return (
     <Card className="py-0">
       <CardContent className="space-y-2 p-4">
@@ -425,22 +422,22 @@ function QuotaCard({
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 const fmtResetAt = (d: Date): string => {
-  const diffMs = d.getTime() - Date.now()
+  const diffMs = d.getTime() - Date.now();
   if (diffMs > 0 && diffMs < 24 * 60 * 60 * 1000) {
     return d.toLocaleTimeString(undefined, {
       hour: 'numeric',
-      minute: '2-digit',
-    })
+      minute: '2-digit'
+    });
   }
   return d.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
-    minute: '2-digit',
-  })
-}
+    minute: '2-digit'
+  });
+};

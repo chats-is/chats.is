@@ -1,12 +1,12 @@
-import '@tanstack/react-start/server-only'
+import '@tanstack/react-start/server-only';
 
-import { cache } from 'react'
-import { eq } from 'drizzle-orm'
+import { cache } from 'react';
+import { eq } from 'drizzle-orm';
 
-import type { ChatUsage, PriceSnapshot, PricingRecord } from '@/types'
-import { parseNumber } from '@/lib/utils'
-import { db } from '@/server/db'
-import { modelPricings, models } from '@/server/db/schema'
+import type { ChatUsage, PriceSnapshot, PricingRecord } from '@/types';
+import { parseNumber } from '@/lib/utils';
+import { db } from '@/server/db';
+import { modelPricings, models } from '@/server/db/schema';
 
 const EMPTY_SNAPSHOT: PriceSnapshot = {
   inputPrice: null,
@@ -20,17 +20,17 @@ const EMPTY_SNAPSHOT: PriceSnapshot = {
   audioInputPrice: null,
   audioOutputPrice: null,
   audioCharactersPrice: null,
-  audioSecondsPrice: null,
-}
+  audioSecondsPrice: null
+};
 
 /** Coerce a numeric-column string to a number, defaulting to 0 (cost math
  *  treats an unset rate as free). Thin wrapper over the shared `parseNumber`. */
-const toNum = (v: string | null | undefined): number => parseNumber(v) ?? 0
+const toNum = (v: string | null | undefined): number => parseNumber(v) ?? 0;
 
 const numToStr = (v: string | null | undefined): string | null => {
-  if (v === null || v === undefined || v === '') return null
-  return String(v)
-}
+  if (v === null || v === undefined || v === '') return null;
+  return String(v);
+};
 
 /**
  * Fetch the pricing row for a given model's modelId string (e.g. "gpt-4o").
@@ -43,10 +43,10 @@ export const getPricingByModelKey = cache(
       .select()
       .from(modelPricings)
       .where(eq(modelPricings.modelId, modelKey))
-      .limit(1)
-    return result[0] ?? null
-  },
-)
+      .limit(1);
+    return result[0] ?? null;
+  }
+);
 
 export class PricingMissingError extends Error {
   /**
@@ -58,20 +58,20 @@ export class PricingMissingError extends Error {
    *
    * `.message` stays the log line: same facts, phrased for the server log.
    */
-  public userMessage: string
+  public userMessage: string;
 
   constructor(modelLabel: string, missingFields?: string[]) {
     const detail = missingFields?.length
       ? `missing ${missingFields.join(', ')}`
-      : undefined
+      : undefined;
     const suffix = detail
       ? `: ${detail}.`
-      : '. Set a price (or 0) in the Pricing console.'
-    super(`Model ${modelLabel} is not configured for billing${suffix}`)
-    this.name = 'PricingMissingError'
+      : '. Set a price (or 0) in the Pricing console.';
+    super(`Model ${modelLabel} is not configured for billing${suffix}`);
+    this.name = 'PricingMissingError';
     this.userMessage = missingFields?.length
       ? `${modelLabel} is missing pricing for ${missingFields.join(', ')}. Fill it in under Console → Pricing.`
-      : `${modelLabel} has no pricing yet. Set it under Console → Pricing (0 is fine) to enable the model.`
+      : `${modelLabel} has no pricing yet. Set it under Console → Pricing (0 is fine) to enable the model.`;
   }
 }
 
@@ -92,38 +92,38 @@ export class PricingMissingError extends Error {
 export function pricingMissingFields(
   capability: 'chat' | 'image' | 'video' | 'audio',
   p: PricingRecord,
-  opts?: { transcription?: boolean },
+  opts?: { transcription?: boolean }
 ): string[] {
-  const set = (x: string | null) => x !== null
+  const set = (x: string | null) => x !== null;
   switch (capability) {
     case 'chat': {
-      const m: string[] = []
-      if (!set(p.input)) m.push('Input')
-      if (!set(p.output)) m.push('Output')
-      return m
+      const m: string[] = [];
+      if (!set(p.input)) m.push('Input');
+      if (!set(p.output)) m.push('Output');
+      return m;
     }
     case 'image':
       // Per-image OR token-based pricing satisfies an image model.
       return set(p.image) || (set(p.input) && set(p.output))
         ? []
-        : ['Image, or Input + Output']
+        : ['Image, or Input + Output'];
     case 'video':
       return set(p.video) || set(p.videoSeconds)
         ? []
-        : ['Per video / Per second']
+        : ['Per video / Per second'];
     case 'audio': {
       // STT bills per second; TTS bills per character or per token. The
       // billed dimension must match the model's direction — a mismatched
       // style would pass the gate but compute $0 cost.
       if (opts?.transcription === true) {
-        return set(p.audioSeconds) ? [] : ['Per second']
+        return set(p.audioSeconds) ? [] : ['Per second'];
       }
       if (opts?.transcription === false) {
-        return set(p.audioCharacters) ? [] : ['Per 1M characters']
+        return set(p.audioCharacters) ? [] : ['Per 1M characters'];
       }
       return set(p.audioCharacters) || set(p.audioSeconds)
         ? []
-        : ['Per 1M characters, Audio input / Audio output, or Per second']
+        : ['Per 1M characters, Audio input / Audio output, or Per second'];
     }
   }
 }
@@ -138,15 +138,15 @@ export async function requirePricing(
   modelKey: string,
   capability: 'chat' | 'image' | 'video' | 'audio',
   modelLabel: string,
-  opts?: { transcription?: boolean },
+  opts?: { transcription?: boolean }
 ): Promise<PricingRecord> {
-  const pricing = await getPricingByModelKey(modelKey)
-  if (!pricing) throw new PricingMissingError(modelLabel)
-  const missing = pricingMissingFields(capability, pricing, opts)
+  const pricing = await getPricingByModelKey(modelKey);
+  if (!pricing) throw new PricingMissingError(modelLabel);
+  const missing = pricingMissingFields(capability, pricing, opts);
   if (missing.length > 0) {
-    throw new PricingMissingError(modelLabel, missing)
+    throw new PricingMissingError(modelLabel, missing);
   }
-  return pricing
+  return pricing;
 }
 
 /**
@@ -160,30 +160,30 @@ export async function requirePricing(
 export const resolveModelByKey = cache(
   async (
     modelKey: string,
-    capability?: 'chat' | 'image' | 'video' | 'audio',
+    capability?: 'chat' | 'image' | 'video' | 'audio'
   ): Promise<{
-    model: typeof models.$inferSelect
-    pricing: PricingRecord | null
+    model: typeof models.$inferSelect;
+    pricing: PricingRecord | null;
   } | null> => {
     const allModels = await db.query.models.findMany({
       where: capability ? eq(models.capability, capability) : undefined,
-      with: { pricings: { limit: 1 } },
-    })
+      with: { pricings: { limit: 1 } }
+    });
 
-    const match = allModels.find((m) => {
-      if (m.modelId === modelKey) return true
-      const aliases = m.aliases as string[] | null
-      return aliases?.includes(modelKey) ?? false
-    })
+    const match = allModels.find(m => {
+      if (m.modelId === modelKey) return true;
+      const aliases = m.aliases as string[] | null;
+      return aliases?.includes(modelKey) ?? false;
+    });
 
-    if (!match) return null
+    if (!match) return null;
 
     return {
       model: match,
-      pricing: match.pricings[0] ?? null,
-    }
-  },
-)
+      pricing: match.pricings[0] ?? null
+    };
+  }
+);
 
 /**
  * Calculate the cost of a chat completion in USD.
@@ -206,32 +206,32 @@ export const resolveModelByKey = cache(
  */
 export function calculateChatCost(
   usage: ChatUsage,
-  pricing: PricingRecord | null,
+  pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } }
+  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const inputRate = toNum(pricing.input)
-  const outputRate = toNum(pricing.output)
-  const cacheReadRate = toNum(pricing.cacheRead)
-  const cacheWriteRate = toNum(pricing.cacheWrite)
+  const inputRate = toNum(pricing.input);
+  const outputRate = toNum(pricing.output);
+  const cacheReadRate = toNum(pricing.cacheRead);
+  const cacheWriteRate = toNum(pricing.cacheWrite);
 
   // Reasoning: explicit rate wins; otherwise fall back to output rate.
-  const reasoningRateStr = pricing.reasoning ?? pricing.output
-  const reasoningRate = toNum(reasoningRateStr)
+  const reasoningRateStr = pricing.reasoning ?? pricing.output;
+  const reasoningRate = toNum(reasoningRateStr);
 
   // Disjoint buckets (see normalizeChatUsage): bill each at its own rate.
-  const inputTokens = usage.inputTokens ?? 0
-  const outputTokens = usage.outputTokens ?? 0
-  const cacheReadTokens = usage.cacheReadTokens ?? 0
-  const cacheWriteTokens = usage.cacheWriteTokens ?? 0
-  const reasoningTokens = usage.reasoningTokens ?? 0
+  const inputTokens = usage.inputTokens ?? 0;
+  const outputTokens = usage.outputTokens ?? 0;
+  const cacheReadTokens = usage.cacheReadTokens ?? 0;
+  const cacheWriteTokens = usage.cacheWriteTokens ?? 0;
+  const reasoningTokens = usage.reasoningTokens ?? 0;
 
   const cost =
     (inputTokens * inputRate) / 1_000_000 +
     (cacheReadTokens * cacheReadRate) / 1_000_000 +
     (cacheWriteTokens * cacheWriteRate) / 1_000_000 +
     (outputTokens * outputRate) / 1_000_000 +
-    (reasoningTokens * reasoningRate) / 1_000_000
+    (reasoningTokens * reasoningRate) / 1_000_000;
 
   return {
     cost: roundCost(cost),
@@ -241,9 +241,9 @@ export function calculateChatCost(
       outputPrice: numToStr(pricing.output),
       cacheReadPrice: numToStr(pricing.cacheRead),
       cacheWritePrice: numToStr(pricing.cacheWrite),
-      reasoningPrice: numToStr(reasoningRateStr),
-    },
-  }
+      reasoningPrice: numToStr(reasoningRateStr)
+    }
+  };
 }
 
 /**
@@ -251,15 +251,15 @@ export function calculateChatCost(
  */
 export function calculateImageCost(
   args: {
-    imageCount: number
-    inputTokens?: number
-    outputTokens?: number
+    imageCount: number;
+    inputTokens?: number;
+    outputTokens?: number;
   },
-  pricing: PricingRecord | null,
+  pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } }
+  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perImage = toNum(pricing.image)
+  const perImage = toNum(pricing.image);
 
   // Two mutually-exclusive billing styles, image-price wins:
   //   - per-image  (DALL-E / imagen): imageCount × image
@@ -269,26 +269,26 @@ export function calculateImageCost(
   if (perImage > 0) {
     return {
       cost: roundCost(args.imageCount * perImage),
-      snapshot: { ...EMPTY_SNAPSHOT, imagePrice: numToStr(pricing.image) },
-    }
+      snapshot: { ...EMPTY_SNAPSHOT, imagePrice: numToStr(pricing.image) }
+    };
   }
 
-  const inputRate = toNum(pricing.input)
-  const outputRate = toNum(pricing.output)
-  const inputTokens = args.inputTokens ?? 0
-  const outputTokens = args.outputTokens ?? 0
+  const inputRate = toNum(pricing.input);
+  const outputRate = toNum(pricing.output);
+  const inputTokens = args.inputTokens ?? 0;
+  const outputTokens = args.outputTokens ?? 0;
   const cost = roundCost(
     (inputTokens * inputRate) / 1_000_000 +
-      (outputTokens * outputRate) / 1_000_000,
-  )
+      (outputTokens * outputRate) / 1_000_000
+  );
   return {
     cost,
     snapshot: {
       ...EMPTY_SNAPSHOT,
       inputPrice: numToStr(pricing.input),
-      outputPrice: numToStr(pricing.output),
-    },
-  }
+      outputPrice: numToStr(pricing.output)
+    }
+  };
 }
 
 /**
@@ -301,26 +301,26 @@ export function calculateImageCost(
  */
 export function calculateVideoCost(
   args: { videoCount?: number; videoSeconds?: number },
-  pricing: PricingRecord | null,
+  pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } }
+  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perVideo = toNum(pricing.video)
+  const perVideo = toNum(pricing.video);
   if (perVideo > 0) {
     return {
       cost: roundCost((args.videoCount ?? 0) * perVideo),
-      snapshot: { ...EMPTY_SNAPSHOT, videoPrice: numToStr(pricing.video) },
-    }
+      snapshot: { ...EMPTY_SNAPSHOT, videoPrice: numToStr(pricing.video) }
+    };
   }
 
-  const perSecond = toNum(pricing.videoSeconds)
+  const perSecond = toNum(pricing.videoSeconds);
   return {
     cost: roundCost((args.videoSeconds ?? 0) * perSecond),
     snapshot: {
       ...EMPTY_SNAPSHOT,
-      videoSecondsPrice: numToStr(pricing.videoSeconds),
-    },
-  }
+      videoSecondsPrice: numToStr(pricing.videoSeconds)
+    }
+  };
 }
 
 /**
@@ -332,20 +332,19 @@ export function calculateVideoCost(
  */
 export function calculateAudioCost(
   args: { audioCharacters?: number },
-  pricing: PricingRecord | null,
+  pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } }
+  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
   return {
     cost: roundCost(
-      ((args.audioCharacters ?? 0) * toNum(pricing.audioCharacters)) /
-        1_000_000,
+      ((args.audioCharacters ?? 0) * toNum(pricing.audioCharacters)) / 1_000_000
     ),
     snapshot: {
       ...EMPTY_SNAPSHOT,
-      audioCharactersPrice: numToStr(pricing.audioCharacters),
-    },
-  }
+      audioCharactersPrice: numToStr(pricing.audioCharacters)
+    }
+  };
 }
 
 /**
@@ -353,18 +352,19 @@ export function calculateAudioCost(
  */
 export function calculateTranscriptionCost(
   args: { audioSeconds?: number },
-  pricing: PricingRecord | null,
+  pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } }
+  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perSecond = toNum(pricing.audioSeconds)
+  const perSecond = toNum(pricing.audioSeconds);
   return {
     cost: roundCost((args.audioSeconds ?? 0) * perSecond),
     snapshot: {
       ...EMPTY_SNAPSHOT,
-      audioSecondsPrice: numToStr(pricing.audioSeconds),
-    },
-  }
+      audioSecondsPrice: numToStr(pricing.audioSeconds)
+    }
+  };
 }
 
-const roundCost = (n: number) => Math.round(n * 10_000_000_000) / 10_000_000_000
+const roundCost = (n: number) =>
+  Math.round(n * 10_000_000_000) / 10_000_000_000;

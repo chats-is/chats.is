@@ -1,35 +1,35 @@
-import { useCallback, useState } from 'react'
-import { useSystemSettings } from '@/contexts/system-settings-context'
-import { type UseChatHelpers } from '@ai-sdk/react'
-import { ArrowUp, Loader2, Square } from 'lucide-react'
-import Textarea from 'react-textarea-autosize'
+import { useCallback, useState } from 'react';
+import { useSystemSettings } from '@/contexts/system-settings-context';
+import { type UseChatHelpers } from '@ai-sdk/react';
+import { ArrowUp, Loader2, Square } from 'lucide-react';
+import Textarea from 'react-textarea-autosize';
 
-import { type Attachment, type ChatMessage } from '@/types'
-import { modelMatchesId } from '@/lib/utils'
-import { useEnterSubmit } from '@/hooks/use-enter-submit'
-import { Button } from '@/components/ui/button'
-import { AddFilesMenu } from '@/components/add-files-menu'
-import { AttachmentsPreview } from '@/components/attachments-preview'
-import { MediaSettingsMenu } from '@/components/media-settings-menu'
-import { ModelMenu, type ModelOptions } from '@/components/model-menu'
+import { type Attachment, type ChatMessage } from '@/types';
+import { modelMatchesId } from '@/lib/utils';
+import { useEnterSubmit } from '@/hooks/use-enter-submit';
+import { Button } from '@/components/ui/button';
+import { AddFilesMenu } from '@/components/add-files-menu';
+import { AttachmentsPreview } from '@/components/attachments-preview';
+import { MediaSettingsMenu } from '@/components/media-settings-menu';
+import { ModelMenu, type ModelOptions } from '@/components/model-menu';
 
-export type { ModelOptions }
+export type { ModelOptions };
 
 export interface ChatPromptFormProps extends Pick<
   UseChatHelpers<ChatMessage>,
   'status' | 'stop'
 > {
   /** Current model value */
-  modelId: string
-  input: string
-  setInput: (value: string) => void
-  onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  modelId: string;
+  input: string;
+  setInput: (value: string) => void;
+  onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   /** Returns false when the message was refused (no resolvable model). */
-  onSubmit: (attachments?: Attachment[]) => boolean
+  onSubmit: (attachments?: Attachment[]) => boolean;
   /** Callback when model changes */
-  onModelChange: (model: string) => void
+  onModelChange: (model: string) => void;
   /** Callback when model options change (like reasoning toggle) */
-  onOptionsChange?: (options: ModelOptions) => void
+  onOptionsChange?: (options: ModelOptions) => void;
 }
 
 export function ChatPromptForm({
@@ -41,14 +41,14 @@ export function ChatPromptForm({
   onInputChange,
   onSubmit,
   onModelChange,
-  onOptionsChange,
+  onOptionsChange
 }: ChatPromptFormProps) {
-  const { formRef, onKeyDown } = useEnterSubmit()
-  const [uploadQueue, setUploadQueue] = useState<Array<string>>([])
-  const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [modelOptions, setModelOptions] = useState<ModelOptions>({})
+  const { formRef, onKeyDown } = useEnterSubmit();
+  const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
-  const { chatModels, sttModels, videoModels } = useSystemSettings()
+  const { chatModels, sttModels, videoModels } = useSystemSettings();
 
   // Two distinct dead ends, both of which make a submission fail:
   //   - no chat model is configured at all;
@@ -58,10 +58,10 @@ export function ChatPromptForm({
   //     the request would reach /api/chat with an empty or unknown modelId and
   //     come back as an opaque 400/403. Alias-aware, since that is how the
   //     server resolves a modelId.
-  const noModels = !chatModels || chatModels.length === 0
+  const noModels = !chatModels || chatModels.length === 0;
   const noModelSelected =
-    !noModels && !chatModels.some((model) => modelMatchesId(model, modelId))
-  const cannotSend = noModels || noModelSelected
+    !noModels && !chatModels.some(model => modelMatchesId(model, modelId));
+  const cannotSend = noModels || noModelSelected;
 
   // Say which dead end it is: with models available the user can fix it right
   // here from the model menu, so the input should point at it rather than just
@@ -70,36 +70,36 @@ export function ChatPromptForm({
     ? 'No models available.'
     : noModelSelected
       ? 'Select a model to start.'
-      : 'Send a message.'
+      : 'Send a message.';
 
   // Attachments: images need a vision-capable chat model, audio needs an STT
   // model to transcribe it. The `+` menu settles *which* STT model when the
   // user picks that row, so existence is enough here.
-  const canAttachImages = !!modelOptions.supportsVision
-  const canAttachAudio = !!sttModels?.length
+  const canAttachImages = !!modelOptions.supportsVision;
+  const canAttachAudio = !!sttModels?.length;
   // Video too, or a model that can only edit video would take an attachment
   // the user then has no thumbnail, progress or remove button for.
-  const canAttachVideo = !!videoModels?.some((model) => model.supportsVideoEdit)
-  const showAttachments = canAttachImages || canAttachAudio || canAttachVideo
+  const canAttachVideo = !!videoModels?.some(model => model.supportsVideoEdit);
+  const showAttachments = canAttachImages || canAttachAudio || canAttachVideo;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
     // Clear only once the message is actually on its way — onSubmit refuses
     // when no model resolves, and wiping the draft anyway would throw away
     // what the user typed along with any uploaded attachments.
-    if (!onSubmit(attachments)) return
-    setInput('')
-    setAttachments([])
-  }
+    if (!onSubmit(attachments)) return;
+    setInput('');
+    setAttachments([]);
+  };
 
   const handleOptionsChange = useCallback(
     (options: ModelOptions) => {
-      setModelOptions(options)
+      setModelOptions(options);
       // Propagate to parent for isReasoning tracking
-      onOptionsChange?.(options)
+      onOptionsChange?.(options);
     },
-    [onOptionsChange],
-  )
+    [onOptionsChange]
+  );
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="w-full">
@@ -128,25 +128,25 @@ export function ChatPromptForm({
             }
             value={input}
             onChange={onInputChange}
-            onKeyDown={(e) => {
+            onKeyDown={e => {
               if (e.key === 'Enter' && e.shiftKey) {
-                e.preventDefault()
-                const textarea = e.currentTarget
-                const start = textarea.selectionStart
-                const end = textarea.selectionEnd
-                const value = textarea.value
+                e.preventDefault();
+                const textarea = e.currentTarget;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const value = textarea.value;
                 textarea.value =
-                  value.substring(0, start) + '\n' + value.substring(end)
-                textarea.selectionStart = textarea.selectionEnd = start + 1
-                setInput(textarea.value)
+                  value.substring(0, start) + '\n' + value.substring(end);
+                textarea.selectionStart = textarea.selectionEnd = start + 1;
+                setInput(textarea.value);
               } else if (e.key === 'Enter') {
                 if (!input.trim()) {
-                  e.preventDefault()
-                  return
+                  e.preventDefault();
+                  return;
                 }
-                onKeyDown(e)
+                onKeyDown(e);
               } else {
-                onKeyDown(e)
+                onKeyDown(e);
               }
             }}
           />
@@ -206,5 +206,5 @@ export function ChatPromptForm({
         </div>
       </div>
     </form>
-  )
+  );
 }

@@ -1,23 +1,23 @@
-import * as React from 'react'
-import { Link } from '@tanstack/react-router'
+import * as React from 'react';
+import { Link } from '@tanstack/react-router';
 
-import { EmailLoginForm } from '@/components/email-login-form'
-import { GitHubLoginButton } from '@/components/github-login-button'
-import { GoogleLoginButton } from '@/components/google-login-button'
+import { EmailLoginForm } from '@/components/email-login-form';
+import { GitHubLoginButton } from '@/components/github-login-button';
+import { GoogleLoginButton } from '@/components/google-login-button';
 
 interface LoginFormProps {
-  emailEnabled: boolean
-  githubEnabled: boolean
-  googleEnabled: boolean
+  emailEnabled: boolean;
+  githubEnabled: boolean;
+  googleEnabled: boolean;
 }
 
 export function LoginForm({
   emailEnabled,
   githubEnabled,
-  googleEnabled,
+  googleEnabled
 }: LoginFormProps) {
-  const [isLoading, setIsLoading] = React.useState<string | null>(null)
-  const hasOAuthProviders = githubEnabled || googleEnabled
+  const [isLoading, setIsLoading] = React.useState<string | null>(null);
+  const hasOAuthProviders = githubEnabled || googleEnabled;
 
   return (
     <div className="space-y-6">
@@ -82,5 +82,5 @@ export function LoginForm({
         .
       </p>
     </div>
-  )
+  );
 }

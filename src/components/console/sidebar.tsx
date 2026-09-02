@@ -1,8 +1,7 @@
-import * as React from 'react'
-import { Link } from '@tanstack/react-router'
-import { useLocation } from '@tanstack/react-router'
+import * as React from 'react';
+import { Link, useLocation } from '@tanstack/react-router';
 
-import { ConsoleNavigation } from '@/lib/console-navigation'
+import { ConsoleNavigation } from '@/lib/console-navigation';
 import {
   SidebarContent,
   SidebarFooter,
@@ -15,14 +14,14 @@ import {
   SidebarMenuItem,
   Sidebar as SidebarPrimitive,
   SidebarRail,
-  SidebarTrigger,
-} from '@/components/ui/sidebar'
-import { UserMenu } from '@/components/user-menu'
+  SidebarTrigger
+} from '@/components/ui/sidebar';
+import { UserMenu } from '@/components/user-menu';
 
 export function Sidebar({
   ...props
 }: React.ComponentProps<typeof SidebarPrimitive>) {
-  const pathname = useLocation({ select: (l) => l.pathname })
+  const pathname = useLocation({ select: l => l.pathname });
 
   return (
     <SidebarPrimitive collapsible="icon" {...props}>
@@ -53,11 +52,11 @@ export function Sidebar({
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {ConsoleNavigation.navMain.map((item) => {
+              {ConsoleNavigation.navMain.map(item => {
                 const isActive =
                   item.url === '/console'
                     ? pathname === '/console'
-                    : pathname.startsWith(item.url)
+                    : pathname.startsWith(item.url);
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -73,7 +72,7 @@ export function Sidebar({
                       }
                     />
                   </SidebarMenuItem>
-                )
+                );
               })}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -84,5 +83,5 @@ export function Sidebar({
       </SidebarFooter>
       <SidebarRail />
     </SidebarPrimitive>
-  )
+  );
 }

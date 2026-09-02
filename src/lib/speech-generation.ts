@@ -1,20 +1,20 @@
-import '@tanstack/react-start/server-only'
+import '@tanstack/react-start/server-only';
 
-import { generateSpeech } from 'ai'
+import { generateSpeech } from 'ai';
 
-import { type Model } from '@/types'
-import { resolveAutoOption } from '@/lib/media-options'
-import { type StoredMedia, uploadGeneratedMedia } from '@/lib/media-upload'
+import { type Model } from '@/types';
+import { resolveAutoOption } from '@/lib/media-options';
+import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
-  type FailoverProvider,
   getSpeechModel,
   runWithProviderFailover,
-} from '@/lib/provider'
+  type FailoverProvider
+} from '@/lib/provider';
 
 export type SpeechGenerationResult = StoredMedia & {
-  characters: number
-  provider: FailoverProvider
-}
+  characters: number;
+  provider: FailoverProvider;
+};
 
 /**
  * Generate speech (TTS) with provider failover and upload it to Vercel Blob.
@@ -22,20 +22,20 @@ export type SpeechGenerationResult = StoredMedia & {
  * tool.
  */
 export async function generateAndStoreSpeech(args: {
-  userId: string
-  text: string
-  dbModel: Model
-  candidates: FailoverProvider[]
-  voice?: string
-  abortSignal?: AbortSignal
+  userId: string;
+  text: string;
+  dbModel: Model;
+  candidates: FailoverProvider[];
+  voice?: string;
+  abortSignal?: AbortSignal;
 }): Promise<SpeechGenerationResult> {
-  const { userId, text, dbModel, candidates, abortSignal } = args
+  const { userId, text, dbModel, candidates, abortSignal } = args;
   // 'auto' (admin-configurable option) means: let the provider decide.
-  const voice = resolveAutoOption(args.voice)
-  const modelId = dbModel.modelId
+  const voice = resolveAutoOption(args.voice);
+  const modelId = dbModel.modelId;
 
   const { result: audio, provider: usedProvider } =
-    await runWithProviderFailover(candidates, async (provider) => {
+    await runWithProviderFailover(candidates, async provider => {
       const { audio } = await generateSpeech({
         model: getSpeechModel(provider, modelId),
         text,
@@ -44,24 +44,24 @@ export async function generateAndStoreSpeech(args: {
         abortSignal,
         ...(provider.apiOptions && {
           providerOptions: {
-            [provider.type]: provider.apiOptions,
-          } as any,
-        }),
-      })
-      return audio
-    })
+            [provider.type]: provider.apiOptions
+          } as any
+        })
+      });
+      return audio;
+    });
 
   const stored = await uploadGeneratedMedia({
     userId,
     kind: 'generate-audios',
     buffer: Buffer.from(audio.base64, 'base64'),
     mediaType: audio.mediaType,
-    ext: 'mp3',
-  })
+    ext: 'mp3'
+  });
 
   return {
     ...stored,
     characters: text.length,
-    provider: usedProvider,
-  }
+    provider: usedProvider
+  };
 }

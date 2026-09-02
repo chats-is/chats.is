@@ -1,11 +1,11 @@
-import React from 'react'
-import remarkGfm from 'remark-gfm'
+import React from 'react';
+import remarkGfm from 'remark-gfm';
 
-import { CodeBlock } from '@/components/codeblock'
-import { MemoizedReactMarkdown } from '@/components/markdown'
+import { CodeBlock } from '@/components/codeblock';
+import { MemoizedReactMarkdown } from '@/components/markdown';
 
 interface MessageMarkdownProps {
-  content: string
+  content: string;
 }
 
 export function MessageMarkdown({ content }: MessageMarkdownProps) {
@@ -19,26 +19,26 @@ export function MessageMarkdown({ content }: MessageMarkdownProps) {
         remarkPlugins={[remarkGfm]}
         components={{
           code({ className, children, ...props }) {
-            const childArray = React.Children.toArray(children)
-            const firstChild = childArray[0] as React.ReactElement<any>
+            const childArray = React.Children.toArray(children);
+            const firstChild = childArray[0] as React.ReactElement<any>;
             const firstChildAsString = React.isValidElement(firstChild)
               ? (firstChild as React.ReactElement<any>).props.children
-              : firstChild
+              : firstChild;
 
             if (firstChildAsString === '▍') {
               return (
                 <span className="mt-1 animate-pulse cursor-default">▍</span>
-              )
+              );
             }
 
             if (typeof firstChildAsString === 'string') {
-              childArray[0] = firstChildAsString.replace('`▍`', '▍')
+              childArray[0] = firstChildAsString.replace('`▍`', '▍');
             }
 
             const languageClass = (className || '')
               .split(/\s+/)
-              .find((token) => token.startsWith('language-'))
-            const language = languageClass?.slice('language-'.length) || ''
+              .find(token => token.startsWith('language-'));
+            const language = languageClass?.slice('language-'.length) || '';
 
             if (
               typeof firstChildAsString === 'string' &&
@@ -48,7 +48,7 @@ export function MessageMarkdown({ content }: MessageMarkdownProps) {
                 <code className={className} {...props}>
                   {childArray}
                 </code>
-              )
+              );
             }
 
             return (
@@ -58,12 +58,12 @@ export function MessageMarkdown({ content }: MessageMarkdownProps) {
                 showLineNumbers={false}
                 {...props}
               />
-            )
-          },
+            );
+          }
         }}
       >
         {content}
       </MemoizedReactMarkdown>
     </div>
-  )
+  );
 }

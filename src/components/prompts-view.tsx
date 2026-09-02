@@ -1,25 +1,25 @@
-import { useRouter } from '@tanstack/react-router'
-import { Sparkles } from 'lucide-react'
+import { useRouter } from '@tanstack/react-router';
+import { api, type RouterOutputs } from '@/trpc/react';
+import { Sparkles } from 'lucide-react';
 
-import { setPendingPrompt } from '@/lib/pending-prompt'
-import { api, type RouterOutputs } from '@/trpc/react'
-import { Skeleton } from '@/components/ui/skeleton'
-import { ChatHeader } from '@/components/chat-header'
+import { setPendingPrompt } from '@/lib/pending-prompt';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChatHeader } from '@/components/chat-header';
 
-type UsablePrompt = RouterOutputs['prompt']['listUsable'][number]
+type UsablePrompt = RouterOutputs['prompt']['listUsable'][number];
 
 /** Card for a single prompt — clicking seeds it into a fresh chat composer. */
 function PromptCard({ prompt }: { prompt: UsablePrompt }) {
-  const router = useRouter()
+  const router = useRouter();
 
   const handleUse = () => {
-    setPendingPrompt(prompt.content)
+    setPendingPrompt(prompt.content);
     // refresh() forces a fresh `/` render (new chat id → remount) so the
     // seeding effect re-runs even when `/` is served from the router cache,
     // matching how NewContent navigates.
-    router.navigate({ to: '/' })
-    router.invalidate()
-  }
+    router.navigate({ to: '/' });
+    router.invalidate();
+  };
 
   return (
     <button
@@ -55,14 +55,14 @@ function PromptCard({ prompt }: { prompt: UsablePrompt }) {
         </>
       )}
     </button>
-  )
+  );
 }
 
 export function PromptsView() {
   const { data: prompts, isLoading } = api.prompt.listUsable.useQuery(
     undefined,
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  )
+    { refetchOnWindowFocus: false, staleTime: 60_000 }
+  );
 
   return (
     <div className="flex size-full flex-col">
@@ -77,7 +77,7 @@ export function PromptsView() {
             </div>
           ) : prompts?.length ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {prompts.map((prompt) => (
+              {prompts.map(prompt => (
                 <PromptCard key={prompt.id} prompt={prompt} />
               ))}
             </div>
@@ -92,5 +92,5 @@ export function PromptsView() {
         </div>
       </div>
     </div>
-  )
+  );
 }

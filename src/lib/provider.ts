@@ -1,57 +1,57 @@
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock'
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createAzure } from '@ai-sdk/azure'
-import { createDeepSeek } from '@ai-sdk/deepseek'
-import { createGoogle } from '@ai-sdk/google'
-import { createVertex } from '@ai-sdk/google-vertex'
-import { createOpenAI } from '@ai-sdk/openai'
-import { createXai } from '@ai-sdk/xai'
+import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createAzure } from '@ai-sdk/azure';
+import { createDeepSeek } from '@ai-sdk/deepseek';
+import { createGoogle } from '@ai-sdk/google';
+import { createVertex } from '@ai-sdk/google-vertex';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createXai } from '@ai-sdk/xai';
 import {
   BedrockClient,
-  ListFoundationModelsCommand,
-} from '@aws-sdk/client-bedrock'
-import { GoogleGenAI } from '@google/genai'
+  ListFoundationModelsCommand
+} from '@aws-sdk/client-bedrock';
+import { GoogleGenAI } from '@google/genai';
 import {
   APICallError,
   type ImageModel,
   type LanguageModel,
   type SpeechModel,
-  type TranscriptionModel,
-} from 'ai'
+  type TranscriptionModel
+} from 'ai';
 
 import type {
   ProviderConfig,
   ProviderType,
-  VertexServiceAccountKey,
-} from '@/types'
+  VertexServiceAccountKey
+} from '@/types';
 
-import { BedrockModels, VertexAIModels } from './constant'
-import { decrypt } from './crypto'
+import { BedrockModels, VertexAIModels } from './constant';
+import { decrypt } from './crypto';
 
 function getProviderBaseUrl(provider: ProviderConfig) {
   if (provider.baseUrl) {
-    return provider.baseUrl.replace(/\/+$/, '')
+    return provider.baseUrl.replace(/\/+$/, '');
   }
 
   switch (provider.type) {
     case 'openai':
-      return 'https://api.openai.com/v1'
+      return 'https://api.openai.com/v1';
     case 'anthropic':
-      return 'https://api.anthropic.com'
+      return 'https://api.anthropic.com';
     case 'google':
-      return 'https://generativelanguage.googleapis.com'
+      return 'https://generativelanguage.googleapis.com';
     case 'xai':
-      return 'https://api.x.ai/v1'
+      return 'https://api.x.ai/v1';
     case 'deepseek':
-      return 'https://api.deepseek.com'
+      return 'https://api.deepseek.com';
     case 'azure':
-      throw new Error('Azure provider baseUrl is required to fetch models')
+      throw new Error('Azure provider baseUrl is required to fetch models');
     case 'vertex':
-      throw new Error('Vertex provider uses SDK model listing')
+      throw new Error('Vertex provider uses SDK model listing');
     case 'bedrock':
-      return 'https://bedrock.us-east-1.amazonaws.com'
+      return 'https://bedrock.us-east-1.amazonaws.com';
     default:
-      throw new Error(`Unknown provider: ${provider.type}`)
+      throw new Error(`Unknown provider: ${provider.type}`);
   }
 }
 
@@ -59,48 +59,48 @@ function getProviderBaseUrl(provider: ProviderConfig) {
  * Convert model ID to Vertex AI format if needed
  */
 function toVertexModelId(modelId: string): string {
-  return VertexAIModels[modelId] || modelId
+  return VertexAIModels[modelId] || modelId;
 }
 
 /**
  * Convert model ID to AWS Bedrock format if needed
  */
 function toBedrockModelId(modelId: string): string {
-  return BedrockModels[modelId] || modelId
+  return BedrockModels[modelId] || modelId;
 }
 
 /**
  * Create provider SDK instance based on type and config
  */
 function createProviderSDK(config: ProviderConfig): any {
-  const { type, baseUrl } = config
-  const apiKey = config.apiKey ? decrypt(config.apiKey) : undefined
+  const { type, baseUrl } = config;
+  const apiKey = config.apiKey ? decrypt(config.apiKey) : undefined;
 
   switch (type) {
     case 'openai':
       return createOpenAI({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined,
-      })
+        baseURL: baseUrl || undefined
+      });
 
     case 'azure':
       return createAzure({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl ? baseUrl + '/openai/deployments' : undefined,
-      })
+        baseURL: baseUrl ? baseUrl + '/openai/deployments' : undefined
+      });
 
     case 'google':
       return createGoogle({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined,
-      })
+        baseURL: baseUrl || undefined
+      });
 
     case 'vertex': {
-      let vertexKey: VertexServiceAccountKey | null = null
+      let vertexKey: VertexServiceAccountKey | null = null;
 
       if (apiKey) {
         try {
-          vertexKey = JSON.parse(apiKey) as VertexServiceAccountKey
+          vertexKey = JSON.parse(apiKey) as VertexServiceAccountKey;
         } catch {}
       }
 
@@ -109,47 +109,47 @@ function createProviderSDK(config: ProviderConfig): any {
           project: vertexKey.credentials.project_id,
           location: vertexKey.location,
           googleAuthOptions: {
-            credentials: vertexKey.credentials,
-          },
-        })
+            credentials: vertexKey.credentials
+          }
+        });
       }
 
       return createVertex({
-        apiKey: apiKey || undefined,
-      })
+        apiKey: apiKey || undefined
+      });
     }
 
     case 'bedrock': {
-      const bedrockKey = apiKey ? JSON.parse(apiKey) : undefined
+      const bedrockKey = apiKey ? JSON.parse(apiKey) : undefined;
 
       return createAmazonBedrock({
         region: bedrockKey?.region || undefined,
         accessKeyId: bedrockKey?.accessKeyId || undefined,
         secretAccessKey: bedrockKey?.secretAccessKey || undefined,
-        sessionToken: bedrockKey?.sessionToken || undefined,
-      })
+        sessionToken: bedrockKey?.sessionToken || undefined
+      });
     }
 
     case 'anthropic':
       return createAnthropic({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined,
-      })
+        baseURL: baseUrl || undefined
+      });
 
     case 'xai':
       return createXai({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined,
-      })
+        baseURL: baseUrl || undefined
+      });
 
     case 'deepseek':
       return createDeepSeek({
         apiKey: apiKey || undefined,
-        baseURL: baseUrl || undefined,
-      })
+        baseURL: baseUrl || undefined
+      });
 
     default:
-      throw new Error(`Unknown provider: ${type}`)
+      throw new Error(`Unknown provider: ${type}`);
   }
 }
 
@@ -158,16 +158,16 @@ function createProviderSDK(config: ProviderConfig): any {
  */
 export function getLanguageModel(
   provider: ProviderConfig,
-  modelId: string,
+  modelId: string
 ): LanguageModel {
-  const sdk = createProviderSDK(provider)
+  const sdk = createProviderSDK(provider);
   const resolvedModelId =
     provider.type === 'vertex'
       ? toVertexModelId(modelId)
       : provider.type === 'bedrock'
         ? toBedrockModelId(modelId)
-        : modelId
-  return sdk(resolvedModelId)
+        : modelId;
+  return sdk(resolvedModelId);
 }
 
 /**
@@ -175,10 +175,10 @@ export function getLanguageModel(
  */
 export function getImageModel(
   provider: ProviderConfig,
-  modelId: string,
+  modelId: string
 ): ImageModel {
-  const sdk = createProviderSDK(provider)
-  return sdk.image(modelId)
+  const sdk = createProviderSDK(provider);
+  return sdk.image(modelId);
 }
 
 /**
@@ -186,18 +186,18 @@ export function getImageModel(
  */
 export function getSpeechModel(
   provider: ProviderConfig,
-  modelId: string,
+  modelId: string
 ): SpeechModel {
-  const sdk = createProviderSDK(provider)
-  return sdk.speech(modelId)
+  const sdk = createProviderSDK(provider);
+  return sdk.speech(modelId);
 }
 
 /**
  * Get a video model by provider config and model ID
  */
 export function getVideoModel(provider: ProviderConfig, modelId: string) {
-  const sdk = createProviderSDK(provider)
-  return sdk.video(modelId)
+  const sdk = createProviderSDK(provider);
+  return sdk.video(modelId);
 }
 
 /**
@@ -205,10 +205,10 @@ export function getVideoModel(provider: ProviderConfig, modelId: string) {
  */
 export function getTranscriptionModel(
   provider: ProviderConfig,
-  modelId: string,
+  modelId: string
 ): TranscriptionModel {
-  const sdk = createProviderSDK(provider)
-  return sdk.transcription(modelId)
+  const sdk = createProviderSDK(provider);
+  return sdk.transcription(modelId);
 }
 
 // ============================================================================
@@ -221,9 +221,9 @@ export function getTranscriptionModel(
  * modelId — failover switches the provider, never the model.
  */
 export type FailoverProvider = ProviderConfig & {
-  id: string
-  name: string
-}
+  id: string;
+  name: string;
+};
 
 /**
  * The upstream model id a provider type actually receives for a logical modelId.
@@ -231,18 +231,18 @@ export type FailoverProvider = ProviderConfig & {
  * Used to match a model against a provider's listed models (compatibility check).
  */
 export function toProviderModelId(type: ProviderType, modelId: string): string {
-  if (type === 'vertex') return toVertexModelId(modelId)
-  if (type === 'bedrock') return toBedrockModelId(modelId)
-  return modelId
+  if (type === 'vertex') return toVertexModelId(modelId);
+  if (type === 'bedrock') return toBedrockModelId(modelId);
+  return modelId;
 }
 
 export class AllProvidersFailedError extends Error {
   constructor(
     message: string,
-    public readonly attempts: { provider: string; error: unknown }[],
+    public readonly attempts: { provider: string; error: unknown }[]
   ) {
-    super(message)
-    this.name = 'AllProvidersFailedError'
+    super(message);
+    this.name = 'AllProvidersFailedError';
   }
 }
 
@@ -253,28 +253,28 @@ export class AllProvidersFailedError extends Error {
 export function bindingsToFailoverProviders(
   bindings: Array<{
     provider: {
-      id: string
-      name: string
-      type: ProviderType
-      apiKey?: string | null
-      baseUrl?: string | null
-      apiOptions?: Record<string, unknown> | null
-    } | null
-  }>,
+      id: string;
+      name: string;
+      type: ProviderType;
+      apiKey?: string | null;
+      baseUrl?: string | null;
+      apiOptions?: Record<string, unknown> | null;
+    } | null;
+  }>
 ): FailoverProvider[] {
   return bindings
     .filter(
       (b): b is typeof b & { provider: NonNullable<typeof b.provider> } =>
-        b.provider != null,
+        b.provider != null
     )
-    .map((b) => ({
+    .map(b => ({
       id: b.provider.id,
       name: b.provider.name,
       type: b.provider.type,
       apiKey: b.provider.apiKey,
       baseUrl: b.provider.baseUrl,
-      apiOptions: b.provider.apiOptions,
-    }))
+      apiOptions: b.provider.apiOptions
+    }));
 }
 
 /**
@@ -295,23 +295,23 @@ export function isRetryableProviderError(error: unknown): boolean {
       : undefined) ??
     (typeof (error as { statusCode?: unknown } | null)?.statusCode === 'number'
       ? (error as { statusCode: number }).statusCode
-      : undefined)
+      : undefined);
 
   if (typeof status === 'number') {
     if (status === 404 || status === 408 || status === 409 || status === 429)
-      return true
-    if (status === 401 || status === 403) return true
-    return status >= 500
+      return true;
+    if (status === 401 || status === 403) return true;
+    return status >= 500;
   }
 
   // No status code: an AI SDK call error with no status is a network/connection
   // failure (worth trying another provider); otherwise fall back to the message.
-  if (APICallError.isInstance(error)) return true
+  if (APICallError.isInstance(error)) return true;
 
-  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
   return /timeout|timed out|fetch failed|network|econn|socket|aborted/.test(
-    message,
-  )
+    message
+  );
 }
 
 /**
@@ -327,39 +327,39 @@ export function isRetryableProviderError(error: unknown): boolean {
 export async function runWithProviderFailover<T>(
   providers: FailoverProvider[],
   run: (provider: FailoverProvider) => Promise<T>,
-  options?: { shouldRetry?: (error: unknown) => boolean },
+  options?: { shouldRetry?: (error: unknown) => boolean }
 ): Promise<{ result: T; provider: FailoverProvider }> {
-  const shouldRetry = options?.shouldRetry ?? isRetryableProviderError
-  const attempts: { provider: string; error: unknown }[] = []
+  const shouldRetry = options?.shouldRetry ?? isRetryableProviderError;
+  const attempts: { provider: string; error: unknown }[] = [];
 
   for (let i = 0; i < providers.length; i++) {
-    const provider = providers[i]
-    const isLast = i === providers.length - 1
+    const provider = providers[i];
+    const isLast = i === providers.length - 1;
     try {
-      const result = await run(provider)
-      return { result, provider }
+      const result = await run(provider);
+      return { result, provider };
     } catch (error) {
-      attempts.push({ provider: provider.name, error })
+      attempts.push({ provider: provider.name, error });
       if (isLast || !shouldRetry(error)) {
-        throw error
+        throw error;
       }
     }
   }
 
-  throw new AllProvidersFailedError('All providers failed', attempts)
+  throw new AllProvidersFailedError('All providers failed', attempts);
 }
 
 export async function getProviderModels(
-  provider: ProviderConfig,
+  provider: ProviderConfig
 ): Promise<string[]> {
   if (!provider.apiKey) {
-    throw new Error('Provider API key is required to fetch models')
+    throw new Error('Provider API key is required to fetch models');
   }
 
-  const apiKey = decrypt(provider.apiKey)
+  const apiKey = decrypt(provider.apiKey);
   const baseUrl =
-    provider.type === 'vertex' ? undefined : getProviderBaseUrl(provider)
-  let response: Response
+    provider.type === 'vertex' ? undefined : getProviderBaseUrl(provider);
+  let response: Response;
 
   switch (provider.type) {
     case 'openai':
@@ -367,40 +367,40 @@ export async function getProviderModels(
     case 'deepseek':
       response = await fetch(`${baseUrl}/models`, {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      })
-      break
+          Authorization: `Bearer ${apiKey}`
+        }
+      });
+      break;
 
     case 'anthropic':
       response = await fetch(`${baseUrl}/v1/models`, {
         headers: {
           'anthropic-version': '2023-06-01',
-          'x-api-key': apiKey ?? '',
-        },
-      })
-      break
+          'x-api-key': apiKey ?? ''
+        }
+      });
+      break;
 
     case 'google':
-      response = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`)
-      break
+      response = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`);
+      break;
 
     case 'azure':
       response = await fetch(
         `${baseUrl}/openai/deployments?api-version=2024-10-21`,
         {
           headers: {
-            'api-key': apiKey ?? '',
-          },
-        },
-      )
-      break
+            'api-key': apiKey ?? ''
+          }
+        }
+      );
+      break;
 
     case 'vertex': {
-      let vertexKey: VertexServiceAccountKey | null = null
+      let vertexKey: VertexServiceAccountKey | null = null;
 
       try {
-        vertexKey = JSON.parse(apiKey) as VertexServiceAccountKey
+        vertexKey = JSON.parse(apiKey) as VertexServiceAccountKey;
       } catch {}
 
       const ai =
@@ -410,32 +410,32 @@ export async function getProviderModels(
               project: vertexKey.credentials.project_id,
               location: vertexKey.location,
               googleAuthOptions: {
-                credentials: vertexKey.credentials,
-              },
+                credentials: vertexKey.credentials
+              }
             })
           : new GoogleGenAI({
               vertexai: true,
-              apiKey,
-            })
-      const pager = await ai.models.list()
-      const vertexModels: string[] = []
+              apiKey
+            });
+      const pager = await ai.models.list();
+      const vertexModels: string[] = [];
 
       for await (const model of pager) {
-        if (!model.name) continue
+        if (!model.name) continue;
 
-        vertexModels.push(model.name.split('/').pop() ?? model.name)
+        vertexModels.push(model.name.split('/').pop() ?? model.name);
       }
 
-      return vertexModels
+      return vertexModels;
     }
 
     case 'bedrock': {
       const credentials = JSON.parse(apiKey) as {
-        region?: string
-        accessKeyId?: string
-        secretAccessKey?: string
-        sessionToken?: string
-      }
+        region?: string;
+        accessKeyId?: string;
+        secretAccessKey?: string;
+        sessionToken?: string;
+      };
 
       if (
         !credentials.region ||
@@ -443,8 +443,8 @@ export async function getProviderModels(
         !credentials.secretAccessKey
       ) {
         throw new Error(
-          'Bedrock credentials must include region, accessKeyId, and secretAccessKey',
-        )
+          'Bedrock credentials must include region, accessKeyId, and secretAccessKey'
+        );
       }
 
       const bedrockClient = new BedrockClient({
@@ -452,28 +452,30 @@ export async function getProviderModels(
         credentials: {
           accessKeyId: credentials.accessKeyId,
           secretAccessKey: credentials.secretAccessKey,
-          sessionToken: credentials.sessionToken,
+          sessionToken: credentials.sessionToken
         },
-        ...(provider.baseUrl && { endpoint: provider.baseUrl }),
-      })
-      const data = await bedrockClient.send(new ListFoundationModelsCommand({}))
+        ...(provider.baseUrl && { endpoint: provider.baseUrl })
+      });
+      const data = await bedrockClient.send(
+        new ListFoundationModelsCommand({})
+      );
 
       return (
         data.modelSummaries
-          ?.map((model) => model.modelId)
+          ?.map(model => model.modelId)
           .filter((modelId): modelId is string => Boolean(modelId)) ?? []
-      )
+      );
     }
 
     default:
-      throw new Error(`Fetching models is not supported for ${provider.type}`)
+      throw new Error(`Fetching models is not supported for ${provider.type}`);
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch provider models: ${response.status}`)
+    throw new Error(`Failed to fetch provider models: ${response.status}`);
   }
 
-  const data = await response.json()
+  const data = await response.json();
   const items =
     typeof data === 'object' && data !== null && 'data' in data
       ? (data as { data: unknown }).data
@@ -485,26 +487,26 @@ export async function getProviderModels(
               data !== null &&
               'modelSummaries' in data
             ? (data as { modelSummaries: unknown }).modelSummaries
-            : []
+            : [];
 
   if (!Array.isArray(items)) {
-    return []
+    return [];
   }
 
   return items
-    .map((item) => {
+    .map(item => {
       if (typeof item !== 'object' || item === null) {
-        return null
+        return null;
       }
 
-      const record = item as Record<string, unknown>
-      const id = record.id ?? record.name ?? record.model ?? record.modelId
+      const record = item as Record<string, unknown>;
+      const id = record.id ?? record.name ?? record.model ?? record.modelId;
 
       if (typeof id !== 'string') {
-        return null
+        return null;
       }
 
-      return id.replace(/^models\//, '')
+      return id.replace(/^models\//, '');
     })
-    .filter((modelId): modelId is string => modelId !== null)
+    .filter((modelId): modelId is string => modelId !== null);
 }

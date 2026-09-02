@@ -113,6 +113,7 @@
   "devDependencies": {
     "@better-auth/core": "^1.7.2",
     "@electric-sql/pglite": "^0.4.6",
+    "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
     "@tanstack/devtools-vite": "^0.8.5",
     "@tanstack/eslint-config": "latest",
     "@tanstack/router-cli": "^1.167.33",
@@ -124,6 +125,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.20.0",
     "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.11"

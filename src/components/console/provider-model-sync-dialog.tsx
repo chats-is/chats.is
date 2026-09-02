@@ -1,52 +1,52 @@
-import { useEffect, useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
-import { toast } from 'sonner'
+import { useEffect, useState } from 'react';
+import { api } from '@/trpc/react';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
-import type { ModelCapability } from '@/types/model'
-import { CAPABILITIES } from '@/lib/constant'
-import { api } from '@/trpc/react'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import type { ModelCapability } from '@/types/model';
+import { CAPABILITIES } from '@/lib/constant';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  DialogTitle
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  SelectValue
+} from '@/components/ui/select';
 
 type ProviderModelSyncDialogProps = {
-  open: boolean
-  providerId: string | null
-  providerName?: string
-  onOpenChange: (open: boolean) => void
-}
+  open: boolean;
+  providerId: string | null;
+  providerName?: string;
+  onOpenChange: (open: boolean) => void;
+};
 
 export function ProviderModelSyncDialog({
   open,
   providerId,
   providerName,
-  onOpenChange,
+  onOpenChange
 }: ProviderModelSyncDialogProps) {
-  const utils = api.useUtils()
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const utils = api.useUtils();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [capabilities, setCapabilities] = useState<
     Record<string, ModelCapability>
-  >({})
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  >({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const {
     data: models,
     isLoading,
-    isFetching,
+    isFetching
   } = api.provider.fetchModels.useQuery(
     { providerId: providerId || '' },
     {
@@ -54,104 +54,104 @@ export function ProviderModelSyncDialog({
       retry: false,
       refetchOnMount: false,
       refetchOnReconnect: false,
-      refetchOnWindowFocus: false,
-    },
-  )
+      refetchOnWindowFocus: false
+    }
+  );
 
   const syncMutation = api.provider.syncModels.useMutation({
-    onSuccess: (result) => {
-      utils.provider.list.invalidate()
-      utils.model.list.invalidate()
-      reset()
-      onOpenChange(false)
+    onSuccess: result => {
+      utils.provider.list.invalidate();
+      utils.model.list.invalidate();
+      reset();
+      onOpenChange(false);
       toast.success(
         `Synced ${result.created} models${
           result.skipped ? `, skipped ${result.skipped} existing` : ''
-        }`,
-      )
+        }`
+      );
     },
-    onError: (error) => toast.error(error.message),
-  })
+    onError: error => toast.error(error.message)
+  });
 
-  const newModels = models?.filter((model) => !model.exists) ?? []
+  const newModels = models?.filter(model => !model.exists) ?? [];
   const allNewModelsSelected =
     newModels.length > 0 &&
-    newModels.every((model) => selectedIds.includes(model.modelId))
-  const isLoadingModels = isLoading || isRefreshing
+    newModels.every(model => selectedIds.includes(model.modelId));
+  const isLoadingModels = isLoading || isRefreshing;
 
   useEffect(() => {
-    if (!models) return
+    if (!models) return;
 
     setSelectedIds(
-      models.filter((model) => !model.exists).map((model) => model.modelId),
-    )
+      models.filter(model => !model.exists).map(model => model.modelId)
+    );
     setCapabilities(
-      Object.fromEntries(models.map((model) => [model.modelId, 'chat'])),
-    )
-  }, [models])
+      Object.fromEntries(models.map(model => [model.modelId, 'chat']))
+    );
+  }, [models]);
 
   const reset = () => {
-    setSelectedIds([])
-    setCapabilities({})
-    setIsRefreshing(false)
-  }
+    setSelectedIds([]);
+    setCapabilities({});
+    setIsRefreshing(false);
+  };
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      reset()
+      reset();
     }
-    onOpenChange(nextOpen)
-  }
+    onOpenChange(nextOpen);
+  };
 
   const toggleSelection = (modelId: string, checked: boolean) => {
-    setSelectedIds((current) =>
+    setSelectedIds(current =>
       checked
         ? Array.from(new Set([...current, modelId]))
-        : current.filter((id) => id !== modelId),
-    )
-  }
+        : current.filter(id => id !== modelId)
+    );
+  };
 
   const setModelCapability = (modelId: string, capability: ModelCapability) => {
-    setCapabilities((current) => ({
+    setCapabilities(current => ({
       ...current,
-      [modelId]: capability,
-    }))
-  }
+      [modelId]: capability
+    }));
+  };
 
   const refreshModels = async () => {
-    if (!providerId) return
+    if (!providerId) return;
 
-    setIsRefreshing(true)
+    setIsRefreshing(true);
     try {
-      utils.provider.fetchModels.setData({ providerId }, undefined)
-      setSelectedIds([])
-      setCapabilities({})
+      utils.provider.fetchModels.setData({ providerId }, undefined);
+      setSelectedIds([]);
+      setCapabilities({});
       const refreshedModels = await utils.provider.fetchModels.fetch({
-        providerId,
-      })
-      utils.provider.fetchModels.setData({ providerId }, refreshedModels)
+        providerId
+      });
+      utils.provider.fetchModels.setData({ providerId }, refreshedModels);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : 'Failed to refresh models',
-      )
+        error instanceof Error ? error.message : 'Failed to refresh models'
+      );
     } finally {
-      setIsRefreshing(false)
+      setIsRefreshing(false);
     }
-  }
+  };
 
   const syncSelectedModels = () => {
-    if (!providerId || !models) return
+    if (!providerId || !models) return;
 
     syncMutation.mutate({
       providerId,
       items: models
-        .filter((model) => selectedIds.includes(model.modelId))
-        .map((model) => ({
+        .filter(model => selectedIds.includes(model.modelId))
+        .map(model => ({
           modelId: model.modelId,
-          capability: capabilities[model.modelId] ?? 'chat',
-        })),
-    })
-  }
+          capability: capabilities[model.modelId] ?? 'chat'
+        }))
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -203,12 +203,10 @@ export function ProviderModelSyncDialog({
                       <Checkbox
                         checked={allNewModelsSelected}
                         disabled={!newModels.length}
-                        onCheckedChange={(checked) => {
+                        onCheckedChange={checked => {
                           setSelectedIds(
-                            checked
-                              ? newModels.map((model) => model.modelId)
-                              : [],
-                          )
+                            checked ? newModels.map(model => model.modelId) : []
+                          );
                         }}
                       />
                     </div>
@@ -220,8 +218,8 @@ export function ProviderModelSyncDialog({
                 </tr>
               </thead>
               <tbody>
-                {models.map((model) => {
-                  const isSelected = selectedIds.includes(model.modelId)
+                {models.map(model => {
+                  const isSelected = selectedIds.includes(model.modelId);
 
                   return (
                     <tr
@@ -233,7 +231,7 @@ export function ProviderModelSyncDialog({
                           <Checkbox
                             checked={isSelected}
                             disabled={model.exists}
-                            onCheckedChange={(checked) =>
+                            onCheckedChange={checked =>
                               toggleSelection(model.modelId, checked === true)
                             }
                           />
@@ -245,10 +243,10 @@ export function ProviderModelSyncDialog({
                       <td className="p-3 align-top">
                         <Select
                           value={capabilities[model.modelId] ?? 'chat'}
-                          onValueChange={(value) =>
+                          onValueChange={value =>
                             setModelCapability(
                               model.modelId,
-                              value as ModelCapability,
+                              value as ModelCapability
                             )
                           }
                           disabled={model.exists || syncMutation.isPending}
@@ -257,7 +255,7 @@ export function ProviderModelSyncDialog({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {CAPABILITIES.map((capability) => (
+                            {CAPABILITIES.map(capability => (
                               <SelectItem
                                 key={capability.value}
                                 value={capability.value}
@@ -269,7 +267,7 @@ export function ProviderModelSyncDialog({
                         </Select>
                       </td>
                     </tr>
-                  )
+                  );
                 })}
               </tbody>
             </table>
@@ -305,5 +303,5 @@ export function ProviderModelSyncDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -1,44 +1,44 @@
-import { useEffect, useState } from 'react'
-import { Monitor, Moon, Sun } from 'lucide-react'
-import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react';
+import { Monitor, Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
-import { Button } from '@/components/ui/button'
-import { Label as UiLabel } from '@/components/ui/label'
+import { Button } from '@/components/ui/button';
+import { Label as UiLabel } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { ClearHistoryDialog } from '@/components/clear-history-dialog'
+  SelectValue
+} from '@/components/ui/select';
+import { ClearHistoryDialog } from '@/components/clear-history-dialog';
 
 export const SettingsGeneral = () => {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   const renderThemeIcon = (value: string) => {
     switch (value) {
       case 'system':
-        return <Monitor className="size-4" />
+        return <Monitor className="size-4" />;
       case 'light':
-        return <Sun className="size-4" />
+        return <Sun className="size-4" />;
       case 'dark':
-        return <Moon className="size-4" />
+        return <Moon className="size-4" />;
     }
-  }
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between space-y-0">
         <UiLabel>Theme</UiLabel>
         <Select
-          onValueChange={(value) => setTheme(value)}
+          onValueChange={value => setTheme(value)}
           value={mounted ? theme : undefined}
         >
           <SelectTrigger className="w-auto rounded-full capitalize">
@@ -88,5 +88,5 @@ export const SettingsGeneral = () => {
         onOpenChange={setIsHistoryOpen}
       />
     </div>
-  )
-}
+  );
+};

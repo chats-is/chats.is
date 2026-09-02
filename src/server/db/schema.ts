@@ -1,3 +1,4 @@
+import type { JSONValue } from 'ai';
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
@@ -13,7 +14,6 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 
-import type { JSONValue } from 'ai';
 import type { ChatMessage, ChatType, ProviderType } from '@/types';
 
 /**

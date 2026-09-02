@@ -1,8 +1,8 @@
-import * as React from 'react'
-import { Link } from '@tanstack/react-router'
-import { useSystemSettings } from '@/contexts/system-settings-context'
+import * as React from 'react';
+import { Link } from '@tanstack/react-router';
+import { useSystemSettings } from '@/contexts/system-settings-context';
 
-import { Separator } from '@/components/ui/separator'
+import { Separator } from '@/components/ui/separator';
 import {
   SidebarContent,
   SidebarFooter,
@@ -12,16 +12,16 @@ import {
   SidebarMenuItem,
   Sidebar as SidebarPrimitive,
   SidebarRail,
-  SidebarTrigger,
-} from '@/components/ui/sidebar'
-import { NewContent } from '@/components/new-content'
-import { SidebarList } from '@/components/sidebar-list'
-import { UserMenu } from '@/components/user-menu'
+  SidebarTrigger
+} from '@/components/ui/sidebar';
+import { NewContent } from '@/components/new-content';
+import { SidebarList } from '@/components/sidebar-list';
+import { UserMenu } from '@/components/user-menu';
 
 export function Sidebar({
   ...props
 }: React.ComponentProps<typeof SidebarPrimitive>) {
-  const { appName } = useSystemSettings()
+  const { appName } = useSystemSettings();
 
   return (
     <SidebarPrimitive collapsible="icon" {...props}>
@@ -59,5 +59,5 @@ export function Sidebar({
       </SidebarFooter>
       <SidebarRail />
     </SidebarPrimitive>
-  )
+  );
 }

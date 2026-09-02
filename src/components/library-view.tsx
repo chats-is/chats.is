@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { useRouter } from '@tanstack/react-router'
+import { useCallback, useRef, useState } from 'react';
+import { Link, useRouter } from '@tanstack/react-router';
+import { api } from '@/trpc/react';
 import {
   Code2,
   Download,
@@ -13,42 +13,41 @@ import {
   Pause,
   Play,
   Table,
-  X,
-} from 'lucide-react'
+  X
+} from 'lucide-react';
 
-import { type Artifact } from '@/types'
-import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact'
-import { getArtifactLanguageLabel } from '@/lib/code-language'
-import { downloadArtifact, downloadFileFromUrl } from '@/lib/download'
-import { formatMediaTime } from '@/lib/utils'
-import type { LibraryItem } from '@/server/api/routers/library'
-import { api } from '@/trpc/react'
-import { Button } from '@/components/ui/button'
+import { type Artifact } from '@/types';
+import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
+import { getArtifactLanguageLabel } from '@/lib/code-language';
+import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
+import { formatMediaTime } from '@/lib/utils';
+import type { LibraryItem } from '@/server/api/routers/library';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Skeleton } from '@/components/ui/skeleton'
-import { ChatHeader } from '@/components/chat-header'
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChatHeader } from '@/components/chat-header';
 
 /** Hover corner actions — uniform across all card kinds: download and
  *  open-chat side by side at the top-right. `dark` for image/video overlays. */
 function CardActions({
   chatId,
   onDownload,
-  dark,
+  dark
 }: {
-  chatId: string | null
-  onDownload?: () => void
-  dark?: boolean
+  chatId: string | null;
+  onDownload?: () => void;
+  dark?: boolean;
 }) {
   // Solid backgrounds — no translucency over the card content.
   const buttonClass = dark
     ? 'rounded-full bg-black p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-700'
-    : 'rounded-full border bg-background p-1.5 text-muted-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-foreground'
+    : 'rounded-full border bg-background p-1.5 text-muted-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-foreground';
 
   return (
     <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
@@ -56,9 +55,9 @@ function CardActions({
         <button
           type="button"
           title="Download"
-          onClick={(event) => {
-            event.stopPropagation()
-            onDownload()
+          onClick={event => {
+            event.stopPropagation();
+            onDownload();
           }}
           className={buttonClass}
         >
@@ -76,17 +75,17 @@ function CardActions({
         </Link>
       )}
     </div>
-  )
+  );
 }
 
 /** Hover title strip along the bottom edge of image/video cards. */
 function CardTitle({ title }: { title?: string }) {
-  if (!title) return null
+  if (!title) return null;
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
       <span className="line-clamp-2 text-xs text-white">{title}</span>
     </div>
-  )
+  );
 }
 
 /** Fullscreen preview dialog for image/video cards (Library-local). */
@@ -94,14 +93,14 @@ function LibraryLightbox({
   type,
   src,
   alt,
-  trigger,
+  trigger
 }: {
-  type: 'image' | 'video'
-  src: string
-  alt?: string
-  trigger: React.ReactNode
+  type: 'image' | 'video';
+  src: string;
+  alt?: string;
+  trigger: React.ReactNode;
 }) {
-  const title = alt || (type === 'image' ? 'Image preview' : 'Video preview')
+  const title = alt || (type === 'image' ? 'Image preview' : 'Video preview');
 
   return (
     <Dialog>
@@ -131,7 +130,7 @@ function LibraryLightbox({
         </DialogClose>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 const ARTIFACT_KIND_META: Record<
@@ -142,12 +141,12 @@ const ARTIFACT_KIND_META: Record<
   code: { label: 'Code', icon: Code2 },
   sheet: { label: 'Sheet', icon: Table },
   image: { label: 'Image', icon: ImageIcon },
-  file: { label: 'File', icon: File },
-}
+  file: { label: 'File', icon: File }
+};
 
 /** Large content preview filling the artifact card (Library-local). */
 function ArtifactCardPreview({ artifact }: { artifact: Artifact }) {
-  const kind = artifactKindFromType(artifact.type)
+  const kind = artifactKindFromType(artifact.type);
 
   if (kind === 'image' && artifact.fileUrl) {
     return (
@@ -156,7 +155,7 @@ function ArtifactCardPreview({ artifact }: { artifact: Artifact }) {
         src={artifact.fileUrl}
         alt={artifact.title}
       />
-    )
+    );
   }
   if (kind === 'file') {
     if (artifact.fileUrl && artifact.mimeType?.startsWith('image/')) {
@@ -166,77 +165,77 @@ function ArtifactCardPreview({ artifact }: { artifact: Artifact }) {
           src={artifact.fileUrl}
           alt={artifact.title}
         />
-      )
+      );
     }
     return (
       <div className="text-xs text-muted-foreground">
         {artifact.fileName ||
           (artifact.fileUrl ? 'File' : 'File URL unavailable')}
       </div>
-    )
+    );
   }
   if (kind === 'sheet') {
     try {
-      const rows = JSON.parse(artifact.content ?? '[]')
+      const rows = JSON.parse(artifact.content ?? '[]');
       if (Array.isArray(rows)) {
         return (
           <div className="text-xs text-muted-foreground">
             {rows.length} rows
           </div>
-        )
+        );
       }
     } catch {}
     // Content may be truncated for the preview — fall back to a neutral label.
-    return <div className="text-xs text-muted-foreground">Sheet data</div>
+    return <div className="text-xs text-muted-foreground">Sheet data</div>;
   }
   if (kind === 'code') {
     return (
       <pre className="line-clamp-[14] overflow-hidden font-mono text-xs whitespace-pre-wrap text-muted-foreground">
         {artifact.content ?? ''}
       </pre>
-    )
+    );
   }
   // text / markdown
   return (
     <div className="line-clamp-[14] text-xs text-muted-foreground">
       {artifact.content ?? ''}
     </div>
-  )
+  );
 }
 
 /** Card-sized large audio player: big central play control + seek bar. */
 function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const progressRef = useRef<HTMLDivElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const togglePlay = useCallback(() => {
-    const audio = audioRef.current
-    if (!audio) return
+    const audio = audioRef.current;
+    if (!audio) return;
     if (audio.paused) {
-      void audio.play()
-      setIsPlaying(true)
+      void audio.play();
+      setIsPlaying(true);
     } else {
-      audio.pause()
-      setIsPlaying(false)
+      audio.pause();
+      setIsPlaying(false);
     }
-  }, [])
+  }, []);
 
   const handleSeek = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      const audio = audioRef.current
-      const bar = progressRef.current
-      if (!audio || !bar || !duration) return
-      const rect = bar.getBoundingClientRect()
-      const ratio = (event.clientX - rect.left) / rect.width
-      const next = Math.min(Math.max(ratio, 0), 1) * duration
-      audio.currentTime = next
-      setCurrentTime(next)
+      const audio = audioRef.current;
+      const bar = progressRef.current;
+      if (!audio || !bar || !duration) return;
+      const rect = bar.getBoundingClientRect();
+      const ratio = (event.clientX - rect.left) / rect.width;
+      const next = Math.min(Math.max(ratio, 0), 1) * duration;
+      audio.currentTime = next;
+      setCurrentTime(next);
     },
-    [duration],
-  )
+    [duration]
+  );
 
   return (
     <div className="relative flex h-full w-full flex-col px-2">
@@ -244,15 +243,13 @@ function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
         ref={audioRef}
         src={src}
         preload="metadata"
-        onTimeUpdate={(event) =>
-          setCurrentTime(event.currentTarget.currentTime)
-        }
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
-        onEnded={(event) => {
+        onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
+        onLoadedMetadata={event => setDuration(event.currentTarget.duration)}
+        onEnded={event => {
           // Back to the 0 state once playback finishes.
-          event.currentTarget.currentTime = 0
-          setCurrentTime(0)
-          setIsPlaying(false)
+          event.currentTarget.currentTime = 0;
+          setCurrentTime(0);
+          setIsPlaying(false);
         }}
       />
       {/* Title along the top edge; the play control sits at the exact card
@@ -286,7 +283,7 @@ function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
               width:
                 Number.isFinite(duration) && duration > 0
                   ? `${(currentTime / duration) * 100}%`
-                  : '0%',
+                  : '0%'
             }}
           />
         </div>
@@ -296,28 +293,28 @@ function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function LibraryCard({ item }: { item: LibraryItem }) {
-  const router = useRouter()
-  const utils = api.useUtils()
+  const router = useRouter();
+  const utils = api.useUtils();
 
   const handleArtifactDownload = async (id: string) => {
     // The feed carries a truncated preview; download needs the full body.
-    const full = await utils.artifact.get.fetch({ id })
-    if (full) downloadArtifact(full)
-  }
+    const full = await utils.artifact.get.fetch({ id });
+    if (full) downloadArtifact(full);
+  };
 
   if (item.type === 'artifact') {
-    const { artifact } = item
-    const kind = artifactKindFromType(artifact.type)
-    const meta = ARTIFACT_KIND_META[kind]
-    const Icon = meta.icon
+    const { artifact } = item;
+    const kind = artifactKindFromType(artifact.type);
+    const meta = ARTIFACT_KIND_META[kind];
+    const Icon = meta.icon;
     const languageLabel =
       kind === 'code' || kind === 'text'
         ? getArtifactLanguageLabel(artifact)
-        : ''
+        : '';
 
     return (
       <div className="group relative aspect-square">
@@ -329,17 +326,17 @@ function LibraryCard({ item }: { item: LibraryItem }) {
             item.chatId &&
             router.navigate({
               to: '/chat/$chatId',
-              params: { chatId: item.chatId },
+              params: { chatId: item.chatId }
             })
           }
-          onKeyDown={(event) => {
+          onKeyDown={event => {
             if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
+              event.preventDefault();
               if (item.chatId)
                 router.navigate({
                   to: '/chat/$chatId',
-                  params: { chatId: item.chatId },
-                })
+                  params: { chatId: item.chatId }
+                });
             }
           }}
         >
@@ -363,7 +360,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
           onDownload={() => void handleArtifactDownload(item.artifact.id)}
         />
       </div>
-    )
+    );
   }
 
   if (item.kind === 'image') {
@@ -389,7 +386,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
           dark
         />
       </div>
-    )
+    );
   }
 
   if (item.kind === 'video') {
@@ -423,7 +420,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
           dark
         />
       </div>
-    )
+    );
   }
 
   // Audio — card-sized large player.
@@ -435,7 +432,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
         onDownload={() => downloadFileFromUrl(item.url)}
       />
     </div>
-  )
+  );
 }
 
 export function LibraryView() {
@@ -443,15 +440,15 @@ export function LibraryView() {
     api.library.list.useInfiniteQuery(
       { limit: 24 },
       {
-        getNextPageParam: (page) => page.nextCursor,
+        getNextPageParam: page => page.nextCursor,
         // Refocusing would serially replay every loaded page — not worth it
         // for an archive view.
         refetchOnWindowFocus: false,
-        staleTime: 60_000,
-      },
-    )
+        staleTime: 60_000
+      }
+    );
 
-  const items = data?.pages.flatMap((page) => page.items) ?? []
+  const items = data?.pages.flatMap(page => page.items) ?? [];
 
   return (
     <div className="flex size-full flex-col">
@@ -474,7 +471,7 @@ export function LibraryView() {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {items.map((item) => (
+                {items.map(item => (
                   <LibraryCard key={`${item.type}-${item.id}`} item={item} />
                 ))}
               </div>
@@ -498,5 +495,5 @@ export function LibraryView() {
         </div>
       </div>
     </div>
-  )
+  );
 }

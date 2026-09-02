@@ -1,7 +1,7 @@
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils';
 
 export function TailwindColor() {
-  if (process.env.NODE_ENV === 'production') return null
+  if (process.env.NODE_ENV === 'production') return null;
 
   const colors = [
     'bg-background',
@@ -17,17 +17,17 @@ export function TailwindColor() {
     'bg-destructive',
     'bg-border',
     'bg-input',
-    'bg-ring',
-  ]
+    'bg-ring'
+  ];
 
   return (
     <div className="fixed right-1 bottom-8 z-50 flex flex-col items-end">
-      {colors.map((color) => (
+      {colors.map(color => (
         <div
           key={color}
           className={cn(
             'mb-px flex items-center justify-center px-1 text-xs',
-            color,
+            color
           )}
         >
           <span className="text-white mix-blend-difference">
@@ -36,5 +36,5 @@ export function TailwindColor() {
         </div>
       ))}
     </div>
-  )
+  );
 }

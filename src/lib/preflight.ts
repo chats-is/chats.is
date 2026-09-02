@@ -1,19 +1,19 @@
-import '@tanstack/react-start/server-only'
+import '@tanstack/react-start/server-only';
 
-import type { ChatErrorKind } from '@/types'
-import { PricingMissingError, requirePricing } from '@/lib/pricing'
+import type { ChatErrorKind } from '@/types';
+import { PricingMissingError, requirePricing } from '@/lib/pricing';
 import {
   assertModelAccess,
   assertQuota,
   ModelAccessDeniedError,
-  QuotaExceededError,
-} from '@/lib/quota'
+  QuotaExceededError
+} from '@/lib/quota';
 
 export type PreflightResult =
   | { ok: true }
   /** `kind` travels with the message so callers can persist the cause, not just
    *  the prose — see CustomUIDataTypes['error']. */
-  | { ok: false; status: 403 | 429; message: string; kind: ChatErrorKind }
+  | { ok: false; status: 403 | 429; message: string; kind: ChatErrorKind };
 
 /**
  * Run the standard pre-flight gates for any generation:
@@ -29,48 +29,48 @@ export type PreflightResult =
  * response, so it can also gate in-stream tool calls (chat media tools).
  */
 export async function preflightCheck(args: {
-  userId: string
-  modelKey: string
-  modelLabel: string
-  capability: 'chat' | 'image' | 'video' | 'audio'
+  userId: string;
+  modelKey: string;
+  modelLabel: string;
+  capability: 'chat' | 'image' | 'video' | 'audio';
   /** Audio direction: true = STT (per-second pricing), false = TTS. */
-  transcription?: boolean
+  transcription?: boolean;
 }): Promise<PreflightResult> {
   try {
     await requirePricing(args.modelKey, args.capability, args.modelLabel, {
-      transcription: args.transcription,
-    })
-    await assertModelAccess(args.userId, args.modelKey, args.modelLabel)
-    await assertQuota(args.userId)
-    return { ok: true }
+      transcription: args.transcription
+    });
+    await assertModelAccess(args.userId, args.modelKey, args.modelLabel);
+    await assertQuota(args.userId);
+    return { ok: true };
   } catch (err) {
     if (err instanceof PricingMissingError) {
       // Log the admin-facing detail (which model, what's missing) so the
       // misconfiguration is discoverable; the user only sees a generic
       // "unavailable, pick another model" message.
-      console.error(`[preflight] ${err.message}`)
+      console.error(`[preflight] ${err.message}`);
       return {
         ok: false,
         status: 403,
         message: err.userMessage,
-        kind: 'pricing',
-      }
+        kind: 'pricing'
+      };
     }
     if (err instanceof ModelAccessDeniedError) {
       return {
         ok: false,
         status: 403,
         message: err.message,
-        kind: 'model-access',
-      }
+        kind: 'model-access'
+      };
     }
     if (err instanceof QuotaExceededError) {
       // Plain message only — the live UsageLimitAlert (powered by
       // `quota.me`) already shows the user the remaining-% gauge + countdown
       // when they're exhausted, so the 429 doesn't need structured detail.
-      return { ok: false, status: 429, message: err.message, kind: 'quota' }
+      return { ok: false, status: 429, message: err.message, kind: 'quota' };
     }
-    throw err
+    throw err;
   }
 }
 
@@ -79,15 +79,15 @@ export async function preflightCheck(args: {
  * Returns a Response to bail out with, or null to proceed.
  */
 export async function preflightGate(args: {
-  userId: string
-  modelKey: string
-  modelLabel: string
-  capability: 'chat' | 'image' | 'video' | 'audio'
-  transcription?: boolean
+  userId: string;
+  modelKey: string;
+  modelLabel: string;
+  capability: 'chat' | 'image' | 'video' | 'audio';
+  transcription?: boolean;
 }): Promise<Response | null> {
-  const result = await preflightCheck(args)
+  const result = await preflightCheck(args);
   if (result.ok) {
-    return null
+    return null;
   }
-  return Response.json({ error: result.message }, { status: result.status })
+  return Response.json({ error: result.message }, { status: result.status });
 }

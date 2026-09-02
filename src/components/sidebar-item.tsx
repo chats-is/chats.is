@@ -1,34 +1,33 @@
-import * as React from 'react'
-import { Link } from '@tanstack/react-router'
-import { useParams } from '@tanstack/react-router'
-import { Image, MessageSquare, Mic, Video } from 'lucide-react'
+import * as React from 'react';
+import { Link, useParams } from '@tanstack/react-router';
+import { Image, MessageSquare, Mic, Video } from 'lucide-react';
 
-import { type Chat } from '@/types'
-import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import { type Chat } from '@/types';
+import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
-import { SidebarActions } from './sidebar-actions'
+import { SidebarActions } from './sidebar-actions';
 
 // Get icon for chat type
 function ChatTypeIcon({ type }: { type: string }) {
   switch (type) {
     case 'image':
-      return <Image className="size-4" />
+      return <Image className="size-4" />;
     case 'video':
-      return <Video className="size-4" />
+      return <Video className="size-4" />;
     case 'audio':
-      return <Mic className="size-4" />
+      return <Mic className="size-4" />;
     default:
-      return <MessageSquare className="size-4" />
+      return <MessageSquare className="size-4" />;
   }
 }
 
 interface SidebarItemProps {
-  chat: Chat
+  chat: Chat;
 }
 
 export function SidebarItem({ chat }: SidebarItemProps) {
-  const params = useParams({ strict: false })
-  const [isOpen, setIsOpen] = React.useState(false)
+  const params = useParams({ strict: false });
+  const [isOpen, setIsOpen] = React.useState(false);
 
   return (
     <SidebarMenuItem>
@@ -48,5 +47,5 @@ export function SidebarItem({ chat }: SidebarItemProps) {
       />
       <SidebarActions chat={chat} onOpenChange={setIsOpen} />
     </SidebarMenuItem>
-  )
+  );
 }

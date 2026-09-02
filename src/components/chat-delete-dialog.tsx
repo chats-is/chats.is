@@ -1,10 +1,10 @@
-import * as React from 'react'
-import { useParams, useRouter } from '@tanstack/react-router'
-import { Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from 'react';
+import { useParams, useRouter } from '@tanstack/react-router';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { type Chat } from '@/types'
-import { useChats } from '@/hooks/use-chats'
+import { type Chat } from '@/types';
+import { useChats } from '@/hooks/use-chats';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,24 +13,24 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 
 interface ChatDeleteDialogProps {
-  chat: Pick<Chat, 'id'>
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  chat: Pick<Chat, 'id'>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function ChatDeleteDialog({
   chat,
   open,
-  onOpenChange,
+  onOpenChange
 }: ChatDeleteDialogProps) {
-  const { deleteChat } = useChats()
-  const router = useRouter()
-  const params = useParams({ strict: false })
-  const [isPending, startTransition] = React.useTransition()
+  const { deleteChat } = useChats();
+  const router = useRouter();
+  const params = useParams({ strict: false });
+  const [isPending, startTransition] = React.useTransition();
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -46,20 +46,20 @@ export function ChatDeleteDialog({
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={isPending}
-            onClick={(e) => {
-              e.preventDefault()
+            onClick={e => {
+              e.preventDefault();
               startTransition(async () => {
                 try {
-                  await deleteChat({ id: chat.id })
-                  toast.success('Chat deleted', { duration: 2000 })
+                  await deleteChat({ id: chat.id });
+                  toast.success('Chat deleted', { duration: 2000 });
                   if (params.chatId === chat.id) {
-                    router.navigate({ to: '/' })
+                    router.navigate({ to: '/' });
                   }
-                  onOpenChange(false)
+                  onOpenChange(false);
                 } catch (err: any) {
-                  toast.error(err.message)
+                  toast.error(err.message);
                 }
-              })
+              });
             }}
           >
             {isPending ? (
@@ -74,5 +74,5 @@ export function ChatDeleteDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }

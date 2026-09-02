@@ -1,15 +1,15 @@
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
-import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared'
+import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared';
 
-const KEYS = ['default.chat.systemPrompt'] as const
+const KEYS = ['default.chat.systemPrompt'] as const;
 
 export function PromptsSettings() {
   const { formData, handleChange, save, hasChanges, isLoading, isSaving } =
-    useSettingsForm(KEYS)
+    useSettingsForm(KEYS);
 
-  if (isLoading) return <SettingsLoading />
+  if (isLoading) return <SettingsLoading />;
 
   return (
     <div className="space-y-6">
@@ -21,7 +21,7 @@ export function PromptsSettings() {
             <Textarea
               disabled={isSaving}
               value={formData['default.chat.systemPrompt'] || ''}
-              onChange={(e) =>
+              onChange={e =>
                 handleChange('default.chat.systemPrompt', e.target.value)
               }
               placeholder="Fallback system prompt for chat models that don't define their own. Supports {provider}, {modelId}, {date}."
@@ -40,5 +40,5 @@ export function PromptsSettings() {
         onSave={save}
       />
     </div>
-  )
+  );
 }

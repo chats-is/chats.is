@@ -1,8 +1,8 @@
-import { type ReactNode } from 'react'
+import { type ReactNode } from 'react';
 
 interface EmptyScreenProps {
-  icon: ReactNode
-  text: string
+  icon: ReactNode;
+  text: string;
 }
 
 export function EmptyScreen({ icon, text }: EmptyScreenProps) {
@@ -13,5 +13,5 @@ export function EmptyScreen({ icon, text }: EmptyScreenProps) {
         <p className="text-lg font-medium lg:text-2xl">{text}</p>
       </div>
     </div>
-  )
+  );
 }

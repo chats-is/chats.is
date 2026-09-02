@@ -1,20 +1,20 @@
-import * as React from 'react'
-import { PanelLeft } from 'lucide-react'
+import * as React from 'react';
+import { PanelLeft } from 'lucide-react';
 
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { useSidebar } from '@/components/ui/sidebar'
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useSidebar } from '@/components/ui/sidebar';
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
 export function SidebarToggle({
   className,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar, open: isSidebarOpen } = useSidebar()
+  const { toggleSidebar, open: isSidebarOpen } = useSidebar();
 
   return (
     <Tooltip>
@@ -36,5 +36,5 @@ export function SidebarToggle({
         {isSidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
       </TooltipContent>
     </Tooltip>
-  )
+  );
 }

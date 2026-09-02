@@ -1,8 +1,8 @@
-import { IconLoading } from '@/components/icons'
-import { ModelIcon } from '@/components/model-icon'
+import { IconLoading } from '@/components/icons';
+import { ModelIcon } from '@/components/model-icon';
 
 export interface MessageLoadingProps {
-  image?: string | null
+  image?: string | null;
 }
 
 export function MessageLoading({ image }: MessageLoadingProps) {
@@ -22,5 +22,5 @@ export function MessageLoading({ image }: MessageLoadingProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
