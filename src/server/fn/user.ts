@@ -228,10 +228,10 @@ export const userQueries = {
       queryKey: [...userQueries.key.list(), input] as const,
       queryFn: () => listUsers({ data: input })
     }),
-  detail: (id: string) =>
+  detail: (input: { id: string }) =>
     queryOptions({
-      queryKey: [...userQueries.key.detail(), id] as const,
-      queryFn: () => getUser({ data: { id } })
+      queryKey: [...userQueries.key.detail(), input] as const,
+      queryFn: () => getUser({ data: input })
     }),
   stats: () =>
     queryOptions({

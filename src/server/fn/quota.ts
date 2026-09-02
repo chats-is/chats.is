@@ -252,9 +252,9 @@ export const quotaQueries = {
       queryKey: [...quotaQueries.key.me()] as const,
       queryFn: () => getMyQuota()
     }),
-  byUser: (userId: string) =>
+  byUser: (input: { userId: string }) =>
     queryOptions({
-      queryKey: [...quotaQueries.key.byUser(), userId] as const,
-      queryFn: () => getQuotaForUser({ data: { userId } })
+      queryKey: [...quotaQueries.key.byUser(), input] as const,
+      queryFn: () => getQuotaForUser({ data: input })
     })
 };

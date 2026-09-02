@@ -55,14 +55,14 @@ export const artifactQueries = {
     get: () => ['artifact', 'get'] as const,
     list: () => ['artifact', 'list'] as const
   },
-  get: (id: string) =>
+  get: (input: { id: string }) =>
     queryOptions({
-      queryKey: [...artifactQueries.key.get(), id] as const,
-      queryFn: () => getArtifact({ data: { id } })
+      queryKey: [...artifactQueries.key.get(), input] as const,
+      queryFn: () => getArtifact({ data: input })
     }),
-  list: (chatId: string) =>
+  list: (input: { chatId: string }) =>
     queryOptions({
-      queryKey: [...artifactQueries.key.list(), chatId] as const,
-      queryFn: () => listArtifacts({ data: { chatId } })
+      queryKey: [...artifactQueries.key.list(), input] as const,
+      queryFn: () => listArtifacts({ data: input })
     })
 };

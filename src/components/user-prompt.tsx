@@ -4,12 +4,13 @@ import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { uploadFile } from '@/lib/api';
-import { mutating, mutating } from '@/lib/mutation';
+import { mutating } from '@/lib/mutation';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { modelQueries } from '@/server/fn/model';
 import {
   createPrompt,
-  deletePrompt,
+  deletePrompt as deletePromptFn,
   listPrompts,
   promptQueries,
   updatePrompt
@@ -187,7 +188,7 @@ export const UserPrompt = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: mutating(deletePrompt),
+    mutationFn: mutating(deletePromptFn),
     onSuccess: async () => {
       await invalidatePrompts();
       setDeleteId(null);

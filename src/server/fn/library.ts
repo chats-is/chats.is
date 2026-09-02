@@ -169,7 +169,7 @@ export const libraryQueries = {
     list: () => ['library', 'list'] as const
   },
   /** The library scrolls; the cursor is the timestamp of the last item shown. */
-  list: (limit = 24) =>
+  list: ({ limit = 24 }: { limit?: number } = {}) =>
     infiniteQueryOptions({
       queryKey: [...libraryQueries.key.list(), limit] as const,
       queryFn: ({ pageParam }) =>

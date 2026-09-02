@@ -304,29 +304,32 @@ export const usageQueries = {
     userModels: () => ['usage', 'userModels'] as const,
     log: () => ['usage', 'log'] as const
   },
-  me: (from: Date) =>
+  me: (input: { from: Date }) =>
     queryOptions({
-      queryKey: [...usageQueries.key.me(), from.toISOString()] as const,
-      queryFn: () => getMyUsage({ data: { from } })
+      queryKey: [...usageQueries.key.me(), input.from.toISOString()] as const,
+      queryFn: () => getMyUsage({ data: input })
     }),
-  byUser: (userId: string, from: Date) =>
+  byUser: (input: { userId: string; from: Date }) =>
     queryOptions({
       queryKey: [
         ...usageQueries.key.byUser(),
-        userId,
-        from.toISOString()
+        input.userId,
+        input.from.toISOString()
       ] as const,
-      queryFn: () => adminUsageByUser({ data: { userId, from } })
+      queryFn: () => adminUsageByUser({ data: input })
     }),
-  adminList: (from: Date) =>
+  adminList: (input: { from: Date }) =>
     queryOptions({
-      queryKey: [...usageQueries.key.adminList(), from.toISOString()] as const,
-      queryFn: () => adminListUsage({ data: { from } })
+      queryKey: [
+        ...usageQueries.key.adminList(),
+        input.from.toISOString()
+      ] as const,
+      queryFn: () => adminListUsage({ data: input })
     }),
-  userModels: (userId: string) =>
+  userModels: (input: { userId: string }) =>
     queryOptions({
-      queryKey: [...usageQueries.key.userModels(), userId] as const,
-      queryFn: () => adminUserModels({ data: { userId } })
+      queryKey: [...usageQueries.key.userModels(), input] as const,
+      queryFn: () => adminUserModels({ data: input })
     }),
   log: (filters: UsageLogFilters = {}) =>
     queryOptions({

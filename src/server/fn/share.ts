@@ -151,9 +151,9 @@ export const shareQueries = {
       queryKey: [...shareQueries.key.list(), input] as const,
       queryFn: () => listShares({ data: input })
     }),
-  detail: (id: string) =>
+  detail: (input: { id: string }) =>
     queryOptions({
-      queryKey: [...shareQueries.key.detail(), id] as const,
-      queryFn: () => getSharedChat({ data: { id } })
+      queryKey: [...shareQueries.key.detail(), input] as const,
+      queryFn: () => getSharedChat({ data: input })
     })
 };

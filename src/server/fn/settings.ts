@@ -136,10 +136,10 @@ export const settingsQueries = {
       queryKey: [...settingsQueries.key.list()] as const,
       queryFn: () => listSettings()
     }),
-  get: (key: string) =>
+  get: (input: { key: string }) =>
     queryOptions({
-      queryKey: [...settingsQueries.key.get(), key] as const,
-      queryFn: () => getSetting({ data: { key } })
+      queryKey: [...settingsQueries.key.get(), input] as const,
+      queryFn: () => getSetting({ data: input })
     }),
   defaults: () =>
     queryOptions({

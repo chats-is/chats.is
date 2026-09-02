@@ -146,9 +146,9 @@ export const messageQueries = {
   key: {
     list: () => ['message', 'list'] as const
   },
-  list: (chatId: string) =>
+  list: (input: { chatId: string }) =>
     queryOptions({
-      queryKey: [...messageQueries.key.list(), chatId] as const,
-      queryFn: () => listMessages({ data: { chatId } })
+      queryKey: [...messageQueries.key.list(), input] as const,
+      queryFn: () => listMessages({ data: input })
     })
 };

@@ -333,14 +333,14 @@ export const providerQueries = {
       queryFn: () => listEnabledProviders()
     }),
   /** Reaches the provider's own API, so it is only fetched on demand. */
-  remoteModels: (providerId: string) =>
+  remoteModels: (input: { providerId: string }) =>
     queryOptions({
-      queryKey: [...providerQueries.key.remoteModels(), providerId] as const,
-      queryFn: () => fetchProviderModels({ data: { providerId } })
+      queryKey: [...providerQueries.key.remoteModels(), input] as const,
+      queryFn: () => fetchProviderModels({ data: input })
     }),
-  compatible: (modelId: string) =>
+  compatible: (input: { modelId: string }) =>
     queryOptions({
-      queryKey: [...providerQueries.key.compatible(), modelId] as const,
-      queryFn: () => compatibleProviders({ data: { modelId } })
+      queryKey: [...providerQueries.key.compatible(), input] as const,
+      queryFn: () => compatibleProviders({ data: input })
     })
 };
