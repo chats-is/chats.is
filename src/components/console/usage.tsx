@@ -26,6 +26,12 @@ import {
 import { UsageQuantity } from '@/components/usage-quantity';
 import { UsageUnitPrice } from '@/components/usage-unit-price';
 
+const dayRangeLabels = {
+  '1': 'Today',
+  '7': 'Last 7 days',
+  '30': 'Last 30 days'
+};
+
 export default function UsagePage() {
   const queryClient = useQueryClient();
   const [days, setDays] = useState(7);
@@ -49,6 +55,7 @@ export default function UsagePage() {
           <h2 className="text-sm font-medium">Stats</h2>
           <div className="flex items-center gap-2">
             <Select
+              items={dayRangeLabels}
               value={String(days)}
               onValueChange={onSelect(v => setDays(Number(v)))}
             >
@@ -142,6 +149,20 @@ function UsageLog({ days }: { days: number }) {
     return Math.max(1, Math.ceil(data.total / pageSize));
   }, [data]);
 
+  // Base UI's trigger renders the value, not the selected item's content, so
+  // the value-to-label mapping is handed to it.
+  const modelFilterLabels = useMemo(
+    () => ({
+      __all__: 'All models',
+      ...Object.fromEntries((models ?? []).map(m => [m.modelId, m.modelId]))
+    }),
+    [models]
+  );
+  const capabilityFilterLabels = {
+    __all__: 'All capabilities',
+    ...Object.fromEntries(CAPABILITIES.map(c => [c.value, c.label]))
+  };
+
   return (
     <Card className="py-0">
       <CardContent className="p-4">
@@ -157,6 +178,7 @@ function UsageLog({ days }: { days: number }) {
             className="w-64"
           />
           <Select
+            items={modelFilterLabels}
             value={modelId || '__all__'}
             onValueChange={onSelect(v => {
               setModelId(v === '__all__' ? '' : v);
@@ -176,6 +198,7 @@ function UsageLog({ days }: { days: number }) {
             </SelectContent>
           </Select>
           <Select
+            items={capabilityFilterLabels}
             value={capability || '__all__'}
             onValueChange={onSelect(v => {
               setCapability(v === '__all__' ? '' : v);

@@ -66,6 +66,11 @@ type ProviderBindingForm = {
   isEnabled: boolean;
 };
 
+const capabilityFilterLabels = {
+  all: 'All Capabilities',
+  ...Object.fromEntries(CAPABILITIES.map(c => [c.value, c.label]))
+};
+
 function ProviderBindingRow({
   binding,
   index,
@@ -97,10 +102,17 @@ function ProviderBindingRow({
   const selectedName =
     allProviders?.find(p => p.id === binding.providerId)?.name ??
     binding.providerId;
+  // Base UI's trigger renders the value, not the selected item's content, so
+  // the value-to-label mapping is handed to it.
+  const providerLabels = {
+    ...Object.fromEntries((allProviders ?? []).map(p => [p.id, p.name])),
+    ...Object.fromEntries(options.map(p => [p.id, p.name]))
+  };
 
   return (
     <div className="flex items-center gap-2 rounded-md border p-2">
       <Select
+        items={providerLabels}
         // `null`, not undefined: an empty binding is a select with nothing
         // chosen, not one that owns its own value — see settings/models.
         value={binding.providerId || null}
@@ -452,6 +464,7 @@ export default function ModelsPage() {
             />
           </div>
           <Select
+            items={capabilityFilterLabels}
             value={filterCapability}
             onValueChange={onSelect(setFilterCapability)}
           >

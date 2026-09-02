@@ -22,6 +22,12 @@ import {
   UsageModuleSkeleton
 } from '@/components/usage-module';
 
+const dayRangeLabels = {
+  '1': 'Today',
+  '7': 'Last 7 days',
+  '30': 'Last 30 days'
+};
+
 export function SettingsUsage() {
   const queryClient = useQueryClient();
   const [days, setDays] = useState(7);
@@ -95,6 +101,7 @@ export function SettingsUsage() {
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">Stats</h2>
           <Select
+            items={dayRangeLabels}
             value={String(days)}
             onValueChange={onSelect(v => setDays(Number(v)))}
           >

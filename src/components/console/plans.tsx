@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -147,6 +147,12 @@ export default function PlansPage() {
 
   const isPending = create.isPending || update.isPending;
 
+  // Base UI's trigger renders the value, not the selected item's content.
+  const quotaLabels = useMemo(
+    () => Object.fromEntries((quotaOptions ?? []).map(q => [q.id, q.name])),
+    [quotaOptions]
+  );
+
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -219,6 +225,7 @@ export default function PlansPage() {
                 <div className="space-y-2">
                   <Label>Quota</Label>
                   <Select
+                    items={quotaLabels}
                     value={form.quotaId}
                     onValueChange={onSelect(v =>
                       setForm({ ...form, quotaId: v })

@@ -112,6 +112,11 @@ const fmt = (v: string | null | undefined): string | null => {
  *
  * Token rates are per 1M tokens; image/video/per-sec are per unit.
  */
+const capabilityFilterLabels = {
+  all: 'All Capabilities',
+  ...Object.fromEntries(CAPABILITIES.map(c => [c.value, c.label]))
+};
+
 function summarizePricing(
   capability: string,
   pricing:
@@ -398,6 +403,7 @@ export default function PricingPage() {
             />
           </div>
           <Select
+            items={capabilityFilterLabels}
             value={filterCapability}
             onValueChange={onSelect(setFilterCapability)}
           >

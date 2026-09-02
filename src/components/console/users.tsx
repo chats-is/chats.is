@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -124,6 +124,21 @@ export default function UsersPage() {
       day: 'numeric'
     });
   };
+
+  // Base UI's trigger renders the value, not the selected item's content, so
+  // the value-to-label mapping is handed to it.
+  const quotaLabels = useMemo(
+    () => ({
+      [QUOTA_NONE]: 'None',
+      ...Object.fromEntries(
+        (quotaOptions ?? []).map(q => [
+          q.id,
+          q.name + (q.isUnlimited ? ' (∞)' : '')
+        ])
+      )
+    }),
+    [quotaOptions]
+  );
 
   if (isLoading) {
     return (
@@ -282,6 +297,7 @@ export default function UsersPage() {
                 <td className="p-3 text-center">
                   <div className="flex justify-center">
                     <Select
+                      items={quotaLabels}
                       value={user.quota?.id ?? QUOTA_NONE}
                       disabled={
                         updatingQuotaUserId === user.id || !quotaOptions?.length

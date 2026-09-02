@@ -37,6 +37,12 @@ const sourceLabel: Record<string, string> = {
   none: 'No quota'
 };
 
+const dayRangeLabels = {
+  '1': 'Today',
+  '7': 'Last 7 days',
+  '30': 'Last 30 days'
+};
+
 export default function UserDetail({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
   const [days, setDays] = useState(7);
@@ -209,6 +215,7 @@ export default function UserDetail({ userId }: { userId: string }) {
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">Stats</h2>
           <Select
+            items={dayRangeLabels}
             value={String(days)}
             onValueChange={onSelect(v => setDays(Number(v)))}
           >
@@ -267,12 +274,27 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
     return Math.max(1, Math.ceil(data.total / pageSize));
   }, [data]);
 
+  // Base UI's trigger renders the value, not the selected item's content, so
+  // the value-to-label mapping is handed to it.
+  const modelFilterLabels = useMemo(
+    () => ({
+      __all__: 'All models',
+      ...Object.fromEntries((userModels ?? []).map(m => [m, m]))
+    }),
+    [userModels]
+  );
+  const capabilityFilterLabels = {
+    __all__: 'All capabilities',
+    ...Object.fromEntries(CAPABILITIES.map(c => [c.value, c.label]))
+  };
+
   return (
     <Card className="py-0">
       <CardContent className="p-4">
         <div className="mb-3 text-base font-medium">Logs</div>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
+            items={modelFilterLabels}
             value={modelId || '__all__'}
             onValueChange={onSelect(v => {
               setModelId(v === '__all__' ? '' : v);
@@ -292,6 +314,7 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
             </SelectContent>
           </Select>
           <Select
+            items={capabilityFilterLabels}
             value={capability || '__all__'}
             onValueChange={onSelect(v => {
               setCapability(v === '__all__' ? '' : v);
