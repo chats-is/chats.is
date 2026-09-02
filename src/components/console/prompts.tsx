@@ -7,6 +7,7 @@ import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/fn/model';
 import {
   adminCreatePrompt,
@@ -107,7 +108,7 @@ export default function PromptsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null);
   const [deletePrompt, setDeletePrompt] = useState<AdminPrompt | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSearchFilter('q', '');
   const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
 
   const queryClient = useQueryClient();

@@ -6,6 +6,7 @@ import { RefreshCw } from 'lucide-react';
 import { CAPABILITIES } from '@/lib/constant';
 import { onSelect } from '@/lib/select';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/fn/model';
 import { usageQueries } from '@/server/fn/usage';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,7 @@ const dayRangeLabels = {
 
 export default function UsagePage() {
   const queryClient = useQueryClient();
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useSearchFilter('days', 7);
   const [refreshing, setRefreshing] = useState(false);
   const from = useMemo(() => reportWindowStart(days), [days]);
   const { data, isLoading } = useQuery(usageQueries.adminList({ from }));
@@ -116,10 +117,10 @@ export default function UsagePage() {
 }
 
 function UsageLog({ days }: { days: number }) {
-  const [userQuery, setUserQuery] = useState('');
-  const [modelId, setModelId] = useState<string>('');
-  const [capability, setCapability] = useState<string>('');
-  const [page, setPage] = useState(1);
+  const [userQuery, setUserQuery] = useSearchFilter('user', '');
+  const [modelId, setModelId] = useSearchFilter('model', '');
+  const [capability, setCapability] = useSearchFilter('capability', '');
+  const [page, setPage] = useSearchFilter('page', 1);
   const pageSize = 50;
 
   // Reset to page 1 when the window changes.

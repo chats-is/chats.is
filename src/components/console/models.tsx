@@ -16,6 +16,7 @@ import { type ModelCapability } from '@/types';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   createModel,
   deleteModel,
@@ -178,8 +179,11 @@ export default function ModelsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [filterCapability, setFilterCapability] = useState<string>('all');
-  const [search, setSearch] = useState('');
+  const [filterCapability, setFilterCapability] = useSearchFilter(
+    'capability',
+    'all'
+  );
+  const [search, setSearch] = useSearchFilter('q', '');
 
   const queryClient = useQueryClient();
   const { data: models, isLoading } = useQuery(modelQueries.list());

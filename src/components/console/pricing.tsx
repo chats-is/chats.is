@@ -7,6 +7,7 @@ import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';
 import { formatUsd } from '@/lib/utils';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   previewPricingSync,
   pricingQueries,
@@ -181,8 +182,11 @@ function summarizePricing(
 
 export default function PricingPage() {
   const queryClient = useQueryClient();
-  const [filterCapability, setFilterCapability] = useState<string>('all');
-  const [search, setSearch] = useState('');
+  const [filterCapability, setFilterCapability] = useSearchFilter(
+    'capability',
+    'all'
+  );
+  const [search, setSearch] = useSearchFilter('q', '');
   const [edit, setEdit] = useState<EditState | null>(null);
 
   // Source selection — held in the popover before opening preview.

@@ -6,6 +6,7 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { CAPABILITIES } from '@/lib/constant';
 import { onSelect } from '@/lib/select';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import { quotaQueries } from '@/server/fn/quota';
 import { usageQueries } from '@/server/fn/usage';
 import { userQueries } from '@/server/fn/user';
@@ -45,7 +46,7 @@ const dayRangeLabels = {
 
 export default function UserDetail({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useSearchFilter('days', 7);
   const [refreshing, setRefreshing] = useState(false);
 
   const from = useMemo(() => reportWindowStart(days), [days]);
@@ -243,9 +244,9 @@ export default function UserDetail({ userId }: { userId: string }) {
 }
 
 function UserLogs({ userId, days }: { userId: string; days: number }) {
-  const [modelId, setModelId] = useState<string>('');
-  const [capability, setCapability] = useState<string>('');
-  const [page, setPage] = useState(1);
+  const [modelId, setModelId] = useSearchFilter('model', '');
+  const [capability, setCapability] = useSearchFilter('capability', '');
+  const [page, setPage] = useSearchFilter('page', 1);
   const pageSize = 50;
 
   useEffect(() => {
