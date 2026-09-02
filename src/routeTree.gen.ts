@@ -9,12 +9,193 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChatRouteImport } from './routes/_chat'
+import { Route as ArtifactPreviewFrameRouteImport } from './routes/artifact-preview-frame'
+import { Route as ConsoleRouteImport } from './routes/console'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ChatIndexRouteImport } from './routes/_chat/index'
+import { Route as ChatLibraryRouteImport } from './routes/_chat/library'
+import { Route as ChatPromptsRouteImport } from './routes/_chat/prompts'
+import { Route as ChatSettingsRouteImport } from './routes/_chat/settings'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiSpeechRouteImport } from './routes/api/speech'
+import { Route as ConsoleIndexRouteImport } from './routes/console/index'
+import { Route as ConsoleModelsRouteImport } from './routes/console/models'
+import { Route as ConsolePlansRouteImport } from './routes/console/plans'
+import { Route as ConsolePricingRouteImport } from './routes/console/pricing'
+import { Route as ConsolePromptsRouteImport } from './routes/console/prompts'
+import { Route as ConsoleProvidersRouteImport } from './routes/console/providers'
+import { Route as ConsoleQuotasRouteImport } from './routes/console/quotas'
+import { Route as ConsoleSettingsRouteImport } from './routes/console/settings'
+import { Route as ConsoleUsageRouteImport } from './routes/console/usage'
+import { Route as ShareIdRouteImport } from './routes/share/$id'
+import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
+import { Route as ChatSettingsIndexRouteImport } from './routes/_chat/settings/index'
+import { Route as ChatSettingsGeneralRouteImport } from './routes/_chat/settings/general'
+import { Route as ChatSettingsPromptsRouteImport } from './routes/_chat/settings/prompts'
+import { Route as ChatSettingsSharedLinksRouteImport } from './routes/_chat/settings/shared-links'
+import { Route as ChatSettingsSpeechRouteImport } from './routes/_chat/settings/speech'
+import { Route as ChatSettingsUsageRouteImport } from './routes/_chat/settings/usage'
+import { Route as ApiArtifactsPreviewRouteImport } from './routes/api/artifacts/preview'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiFilesUploadRouteImport } from './routes/api/files/upload'
+import { Route as ConsoleSettingsIndexRouteImport } from './routes/console/settings/index'
+import { Route as ConsoleSettingsGeneralRouteImport } from './routes/console/settings/general'
+import { Route as ConsoleSettingsModelsRouteImport } from './routes/console/settings/models'
+import { Route as ConsoleSettingsPromptsRouteImport } from './routes/console/settings/prompts'
+import { Route as ConsoleSettingsQuotaRouteImport } from './routes/console/settings/quota'
+import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users/index'
+import { Route as ConsoleUsersUserIdRouteImport } from './routes/console/users/$userId'
 
-const IndexRoute = IndexRouteImport.update({
+const ChatRoute = ChatRouteImport.update({
+  id: '/_chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArtifactPreviewFrameRoute = ArtifactPreviewFrameRouteImport.update({
+  id: '/artifact-preview-frame',
+  path: '/artifact-preview-frame',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsoleRoute = ConsoleRouteImport.update({
+  id: '/console',
+  path: '/console',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatLibraryRoute = ChatLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatPromptsRoute = ChatPromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatSettingsRoute = ChatSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFilesRoute = ApiFilesRouteImport.update({
+  id: '/api/files',
+  path: '/api/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSpeechRoute = ApiSpeechRouteImport.update({
+  id: '/api/speech',
+  path: '/api/speech',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsoleIndexRoute = ConsoleIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleModelsRoute = ConsoleModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsolePlansRoute = ConsolePlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsolePricingRoute = ConsolePricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsolePromptsRoute = ConsolePromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleProvidersRoute = ConsoleProvidersRouteImport.update({
+  id: '/providers',
+  path: '/providers',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleQuotasRoute = ConsoleQuotasRouteImport.update({
+  id: '/quotas',
+  path: '/quotas',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleSettingsRoute = ConsoleSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleUsageRoute = ConsoleUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ShareIdRoute = ShareIdRouteImport.update({
+  id: '/share/$id',
+  path: '/share/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatChatChatIdRoute = ChatChatChatIdRouteImport.update({
+  id: '/chat/$chatId',
+  path: '/chat/$chatId',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatSettingsIndexRoute = ChatSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ChatSettingsGeneralRoute = ChatSettingsGeneralRouteImport.update({
+  id: '/general',
+  path: '/general',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ChatSettingsPromptsRoute = ChatSettingsPromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ChatSettingsSharedLinksRoute = ChatSettingsSharedLinksRouteImport.update({
+  id: '/shared-links',
+  path: '/shared-links',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ChatSettingsSpeechRoute = ChatSettingsSpeechRouteImport.update({
+  id: '/speech',
+  path: '/speech',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ChatSettingsUsageRoute = ChatSettingsUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ApiArtifactsPreviewRoute = ApiArtifactsPreviewRouteImport.update({
+  id: '/api/artifacts/preview',
+  path: '/api/artifacts/preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -22,40 +203,511 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFilesUploadRoute = ApiFilesUploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => ApiFilesRoute,
+} as any)
+const ConsoleSettingsIndexRoute = ConsoleSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleSettingsRoute,
+} as any)
+const ConsoleSettingsGeneralRoute = ConsoleSettingsGeneralRouteImport.update({
+  id: '/general',
+  path: '/general',
+  getParentRoute: () => ConsoleSettingsRoute,
+} as any)
+const ConsoleSettingsModelsRoute = ConsoleSettingsModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => ConsoleSettingsRoute,
+} as any)
+const ConsoleSettingsPromptsRoute = ConsoleSettingsPromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => ConsoleSettingsRoute,
+} as any)
+const ConsoleSettingsQuotaRoute = ConsoleSettingsQuotaRouteImport.update({
+  id: '/quota',
+  path: '/quota',
+  getParentRoute: () => ConsoleSettingsRoute,
+} as any)
+const ConsoleUsersIndexRoute = ConsoleUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleUsersUserIdRoute = ConsoleUsersUserIdRouteImport.update({
+  id: '/users/$userId',
+  path: '/users/$userId',
+  getParentRoute: () => ConsoleRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof ChatIndexRoute
+  '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
+  '/console': typeof ConsoleRouteWithChildren
+  '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/library': typeof ChatLibraryRoute
+  '/prompts': typeof ChatPromptsRoute
+  '/settings': typeof ChatSettingsRouteWithChildren
+  '/api/chat': typeof ApiChatRoute
+  '/api/files': typeof ApiFilesRouteWithChildren
+  '/api/speech': typeof ApiSpeechRoute
+  '/console/models': typeof ConsoleModelsRoute
+  '/console/plans': typeof ConsolePlansRoute
+  '/console/pricing': typeof ConsolePricingRoute
+  '/console/prompts': typeof ConsolePromptsRoute
+  '/console/providers': typeof ConsoleProvidersRoute
+  '/console/quotas': typeof ConsoleQuotasRoute
+  '/console/settings': typeof ConsoleSettingsRouteWithChildren
+  '/console/usage': typeof ConsoleUsageRoute
+  '/share/$id': typeof ShareIdRoute
+  '/console/': typeof ConsoleIndexRoute
+  '/chat/$chatId': typeof ChatChatChatIdRoute
+  '/settings/general': typeof ChatSettingsGeneralRoute
+  '/settings/prompts': typeof ChatSettingsPromptsRoute
+  '/settings/shared-links': typeof ChatSettingsSharedLinksRoute
+  '/settings/speech': typeof ChatSettingsSpeechRoute
+  '/settings/usage': typeof ChatSettingsUsageRoute
+  '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/upload': typeof ApiFilesUploadRoute
+  '/console/settings/general': typeof ConsoleSettingsGeneralRoute
+  '/console/settings/models': typeof ConsoleSettingsModelsRoute
+  '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
+  '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
+  '/console/users/$userId': typeof ConsoleUsersUserIdRoute
+  '/settings/': typeof ChatSettingsIndexRoute
+  '/console/settings/': typeof ConsoleSettingsIndexRoute
+  '/console/users/': typeof ConsoleUsersIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
+  '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/library': typeof ChatLibraryRoute
+  '/prompts': typeof ChatPromptsRoute
+  '/api/chat': typeof ApiChatRoute
+  '/api/files': typeof ApiFilesRouteWithChildren
+  '/api/speech': typeof ApiSpeechRoute
+  '/console/models': typeof ConsoleModelsRoute
+  '/console/plans': typeof ConsolePlansRoute
+  '/console/pricing': typeof ConsolePricingRoute
+  '/console/prompts': typeof ConsolePromptsRoute
+  '/console/providers': typeof ConsoleProvidersRoute
+  '/console/quotas': typeof ConsoleQuotasRoute
+  '/console/usage': typeof ConsoleUsageRoute
+  '/share/$id': typeof ShareIdRoute
+  '/': typeof ChatIndexRoute
+  '/console': typeof ConsoleIndexRoute
+  '/chat/$chatId': typeof ChatChatChatIdRoute
+  '/settings/general': typeof ChatSettingsGeneralRoute
+  '/settings/prompts': typeof ChatSettingsPromptsRoute
+  '/settings/shared-links': typeof ChatSettingsSharedLinksRoute
+  '/settings/speech': typeof ChatSettingsSpeechRoute
+  '/settings/usage': typeof ChatSettingsUsageRoute
+  '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/upload': typeof ApiFilesUploadRoute
+  '/console/settings/general': typeof ConsoleSettingsGeneralRoute
+  '/console/settings/models': typeof ConsoleSettingsModelsRoute
+  '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
+  '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
+  '/console/users/$userId': typeof ConsoleUsersUserIdRoute
+  '/settings': typeof ChatSettingsIndexRoute
+  '/console/settings': typeof ConsoleSettingsIndexRoute
+  '/console/users': typeof ConsoleUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_chat': typeof ChatRouteWithChildren
+  '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
+  '/console': typeof ConsoleRouteWithChildren
+  '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/_chat/library': typeof ChatLibraryRoute
+  '/_chat/prompts': typeof ChatPromptsRoute
+  '/_chat/settings': typeof ChatSettingsRouteWithChildren
+  '/api/chat': typeof ApiChatRoute
+  '/api/files': typeof ApiFilesRouteWithChildren
+  '/api/speech': typeof ApiSpeechRoute
+  '/console/models': typeof ConsoleModelsRoute
+  '/console/plans': typeof ConsolePlansRoute
+  '/console/pricing': typeof ConsolePricingRoute
+  '/console/prompts': typeof ConsolePromptsRoute
+  '/console/providers': typeof ConsoleProvidersRoute
+  '/console/quotas': typeof ConsoleQuotasRoute
+  '/console/settings': typeof ConsoleSettingsRouteWithChildren
+  '/console/usage': typeof ConsoleUsageRoute
+  '/share/$id': typeof ShareIdRoute
+  '/_chat/': typeof ChatIndexRoute
+  '/console/': typeof ConsoleIndexRoute
+  '/_chat/chat/$chatId': typeof ChatChatChatIdRoute
+  '/_chat/settings/general': typeof ChatSettingsGeneralRoute
+  '/_chat/settings/prompts': typeof ChatSettingsPromptsRoute
+  '/_chat/settings/shared-links': typeof ChatSettingsSharedLinksRoute
+  '/_chat/settings/speech': typeof ChatSettingsSpeechRoute
+  '/_chat/settings/usage': typeof ChatSettingsUsageRoute
+  '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/upload': typeof ApiFilesUploadRoute
+  '/console/settings/general': typeof ConsoleSettingsGeneralRoute
+  '/console/settings/models': typeof ConsoleSettingsModelsRoute
+  '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
+  '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
+  '/console/users/$userId': typeof ConsoleUsersUserIdRoute
+  '/_chat/settings/': typeof ChatSettingsIndexRoute
+  '/console/settings/': typeof ConsoleSettingsIndexRoute
+  '/console/users/': typeof ConsoleUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/artifact-preview-frame'
+    | '/console'
+    | '/login'
+    | '/privacy'
+    | '/library'
+    | '/prompts'
+    | '/settings'
+    | '/api/chat'
+    | '/api/files'
+    | '/api/speech'
+    | '/console/models'
+    | '/console/plans'
+    | '/console/pricing'
+    | '/console/prompts'
+    | '/console/providers'
+    | '/console/quotas'
+    | '/console/settings'
+    | '/console/usage'
+    | '/share/$id'
+    | '/console/'
+    | '/chat/$chatId'
+    | '/settings/general'
+    | '/settings/prompts'
+    | '/settings/shared-links'
+    | '/settings/speech'
+    | '/settings/usage'
+    | '/api/artifacts/preview'
+    | '/api/auth/$'
+    | '/api/files/upload'
+    | '/console/settings/general'
+    | '/console/settings/models'
+    | '/console/settings/prompts'
+    | '/console/settings/quota'
+    | '/console/users/$userId'
+    | '/settings/'
+    | '/console/settings/'
+    | '/console/users/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/auth/$'
-  id: '__root__' | '/' | '/api/auth/$'
+  to:
+    | '/artifact-preview-frame'
+    | '/login'
+    | '/privacy'
+    | '/library'
+    | '/prompts'
+    | '/api/chat'
+    | '/api/files'
+    | '/api/speech'
+    | '/console/models'
+    | '/console/plans'
+    | '/console/pricing'
+    | '/console/prompts'
+    | '/console/providers'
+    | '/console/quotas'
+    | '/console/usage'
+    | '/share/$id'
+    | '/'
+    | '/console'
+    | '/chat/$chatId'
+    | '/settings/general'
+    | '/settings/prompts'
+    | '/settings/shared-links'
+    | '/settings/speech'
+    | '/settings/usage'
+    | '/api/artifacts/preview'
+    | '/api/auth/$'
+    | '/api/files/upload'
+    | '/console/settings/general'
+    | '/console/settings/models'
+    | '/console/settings/prompts'
+    | '/console/settings/quota'
+    | '/console/users/$userId'
+    | '/settings'
+    | '/console/settings'
+    | '/console/users'
+  id:
+    | '__root__'
+    | '/_chat'
+    | '/artifact-preview-frame'
+    | '/console'
+    | '/login'
+    | '/privacy'
+    | '/_chat/library'
+    | '/_chat/prompts'
+    | '/_chat/settings'
+    | '/api/chat'
+    | '/api/files'
+    | '/api/speech'
+    | '/console/models'
+    | '/console/plans'
+    | '/console/pricing'
+    | '/console/prompts'
+    | '/console/providers'
+    | '/console/quotas'
+    | '/console/settings'
+    | '/console/usage'
+    | '/share/$id'
+    | '/_chat/'
+    | '/console/'
+    | '/_chat/chat/$chatId'
+    | '/_chat/settings/general'
+    | '/_chat/settings/prompts'
+    | '/_chat/settings/shared-links'
+    | '/_chat/settings/speech'
+    | '/_chat/settings/usage'
+    | '/api/artifacts/preview'
+    | '/api/auth/$'
+    | '/api/files/upload'
+    | '/console/settings/general'
+    | '/console/settings/models'
+    | '/console/settings/prompts'
+    | '/console/settings/quota'
+    | '/console/users/$userId'
+    | '/_chat/settings/'
+    | '/console/settings/'
+    | '/console/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  ChatRoute: typeof ChatRouteWithChildren
+  ArtifactPreviewFrameRoute: typeof ArtifactPreviewFrameRoute
+  ConsoleRoute: typeof ConsoleRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ApiChatRoute: typeof ApiChatRoute
+  ApiFilesRoute: typeof ApiFilesRouteWithChildren
+  ApiSpeechRoute: typeof ApiSpeechRoute
+  ShareIdRoute: typeof ShareIdRoute
+  ApiArtifactsPreviewRoute: typeof ApiArtifactsPreviewRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_chat': {
+      id: '/_chat'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artifact-preview-frame': {
+      id: '/artifact-preview-frame'
+      path: '/artifact-preview-frame'
+      fullPath: '/artifact-preview-frame'
+      preLoaderRoute: typeof ArtifactPreviewFrameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/console': {
+      id: '/console'
+      path: '/console'
+      fullPath: '/console'
+      preLoaderRoute: typeof ConsoleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_chat/': {
+      id: '/_chat/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof ChatIndexRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/_chat/library': {
+      id: '/_chat/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof ChatLibraryRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/_chat/prompts': {
+      id: '/_chat/prompts'
+      path: '/prompts'
+      fullPath: '/prompts'
+      preLoaderRoute: typeof ChatPromptsRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/_chat/settings': {
+      id: '/_chat/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof ChatSettingsRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/files': {
+      id: '/api/files'
+      path: '/api/files'
+      fullPath: '/api/files'
+      preLoaderRoute: typeof ApiFilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/speech': {
+      id: '/api/speech'
+      path: '/api/speech'
+      fullPath: '/api/speech'
+      preLoaderRoute: typeof ApiSpeechRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/console/': {
+      id: '/console/'
+      path: '/'
+      fullPath: '/console/'
+      preLoaderRoute: typeof ConsoleIndexRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/models': {
+      id: '/console/models'
+      path: '/models'
+      fullPath: '/console/models'
+      preLoaderRoute: typeof ConsoleModelsRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/plans': {
+      id: '/console/plans'
+      path: '/plans'
+      fullPath: '/console/plans'
+      preLoaderRoute: typeof ConsolePlansRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/pricing': {
+      id: '/console/pricing'
+      path: '/pricing'
+      fullPath: '/console/pricing'
+      preLoaderRoute: typeof ConsolePricingRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/prompts': {
+      id: '/console/prompts'
+      path: '/prompts'
+      fullPath: '/console/prompts'
+      preLoaderRoute: typeof ConsolePromptsRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/providers': {
+      id: '/console/providers'
+      path: '/providers'
+      fullPath: '/console/providers'
+      preLoaderRoute: typeof ConsoleProvidersRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/quotas': {
+      id: '/console/quotas'
+      path: '/quotas'
+      fullPath: '/console/quotas'
+      preLoaderRoute: typeof ConsoleQuotasRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/settings': {
+      id: '/console/settings'
+      path: '/settings'
+      fullPath: '/console/settings'
+      preLoaderRoute: typeof ConsoleSettingsRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/usage': {
+      id: '/console/usage'
+      path: '/usage'
+      fullPath: '/console/usage'
+      preLoaderRoute: typeof ConsoleUsageRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/share/$id': {
+      id: '/share/$id'
+      path: '/share/$id'
+      fullPath: '/share/$id'
+      preLoaderRoute: typeof ShareIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_chat/chat/$chatId': {
+      id: '/_chat/chat/$chatId'
+      path: '/chat/$chatId'
+      fullPath: '/chat/$chatId'
+      preLoaderRoute: typeof ChatChatChatIdRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/_chat/settings/': {
+      id: '/_chat/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof ChatSettingsIndexRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/general': {
+      id: '/_chat/settings/general'
+      path: '/general'
+      fullPath: '/settings/general'
+      preLoaderRoute: typeof ChatSettingsGeneralRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/prompts': {
+      id: '/_chat/settings/prompts'
+      path: '/prompts'
+      fullPath: '/settings/prompts'
+      preLoaderRoute: typeof ChatSettingsPromptsRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/shared-links': {
+      id: '/_chat/settings/shared-links'
+      path: '/shared-links'
+      fullPath: '/settings/shared-links'
+      preLoaderRoute: typeof ChatSettingsSharedLinksRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/speech': {
+      id: '/_chat/settings/speech'
+      path: '/speech'
+      fullPath: '/settings/speech'
+      preLoaderRoute: typeof ChatSettingsSpeechRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/usage': {
+      id: '/_chat/settings/usage'
+      path: '/usage'
+      fullPath: '/settings/usage'
+      preLoaderRoute: typeof ChatSettingsUsageRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/api/artifacts/preview': {
+      id: '/api/artifacts/preview'
+      path: '/api/artifacts/preview'
+      fullPath: '/api/artifacts/preview'
+      preLoaderRoute: typeof ApiArtifactsPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -65,11 +717,179 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/files/upload': {
+      id: '/api/files/upload'
+      path: '/upload'
+      fullPath: '/api/files/upload'
+      preLoaderRoute: typeof ApiFilesUploadRouteImport
+      parentRoute: typeof ApiFilesRoute
+    }
+    '/console/settings/': {
+      id: '/console/settings/'
+      path: '/'
+      fullPath: '/console/settings/'
+      preLoaderRoute: typeof ConsoleSettingsIndexRouteImport
+      parentRoute: typeof ConsoleSettingsRoute
+    }
+    '/console/settings/general': {
+      id: '/console/settings/general'
+      path: '/general'
+      fullPath: '/console/settings/general'
+      preLoaderRoute: typeof ConsoleSettingsGeneralRouteImport
+      parentRoute: typeof ConsoleSettingsRoute
+    }
+    '/console/settings/models': {
+      id: '/console/settings/models'
+      path: '/models'
+      fullPath: '/console/settings/models'
+      preLoaderRoute: typeof ConsoleSettingsModelsRouteImport
+      parentRoute: typeof ConsoleSettingsRoute
+    }
+    '/console/settings/prompts': {
+      id: '/console/settings/prompts'
+      path: '/prompts'
+      fullPath: '/console/settings/prompts'
+      preLoaderRoute: typeof ConsoleSettingsPromptsRouteImport
+      parentRoute: typeof ConsoleSettingsRoute
+    }
+    '/console/settings/quota': {
+      id: '/console/settings/quota'
+      path: '/quota'
+      fullPath: '/console/settings/quota'
+      preLoaderRoute: typeof ConsoleSettingsQuotaRouteImport
+      parentRoute: typeof ConsoleSettingsRoute
+    }
+    '/console/users/': {
+      id: '/console/users/'
+      path: '/users'
+      fullPath: '/console/users/'
+      preLoaderRoute: typeof ConsoleUsersIndexRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/users/$userId': {
+      id: '/console/users/$userId'
+      path: '/users/$userId'
+      fullPath: '/console/users/$userId'
+      preLoaderRoute: typeof ConsoleUsersUserIdRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
   }
 }
 
+interface ChatSettingsRouteChildren {
+  ChatSettingsGeneralRoute: typeof ChatSettingsGeneralRoute
+  ChatSettingsPromptsRoute: typeof ChatSettingsPromptsRoute
+  ChatSettingsSharedLinksRoute: typeof ChatSettingsSharedLinksRoute
+  ChatSettingsSpeechRoute: typeof ChatSettingsSpeechRoute
+  ChatSettingsUsageRoute: typeof ChatSettingsUsageRoute
+  ChatSettingsIndexRoute: typeof ChatSettingsIndexRoute
+}
+
+const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
+  ChatSettingsGeneralRoute: ChatSettingsGeneralRoute,
+  ChatSettingsPromptsRoute: ChatSettingsPromptsRoute,
+  ChatSettingsSharedLinksRoute: ChatSettingsSharedLinksRoute,
+  ChatSettingsSpeechRoute: ChatSettingsSpeechRoute,
+  ChatSettingsUsageRoute: ChatSettingsUsageRoute,
+  ChatSettingsIndexRoute: ChatSettingsIndexRoute,
+}
+
+const ChatSettingsRouteWithChildren = ChatSettingsRoute._addFileChildren(
+  ChatSettingsRouteChildren,
+)
+
+interface ChatRouteChildren {
+  ChatLibraryRoute: typeof ChatLibraryRoute
+  ChatPromptsRoute: typeof ChatPromptsRoute
+  ChatSettingsRoute: typeof ChatSettingsRouteWithChildren
+  ChatIndexRoute: typeof ChatIndexRoute
+  ChatChatChatIdRoute: typeof ChatChatChatIdRoute
+}
+
+const ChatRouteChildren: ChatRouteChildren = {
+  ChatLibraryRoute: ChatLibraryRoute,
+  ChatPromptsRoute: ChatPromptsRoute,
+  ChatSettingsRoute: ChatSettingsRouteWithChildren,
+  ChatIndexRoute: ChatIndexRoute,
+  ChatChatChatIdRoute: ChatChatChatIdRoute,
+}
+
+const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
+
+interface ConsoleSettingsRouteChildren {
+  ConsoleSettingsGeneralRoute: typeof ConsoleSettingsGeneralRoute
+  ConsoleSettingsModelsRoute: typeof ConsoleSettingsModelsRoute
+  ConsoleSettingsPromptsRoute: typeof ConsoleSettingsPromptsRoute
+  ConsoleSettingsQuotaRoute: typeof ConsoleSettingsQuotaRoute
+  ConsoleSettingsIndexRoute: typeof ConsoleSettingsIndexRoute
+}
+
+const ConsoleSettingsRouteChildren: ConsoleSettingsRouteChildren = {
+  ConsoleSettingsGeneralRoute: ConsoleSettingsGeneralRoute,
+  ConsoleSettingsModelsRoute: ConsoleSettingsModelsRoute,
+  ConsoleSettingsPromptsRoute: ConsoleSettingsPromptsRoute,
+  ConsoleSettingsQuotaRoute: ConsoleSettingsQuotaRoute,
+  ConsoleSettingsIndexRoute: ConsoleSettingsIndexRoute,
+}
+
+const ConsoleSettingsRouteWithChildren = ConsoleSettingsRoute._addFileChildren(
+  ConsoleSettingsRouteChildren,
+)
+
+interface ConsoleRouteChildren {
+  ConsoleModelsRoute: typeof ConsoleModelsRoute
+  ConsolePlansRoute: typeof ConsolePlansRoute
+  ConsolePricingRoute: typeof ConsolePricingRoute
+  ConsolePromptsRoute: typeof ConsolePromptsRoute
+  ConsoleProvidersRoute: typeof ConsoleProvidersRoute
+  ConsoleQuotasRoute: typeof ConsoleQuotasRoute
+  ConsoleSettingsRoute: typeof ConsoleSettingsRouteWithChildren
+  ConsoleUsageRoute: typeof ConsoleUsageRoute
+  ConsoleIndexRoute: typeof ConsoleIndexRoute
+  ConsoleUsersUserIdRoute: typeof ConsoleUsersUserIdRoute
+  ConsoleUsersIndexRoute: typeof ConsoleUsersIndexRoute
+}
+
+const ConsoleRouteChildren: ConsoleRouteChildren = {
+  ConsoleModelsRoute: ConsoleModelsRoute,
+  ConsolePlansRoute: ConsolePlansRoute,
+  ConsolePricingRoute: ConsolePricingRoute,
+  ConsolePromptsRoute: ConsolePromptsRoute,
+  ConsoleProvidersRoute: ConsoleProvidersRoute,
+  ConsoleQuotasRoute: ConsoleQuotasRoute,
+  ConsoleSettingsRoute: ConsoleSettingsRouteWithChildren,
+  ConsoleUsageRoute: ConsoleUsageRoute,
+  ConsoleIndexRoute: ConsoleIndexRoute,
+  ConsoleUsersUserIdRoute: ConsoleUsersUserIdRoute,
+  ConsoleUsersIndexRoute: ConsoleUsersIndexRoute,
+}
+
+const ConsoleRouteWithChildren =
+  ConsoleRoute._addFileChildren(ConsoleRouteChildren)
+
+interface ApiFilesRouteChildren {
+  ApiFilesUploadRoute: typeof ApiFilesUploadRoute
+}
+
+const ApiFilesRouteChildren: ApiFilesRouteChildren = {
+  ApiFilesUploadRoute: ApiFilesUploadRoute,
+}
+
+const ApiFilesRouteWithChildren = ApiFilesRoute._addFileChildren(
+  ApiFilesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  ChatRoute: ChatRouteWithChildren,
+  ArtifactPreviewFrameRoute: ArtifactPreviewFrameRoute,
+  ConsoleRoute: ConsoleRouteWithChildren,
+  LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
+  ApiChatRoute: ApiChatRoute,
+  ApiFilesRoute: ApiFilesRouteWithChildren,
+  ApiSpeechRoute: ApiSpeechRoute,
+  ShareIdRoute: ShareIdRoute,
+  ApiArtifactsPreviewRoute: ApiArtifactsPreviewRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

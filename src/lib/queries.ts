@@ -1,9 +1,9 @@
 import '@tanstack/react-start/server-only';
 
-import { cache } from 'react';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
 import type { ResolvedSource } from '@/types';
+import { perRequest } from '@/lib/request-cache';
 import { parseNumber } from '@/lib/utils';
 import { db } from '@/server/db';
 import {
@@ -39,7 +39,7 @@ const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
 // Internal Query Helpers
 // ============================================================================
 
-const getAllModels = cache(async (): Promise<Model[]> => {
+const getAllModels = perRequest('getAllModels', async (): Promise<Model[]> => {
   const result = await db.query.models.findMany({
     where: eq(models.isEnabled, true),
     with: {
@@ -92,7 +92,8 @@ const getAllModels = cache(async (): Promise<Model[]> => {
 // Model Queries
 // ============================================================================
 
-export const findModelByModelId = cache(
+export const findModelByModelId = perRequest(
+  'findModelByModelId',
   async (
     modelId: string,
     capability?: 'chat' | 'image' | 'video' | 'audio'
@@ -113,17 +114,20 @@ export const findModelByModelId = cache(
 
 /** System default quota id (setting `default.quotaId`). Applied to users
  *  with no plan and no override. `null` = unconfigured (free unlimited). */
-export const getDefaultQuotaId = cache(async (): Promise<string | null> => {
-  const values = await getSettings(['default.quotaId']);
-  return values['default.quotaId'];
-});
+export const getDefaultQuotaId = perRequest(
+  'getDefaultQuotaId',
+  async (): Promise<string | null> => {
+    const values = await getSettings(['default.quotaId']);
+    return values['default.quotaId'];
+  }
+);
 
 /**
  * Reading a message aloud runs on the same text-to-speech model the chat tool
  * uses — one selection, not two. `speech.enabled` stays its own switch: the
  * button can be turned off without touching how speech is generated.
  */
-export const getSpeechSettings = cache(async () => {
+export const getSpeechSettings = perRequest('getSpeechSettings', async () => {
   const values = await getSettings(['speech.enabled', 'default.tts.modelId']);
 
   return {
@@ -133,27 +137,30 @@ export const getSpeechSettings = cache(async () => {
 });
 
 /** Admin-configured default media models for the chat media tools. */
-export const getMediaDefaultModelIds = cache(async () => {
-  const values = await getSettings([
-    'default.image.modelId',
-    'default.image.editModelId',
-    'default.video.modelId',
-    'default.video.imageModelId',
-    'default.video.editModelId',
-    'default.tts.modelId',
-    'default.stt.modelId'
-  ]);
+export const getMediaDefaultModelIds = perRequest(
+  'getMediaDefaultModelIds',
+  async () => {
+    const values = await getSettings([
+      'default.image.modelId',
+      'default.image.editModelId',
+      'default.video.modelId',
+      'default.video.imageModelId',
+      'default.video.editModelId',
+      'default.tts.modelId',
+      'default.stt.modelId'
+    ]);
 
-  return {
-    imageModelId: values['default.image.modelId'],
-    imageEditModelId: values['default.image.editModelId'],
-    videoModelId: values['default.video.modelId'],
-    videoImageModelId: values['default.video.imageModelId'],
-    videoEditModelId: values['default.video.editModelId'],
-    ttsModelId: values['default.tts.modelId'],
-    sttModelId: values['default.stt.modelId']
-  };
-});
+    return {
+      imageModelId: values['default.image.modelId'],
+      imageEditModelId: values['default.image.editModelId'],
+      videoModelId: values['default.video.modelId'],
+      videoImageModelId: values['default.video.imageModelId'],
+      videoEditModelId: values['default.video.editModelId'],
+      ttsModelId: values['default.tts.modelId'],
+      sttModelId: values['default.stt.modelId']
+    };
+  }
+);
 
 const DEFAULT_TITLE_PROMPT = `
 - Generate a short title that summarizes the user's first message.
@@ -164,7 +171,7 @@ const DEFAULT_TITLE_PROMPT = `
 - Output only the title text, with nothing else (no preamble, punctuation, or explanation).
 `.trim();
 
-export const getTitleSettings = cache(async () => {
+export const getTitleSettings = perRequest('getTitleSettings', async () => {
   const values = await getSettings(['title.modelId']);
   const modelId = values['title.modelId'];
 
@@ -182,7 +189,8 @@ export const getTitleSettings = cache(async () => {
 //  System Prompt
 // ============================================================================
 
-export const getSystemPrompt = cache(
+export const getSystemPrompt = perRequest(
+  'getSystemPrompt',
   async (modelSystemPrompt?: string | null): Promise<string | null> => {
     // The model carries its own inline system prompt; fall back to the global
     // default chat system prompt setting when the model leaves it empty.
@@ -194,7 +202,8 @@ export const getSystemPrompt = cache(
   }
 );
 
-const getSettings = cache(
+const getSettings = perRequest(
+  'getSettings',
   async (keys: string[]): Promise<Record<string, string | null>> => {
     if (keys.length === 0) {
       return {};
@@ -242,7 +251,7 @@ const DEFAULT_APP_DESCRIPTION =
 // High-level Service Functions
 // ============================================================================
 
-export const getAppSettings = cache(async () => {
+export const getAppSettings = perRequest('getAppSettings', async () => {
   const values = await getSettings([
     'app.name',
     'app.subtitle',
@@ -312,7 +321,8 @@ export async function getSystemSettings() {
  * `assertModelAccess` and `assertQuota` back-to-back; cache dedupes the
  * user/plan join to one DB round-trip.
  */
-export const getUserResolvedQuota = cache(
+export const getUserResolvedQuota = perRequest(
+  'getUserResolvedQuota',
   async (
     userId: string
   ): Promise<{
