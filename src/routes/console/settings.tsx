@@ -1,8 +1,11 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
+import { settingsQueries } from '@/server/fn/settings';
 import { ConsoleSettingsNav } from '@/components/console/settings-nav';
 
 export const Route = createFileRoute('/console/settings')({
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(settingsQueries.list()),
   component: ConsoleSettingsLayout
 });
 
