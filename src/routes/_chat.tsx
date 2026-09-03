@@ -6,7 +6,6 @@ import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 import { sessionQueries } from '@/server/fn/auth';
 import { getSystemSettingsFn } from '@/server/fn/settings';
 import { userQueries } from '@/server/fn/user';
-import { RoutePending } from '@/components/route-pending';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Sidebar } from '@/components/sidebar';
 
@@ -17,6 +16,9 @@ import { Sidebar } from '@/components/sidebar';
  * so a signed-out visitor is sent to sign in instead of watching a page render
  * whose every read would then be refused.
  */
+// No pending component on this layout either. It wraps ChatUI, and an
+// invalidated match skips the usual grace period entirely — so "New chat",
+// which invalidates as it navigates, would blank the whole shell at once.
 export const Route = createFileRoute('/_chat')({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(
@@ -37,7 +39,6 @@ export const Route = createFileRoute('/_chat')({
     ]);
     return settings;
   },
-  pendingComponent: RoutePending,
   component: ChatLayout
 });
 
