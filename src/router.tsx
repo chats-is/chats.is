@@ -24,7 +24,12 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreload: 'intent'
+    defaultPreload: 'intent',
+    // A route's pending state is held back for a moment so a fast load does
+    // not flash a placeholder, but a whole second of nothing reads as a click
+    // that did not register. Long enough to skip the flash, short enough that
+    // a slower load says something is happening.
+    defaultPendingMs: 150
   });
 
   // Queries a loader resolved on the server travel with the page, so the

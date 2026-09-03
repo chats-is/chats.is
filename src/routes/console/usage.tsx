@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { modelQueries } from '@/server/fn/model';
+import { RoutePending } from '@/components/route-pending';
 import Usage from '@/components/console/usage';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
@@ -20,5 +21,6 @@ export const Route = createFileRoute('/console/usage')({
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(modelQueries.list({})),
   head: () => ({ meta: [{ title: 'Usage' }] }),
+  pendingComponent: RoutePending,
   component: Usage
 });

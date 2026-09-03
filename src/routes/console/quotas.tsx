@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { modelQueries } from '@/server/fn/model';
 import { quotaQueries } from '@/server/fn/quota';
+import { RoutePending } from '@/components/route-pending';
 import Quotas from '@/components/console/quotas';
 
 export const Route = createFileRoute('/console/quotas')({
@@ -11,5 +12,6 @@ export const Route = createFileRoute('/console/quotas')({
       context.queryClient.ensureQueryData(modelQueries.list({}))
     ]),
   head: () => ({ meta: [{ title: 'Quotas' }] }),
+  pendingComponent: RoutePending,
   component: Quotas
 });

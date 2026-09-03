@@ -3,9 +3,10 @@ import { ArtifactProvider } from '@/contexts/artifact-context';
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
-import { requireUser } from '@/server/fn/auth';
+import { sessionQueries } from '@/server/fn/auth';
 import { getSystemSettingsFn } from '@/server/fn/settings';
 import { userQueries } from '@/server/fn/user';
+import { RoutePending } from '@/components/route-pending';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Sidebar } from '@/components/sidebar';
 
@@ -17,8 +18,10 @@ import { Sidebar } from '@/components/sidebar';
  * whose every read would then be refused.
  */
 export const Route = createFileRoute('/_chat')({
-  beforeLoad: async ({ location }) => {
-    const user = await requireUser();
+  beforeLoad: async ({ context, location }) => {
+    const user = await context.queryClient.ensureQueryData(
+      sessionQueries.me()
+    );
     if (!user) {
       throw redirect({ to: '/login', search: { redirect: location.href } });
     }
@@ -34,6 +37,7 @@ export const Route = createFileRoute('/_chat')({
     ]);
     return settings;
   },
+  pendingComponent: RoutePending,
   component: ChatLayout
 });
 

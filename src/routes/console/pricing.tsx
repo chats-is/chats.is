@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { pricingQueries } from '@/server/fn/pricing';
+import { RoutePending } from '@/components/route-pending';
 import Pricing from '@/components/console/pricing';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
@@ -17,5 +18,6 @@ export const Route = createFileRoute('/console/pricing')({
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(pricingQueries.listWithModels({})),
   head: () => ({ meta: [{ title: 'Pricing' }] }),
+  pendingComponent: RoutePending,
   component: Pricing
 });

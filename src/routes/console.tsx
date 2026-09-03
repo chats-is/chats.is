@@ -3,9 +3,10 @@ import { createServerFn } from '@tanstack/react-start';
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
-import { requireUser } from '@/server/fn/auth';
+import { sessionQueries } from '@/server/fn/auth';
 import { getSystemSettingsFn } from '@/server/fn/settings';
 import { userQueries } from '@/server/fn/user';
+import { RoutePending } from '@/components/route-pending';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ConsoleHeader } from '@/components/console/header';
 import { Sidebar } from '@/components/console/sidebar';
@@ -22,8 +23,10 @@ const getAppName = createServerFn({ method: 'GET' }).handler(async () => {
  * now rather than when a token would have expired.
  */
 export const Route = createFileRoute('/console')({
-  beforeLoad: async () => {
-    const user = await requireUser();
+  beforeLoad: async ({ context }) => {
+    const user = await context.queryClient.ensureQueryData(
+      sessionQueries.me()
+    );
     if (!user?.admin) {
       throw redirect({ to: '/' });
     }
@@ -41,6 +44,7 @@ export const Route = createFileRoute('/console')({
   head: ({ loaderData }) => ({
     meta: [{ title: `${loaderData?.appName ?? 'chats.is'} Console` }]
   }),
+  pendingComponent: RoutePending,
   component: ConsoleLayout
 });
 

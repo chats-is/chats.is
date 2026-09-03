@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { modelQueries } from '@/server/fn/model';
 import { promptQueries } from '@/server/fn/prompt';
+import { RoutePending } from '@/components/route-pending';
 import Prompts from '@/components/console/prompts';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
@@ -20,5 +21,6 @@ export const Route = createFileRoute('/console/prompts')({
       context.queryClient.ensureQueryData(modelQueries.list({}))
     ]),
   head: () => ({ meta: [{ title: 'Prompts' }] }),
+  pendingComponent: RoutePending,
   component: Prompts
 });

@@ -6,6 +6,7 @@ import { getPromptStats } from '@/server/fn/prompt';
 import { listProviders } from '@/server/fn/provider';
 import { listSettings } from '@/server/fn/settings';
 import { getUserStats } from '@/server/fn/user';
+import { RoutePending } from '@/components/route-pending';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const Route = createFileRoute('/console/')({
@@ -22,6 +23,7 @@ export const Route = createFileRoute('/console/')({
     return { providers, models, promptStats, settings, userStats };
   },
   head: () => ({ meta: [{ title: 'Console' }] }),
+  pendingComponent: RoutePending,
   component: ConsoleHome
 });
 

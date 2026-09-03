@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { modelQueries } from '@/server/fn/model';
 import { providerQueries } from '@/server/fn/provider';
+import { RoutePending } from '@/components/route-pending';
 import Models from '@/components/console/models';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
@@ -21,5 +22,6 @@ export const Route = createFileRoute('/console/models')({
       context.queryClient.ensureQueryData(providerQueries.list())
     ]),
   head: () => ({ meta: [{ title: 'Models' }] }),
+  pendingComponent: RoutePending,
   component: Models
 });

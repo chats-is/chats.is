@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { convertToChatMessages } from '@/lib/utils';
 import { chatQueries } from '@/server/fn/chat';
+import { RoutePending } from '@/components/route-pending';
 import { ChatNotFound } from '@/components/chat-notfound';
 import { ChatUI } from '@/components/chat-ui';
 
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/_chat/chat/$chatId')({
   head: ({ loaderData }) => ({
     meta: loaderData?.title ? [{ title: loaderData.title }] : []
   }),
+  pendingComponent: RoutePending,
   component: ChatPage
 });
 

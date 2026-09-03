@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { convertToChatMessages } from '@/lib/utils';
 import { getSystemSettingsFn } from '@/server/fn/settings';
 import { getSharedChat } from '@/server/fn/share';
+import { RoutePending } from '@/components/route-pending';
 import { SharedChatView } from '@/components/shared-chat-view';
 
 /** A share link is public: no guard above it, and none needed. */
@@ -21,6 +22,7 @@ export const Route = createFileRoute('/share/$id')({
   head: ({ loaderData }) => ({
     meta: loaderData?.chat.title ? [{ title: loaderData.chat.title }] : []
   }),
+  pendingComponent: RoutePending,
   component: SharedChatPage
 });
 

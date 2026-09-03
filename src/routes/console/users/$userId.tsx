@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { quotaQueries } from '@/server/fn/quota';
 import { usageQueries } from '@/server/fn/usage';
+import { RoutePending } from '@/components/route-pending';
 import UserDetail from '@/components/console/user-detail';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
@@ -29,6 +30,7 @@ export const Route = createFileRoute('/console/users/$userId')({
       )
     ]),
   head: () => ({ meta: [{ title: 'User usage limits' }] }),
+  pendingComponent: RoutePending,
   component: UserDetailPage
 });
 
