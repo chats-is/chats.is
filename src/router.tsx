@@ -24,8 +24,7 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreload: 'intent',
-    defaultPreloadStaleTime: 0
+    defaultPreload: 'intent'
   });
 
   // Queries a loader resolved on the server travel with the page, so the
