@@ -16,12 +16,26 @@ const getSignInMethods = createServerFn({ method: 'GET' }).handler(
   })
 );
 
+/**
+ * Where to go once signed in. Only a path inside this app: a crafted link
+ * carrying a full URL — or a protocol-relative `//host` — would otherwise
+ * bounce someone off-site the moment they signed in. Anything else is
+ * dropped rather than rejected, so a bad link still reaches the form.
+ */
+const searchSchema = z.object({
+  redirect: z
+    .string()
+    .refine(to => /^\/(?![/\\])/.test(to))
+    .optional()
+    .catch(undefined)
+});
+
 export const Route = createFileRoute('/login')({
-  validateSearch: z.object({ redirect: z.string().optional() }),
-  beforeLoad: async ({ context }) => {
-    // Already signed in — there is nothing to do here.
+  validateSearch: searchSchema,
+  beforeLoad: async ({ context, search }) => {
+    // Already signed in — go where they were headed.
     if (await context.queryClient.ensureQueryData(sessionQueries.me())) {
-      throw redirect({ to: '/' });
+      throw redirect({ href: search.redirect ?? '/' });
     }
   },
   loader: () => getSignInMethods(),
@@ -32,11 +46,12 @@ export const Route = createFileRoute('/login')({
 
 function LoginPage() {
   const methods = Route.useLoaderData();
+  const { redirect: redirectTo } = Route.useSearch();
 
   return (
     <div className="flex size-full items-center justify-center">
       <div className="mx-6 w-full sm:w-[350px]">
-        <LoginForm {...methods} />
+        <LoginForm {...methods} redirectTo={redirectTo ?? '/'} />
       </div>
     </div>
   );

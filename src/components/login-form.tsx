@@ -6,12 +6,15 @@ import { GitHubLoginButton } from '@/components/github-login-button';
 import { GoogleLoginButton } from '@/components/google-login-button';
 
 interface LoginFormProps {
+  /** Where to land once signed in; the login route has already vetted it. */
+  redirectTo: string;
   emailEnabled: boolean;
   githubEnabled: boolean;
   googleEnabled: boolean;
 }
 
 export function LoginForm({
+  redirectTo,
   emailEnabled,
   githubEnabled,
   googleEnabled
@@ -28,7 +31,11 @@ export function LoginForm({
       </div>
 
       {emailEnabled && (
-        <EmailLoginForm isLoading={isLoading} setIsLoading={setIsLoading} />
+        <EmailLoginForm
+          redirectTo={redirectTo}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+        />
       )}
 
       {emailEnabled && hasOAuthProviders && (
@@ -48,12 +55,14 @@ export function LoginForm({
         <div className="flex flex-col space-y-4">
           {githubEnabled && (
             <GitHubLoginButton
+              redirectTo={redirectTo}
               isLoading={isLoading}
               setIsLoading={setIsLoading}
             />
           )}
           {googleEnabled && (
             <GoogleLoginButton
+              redirectTo={redirectTo}
               isLoading={isLoading}
               setIsLoading={setIsLoading}
             />

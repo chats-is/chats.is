@@ -24,10 +24,12 @@ export const requireUser = createServerFn({ method: 'GET' }).handler(async () =>
  * the cache never outlives the session it describes.
  */
 export const sessionQueries = {
+  /** Key prefixes, shared by the readers and by anything that
+   *  invalidates them, so the two can never drift apart. */
   key: { me: () => ['session', 'me'] as const },
   me: () =>
     queryOptions({
-      queryKey: ['session', 'me'] as const,
+      queryKey: sessionQueries.key.me(),
       queryFn: () => requireUser(),
       staleTime: 5 * 60 * 1000
     })

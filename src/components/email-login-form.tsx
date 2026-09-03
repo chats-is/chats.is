@@ -13,12 +13,15 @@ import {
 
 interface EmailLoginFormProps {
   className?: string;
+  /** Where to land once signed in; the login route has already vetted it. */
+  redirectTo: string;
   isLoading?: string | null;
   setIsLoading?: (provider: string | null) => void;
 }
 
 export function EmailLoginForm({
   className,
+  redirectTo,
   isLoading = null,
   setIsLoading
 }: EmailLoginFormProps) {
@@ -80,7 +83,7 @@ export function EmailLoginForm({
         return;
       }
 
-      window.location.href = '/';
+      window.location.href = redirectTo;
     } catch {
       setError('An error occurred. Please try again.');
       setIsLoading?.(null);

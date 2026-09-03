@@ -9,11 +9,14 @@ interface GoogleLoginButtonProps extends Omit<
   React.ComponentProps<typeof Button>,
   'children' | 'disabled' | 'onClick'
 > {
+  /** Where to land once signed in; the login route has already vetted it. */
+  redirectTo: string;
   isLoading?: string | null;
   setIsLoading?: (provider: string | null) => void;
 }
 
 export function GoogleLoginButton({
+  redirectTo,
   isLoading = null,
   setIsLoading,
   ...buttonProps
@@ -22,7 +25,7 @@ export function GoogleLoginButton({
 
   const handleSignIn = () => {
     setIsLoading?.('google');
-    authClient.signIn.social({ provider: 'google', callbackURL: '/' });
+    authClient.signIn.social({ provider: 'google', callbackURL: redirectTo });
   };
 
   return (
