@@ -314,18 +314,16 @@ export default function PricingPage() {
       const merged = new Map<string, PreviewRow>();
       for (const { source, rows } of results) {
         for (const r of rows) {
-          const entry =
-            merged.get(r.modelDbId) ??
-            ({
-              modelDbId: r.modelDbId,
-              modelId: r.modelId,
-              modelName: r.modelName,
-              current: r.current,
-              sources: {
-                'models.dev': { matched: false, remote: null },
-                'llm-metadata': { matched: false, remote: null }
-              }
-            } as PreviewRow);
+          const entry = merged.get(r.modelDbId) ?? {
+            modelDbId: r.modelDbId,
+            modelId: r.modelId,
+            modelName: r.modelName,
+            current: r.current,
+            sources: {
+              'models.dev': { matched: false, remote: null },
+              'llm-metadata': { matched: false, remote: null }
+            }
+          };
           entry.sources[source] = { matched: r.matched, remote: r.remote };
           // Keep latest current (they should be the same).
           entry.current = r.current;

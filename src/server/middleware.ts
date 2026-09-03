@@ -1,7 +1,5 @@
 import { createMiddleware } from '@tanstack/react-start';
 
-import type { User } from '@/types';
-
 import { getUser } from './session';
 
 /**
@@ -28,7 +26,7 @@ export const adminMiddleware = createMiddleware({ type: 'function' })
     if (!context.user.admin) {
       throw new Response('Admin access required', { status: 403 });
     }
-    return next({ context: { user: context.user as User } });
+    return next({ context: { user: context.user } });
   });
 
 /**

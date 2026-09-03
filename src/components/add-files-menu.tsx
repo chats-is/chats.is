@@ -117,7 +117,7 @@ export function AddFilesMenu({
       try {
         const uploaded = await Promise.all(
           files.map(async file => {
-            const result = await uploadFile(file, { userId: user!.id });
+            const result = await uploadFile(file, { userId: user.id });
             if (result && 'error' in result) {
               toast.error(result.error);
               return;

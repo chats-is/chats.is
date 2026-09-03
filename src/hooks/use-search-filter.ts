@@ -37,7 +37,7 @@ export function useSearchFilter<TKey extends keyof Filters>(
   fallback: Filters[TKey]
 ): [Filters[TKey], (value: Update<Filters[TKey]>) => void] {
   const navigate = useNavigate();
-  const search = useSearch({ strict: false }) as Partial<Filters>;
+  const search = useSearch({ strict: false });
 
   const set = useCallback(
     (next: Update<Filters[TKey]>) => {
@@ -45,10 +45,7 @@ export function useSearchFilter<TKey extends keyof Filters>(
         to: '.',
         search: (previous: Record<string, unknown>) => {
           const current = (previous[key] ?? fallback) as Filters[TKey];
-          const value =
-            typeof next === 'function'
-              ? (next as (p: Filters[TKey]) => Filters[TKey])(current)
-              : next;
+          const value = typeof next === 'function' ? next(current) : next;
 
           const rest = { ...previous };
           delete rest[key];
@@ -60,5 +57,8 @@ export function useSearchFilter<TKey extends keyof Filters>(
     [navigate, key, fallback]
   );
 
+  // The router hands back the union of every route's search, so narrowing it
+  // to this hook's own filter type needs the assertion — the rule reads it as
+  // redundant, but removing it does not type-check.
   return [(search[key] ?? fallback) as Filters[TKey], set];
 }

@@ -11,19 +11,19 @@ import {
   ListFoundationModelsCommand
 } from '@aws-sdk/client-bedrock';
 import { GoogleGenAI } from '@google/genai';
-import type { JSONValue } from 'ai';
 import {
   APICallError,
   type ImageModel,
+  type JSONValue,
   type LanguageModel,
   type SpeechModel,
   type TranscriptionModel
 } from 'ai';
 
-import type {
-  ProviderConfig,
-  ProviderType,
-  VertexServiceAccountKey
+import {
+  type ProviderConfig,
+  type ProviderType,
+  type VertexServiceAccountKey
 } from '@/types';
 
 import { BedrockModels, VertexAIModels } from './constant';

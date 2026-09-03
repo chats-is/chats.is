@@ -1,4 +1,4 @@
-import type { ChatUsage } from './pricing';
+import { type ChatUsage } from './pricing';
 
 /** Shared input fields for `recordXxxUsage` writers. */
 type RecordUsageBase = {

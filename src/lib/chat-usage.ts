@@ -1,4 +1,4 @@
-import type { ChatUsage } from '@/types';
+import { type ChatUsage } from '@/types';
 
 /**
  * The subset of the AI SDK's `LanguageModelUsage` (the `usage` object passed to

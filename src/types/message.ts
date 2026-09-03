@@ -2,9 +2,9 @@ import { type UIMessage } from 'ai';
 import { type InferSelectModel } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { messages } from '@/server/db/schema';
+import { type messages } from '@/server/db/schema';
 
-import type { ChatTools } from './chat-tools';
+import { type ChatTools } from './chat-tools';
 import {
   dataUIPartSchema,
   dynamicToolUIPartSchema,
@@ -16,7 +16,7 @@ import {
   textUIPartSchema,
   toolUIPartSchema
 } from './content-part';
-import type { CustomUIDataTypes } from './ui-data';
+import { type CustomUIDataTypes } from './ui-data';
 
 export type DBMessage = Omit<
   InferSelectModel<typeof messages>,

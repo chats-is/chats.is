@@ -1,4 +1,4 @@
-import type { ArtifactType } from '@/types';
+import { type ArtifactType } from '@/types';
 
 export type ArtifactKind = 'text' | 'code' | 'image' | 'sheet' | 'file';
 

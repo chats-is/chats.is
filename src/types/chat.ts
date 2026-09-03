@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import type { Artifact } from './artifact';
-import type { ChatMessage } from './message';
+import { type Artifact } from './artifact';
+import { type ChatMessage } from './message';
 
 export const chatTypeSchema = z.enum(['chat', 'audio', 'image', 'video']);
 export type ChatType = z.infer<typeof chatTypeSchema>;

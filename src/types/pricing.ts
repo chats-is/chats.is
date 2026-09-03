@@ -1,4 +1,4 @@
-import type { modelPricings } from '@/server/db/schema';
+import { type modelPricings } from '@/server/db/schema';
 
 /** A row in `model_pricing`. Inferred from the Drizzle schema. */
 export type PricingRecord = typeof modelPricings.$inferSelect;

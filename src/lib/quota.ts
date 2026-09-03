@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import type { ResolvedSource, UserQuota } from '@/types';
+import { type ResolvedSource, type UserQuota } from '@/types';
 import { getUserResolvedQuota, getUserUsageWindows } from '@/lib/queries';
 import { parseNumber } from '@/lib/utils';
 
@@ -67,10 +67,10 @@ export async function getUserQuota(userId: string): Promise<UserQuota> {
   return {
     ...base,
     ...(hasFiveHour && {
-      fiveHour: toEntry(capFiveHour!, data.fiveHour.used, data.fiveHour.resetAt)
+      fiveHour: toEntry(capFiveHour, data.fiveHour.used, data.fiveHour.resetAt)
     }),
     ...(hasSevenDay && {
-      sevenDay: toEntry(capSevenDay!, data.sevenDay.used, data.sevenDay.resetAt)
+      sevenDay: toEntry(capSevenDay, data.sevenDay.used, data.sevenDay.resetAt)
     })
   };
 }

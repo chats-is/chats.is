@@ -39,7 +39,7 @@ const DAY = 24 * HOUR;
 beforeAll(async () => {
   const t = await makeTestDb();
   h.db = t.db;
-  client = t.client as never;
+  client = t.client;
 });
 
 afterAll(async () => {

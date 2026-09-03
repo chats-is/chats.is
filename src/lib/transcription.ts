@@ -42,7 +42,7 @@ export async function transcribeAudio(args: {
         ...(provider.apiOptions && {
           providerOptions: {
             [provider.type]: provider.apiOptions
-          } as any
+          }
         })
       });
       return {

@@ -11,9 +11,9 @@ import { modelQueries } from '@/server/fn/model';
 import {
   createPrompt,
   deletePrompt as deletePromptFn,
-  listPrompts,
   promptQueries,
-  updatePrompt
+  updatePrompt,
+  type listPrompts
 } from '@/server/fn/prompt';
 import {
   AlertDialog,

@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import type { ChatErrorKind } from '@/types';
+import { type ChatErrorKind } from '@/types';
 import { PricingMissingError, requirePricing } from '@/lib/pricing';
 import {
   assertModelAccess,

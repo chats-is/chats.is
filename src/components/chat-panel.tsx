@@ -1,10 +1,9 @@
-import type { ChangeEvent } from 'react';
-import { lazy, Suspense, type ComponentProps } from 'react';
+import { lazy, Suspense, type ChangeEvent, type ComponentProps } from 'react';
 import { ClientOnly } from '@tanstack/react-router';
-import type { UseChatHelpers } from '@ai-sdk/react';
+import { type UseChatHelpers } from '@ai-sdk/react';
 import { MessageSquare } from 'lucide-react';
 
-import type { Artifact, Attachment, ChatMessage } from '@/types';
+import { type Artifact, type Attachment, type ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { ChatHeader } from '@/components/chat-header';
 import {

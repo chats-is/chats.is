@@ -62,8 +62,8 @@ const args = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequirePricing.mockResolvedValue(undefined as never);
-  mockAssertModelAccess.mockResolvedValue(undefined as never);
-  mockAssertQuota.mockResolvedValue(undefined as never);
+  mockAssertModelAccess.mockResolvedValue(undefined);
+  mockAssertQuota.mockResolvedValue(undefined);
 });
 
 describe('preflightCheck', () => {

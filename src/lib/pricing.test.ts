@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PricingRecord } from '@/types';
+import { type PricingRecord } from '@/types';
 
 import {
   calculateAudioCost,
@@ -37,7 +37,7 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides
-  } as PricingRecord;
+  };
 }
 
 describe('calculateChatCost', () => {

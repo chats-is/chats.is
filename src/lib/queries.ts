@@ -2,18 +2,18 @@ import '@tanstack/react-start/server-only';
 
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
-import type { ResolvedSource } from '@/types';
+import { type ResolvedSource } from '@/types';
 import { perRequest } from '@/lib/request-cache';
 import { parseNumber } from '@/lib/utils';
 import { db } from '@/server/db';
 import {
-  modelProviders,
   models,
-  providers,
   quotas,
   settings,
   usage,
-  users
+  users,
+  type modelProviders,
+  type providers
 } from '@/server/db/schema';
 
 // ============================================================================
@@ -102,7 +102,7 @@ export const findModelByModelId = perRequest(
 
     return allModels.find(m => {
       if (capability && m.capability !== capability) return false;
-      const aliases = m.aliases as string[] | null;
+      const aliases = m.aliases;
       return m.modelId === modelId || aliases?.includes(modelId);
     });
   }

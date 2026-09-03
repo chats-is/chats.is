@@ -36,9 +36,9 @@ export interface Preferences {
 
 interface PreferencesContextValue {
   preferences: Preferences;
-  setPreference: <K extends keyof Preferences>(
-    key: K,
-    value: Preferences[K]
+  setPreference: <TKey extends keyof Preferences>(
+    key: TKey,
+    value: Preferences[TKey]
   ) => void;
 }
 
@@ -168,7 +168,7 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
   });
 
   const setPreference = useCallback(
-    <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
+    <TKey extends keyof Preferences>(key: TKey, value: Preferences[TKey]) => {
       setPreferences(prev => {
         const newPrefs = { ...prev, [key]: value };
         try {

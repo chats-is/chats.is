@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Model, ProviderConfig } from '@/types';
-import type { FailoverProvider } from '@/lib/provider';
+import { type Model, type ProviderConfig } from '@/types';
+import { type FailoverProvider } from '@/lib/provider';
 
 import {
   generateAndStoreVideo,

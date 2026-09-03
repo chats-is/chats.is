@@ -1,5 +1,5 @@
-import type { ChatMessage } from '@/types';
-import type { VertexServiceAccountKey } from '@/types/provider';
+import { type ChatMessage } from '@/types';
+import { type VertexServiceAccountKey } from '@/types/provider';
 
 /**
  * Widens what a server function is allowed to return.

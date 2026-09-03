@@ -1,7 +1,7 @@
 import { experimental_generateVideo as generateVideo } from 'ai';
 import OpenAI, { AzureOpenAI } from 'openai';
 
-import type { Model, ProviderConfig } from '@/types';
+import { type Model, type ProviderConfig } from '@/types';
 import { decrypt } from '@/lib/crypto';
 import { resolveAutoOption } from '@/lib/media-options';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
@@ -83,7 +83,7 @@ function createOpenAIClient(provider: ProviderConfig): OpenAI {
     // which is selected by a 'preview' (or dated v1) api-version.
     const apiVersion =
       typeof provider.apiOptions?.apiVersion === 'string'
-        ? (provider.apiOptions.apiVersion as string)
+        ? provider.apiOptions.apiVersion
         : 'preview';
     return new AzureOpenAI({
       apiKey,
@@ -124,9 +124,9 @@ export async function generateWithSora(
 
   // Create video generation request
   const video = await openai.videos.create({
-    model: model as any, // 'sora-2' | 'sora-2-pro'
+    model: model, // 'sora-2' | 'sora-2-pro'
     prompt,
-    size: size as any,
+    size: size,
     seconds,
     ...(resolution && { resolution: resolution as any })
   });
@@ -300,7 +300,7 @@ export async function generateAndStoreVideo(args: {
             ...(Object.keys(providerOpts).length > 0 && {
               providerOptions: {
                 [provider.type]: providerOpts
-              } as any
+              }
             })
           }));
         } catch (err) {

@@ -1,6 +1,6 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
-import type { VertexServiceAccountKey } from '@/types';
+import { type VertexServiceAccountKey } from '@/types';
 import { env } from '@/lib/env';
 
 const ALGORITHM = 'aes-256-gcm';

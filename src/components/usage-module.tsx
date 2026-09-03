@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 
-import type {
-  DailyDay,
-  DailyGroup,
-  UsageKpi,
-  UsageRow,
-  UserUsageKpi,
-  UserUsageRow
+import {
+  type DailyDay,
+  type DailyGroup,
+  type UsageKpi,
+  type UsageRow,
+  type UserUsageKpi,
+  type UserUsageRow
 } from '@/types';
 import { formatNumber, formatUsd } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -571,7 +571,7 @@ export function UsageModule({
                 Cost
               </div>
               <div className="text-2xl font-bold">
-                {formatUsd((kpi as UsageKpi).totalCost)}
+                {formatUsd(kpi.totalCost)}
               </div>
               <Sparkline
                 color="#3b82f6"

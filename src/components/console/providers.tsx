@@ -3,10 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type {
-  ProviderType,
-  VertexAuthMode,
-  VertexServiceAccountKey
+import {
+  type ProviderType,
+  type VertexAuthMode,
+  type VertexServiceAccountKey
 } from '@/types';
 import { ProviderTypes } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';

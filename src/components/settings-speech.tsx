@@ -29,7 +29,7 @@ export const SettingsSpeech = () => {
 
   // Get available voices from current model's uiOptions
   const availableVoices = useMemo(() => {
-    const voices = selectedModel?.uiOptions?.voices as string[] | undefined;
+    const voices = selectedModel?.uiOptions?.voices;
     return voices || [];
   }, [selectedModel]);
 

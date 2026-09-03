@@ -1,4 +1,4 @@
-import type { UsageRowLike } from '@/types';
+import { type UsageRowLike } from '@/types';
 import { formatNumber, parseNumber } from '@/lib/utils';
 
 /**

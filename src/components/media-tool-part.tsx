@@ -1,12 +1,7 @@
 import { usePreferences } from '@/contexts/preferences-context';
 import { Loader2 } from 'lucide-react';
 
-import {
-  mediaToolNames,
-  type ChatMessage,
-  type MediaToolName,
-  type MediaToolOutput
-} from '@/types';
+import { mediaToolNames, type ChatMessage, type MediaToolName } from '@/types';
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaLightbox } from '@/components/media-lightbox';
 import { MediaPlaceholder } from '@/components/media-placeholder';
@@ -110,7 +105,7 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
     return null;
   }
 
-  const output = part.output as MediaToolOutput;
+  const output = part.output;
   if (output.status === 'error') return null;
 
   if (output.mediaType.startsWith('image/')) {

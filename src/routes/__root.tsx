@@ -5,7 +5,7 @@ import {
   Scripts
 } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
-import type { QueryClient } from '@tanstack/react-query';
+import { type QueryClient } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 
 import { env } from '@/lib/env';

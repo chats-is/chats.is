@@ -3,7 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
-import type { VertexServiceAccountKey } from '@/types';
+import { type VertexServiceAccountKey } from '@/types';
 import { decrypt, encrypt, maskedKey } from '@/lib/crypto';
 import { getProviderModels, toProviderModelId } from '@/lib/provider';
 import { generateUUID } from '@/lib/utils';

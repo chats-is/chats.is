@@ -101,16 +101,13 @@ export function ModelMenu({
 
   // Get available options from selected model
   const uiOptions = selectedModel?.uiOptions as Record<string, unknown> | null;
-  const defaultSize =
-    typeof uiOptions?.size === 'string' ? (uiOptions.size as string) : '';
+  const defaultSize = typeof uiOptions?.size === 'string' ? uiOptions.size : '';
   const availableSizes = useMemo(
     () => (uiOptions?.sizes as string[]) || [],
     [uiOptions?.sizes]
   );
   const defaultAspectRatio =
-    typeof uiOptions?.aspectRatio === 'string'
-      ? (uiOptions.aspectRatio as string)
-      : '';
+    typeof uiOptions?.aspectRatio === 'string' ? uiOptions.aspectRatio : '';
   const availableAspectRatios = useMemo(
     () => (uiOptions?.aspectRatios as string[]) || [],
     [uiOptions?.aspectRatios]
@@ -125,22 +122,20 @@ export function ModelMenu({
     return undefined;
   }, [uiOptions?.duration]);
   const availableDurations = useMemo(() => {
-    const values = uiOptions?.durations as unknown;
+    const values = uiOptions?.durations;
     if (!Array.isArray(values)) return [];
     return values
       .map(v => (typeof v === 'number' ? v : Number(v)))
       .filter(v => Number.isFinite(v));
   }, [uiOptions?.durations]);
   const defaultResolution =
-    typeof uiOptions?.resolution === 'string'
-      ? (uiOptions.resolution as string)
-      : '';
+    typeof uiOptions?.resolution === 'string' ? uiOptions.resolution : '';
   const availableResolutions = useMemo(
     () => (uiOptions?.resolutions as string[]) || [],
     [uiOptions?.resolutions]
   );
   const defaultVoice =
-    typeof uiOptions?.voice === 'string' ? (uiOptions.voice as string) : '';
+    typeof uiOptions?.voice === 'string' ? uiOptions.voice : '';
   const availableVoices = useMemo(
     () => (uiOptions?.voices as string[]) || [],
     [uiOptions?.voices]

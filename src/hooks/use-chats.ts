@@ -1,8 +1,8 @@
-import type { InfiniteData } from '@tanstack/react-query';
 import {
   useInfiniteQuery,
   useMutation,
-  useQueryClient
+  useQueryClient,
+  type InfiniteData
 } from '@tanstack/react-query';
 
 import { type Chat } from '@/types';
@@ -11,8 +11,8 @@ import {
   chatQueries,
   deleteAllChats,
   deleteChat,
-  listChats,
-  updateChat
+  updateChat,
+  type listChats
 } from '@/server/fn/chat';
 
 const LIMIT = 25;

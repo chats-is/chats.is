@@ -4,8 +4,11 @@ import { type ChatMessage } from '@/types';
 
 import { sanitizeTitle, TITLE_MAX, titleInputFromMessage } from './chat-title';
 
-const message = (parts: ChatMessage['parts']): ChatMessage =>
-  ({ id: 'm1', role: 'user', parts }) as ChatMessage;
+const message = (parts: ChatMessage['parts']): ChatMessage => ({
+  id: 'm1',
+  role: 'user',
+  parts
+});
 
 describe('titleInputFromMessage', () => {
   it('hands over what the user wrote, not the message shape', () => {

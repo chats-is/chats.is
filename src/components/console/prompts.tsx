@@ -12,9 +12,9 @@ import { modelQueries } from '@/server/fn/model';
 import {
   adminCreatePrompt,
   adminDeletePrompt,
-  adminListPrompts,
   adminUpdatePrompt,
-  promptQueries
+  promptQueries,
+  type adminListPrompts
 } from '@/server/fn/prompt';
 import {
   AlertDialog,

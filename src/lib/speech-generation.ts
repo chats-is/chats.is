@@ -45,7 +45,7 @@ export async function generateAndStoreSpeech(args: {
         ...(provider.apiOptions && {
           providerOptions: {
             [provider.type]: provider.apiOptions
-          } as any
+          }
         })
       });
       return audio;

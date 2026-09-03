@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only';
 
 import { getRequestHeaders } from '@tanstack/react-start/server';
 
-import type { User } from '@/types';
+import { type User } from '@/types';
 
 import { auth } from './auth';
 

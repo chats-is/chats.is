@@ -7,12 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import { toast } from 'sonner';
 
-import {
-  type Artifact,
-  type Attachment,
-  type ChatMessage,
-  type CustomUIDataTypes
-} from '@/types';
+import { type Artifact, type Attachment, type ChatMessage } from '@/types';
 import { takePendingPrompt } from '@/lib/pending-prompt';
 import {
   generateUUID,
@@ -253,7 +248,7 @@ export function ChatUI({
       }
 
       if (dataPart.type === 'data-chat' && dataPart.data) {
-        const chatData = dataPart.data as CustomUIDataTypes['chat'];
+        const chatData = dataPart.data;
         if (chatData.title) {
           if (!title) {
             window.history.replaceState({}, '', `/chat/${id}`);

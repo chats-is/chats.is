@@ -3,7 +3,11 @@ import '@tanstack/react-start/server-only';
 import { cache } from 'react';
 import { eq } from 'drizzle-orm';
 
-import type { ChatUsage, PriceSnapshot, PricingRecord } from '@/types';
+import {
+  type ChatUsage,
+  type PriceSnapshot,
+  type PricingRecord
+} from '@/types';
 import { parseNumber } from '@/lib/utils';
 import { db } from '@/server/db';
 import { modelPricings, models } from '@/server/db/schema';
@@ -172,7 +176,7 @@ export const resolveModelByKey = cache(
 
     const match = allModels.find(m => {
       if (m.modelId === modelKey) return true;
-      const aliases = m.aliases as string[] | null;
+      const aliases = m.aliases;
       return aliases?.includes(modelKey) ?? false;
     });
 

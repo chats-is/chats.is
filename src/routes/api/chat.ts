@@ -14,7 +14,7 @@ import {
   UI_MESSAGE_STREAM_HEADERS
 } from 'ai';
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
+import { type z } from 'zod';
 
 import {
   createArtifactInputSchema,
@@ -304,7 +304,7 @@ async function POST({ request: req }: { request: Request }) {
           type: 'data-chat',
           data: { title },
           transient: true
-        } as Parameters<typeof writer.write>[0]);
+        });
       },
       generateId: () => errorMessageId,
       onEnd: async ({ responseMessage }) => {

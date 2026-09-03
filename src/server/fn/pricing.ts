@@ -3,7 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-import type { PricingRecord, PricingSource } from '@/types';
+import { type PricingRecord } from '@/types';
 import { pricingMissingFields } from '@/lib/pricing';
 import {
   previewSync,
@@ -92,7 +92,7 @@ export const upsertPricing = createServerFn({ method: 'POST' })
     // to 0 below, so they don't need to be in the required list. Reuses
     // `pricingMissingFields` from lib/pricing so admin-side and runtime
     // gate share the same rule.
-    const cap = model.capability as 'chat' | 'image' | 'video' | 'audio';
+    const cap = model.capability;
 
     // Image models bill EITHER per-image OR per-token, never both — the two
     // styles are mutually exclusive (see calculateImageCost).
@@ -200,7 +200,7 @@ export const previewPricingSync = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     return await previewSync({
-      source: data.source as PricingSource,
+      source: data.source,
       modelDbIds: data.modelDbIds
     });
   });
@@ -220,7 +220,7 @@ export const runPricingSync = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     return await syncPricing({
-      source: data.source as PricingSource,
+      source: data.source,
       modelDbIds: data.modelDbIds,
       onlyMissing: data.onlyMissing
     });
@@ -241,7 +241,7 @@ export const searchRemotePricingFn = createServerFn({ method: 'GET' })
   )
   .handler(async ({ data }) => {
     return await searchRemotePricing({
-      source: data.source as PricingSource,
+      source: data.source,
       query: data.query,
       limit: data.limit
     });

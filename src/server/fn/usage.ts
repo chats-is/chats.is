@@ -3,7 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
-import type { UsageRow, UserUsageRow } from '@/types';
+import { type UsageRow, type UserUsageRow } from '@/types';
 import { db } from '@/server/db';
 import { models, providers, usage, users } from '@/server/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';

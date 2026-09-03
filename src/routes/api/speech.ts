@@ -96,7 +96,7 @@ async function POST({ request: req }: { request: Request }) {
           ...(provider.apiOptions && {
             providerOptions: {
               [provider.type]: provider.apiOptions
-            } as any
+            }
           })
         });
         return audio;

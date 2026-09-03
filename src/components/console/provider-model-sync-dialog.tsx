@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { ModelCapability } from '@/types/model';
+import { type ModelCapability } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating, type Output } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';

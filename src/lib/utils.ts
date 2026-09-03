@@ -1,14 +1,8 @@
-import { type UIMessagePart } from 'ai';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { v4 as uuidv4 } from 'uuid';
 
-import {
-  type ChatMessage,
-  type ChatTools,
-  type CustomUIDataTypes,
-  type Result
-} from '@/types';
+import { type ChatMessage } from '@/types';
 import { type DBMessage } from '@/types/message';
 
 export function cn(...inputs: ClassValue[]) {
@@ -20,7 +14,7 @@ export const fetcher = async (url: string) => {
 
   if (!res.ok) {
     const json = await res.json();
-    throw { error: json.error } as Result;
+    throw { error: json.error };
   }
 
   return res.json();
@@ -144,8 +138,8 @@ export function formatMediaTime(time: number): string {
 export function convertToChatMessages(messages: DBMessage[]): ChatMessage[] {
   return messages.map(message => ({
     id: message.id,
-    role: message.role as 'user' | 'assistant' | 'system',
-    parts: message.parts as UIMessagePart<CustomUIDataTypes, ChatTools>[],
+    role: message.role,
+    parts: message.parts,
     metadata: {
       parentId: message.parentId,
       reasonDuration: message.reasonDuration ?? undefined,

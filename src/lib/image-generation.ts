@@ -123,7 +123,7 @@ export async function generateAndStoreImage(args: {
           ...(provider.apiOptions && {
             providerOptions: {
               [provider.type]: provider.apiOptions
-            } as any
+            }
           })
         });
 

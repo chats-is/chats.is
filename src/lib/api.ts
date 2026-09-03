@@ -21,7 +21,7 @@ export const createSpeech = async (
 
   if (!res.ok) {
     const result = await res.json();
-    return { error: result.error } as Result;
+    return { error: result.error };
   }
 
   const json = await res.json();
@@ -73,7 +73,7 @@ export const uploadFile = async (
       contentType: blob.contentType || file.type
     };
   } catch (error) {
-    return { error: (error as Error).message } as Result;
+    return { error: (error as Error).message };
   }
 };
 
@@ -84,6 +84,6 @@ export const deleteFile = async (url: string) => {
 
   if (!res.ok) {
     const result = await res.json();
-    return { error: result.error } as Result;
+    return { error: result.error };
   }
 };

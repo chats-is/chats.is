@@ -1,4 +1,4 @@
-import type { JSONValue } from 'ai';
+import { type JSONValue } from 'ai';
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
@@ -10,11 +10,11 @@ import {
   text,
   timestamp,
   uniqueIndex,
-  varchar
+  varchar,
+  type PgColumn
 } from 'drizzle-orm/pg-core';
-import type { PgColumn } from 'drizzle-orm/pg-core';
 
-import type { ChatMessage, ChatType, ProviderType } from '@/types';
+import { type ChatMessage, type ChatType, type ProviderType } from '@/types';
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same

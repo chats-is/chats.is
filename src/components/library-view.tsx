@@ -22,8 +22,7 @@ import { getArtifactLanguageLabel } from '@/lib/code-language';
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
 import { formatMediaTime } from '@/lib/utils';
 import { artifactQueries } from '@/server/fn/artifact';
-import type { LibraryItem } from '@/server/fn/library';
-import { libraryQueries } from '@/server/fn/library';
+import { libraryQueries, type LibraryItem } from '@/server/fn/library';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

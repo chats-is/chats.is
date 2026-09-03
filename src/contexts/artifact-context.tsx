@@ -8,7 +8,7 @@ import React, {
   useState
 } from 'react';
 
-import type { Artifact, ArtifactType } from '@/types';
+import { type Artifact, type ArtifactType } from '@/types';
 import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 
 export type { ArtifactKind };

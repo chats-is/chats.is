@@ -135,6 +135,9 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "lightningcss"
-    ]
+    ],
+    "overrides": {
+      "rolldown": "1.2.7"
+    }
   }
 }

@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
-import type { UseChatHelpers } from '@ai-sdk/react';
+import { type ReactNode } from 'react';
+import { type UseChatHelpers } from '@ai-sdk/react';
 import ReactScrollToBottom from 'react-scroll-to-bottom';
 
-import type { ChatMessage } from '@/types';
+import { type ChatMessage } from '@/types';
 import { ButtonScrollToBottom } from '@/components/button-scroll-to-bottom';
 
 interface ScrollToBottomProps

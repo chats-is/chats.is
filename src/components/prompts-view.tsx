@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 
 import { setPendingPrompt } from '@/lib/pending-prompt';
-import { listUsablePrompts, promptQueries } from '@/server/fn/prompt';
+import { promptQueries, type listUsablePrompts } from '@/server/fn/prompt';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatHeader } from '@/components/chat-header';
 

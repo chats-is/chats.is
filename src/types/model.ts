@@ -1,4 +1,4 @@
-import type { ProviderType } from './provider';
+import { type ProviderType } from './provider';
 
 // Model capability type ('audio' covers both TTS and STT models;
 // `supportsTranscription` distinguishes the direction)

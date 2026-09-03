@@ -1,5 +1,5 @@
-import type { MediaToolName } from '@/types/chat-tools';
-import type { ModelCapability } from '@/types/model';
+import { type MediaToolName } from '@/types/chat-tools';
+import { type ModelCapability } from '@/types/model';
 
 /**
  * Provider types for the console
