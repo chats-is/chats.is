@@ -73,7 +73,7 @@
     "@tanstack/router-core": "^1.171.27",
     "@uiw/codemirror-theme-github": "^4.25.11",
     "@vercel/analytics": "^1.6.1",
-    "@vercel/blob": "^0.27.3",
+    "@vercel/blob": "^2.8.0",
     "@vercel/functions": "^3.9.5",
     "ai": "^7.0.90",
     "better-auth": "^1.7.2",
@@ -137,7 +137,8 @@
       "lightningcss"
     ],
     "overrides": {
-      "rolldown": "1.2.7"
+      "rolldown": "1.2.7",
+      "esbuild@<0.25.0": "^0.25.0"
     }
   }
 }

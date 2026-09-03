@@ -25,6 +25,11 @@ export default [
       // rule's judgement is not reliable for index access — an array element
       // reads as present whether or not it is there. Left as written.
       '@typescript-eslint/no-unnecessary-condition': 'off',
+      // A callback parameter naming the same thing as the value it came from
+      // reads better than a second name invented to avoid the clash — the
+      // Drizzle query builders in particular are written this way. Renaming
+      // thirty of these made the code harder to follow, not easier.
+      'no-shadow': 'off',
       // These two disagreed by default: one wanted type imports lifted to a
       // top-level `import type`, the other wanted every import from a module
       // merged into one statement. Fixing both at once produced an
