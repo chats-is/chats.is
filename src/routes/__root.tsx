@@ -29,10 +29,15 @@ const getAnalytics = createServerFn({ method: 'GET' }).handler(async () => ({
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
-    loader: async () => ({
-      settings: await getAppSettings(),
-      analytics: await getAnalytics()
-    }),
+    // Neither depends on the other; asking one after the other made the first
+    // page wait for two round trips instead of one.
+    loader: async () => {
+      const [settings, analytics] = await Promise.all([
+        getAppSettings(),
+        getAnalytics()
+      ]);
+      return { settings, analytics };
+    },
     head: ({ loaderData }) => {
       const { appName, appSubtitle, appDescription } =
         loaderData?.settings ?? {};

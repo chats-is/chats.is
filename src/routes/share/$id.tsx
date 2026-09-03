@@ -12,12 +12,18 @@ import { SharedChatView } from '@/components/shared-chat-view';
 /** A share link is public: no guard above it, and none needed. */
 export const Route = createFileRoute('/share/$id')({
   loader: async ({ params }) => {
-    const chat = await getSharedChat({ data: { id: params.id } });
+    // The settings do not depend on the chat, so both are asked for at once
+    // rather than one after the other.
+    const [chat, settings] = await Promise.all([
+      getSharedChat({ data: { id: params.id } }),
+      getSystemSettingsFn()
+    ]);
+
     if (!chat) {
       throw notFound();
     }
 
-    return { chat, settings: await getSystemSettingsFn() };
+    return { chat, settings };
   },
   head: ({ loaderData }) => ({
     meta: loaderData?.chat.title ? [{ title: loaderData.chat.title }] : []
