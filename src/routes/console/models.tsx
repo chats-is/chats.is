@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
+import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/fn/model';
 import { providerQueries } from '@/server/fn/provider';
 import { RoutePending } from '@/components/route-pending';
@@ -21,7 +22,7 @@ export const Route = createFileRoute('/console/models')({
       context.queryClient.ensureQueryData(modelQueries.list({})),
       context.queryClient.ensureQueryData(providerQueries.list())
     ]),
-  head: () => ({ meta: [{ title: 'Models' }] }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Models') }] }),
   pendingComponent: RoutePending,
   component: Models
 });

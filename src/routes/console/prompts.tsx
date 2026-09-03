@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
+import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/fn/model';
 import { promptQueries } from '@/server/fn/prompt';
 import { RoutePending } from '@/components/route-pending';
@@ -20,7 +21,7 @@ export const Route = createFileRoute('/console/prompts')({
       context.queryClient.ensureQueryData(promptQueries.adminList()),
       context.queryClient.ensureQueryData(modelQueries.list({}))
     ]),
-  head: () => ({ meta: [{ title: 'Prompts' }] }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Prompts') }] }),
   pendingComponent: RoutePending,
   component: Prompts
 });

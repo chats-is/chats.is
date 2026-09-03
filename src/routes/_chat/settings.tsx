@@ -1,10 +1,11 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
+import { pageTitle } from '@/lib/head';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { SettingsNav } from '@/components/settings-nav';
 
 export const Route = createFileRoute('/_chat/settings')({
-  head: () => ({ meta: [{ title: 'Settings' }] }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Settings') }] }),
   component: SettingsLayout
 });
 

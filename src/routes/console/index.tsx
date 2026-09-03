@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
 
+import { pageTitle } from '@/lib/head';
 import { listModels } from '@/server/fn/model';
 import { getPromptStats } from '@/server/fn/prompt';
 import { listProviders } from '@/server/fn/provider';
@@ -22,7 +23,7 @@ export const Route = createFileRoute('/console/')({
 
     return { providers, models, promptStats, settings, userStats };
   },
-  head: () => ({ meta: [{ title: 'Console' }] }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Console') }] }),
   pendingComponent: RoutePending,
   component: ConsoleHome
 });

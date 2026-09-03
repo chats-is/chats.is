@@ -4,6 +4,7 @@ import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 import { format } from 'date-fns';
 
 import { convertToChatMessages } from '@/lib/utils';
+import { pageTitle } from '@/lib/head';
 import { getSystemSettingsFn } from '@/server/fn/settings';
 import { getSharedChat } from '@/server/fn/share';
 import { RoutePending } from '@/components/route-pending';
@@ -25,8 +26,8 @@ export const Route = createFileRoute('/share/$id')({
 
     return { chat, settings };
   },
-  head: ({ loaderData }) => ({
-    meta: loaderData?.chat.title ? [{ title: loaderData.chat.title }] : []
+  head: ({ matches, loaderData }) => ({
+    meta: [{ title: pageTitle(matches, loaderData?.chat.title ?? undefined) }]
   }),
   pendingComponent: RoutePending,
   component: SharedChatPage

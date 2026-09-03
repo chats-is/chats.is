@@ -3,6 +3,7 @@ import { useRouter } from '@tanstack/react-router';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { PlusCircle } from 'lucide-react';
 
+import { formatTitle } from '@/lib/head';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
@@ -20,7 +21,14 @@ export function ChatHeader({ title }: ChatHeaderProps) {
   };
 
   useEffect(() => {
-    const documentTitle = title ? `${title} - ${appName}` : appName;
+    // Only a page that names itself. A new chat has no title yet, and writing
+    // one here would overwrite what the route already put in the head with
+    // something shorter.
+    if (!title) return;
+
+    // Built the same way the route's head builds it, so this rewrites the title
+    // only when a chat gains one mid-stream — never on arrival.
+    const documentTitle = formatTitle(title, appName);
 
     if (documentTitle !== document.title) {
       document.title = documentTitle;

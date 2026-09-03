@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
+import { pageTitle } from '@/lib/head';
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
@@ -41,9 +42,7 @@ export const Route = createFileRoute('/console')({
     ]);
     return { settings, appName };
   },
-  head: ({ loaderData }) => ({
-    meta: [{ title: `${loaderData?.appName ?? 'chats.is'} Console` }]
-  }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Console') }] }),
   pendingComponent: RoutePending,
   component: ConsoleLayout
 });

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { pageTitle } from '@/lib/head';
 import { planQueries } from '@/server/fn/plan';
 import { quotaQueries } from '@/server/fn/quota';
 import { RoutePending } from '@/components/route-pending';
@@ -11,7 +12,7 @@ export const Route = createFileRoute('/console/plans')({
       context.queryClient.ensureQueryData(planQueries.list()),
       context.queryClient.ensureQueryData(quotaQueries.listForSelect())
     ]),
-  head: () => ({ meta: [{ title: 'Plans' }] }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Plans') }] }),
   pendingComponent: RoutePending,
   component: Plans
 });

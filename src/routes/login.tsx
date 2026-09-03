@@ -3,6 +3,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 
 import { env } from '@/lib/env';
+import { pageTitle } from '@/lib/head';
 import { sessionQueries } from '@/server/fn/auth';
 import { RoutePending } from '@/components/route-pending';
 import { LoginForm } from '@/components/login-form';
@@ -39,7 +40,7 @@ export const Route = createFileRoute('/login')({
     }
   },
   loader: () => getSignInMethods(),
-  head: () => ({ meta: [{ title: 'Sign in' }] }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Sign in') }] }),
   pendingComponent: RoutePending,
   component: LoginPage
 });

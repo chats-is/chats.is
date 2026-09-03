@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { convertToChatMessages } from '@/lib/utils';
+import { pageTitle } from '@/lib/head';
 import { chatQueries } from '@/server/fn/chat';
 import { ChatNotFound } from '@/components/chat-notfound';
 import { ChatUI } from '@/components/chat-ui';
@@ -14,8 +15,8 @@ export const Route = createFileRoute('/_chat/chat/$chatId')({
     context.queryClient.ensureQueryData(
       chatQueries.detail({ id: params.chatId, includeArtifacts: true })
     ),
-  head: ({ loaderData }) => ({
-    meta: loaderData?.title ? [{ title: loaderData.title }] : []
+  head: ({ matches, loaderData }) => ({
+    meta: [{ title: pageTitle(matches, loaderData?.title ?? undefined) }]
   }),
   component: ChatPage
 });

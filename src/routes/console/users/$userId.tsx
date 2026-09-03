@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
+import { pageTitle } from '@/lib/head';
 import { quotaQueries } from '@/server/fn/quota';
 import { usageQueries } from '@/server/fn/usage';
 import { RoutePending } from '@/components/route-pending';
@@ -29,7 +30,7 @@ export const Route = createFileRoute('/console/users/$userId')({
         usageQueries.userModels({ userId: params.userId })
       )
     ]),
-  head: () => ({ meta: [{ title: 'User usage limits' }] }),
+  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'User usage limits') }] }),
   pendingComponent: RoutePending,
   component: UserDetailPage
 });
