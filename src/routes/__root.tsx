@@ -11,6 +11,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { env } from '@/lib/env';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
+import { RouterDevtools } from '@/components/router-devtools';
 import { TailwindIndicator } from '@/components/tailwind-indicator';
 
 import appCss from '../styles.css?url';
@@ -116,6 +117,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Providers attribute="class" defaultTheme="system" enableSystem>
           {children}
           <TailwindIndicator />
+          <RouterDevtools />
           <Analytics />
         </Providers>
         <Scripts />
