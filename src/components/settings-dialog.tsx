@@ -83,7 +83,11 @@ function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(38rem,calc(100dvh-4rem))] flex-col gap-0 p-0 sm:max-w-3xl">
+      {/* Wide enough that the Prompts panel's table clears its own
+          min-w-[720px] beside the nav column rather than scrolling sideways,
+          and tall enough to show a run of rows — both capped to the viewport
+          so a short window still gets a dialog that fits inside it. */}
+      <DialogContent className="flex h-[min(46rem,calc(100dvh-4rem))] flex-col gap-0 p-0 sm:max-w-5xl">
         <DialogHeader className="border-b px-5 py-4">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="sr-only">
