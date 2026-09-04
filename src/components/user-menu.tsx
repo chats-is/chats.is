@@ -26,11 +26,13 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useOpenSettings } from '@/components/settings-dialog';
 
 export function UserMenu() {
   const { user, isLoading } = useCurrentUser();
   const { isMobile, state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const openSettings = useOpenSettings();
 
   if (isLoading) {
     return (
@@ -85,17 +87,15 @@ export function UserMenu() {
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuItem
-              render={
-                <Link
-                  to="/settings/general"
-                  className="flex w-full items-center gap-2"
-                >
-                  <Settings className="size-4" />
-                  Settings
-                </Link>
-              }
-            />
+            {openSettings && (
+              <DropdownMenuItem
+                onClick={openSettings}
+                className="flex items-center gap-2"
+              >
+                <Settings className="size-4" />
+                Settings
+              </DropdownMenuItem>
+            )}
             {user.admin && (
               <DropdownMenuItem
                 render={

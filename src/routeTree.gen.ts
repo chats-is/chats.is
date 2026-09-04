@@ -17,7 +17,6 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ChatIndexRouteImport } from './routes/_chat/index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat/library'
 import { Route as ChatPromptsRouteImport } from './routes/_chat/prompts'
-import { Route as ChatSettingsRouteImport } from './routes/_chat/settings'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiSpeechRouteImport } from './routes/api/speech'
@@ -32,12 +31,6 @@ import { Route as ConsoleSettingsRouteImport } from './routes/console/settings'
 import { Route as ConsoleUsageRouteImport } from './routes/console/usage'
 import { Route as ShareIdRouteImport } from './routes/share/$id'
 import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
-import { Route as ChatSettingsIndexRouteImport } from './routes/_chat/settings/index'
-import { Route as ChatSettingsGeneralRouteImport } from './routes/_chat/settings/general'
-import { Route as ChatSettingsPromptsRouteImport } from './routes/_chat/settings/prompts'
-import { Route as ChatSettingsSharedLinksRouteImport } from './routes/_chat/settings/shared-links'
-import { Route as ChatSettingsSpeechRouteImport } from './routes/_chat/settings/speech'
-import { Route as ChatSettingsUsageRouteImport } from './routes/_chat/settings/usage'
 import { Route as ApiArtifactsPreviewRouteImport } from './routes/api/artifacts/preview'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiFilesUploadRouteImport } from './routes/api/files/upload'
@@ -86,11 +79,6 @@ const ChatLibraryRoute = ChatLibraryRouteImport.update({
 const ChatPromptsRoute = ChatPromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
-  getParentRoute: () => ChatRoute,
-} as any)
-const ChatSettingsRoute = ChatSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => ChatRoute,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -163,36 +151,6 @@ const ChatChatChatIdRoute = ChatChatChatIdRouteImport.update({
   path: '/chat/$chatId',
   getParentRoute: () => ChatRoute,
 } as any)
-const ChatSettingsIndexRoute = ChatSettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ChatSettingsRoute,
-} as any)
-const ChatSettingsGeneralRoute = ChatSettingsGeneralRouteImport.update({
-  id: '/general',
-  path: '/general',
-  getParentRoute: () => ChatSettingsRoute,
-} as any)
-const ChatSettingsPromptsRoute = ChatSettingsPromptsRouteImport.update({
-  id: '/prompts',
-  path: '/prompts',
-  getParentRoute: () => ChatSettingsRoute,
-} as any)
-const ChatSettingsSharedLinksRoute = ChatSettingsSharedLinksRouteImport.update({
-  id: '/shared-links',
-  path: '/shared-links',
-  getParentRoute: () => ChatSettingsRoute,
-} as any)
-const ChatSettingsSpeechRoute = ChatSettingsSpeechRouteImport.update({
-  id: '/speech',
-  path: '/speech',
-  getParentRoute: () => ChatSettingsRoute,
-} as any)
-const ChatSettingsUsageRoute = ChatSettingsUsageRouteImport.update({
-  id: '/usage',
-  path: '/usage',
-  getParentRoute: () => ChatSettingsRoute,
-} as any)
 const ApiArtifactsPreviewRoute = ApiArtifactsPreviewRouteImport.update({
   id: '/api/artifacts/preview',
   path: '/api/artifacts/preview',
@@ -252,7 +210,6 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/library': typeof ChatLibraryRoute
   '/prompts': typeof ChatPromptsRoute
-  '/settings': typeof ChatSettingsRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/files': typeof ApiFilesRouteWithChildren
   '/api/speech': typeof ApiSpeechRoute
@@ -267,11 +224,6 @@ export interface FileRoutesByFullPath {
   '/share/$id': typeof ShareIdRoute
   '/console/': typeof ConsoleIndexRoute
   '/chat/$chatId': typeof ChatChatChatIdRoute
-  '/settings/general': typeof ChatSettingsGeneralRoute
-  '/settings/prompts': typeof ChatSettingsPromptsRoute
-  '/settings/shared-links': typeof ChatSettingsSharedLinksRoute
-  '/settings/speech': typeof ChatSettingsSpeechRoute
-  '/settings/usage': typeof ChatSettingsUsageRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
@@ -280,7 +232,6 @@ export interface FileRoutesByFullPath {
   '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
   '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
-  '/settings/': typeof ChatSettingsIndexRoute
   '/console/settings/': typeof ConsoleSettingsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
 }
@@ -304,11 +255,6 @@ export interface FileRoutesByTo {
   '/': typeof ChatIndexRoute
   '/console': typeof ConsoleIndexRoute
   '/chat/$chatId': typeof ChatChatChatIdRoute
-  '/settings/general': typeof ChatSettingsGeneralRoute
-  '/settings/prompts': typeof ChatSettingsPromptsRoute
-  '/settings/shared-links': typeof ChatSettingsSharedLinksRoute
-  '/settings/speech': typeof ChatSettingsSpeechRoute
-  '/settings/usage': typeof ChatSettingsUsageRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
@@ -317,7 +263,6 @@ export interface FileRoutesByTo {
   '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
   '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
-  '/settings': typeof ChatSettingsIndexRoute
   '/console/settings': typeof ConsoleSettingsIndexRoute
   '/console/users': typeof ConsoleUsersIndexRoute
 }
@@ -330,7 +275,6 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/_chat/library': typeof ChatLibraryRoute
   '/_chat/prompts': typeof ChatPromptsRoute
-  '/_chat/settings': typeof ChatSettingsRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/files': typeof ApiFilesRouteWithChildren
   '/api/speech': typeof ApiSpeechRoute
@@ -346,11 +290,6 @@ export interface FileRoutesById {
   '/_chat/': typeof ChatIndexRoute
   '/console/': typeof ConsoleIndexRoute
   '/_chat/chat/$chatId': typeof ChatChatChatIdRoute
-  '/_chat/settings/general': typeof ChatSettingsGeneralRoute
-  '/_chat/settings/prompts': typeof ChatSettingsPromptsRoute
-  '/_chat/settings/shared-links': typeof ChatSettingsSharedLinksRoute
-  '/_chat/settings/speech': typeof ChatSettingsSpeechRoute
-  '/_chat/settings/usage': typeof ChatSettingsUsageRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
@@ -359,7 +298,6 @@ export interface FileRoutesById {
   '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
   '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
-  '/_chat/settings/': typeof ChatSettingsIndexRoute
   '/console/settings/': typeof ConsoleSettingsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
 }
@@ -373,7 +311,6 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/library'
     | '/prompts'
-    | '/settings'
     | '/api/chat'
     | '/api/files'
     | '/api/speech'
@@ -388,11 +325,6 @@ export interface FileRouteTypes {
     | '/share/$id'
     | '/console/'
     | '/chat/$chatId'
-    | '/settings/general'
-    | '/settings/prompts'
-    | '/settings/shared-links'
-    | '/settings/speech'
-    | '/settings/usage'
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
@@ -401,7 +333,6 @@ export interface FileRouteTypes {
     | '/console/settings/prompts'
     | '/console/settings/quota'
     | '/console/users/$userId'
-    | '/settings/'
     | '/console/settings/'
     | '/console/users/'
   fileRoutesByTo: FileRoutesByTo
@@ -425,11 +356,6 @@ export interface FileRouteTypes {
     | '/'
     | '/console'
     | '/chat/$chatId'
-    | '/settings/general'
-    | '/settings/prompts'
-    | '/settings/shared-links'
-    | '/settings/speech'
-    | '/settings/usage'
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
@@ -438,7 +364,6 @@ export interface FileRouteTypes {
     | '/console/settings/prompts'
     | '/console/settings/quota'
     | '/console/users/$userId'
-    | '/settings'
     | '/console/settings'
     | '/console/users'
   id:
@@ -450,7 +375,6 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/_chat/library'
     | '/_chat/prompts'
-    | '/_chat/settings'
     | '/api/chat'
     | '/api/files'
     | '/api/speech'
@@ -466,11 +390,6 @@ export interface FileRouteTypes {
     | '/_chat/'
     | '/console/'
     | '/_chat/chat/$chatId'
-    | '/_chat/settings/general'
-    | '/_chat/settings/prompts'
-    | '/_chat/settings/shared-links'
-    | '/_chat/settings/speech'
-    | '/_chat/settings/usage'
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
@@ -479,7 +398,6 @@ export interface FileRouteTypes {
     | '/console/settings/prompts'
     | '/console/settings/quota'
     | '/console/users/$userId'
-    | '/_chat/settings/'
     | '/console/settings/'
     | '/console/users/'
   fileRoutesById: FileRoutesById
@@ -554,13 +472,6 @@ declare module '@tanstack/react-router' {
       path: '/prompts'
       fullPath: '/prompts'
       preLoaderRoute: typeof ChatPromptsRouteImport
-      parentRoute: typeof ChatRoute
-    }
-    '/_chat/settings': {
-      id: '/_chat/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof ChatSettingsRouteImport
       parentRoute: typeof ChatRoute
     }
     '/api/chat': {
@@ -661,48 +572,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatChatChatIdRouteImport
       parentRoute: typeof ChatRoute
     }
-    '/_chat/settings/': {
-      id: '/_chat/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof ChatSettingsIndexRouteImport
-      parentRoute: typeof ChatSettingsRoute
-    }
-    '/_chat/settings/general': {
-      id: '/_chat/settings/general'
-      path: '/general'
-      fullPath: '/settings/general'
-      preLoaderRoute: typeof ChatSettingsGeneralRouteImport
-      parentRoute: typeof ChatSettingsRoute
-    }
-    '/_chat/settings/prompts': {
-      id: '/_chat/settings/prompts'
-      path: '/prompts'
-      fullPath: '/settings/prompts'
-      preLoaderRoute: typeof ChatSettingsPromptsRouteImport
-      parentRoute: typeof ChatSettingsRoute
-    }
-    '/_chat/settings/shared-links': {
-      id: '/_chat/settings/shared-links'
-      path: '/shared-links'
-      fullPath: '/settings/shared-links'
-      preLoaderRoute: typeof ChatSettingsSharedLinksRouteImport
-      parentRoute: typeof ChatSettingsRoute
-    }
-    '/_chat/settings/speech': {
-      id: '/_chat/settings/speech'
-      path: '/speech'
-      fullPath: '/settings/speech'
-      preLoaderRoute: typeof ChatSettingsSpeechRouteImport
-      parentRoute: typeof ChatSettingsRoute
-    }
-    '/_chat/settings/usage': {
-      id: '/_chat/settings/usage'
-      path: '/usage'
-      fullPath: '/settings/usage'
-      preLoaderRoute: typeof ChatSettingsUsageRouteImport
-      parentRoute: typeof ChatSettingsRoute
-    }
     '/api/artifacts/preview': {
       id: '/api/artifacts/preview'
       path: '/api/artifacts/preview'
@@ -776,32 +645,9 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface ChatSettingsRouteChildren {
-  ChatSettingsGeneralRoute: typeof ChatSettingsGeneralRoute
-  ChatSettingsPromptsRoute: typeof ChatSettingsPromptsRoute
-  ChatSettingsSharedLinksRoute: typeof ChatSettingsSharedLinksRoute
-  ChatSettingsSpeechRoute: typeof ChatSettingsSpeechRoute
-  ChatSettingsUsageRoute: typeof ChatSettingsUsageRoute
-  ChatSettingsIndexRoute: typeof ChatSettingsIndexRoute
-}
-
-const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
-  ChatSettingsGeneralRoute: ChatSettingsGeneralRoute,
-  ChatSettingsPromptsRoute: ChatSettingsPromptsRoute,
-  ChatSettingsSharedLinksRoute: ChatSettingsSharedLinksRoute,
-  ChatSettingsSpeechRoute: ChatSettingsSpeechRoute,
-  ChatSettingsUsageRoute: ChatSettingsUsageRoute,
-  ChatSettingsIndexRoute: ChatSettingsIndexRoute,
-}
-
-const ChatSettingsRouteWithChildren = ChatSettingsRoute._addFileChildren(
-  ChatSettingsRouteChildren,
-)
-
 interface ChatRouteChildren {
   ChatLibraryRoute: typeof ChatLibraryRoute
   ChatPromptsRoute: typeof ChatPromptsRoute
-  ChatSettingsRoute: typeof ChatSettingsRouteWithChildren
   ChatIndexRoute: typeof ChatIndexRoute
   ChatChatChatIdRoute: typeof ChatChatChatIdRoute
 }
@@ -809,7 +655,6 @@ interface ChatRouteChildren {
 const ChatRouteChildren: ChatRouteChildren = {
   ChatLibraryRoute: ChatLibraryRoute,
   ChatPromptsRoute: ChatPromptsRoute,
-  ChatSettingsRoute: ChatSettingsRouteWithChildren,
   ChatIndexRoute: ChatIndexRoute,
   ChatChatChatIdRoute: ChatChatChatIdRoute,
 }

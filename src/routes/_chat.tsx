@@ -7,6 +7,7 @@ import { sessionQueries } from '@/server/fn/auth';
 import { getSystemSettingsFn } from '@/server/fn/settings';
 import { userQueries } from '@/server/fn/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { SettingsDialogProvider } from '@/components/settings-dialog';
 import { Sidebar } from '@/components/sidebar';
 
 /**
@@ -21,9 +22,7 @@ import { Sidebar } from '@/components/sidebar';
 // which invalidates as it navigates, would blank the whole shell at once.
 export const Route = createFileRoute('/_chat')({
   beforeLoad: async ({ context, location }) => {
-    const user = await context.queryClient.ensureQueryData(
-      sessionQueries.me()
-    );
+    const user = await context.queryClient.ensureQueryData(sessionQueries.me());
     if (!user) {
       throw redirect({ to: '/login', search: { redirect: location.href } });
     }
@@ -49,12 +48,14 @@ function ChatLayout() {
     <SystemSettingsProvider settings={settings}>
       <PreferencesProvider>
         <ArtifactProvider>
-          <SidebarProvider className="h-svh overflow-hidden">
-            <Sidebar />
-            <SidebarInset className="h-full overflow-hidden">
-              <Outlet />
-            </SidebarInset>
-          </SidebarProvider>
+          <SettingsDialogProvider>
+            <SidebarProvider className="h-svh overflow-hidden">
+              <Sidebar />
+              <SidebarInset className="h-full overflow-hidden">
+                <Outlet />
+              </SidebarInset>
+            </SidebarProvider>
+          </SettingsDialogProvider>
         </ArtifactProvider>
       </PreferencesProvider>
     </SystemSettingsProvider>

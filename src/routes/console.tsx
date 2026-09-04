@@ -10,6 +10,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ConsoleHeader } from '@/components/console/header';
 import { Sidebar } from '@/components/console/sidebar';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { SettingsDialogProvider } from '@/components/settings-dialog';
 
 /**
  * The console is admin-only, and says so once here. `role` is read from the
@@ -74,9 +75,11 @@ function ConsoleLayout() {
   return (
     <SystemSettingsProvider settings={settings}>
       <PreferencesProvider>
-        <ConsoleShell>
-          <Outlet />
-        </ConsoleShell>
+        <SettingsDialogProvider>
+          <ConsoleShell>
+            <Outlet />
+          </ConsoleShell>
+        </SettingsDialogProvider>
       </PreferencesProvider>
     </SystemSettingsProvider>
   );
