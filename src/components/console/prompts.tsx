@@ -47,6 +47,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 
 type AdminPrompt = Awaited<ReturnType<typeof adminListPrompts>>[number];
 
@@ -325,11 +326,7 @@ export default function PromptsPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ConsoleTableSkeleton columns={7} />;
   }
 
   return (

@@ -402,7 +402,7 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
           columns={columns}
           data={isLoading ? undefined : data?.rows}
           dense
-          empty={isLoading ? 'Loading...' : 'No records.'}
+          empty="No records."
           tableClassName="text-sm"
         />
 

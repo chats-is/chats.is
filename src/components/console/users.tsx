@@ -28,6 +28,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { IconGoogle } from '@/components/icons';
 
 type User = Awaited<ReturnType<typeof listUsers>>[number];
@@ -354,11 +355,7 @@ export default function UsersPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <ConsoleTableSkeleton columns={8} />;
   }
 
   return (

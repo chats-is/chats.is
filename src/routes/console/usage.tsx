@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/fn/model';
-import { RoutePending } from '@/components/route-pending';
+import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
 import Usage from '@/components/console/usage';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
@@ -22,6 +22,6 @@ export const Route = createFileRoute('/console/usage')({
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(modelQueries.list({})),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Usage') }] }),
-  pendingComponent: RoutePending,
+  pendingComponent: () => <ConsoleUsageSkeleton />,
   component: Usage
 });

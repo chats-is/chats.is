@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { pageTitle } from '@/lib/head';
 import { quotaQueries } from '@/server/fn/quota';
 import { usageQueries } from '@/server/fn/usage';
-import { RoutePending } from '@/components/route-pending';
+import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
 import UserDetail from '@/components/console/user-detail';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
@@ -30,8 +30,10 @@ export const Route = createFileRoute('/console/users/$userId')({
         usageQueries.userModels({ userId: params.userId })
       )
     ]),
-  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'User usage limits') }] }),
-  pendingComponent: RoutePending,
+  head: ({ matches }) => ({
+    meta: [{ title: pageTitle(matches, 'User usage limits') }]
+  }),
+  pendingComponent: () => <ConsoleUsageSkeleton />,
   component: UserDetailPage
 });
 

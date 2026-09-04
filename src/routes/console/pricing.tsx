@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
 import { pricingQueries } from '@/server/fn/pricing';
-import { RoutePending } from '@/components/route-pending';
 import Pricing from '@/components/console/pricing';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
  *  and come back to. Each is optional: a filter at its default is simply
@@ -19,6 +19,6 @@ export const Route = createFileRoute('/console/pricing')({
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(pricingQueries.listWithModels({})),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Pricing') }] }),
-  pendingComponent: RoutePending,
+  pendingComponent: () => <ConsoleTableSkeleton columns={7} />,
   component: Pricing
 });

@@ -44,6 +44,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
@@ -233,11 +234,7 @@ export default function PlansPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <ConsoleTableSkeleton columns={4} />;
   }
 
   return (

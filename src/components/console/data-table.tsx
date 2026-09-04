@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-table';
 
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import { CELL_WIDTHS } from '@/components/console/skeletons';
 
 /**
  * The console's tables.
@@ -65,15 +67,18 @@ export function DataTable<TData extends RowData>({
   columns,
   data,
   empty,
+  pendingRows = 5,
   dense,
   className,
   tableClassName
 }: {
   columns: ConsoleColumns<TData>;
-  /** Undefined while the query is in flight — the empty message covers it. */
+  /** Undefined while the query is in flight — the rows stand in until it lands. */
   data: Array<TData> | undefined;
-  /** Shown in place of the rows when there are none. */
+  /** Shown in place of the rows when the table has loaded and holds none. */
   empty: React.ReactNode;
+  /** How many rows to stand in with while `data` is undefined. */
+  pendingRows?: number;
   /** Tighter padding, for the log tables that sit inside a card. */
   dense?: boolean;
   className?: string;
@@ -110,7 +115,30 @@ export function DataTable<TData extends RowData>({
           ))}
         </TableHeader>
         <TableBody>
-          {rows.length === 0 ? (
+          {/* A table with no data yet is a table mid-flight, not an empty one:
+              standing in with rows keeps the height and lets the real rows
+              arrive in place. */}
+          {data === undefined ? (
+            Array.from({ length: pendingRows }).map((_, row) => (
+              <TableRow key={row} className="hover:bg-transparent">
+                {table.getAllLeafColumns().map((column, col) => (
+                  <TableCell
+                    key={column.id}
+                    className={cn(
+                      'whitespace-normal',
+                      dense ? 'p-2' : 'p-3',
+                      alignOf(column.columnDef.meta),
+                      column.columnDef.meta?.cellClassName
+                    )}
+                  >
+                    <Skeleton
+                      className={`h-4 ${CELL_WIDTHS[(row + col) % CELL_WIDTHS.length]}`}
+                    />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : rows.length === 0 ? (
             <TableRow className="hover:bg-transparent">
               <TableCell
                 colSpan={table.getAllLeafColumns().length}

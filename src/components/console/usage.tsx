@@ -285,7 +285,7 @@ function UsageLog({ days }: { days: number }) {
           columns={logColumns}
           data={isLoading ? undefined : data?.rows}
           dense
-          empty={isLoading ? 'Loading...' : 'No records.'}
+          empty="No records."
           tableClassName="text-sm"
         />
 

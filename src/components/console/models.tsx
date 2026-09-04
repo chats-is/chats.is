@@ -66,6 +66,7 @@ import {
   DataTable
 } from '@/components/console/data-table';
 import { IconPicker } from '@/components/console/icon-picker';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ModelIcon } from '@/components/model-icon';
 
 type Model = Awaited<ReturnType<typeof listModels>>[number];
@@ -532,11 +533,7 @@ export default function ModelsPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <ConsoleTableSkeleton columns={7} />;
   }
 
   return (

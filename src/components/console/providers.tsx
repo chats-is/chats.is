@@ -53,6 +53,7 @@ import {
 } from '@/components/console/data-table';
 import { IconPicker } from '@/components/console/icon-picker';
 import { ProviderModelSyncDialog } from '@/components/console/provider-model-sync-dialog';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ModelIcon } from '@/components/model-icon';
 
 type Provider = Awaited<ReturnType<typeof listProviders>>[number];
@@ -533,11 +534,7 @@ export default function ProvidersPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <ConsoleTableSkeleton columns={6} />;
   }
 
   return (

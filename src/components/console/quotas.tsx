@@ -46,6 +46,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 
 type Quota = Awaited<ReturnType<typeof listQuotas>>[number];
 type Role = 'strict' | 'standard' | 'flexible' | 'custom';
@@ -370,11 +371,7 @@ export default function QuotasPage() {
   }, [models]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <ConsoleTableSkeleton columns={5} />;
   }
 
   return (

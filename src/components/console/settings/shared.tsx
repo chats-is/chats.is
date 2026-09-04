@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { mutating } from '@/lib/mutation';
 import { bulkUpdateSettings, settingsQueries } from '@/server/fn/settings';
 import { Button } from '@/components/ui/button';
+import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
 
 /**
  * Descriptions persisted alongside each setting. Kept in one place because the
@@ -107,9 +108,7 @@ export function useSettingsForm(keys: readonly string[]) {
 }
 
 export function SettingsLoading() {
-  return (
-    <div className="flex h-[50vh] items-center justify-center">Loading...</div>
-  );
+  return <ConsoleSettingsPanelSkeleton />;
 }
 
 export function SettingsSaveBar({

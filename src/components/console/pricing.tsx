@@ -44,6 +44,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ModelIcon } from '@/components/model-icon';
 
 type PricingSource = 'models.dev' | 'llm-metadata';
@@ -532,11 +533,7 @@ export default function PricingPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <ConsoleTableSkeleton columns={7} />;
   }
 
   return (

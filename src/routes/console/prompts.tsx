@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/fn/model';
 import { promptQueries } from '@/server/fn/prompt';
-import { RoutePending } from '@/components/route-pending';
 import Prompts from '@/components/console/prompts';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
  *  and come back to. Each is optional: a filter at its default is simply
@@ -22,6 +22,6 @@ export const Route = createFileRoute('/console/prompts')({
       context.queryClient.ensureQueryData(modelQueries.list({}))
     ]),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Prompts') }] }),
-  pendingComponent: RoutePending,
+  pendingComponent: () => <ConsoleTableSkeleton columns={7} />,
   component: Prompts
 });

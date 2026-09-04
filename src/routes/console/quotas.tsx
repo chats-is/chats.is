@@ -3,8 +3,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/fn/model';
 import { quotaQueries } from '@/server/fn/quota';
-import { RoutePending } from '@/components/route-pending';
 import Quotas from '@/components/console/quotas';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 
 export const Route = createFileRoute('/console/quotas')({
   loader: ({ context }) =>
@@ -13,6 +13,6 @@ export const Route = createFileRoute('/console/quotas')({
       context.queryClient.ensureQueryData(modelQueries.list({}))
     ]),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Quotas') }] }),
-  pendingComponent: RoutePending,
+  pendingComponent: () => <ConsoleTableSkeleton columns={5} />,
   component: Quotas
 });

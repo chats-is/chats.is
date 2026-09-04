@@ -7,8 +7,8 @@ import { getPromptStats } from '@/server/fn/prompt';
 import { listProviders } from '@/server/fn/provider';
 import { listSettings } from '@/server/fn/settings';
 import { getUserStats } from '@/server/fn/user';
-import { RoutePending } from '@/components/route-pending';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConsoleCardsSkeleton } from '@/components/console/skeletons';
 
 export const Route = createFileRoute('/console/')({
   loader: async () => {
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/console/')({
     return { providers, models, promptStats, settings, userStats };
   },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Console') }] }),
-  pendingComponent: RoutePending,
+  pendingComponent: () => <ConsoleCardsSkeleton />,
   component: ConsoleHome
 });
 
