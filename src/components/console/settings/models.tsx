@@ -1,18 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { onSelect } from '@/lib/select';
 import { modelQueries } from '@/server/fn/model';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 
-import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared';
+import {
+  SettingsForm,
+  SettingsLoading,
+  useSettingsForm,
+  type SettingsFormApi
+} from './shared';
 
 const KEYS = [
   'default.chat.modelId',
@@ -29,56 +26,45 @@ const KEYS = [
 
 type ModelOption = { id: string; modelId: string; name: string };
 
-/** One "pick a default model" select — the same shape repeated nine times. */
+/**
+ * One "pick a default model" select — the same shape repeated nine times.
+ *
+ * A saved id that no longer names an available model shows the placeholder
+ * rather than a blank trigger; `SelectField` does that for any select whose
+ * value is not among its options.
+ */
 function ModelSelect({
+  form,
+  name,
   label,
-  options,
-  value,
-  onChange,
-  disabled
+  options
 }: {
+  form: SettingsFormApi;
+  name: string;
   label: string;
   options: ModelOption[] | undefined;
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
 }) {
   const isEmpty = !options?.length;
 
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <Select
-        disabled={isEmpty || disabled}
-        // `null` (not '') so the placeholder shows rather than a blank value —
-        // including when the saved id names a model that has since been
-        // deleted or disabled, which would otherwise render as an empty
-        // trigger with no hint that anything is set. Base UI reads null as
-        // "nothing chosen" and undefined as "this select owns its own value",
-        // so null is also what keeps it controlled from the first render.
-        value={options?.some(option => option.modelId === value) ? value : null}
-        onValueChange={onSelect(onChange)}
-      >
-        <SelectTrigger>
-          <SelectValue
-            placeholder={isEmpty ? 'No available models' : 'Select model'}
-          />
-        </SelectTrigger>
-        <SelectContent>
-          {options?.map(option => (
-            <SelectItem key={option.id} value={option.modelId}>
-              {option.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <form.AppField name={name}>
+      {field => (
+        <field.SelectField
+          label={label}
+          disabled={isEmpty}
+          placeholder={isEmpty ? 'No available models' : 'Select model'}
+          options={(options ?? []).map(option => ({
+            value: option.modelId,
+            label: option.name
+          }))}
+        />
+      )}
+    </form.AppField>
   );
 }
 
 export function ModelsSettings() {
-  const { formData, handleChange, save, hasChanges, isLoading, isSaving } =
-    useSettingsForm(KEYS);
+  const { form, isLoading } = useSettingsForm(KEYS);
   const { data: models } = useQuery(modelQueries.list());
 
   const chatModels = models?.filter(
@@ -102,71 +88,60 @@ export function ModelsSettings() {
     m => m.capability === 'audio' && m.isEnabled && m.supportsTranscription
   );
 
-  const speechEnabled = formData['speech.enabled'] === 'true';
   if (isLoading) return <SettingsLoading />;
 
   return (
-    <div className="space-y-6">
+    <SettingsForm form={form}>
       <div className="rounded-lg border p-4">
         <h2 className="mb-4 text-lg font-semibold">Default Models</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <ModelSelect
+            form={form}
+            name="default.chat.modelId"
             label="Default Chat Model"
             options={chatModels}
-            value={formData['default.chat.modelId']}
-            onChange={value => handleChange('default.chat.modelId', value)}
-            disabled={isSaving}
           />
           <ModelSelect
+            form={form}
+            name="default.image.modelId"
             label="Default Image Model"
             options={imageModels}
-            value={formData['default.image.modelId']}
-            onChange={value => handleChange('default.image.modelId', value)}
-            disabled={isSaving}
           />
           <ModelSelect
+            form={form}
+            name="default.image.editModelId"
             label="Default Image Edit Model"
             options={imageEditModels}
-            value={formData['default.image.editModelId']}
-            onChange={value => handleChange('default.image.editModelId', value)}
-            disabled={isSaving}
           />
           <ModelSelect
+            form={form}
+            name="default.video.modelId"
             label="Default Video Model"
             options={videoModels}
-            value={formData['default.video.modelId']}
-            onChange={value => handleChange('default.video.modelId', value)}
-            disabled={isSaving}
           />
           <ModelSelect
+            form={form}
+            name="default.video.imageModelId"
             label="Default Image-to-Video Model"
             options={videoImageModels}
-            value={formData['default.video.imageModelId']}
-            onChange={value =>
-              handleChange('default.video.imageModelId', value)
-            }
-            disabled={isSaving}
           />
           <ModelSelect
+            form={form}
+            name="default.video.editModelId"
             label="Default Video Edit Model"
             options={videoEditModels}
-            value={formData['default.video.editModelId']}
-            onChange={value => handleChange('default.video.editModelId', value)}
-            disabled={isSaving}
           />
           <ModelSelect
+            form={form}
+            name="default.tts.modelId"
             label="Default TTS Model"
             options={speechModels}
-            value={formData['default.tts.modelId']}
-            onChange={value => handleChange('default.tts.modelId', value)}
-            disabled={isSaving}
           />
           <ModelSelect
+            form={form}
+            name="default.stt.modelId"
             label="Default Transcription Model"
             options={transcriptionModels}
-            value={formData['default.stt.modelId']}
-            onChange={value => handleChange('default.stt.modelId', value)}
-            disabled={isSaving}
           />
         </div>
       </div>
@@ -180,18 +155,26 @@ export function ModelsSettings() {
         </p>
         <div className="space-y-2">
           <Label>Enable Speech</Label>
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={speechEnabled}
-              onCheckedChange={checked =>
-                handleChange('speech.enabled', String(checked))
-              }
-              disabled={isSaving}
-            />
-            <Label className="font-normal text-muted-foreground">
-              {speechEnabled ? 'Enabled' : 'Disabled'}
-            </Label>
-          </div>
+          {/* Settings are stored as text, so this switch is over "true"/"false"
+              rather than a boolean, and binds by hand. */}
+          <form.Field name="speech.enabled">
+            {field => {
+              const enabled = field.state.value === 'true';
+              return (
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={enabled}
+                    onCheckedChange={checked =>
+                      field.handleChange(String(checked))
+                    }
+                  />
+                  <Label className="font-normal text-muted-foreground">
+                    {enabled ? 'Enabled' : 'Disabled'}
+                  </Label>
+                </div>
+              );
+            }}
+          </form.Field>
         </div>
       </div>
 
@@ -199,20 +182,13 @@ export function ModelsSettings() {
         <h2 className="mb-4 text-lg font-semibold">Title Generation</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <ModelSelect
+            form={form}
+            name="title.modelId"
             label="Title Generation Model"
             options={chatModels}
-            value={formData['title.modelId']}
-            onChange={value => handleChange('title.modelId', value)}
-            disabled={isSaving}
           />
         </div>
       </div>
-
-      <SettingsSaveBar
-        hasChanges={hasChanges}
-        isSaving={isSaving}
-        onSave={save}
-      />
-    </div>
+    </SettingsForm>
   );
 }

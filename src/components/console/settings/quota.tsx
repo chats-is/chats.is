@@ -1,79 +1,43 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { onSelect } from '@/lib/select';
 import { quotaQueries } from '@/server/fn/quota';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 
-import { SettingsLoading, SettingsSaveBar, useSettingsForm } from './shared';
+import { SettingsForm, SettingsLoading, useSettingsForm } from './shared';
 
 const KEYS = ['default.quotaId'] as const;
 
 export function QuotaSettings() {
-  const { formData, handleChange, save, hasChanges, isLoading, isSaving } =
-    useSettingsForm(KEYS);
+  const { form, isLoading } = useSettingsForm(KEYS);
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
 
   if (isLoading) return <SettingsLoading />;
 
   const isEmpty = !quotaOptions?.length;
+  const options = (quotaOptions ?? []).map(quota => ({
+    value: quota.id,
+    label: quota.name + (quota.isUnlimited ? ' (Unlimited)' : '')
+  }));
 
   return (
-    <div className="space-y-6">
+    <SettingsForm form={form}>
       <div className="rounded-lg border p-4">
         <h2 className="mb-2 text-lg font-semibold">Default Quota</h2>
         <p className="mb-4 text-sm text-muted-foreground">
           Fallback quota for users without a plan.
         </p>
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Default Quota</Label>
-            <Select
-              disabled={isEmpty || isSaving}
-              // Undefined when the saved id no longer names a quota, so the
-              // placeholder shows instead of a blank trigger.
-              value={
-                quotaOptions?.some(
-                  quota => quota.id === formData['default.quotaId']
-                )
-                  ? formData['default.quotaId']
-                  : undefined
-              }
-              onValueChange={onSelect(value =>
-                handleChange('default.quotaId', value)
-              )}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    isEmpty ? 'No quotas available' : 'Select a quota'
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {quotaOptions?.map(quota => (
-                  <SelectItem key={quota.id} value={quota.id}>
-                    {quota.name}
-                    {quota.isUnlimited ? ' (Unlimited)' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <form.AppField name="default.quotaId">
+            {field => (
+              <field.SelectField
+                label="Default Quota"
+                options={options}
+                disabled={isEmpty}
+                placeholder={isEmpty ? 'No quotas available' : 'Select a quota'}
+              />
+            )}
+          </form.AppField>
         </div>
       </div>
-
-      <SettingsSaveBar
-        hasChanges={hasChanges}
-        isSaving={isSaving}
-        onSave={save}
-      />
-    </div>
+    </SettingsForm>
   );
 }

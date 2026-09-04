@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,7 +7,10 @@ import { toast } from 'sonner';
 import { mutating } from '@/lib/mutation';
 import { bulkUpdateSettings, settingsQueries } from '@/server/fn/settings';
 import { Button } from '@/components/ui/button';
+import { useAppForm } from '@/components/app-form';
 import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
+
+import { expand, readPath } from './values';
 
 /**
  * Descriptions persisted alongside each setting. Kept in one place because the
@@ -41,95 +45,128 @@ const SETTING_DESCRIPTIONS: Record<string, string> = {
  * `settings.list` query through the React Query cache, so navigating between
  * pages costs no extra request, and `bulkUpdate` upserts only the keys it is
  * given — so saving one section never clobbers another.
+ *
+ * A setting key is a dotted path (`app.name`, `default.chat.modelId`), which
+ * is exactly how the form addresses a nested field — so the keys are expanded
+ * into an object here and a page names its fields with the key itself.
  */
 export function useSettingsForm(keys: readonly string[]) {
   const queryClient = useQueryClient();
   const { data: settings, isLoading } = useQuery(settingsQueries.list());
-  const [formData, setFormData] = useState<Record<string, string>>({});
-  const [hasChanges, setHasChanges] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: mutating(bulkUpdateSettings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: settingsQueries.key.list() });
+      toast.success('Settings saved successfully');
+    },
+    onError: error => toast.error(error.message)
+  });
+
+  const form = useAppForm({
+    defaultValues: {},
+    onSubmit: async ({ value }) => {
+      await mutation.mutateAsync(
+        keys.map(key => ({
+          key,
+          value: readPath(value, key) || null,
+          description: SETTING_DESCRIPTIONS[key]
+        }))
+      );
+      // The values just saved become the ones "no changes" is measured from,
+      // so the Save button settles rather than staying lit.
+      form.reset(value);
+    }
+  });
+
   // Read inside the hydrate effect without making it a dependency — depending
   // on it would re-run hydration on the very edit it is meant to protect.
-  const hasChangesRef = useRef(false);
-  hasChangesRef.current = hasChanges;
+  const isDirty = useStore(form.store, state => state.isDirty);
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
+  // The values arrive in an effect, which runs after the first render with
+  // data. Until then the fields would mount against an empty form — React
+  // would call them uncontrolled and the page would flash blank — so the page
+  // keeps waiting until the form actually holds something.
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
     // `settings.list` refetches in the background (30s staleTime, and React
     // Query refetches on window focus by default), which would otherwise
     // overwrite whatever the user has typed — silently, since the same pass
-    // would clear hasChanges and disable Save. Leave edits alone; the next
+    // would clear the dirty flag and disable Save. Leave edits alone; the next
     // successful save re-hydrates from the server anyway.
-    if (hasChangesRef.current) return;
+    if (isDirtyRef.current) return;
 
-    const data: Record<string, string> = {};
+    const flat: Record<string, string> = {};
     settings.forEach(setting => {
-      data[setting.key] = setting.value || '';
+      flat[setting.key] = setting.value || '';
     });
-    if (!data['speech.enabled']) {
-      data['speech.enabled'] = 'false';
+    if (!flat['speech.enabled']) {
+      flat['speech.enabled'] = 'false';
     }
-    setFormData(data);
-    setHasChanges(false);
-  }, [settings]);
+    form.reset(expand(flat));
+    setIsHydrated(true);
+  }, [settings, form]);
 
-  const mutation = useMutation({
-    mutationFn: mutating(bulkUpdateSettings),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: settingsQueries.key.list() });
-      setHasChanges(false);
-      toast.success('Settings saved successfully');
-    },
-    onError: error => toast.error(error.message)
-  });
-
-  const handleChange = (key: string, value: string) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  };
-
-  const save = () => {
-    mutation.mutate(
-      keys.map(key => ({
-        key,
-        value: formData[key] || null,
-        description: SETTING_DESCRIPTIONS[key]
-      }))
-    );
-  };
-
-  return {
-    formData,
-    handleChange,
-    save,
-    hasChanges,
-    isLoading,
-    isSaving: mutation.isPending
-  };
+  return { form, isLoading: isLoading || !isHydrated };
 }
 
 export function SettingsLoading() {
   return <ConsoleSettingsPanelSkeleton />;
 }
 
-export function SettingsSaveBar({
-  hasChanges,
-  isSaving,
-  onSave
-}: {
-  hasChanges: boolean;
-  isSaving: boolean;
-  onSave: () => void;
-}) {
+/**
+ * Save, lit only once something has actually been edited. The form is the one
+ * that knows, so the bar reads it rather than being told.
+ */
+export function SettingsSaveBar({ form }: { form: SettingsFormApi }) {
+  const isDirty = useStore(form.store, state => state.isDirty);
+  const isSubmitting = useStore(form.store, state => state.isSubmitting);
+
   return (
     <div className="flex items-center justify-start">
       <Button
-        onClick={onSave}
-        disabled={!hasChanges || isSaving}
+        type="submit"
+        disabled={!isDirty || isSubmitting}
         className="gap-2"
       >
-        {isSaving && <Loader2 className="size-4 animate-spin" />}
-        {isSaving ? 'Saving...' : 'Save Changes'}
+        {isSubmitting && <Loader2 className="size-4 animate-spin" />}
+        {isSubmitting ? 'Saving...' : 'Save Changes'}
       </Button>
     </div>
+  );
+}
+
+/**
+ * The form a settings page holds. Its values are a tree of strings whose shape
+ * depends on which keys the page owns, so the page-specific typing stops here.
+ */
+export type SettingsFormApi = ReturnType<typeof useSettingsForm>['form'];
+
+/**
+ * A settings page: its fields, and the Save that commits them. Submitting is
+ * what saves, so the button is inside the form rather than wired to a handler.
+ */
+export function SettingsForm({
+  form,
+  children
+}: {
+  form: SettingsFormApi;
+  children: React.ReactNode;
+}) {
+  return (
+    <form
+      onSubmit={e => {
+        e.preventDefault();
+        form.handleSubmit();
+      }}
+      className="space-y-6"
+    >
+      {children}
+      <SettingsSaveBar form={form} />
+    </form>
   );
 }

@@ -490,15 +490,18 @@ export default function ProvidersPage() {
     }
   };
 
-  const shape = useStore(form.store, state => ({
-    type: state.values.type,
-    vertexAuthMode: state.values.vertexAuthMode
-  }));
-  const isVertex = shape.type === 'vertex';
-  const isBedrock = shape.type === 'bedrock';
+  // One field at a time: the store compares by identity, so a selector
+  // returning a fresh object would re-render the page on every keystroke.
+  const type = useStore(form.store, state => state.values.type);
+  const vertexAuthMode = useStore(
+    form.store,
+    state => state.values.vertexAuthMode
+  );
+  const isVertex = type === 'vertex';
+  const isBedrock = type === 'bedrock';
   const isVertexServiceAccount =
-    isVertex && shape.vertexAuthMode === 'service_account';
-  const isVertexApiKey = isVertex && shape.vertexAuthMode === 'api_key';
+    isVertex && vertexAuthMode === 'service_account';
+  const isVertexApiKey = isVertex && vertexAuthMode === 'api_key';
   const requiresJsonApiKey = isVertexServiceAccount || isBedrock;
 
   const apiKeyPlaceholder = (() => {

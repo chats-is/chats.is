@@ -104,7 +104,9 @@ function TextField({
   const input = (
     <Input
       id={field.name}
-      value={field.state.value}
+      // `?? ''`: a field can be asked to render before its value is set, and
+      // an undefined value would hand React an uncontrolled input.
+      value={field.state.value ?? ''}
       onChange={e => field.handleChange(e.target.value)}
       onBlur={field.handleBlur}
       aria-invalid={!!error}
@@ -165,7 +167,7 @@ function TextareaField({
     >
       <Textarea
         id={field.name}
-        value={field.state.value}
+        value={field.state.value ?? ''}
         onChange={e => field.handleChange(e.target.value)}
         onBlur={field.handleBlur}
         aria-invalid={!!error}
@@ -215,6 +217,9 @@ function SelectField({
   // Base UI's trigger renders the value, not the selected item's content, so
   // it needs the value-to-label mapping handed to it.
   const items = Object.fromEntries(options.map(o => [o.value, o.label]));
+  const chosen = options.some(o => o.value === field.state.value)
+    ? field.state.value
+    : null;
 
   return (
     <FieldShell
@@ -227,8 +232,10 @@ function SelectField({
       <Select
         items={items}
         // `null`, not `''`: an unset select is one with nothing chosen, not
-        // one holding an empty value of its own.
-        value={field.state.value || null}
+        // one holding an empty value of its own. A value that no longer names
+        // an option counts as unset too — otherwise the trigger renders blank
+        // with no hint that anything was ever chosen.
+        value={chosen}
         onValueChange={value => {
           if (value !== null) field.handleChange(value);
         }}
@@ -292,10 +299,10 @@ function SubmitButton({
   ...props
 }: React.ComponentProps<typeof Button>) {
   const form = useFormContext();
-  const [canSubmit, isSubmitting] = useStore(form.store, state => [
-    state.canSubmit,
-    state.isSubmitting
-  ]);
+  // Selected one at a time: the store compares by identity, so a selector
+  // returning a fresh array would re-render this on every keystroke.
+  const canSubmit = useStore(form.store, state => state.canSubmit);
+  const isSubmitting = useStore(form.store, state => state.isSubmitting);
 
   return (
     <Button
