@@ -2,8 +2,8 @@ import { type UsageRowLike } from '@/types';
 import { parseNumber } from '@/lib/utils';
 
 /**
- * Capability-aware "Unit Price" cell for usage log tables. Returns a single
- * `<td>` (must be used directly inside `<tr>`).
+ * Capability-aware "Unit Price" cell for usage log tables. Returns the cell's
+ * contents; the column definition that uses it owns the cell itself.
  *
  * Shows the per-unit rate snapshot stored on each usage row — the rate that
  * was actually applied at compute time, so the Cost column is auditable.
@@ -38,11 +38,11 @@ export function UsageUnitPrice({ row }: { row: UsageRowLike }) {
       bottom.push({ label: 'Cache Write', value: per1M(row.cacheWritePrice) });
 
     return (
-      <td className="p-2 text-left align-middle font-mono text-xs">
+      <>
         {top.length > 0 && <div>{renderPairs(top)}</div>}
         {bottom.length > 0 && <div>{renderPairs(bottom)}</div>}
         {top.length === 0 && bottom.length === 0 && '—'}
-      </td>
+      </>
     );
   }
 
@@ -57,11 +57,7 @@ export function UsageUnitPrice({ row }: { row: UsageRowLike }) {
       if (has(row.outputPrice))
         items.push({ label: 'Output', value: per1M(row.outputPrice) });
     }
-    return (
-      <td className="p-2 text-left font-mono text-xs">
-        {items.length ? renderPairs(items) : '—'}
-      </td>
-    );
+    return <>{items.length ? renderPairs(items) : '—'}</>;
   }
 
   if (row.capability === 'video') {
@@ -73,11 +69,7 @@ export function UsageUnitPrice({ row }: { row: UsageRowLike }) {
         label: 'Per sec',
         value: perUnit(row.videoSecondsPrice, 's')
       });
-    return (
-      <td className="p-2 text-left font-mono text-xs">
-        {items.length ? renderPairs(items) : '—'}
-      </td>
-    );
+    return <>{items.length ? renderPairs(items) : '—'}</>;
   }
 
   // audio — per-character (classic TTS) or per-token (gpt-4o-mini-tts, omni)
@@ -90,11 +82,7 @@ export function UsageUnitPrice({ row }: { row: UsageRowLike }) {
     if (has(row.audioOutputPrice))
       items.push({ label: 'Out', value: per1M(row.audioOutputPrice) });
   }
-  return (
-    <td className="p-2 text-left font-mono text-xs">
-      {items.length ? renderPairs(items) : '—'}
-    </td>
-  );
+  return <>{items.length ? renderPairs(items) : '—'}</>;
 }
 
 type Pair = { label: string; value: string };

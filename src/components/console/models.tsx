@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -11,8 +12,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { z } from 'zod';
 
-import { type ModelCapability } from '@/types';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';
@@ -22,7 +23,8 @@ import {
   deleteModel,
   modelQueries,
   toggleEnabledModel,
-  updateModel
+  updateModel,
+  type listModels
 } from '@/server/fn/model';
 import { providerQueries } from '@/server/fn/provider';
 import {
@@ -53,127 +55,301 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { useAppForm } from '@/components/app-form';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
 import { IconPicker } from '@/components/console/icon-picker';
 import { ModelIcon } from '@/components/model-icon';
 
-type ProviderBindingForm = {
-  providerId: string;
-  isEnabled: boolean;
-};
+type Model = Awaited<ReturnType<typeof listModels>>[number];
 
 const capabilityFilterLabels = {
   all: 'All Capabilities',
   ...Object.fromEntries(CAPABILITIES.map(c => [c.value, c.label]))
 };
 
-function ProviderBindingRow({
-  binding,
-  index,
-  bindings,
-  providers,
-  allProviders,
-  isPending,
-  onChange,
-  onMoveUp,
-  onMoveDown,
-  onRemove
-}: {
-  binding: ProviderBindingForm;
-  index: number;
-  bindings: ProviderBindingForm[];
-  /** Providers compatible with the model id (same-kind) — the only selectable ones. */
-  providers: { id: string; name: string }[] | undefined;
-  /** All providers, used to label an already-selected but now-incompatible one. */
-  allProviders: { id: string; name: string }[] | undefined;
-  isPending: boolean;
-  onChange: (patch: Partial<ProviderBindingForm>) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onRemove: () => void;
-}) {
-  const options = providers ?? [];
-  const selectedMissing =
-    !!binding.providerId && !options.some(p => p.id === binding.providerId);
-  const selectedName =
-    allProviders?.find(p => p.id === binding.providerId)?.name ??
-    binding.providerId;
-  // Base UI's trigger renders the value, not the selected item's content, so
-  // the value-to-label mapping is handed to it.
-  const providerLabels = {
-    ...Object.fromEntries((allProviders ?? []).map(p => [p.id, p.name])),
-    ...Object.fromEntries(options.map(p => [p.id, p.name]))
-  };
+const CAPABILITY_OPTIONS = CAPABILITIES.map(c => ({
+  value: c.value,
+  label: c.label
+}));
 
-  return (
-    <div className="flex items-center gap-2 rounded-md border p-2">
-      <Select
-        items={providerLabels}
-        // `null`, not undefined: an empty binding is a select with nothing
-        // chosen, not one that owns its own value — see settings/models.
-        value={binding.providerId || null}
-        onValueChange={onSelect(value => onChange({ providerId: value }))}
-        disabled={isPending}
-      >
-        <SelectTrigger className="flex-1">
-          <SelectValue placeholder="Select provider" />
-        </SelectTrigger>
-        <SelectContent>
-          {selectedMissing && (
-            <SelectItem value={binding.providerId}>{selectedName}</SelectItem>
-          )}
-          {options.map(p => {
-            const takenByOther = bindings.some(
-              (b, i) => i !== index && b.providerId === p.id
-            );
-            return (
-              <SelectItem key={p.id} value={p.id} disabled={takenByOther}>
-                {p.name}
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
-      <Switch
-        checked={binding.isEnabled}
-        onCheckedChange={checked => onChange({ isEnabled: checked })}
-        disabled={isPending}
+/** A JSON object, or nothing. Stored as text so the admin can keep editing it. */
+const jsonObject = z.string().refine(value => {
+  if (!value.trim()) return true;
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null;
+  } catch {
+    return false;
+  }
+}, 'Invalid JSON format');
+
+const modelSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Display name is required'),
+    modelId: z.string().trim().min(1, 'Model ID is required'),
+    capability: z.enum(['chat', 'image', 'video', 'audio']),
+    image: z.string(),
+    aliases: z.string(),
+    supportsVision: z.boolean(),
+    supportsReasoning: z.boolean(),
+    supportsImageEdit: z.boolean(),
+    supportsImageToVideo: z.boolean(),
+    supportsVideoEdit: z.boolean(),
+    supportsTranscription: z.boolean(),
+    isEnabled: z.boolean(),
+    systemPrompt: z.string(),
+    uiOptions: jsonObject,
+    apiParams: jsonObject,
+    providers: z.array(
+      z.object({ providerId: z.string(), isEnabled: z.boolean() })
+    )
+  })
+  // A model is only reachable through a provider, and the list is a failover
+  // order — so it needs at least one, and no provider twice.
+  .superRefine((value, ctx) => {
+    const chosen = value.providers
+      .map(binding => binding.providerId)
+      .filter(Boolean);
+
+    if (chosen.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['providers'],
+        message: 'At least one provider is required'
+      });
+    }
+    if (new Set(chosen).size !== chosen.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['providers'],
+        message: 'Each provider can only be added once'
+      });
+    }
+  });
+
+type ModelForm = z.infer<typeof modelSchema>;
+
+const EMPTY_FORM: ModelForm = {
+  name: '',
+  modelId: '',
+  capability: 'chat',
+  image: '',
+  aliases: '',
+  supportsVision: false,
+  supportsReasoning: false,
+  supportsImageEdit: false,
+  supportsImageToVideo: false,
+  supportsVideoEdit: false,
+  supportsTranscription: false,
+  isEnabled: true,
+  systemPrompt: '',
+  uiOptions: '',
+  apiParams: '',
+  providers: [{ providerId: '', isEnabled: true }]
+};
+
+const uiOptionsPlaceholderByCapability: Record<string, string> = {
+  chat: `{
+  "reasoning": false
+}`,
+  image: `{
+  "size": "auto",
+  "sizes": ["auto", "1024x1024"],
+  "aspectRatio": "auto",
+  "aspectRatios": ["auto", "16:9"]
+}`,
+  video: `{
+  "duration": 6,
+  "durations": [4, 6, 8],
+  "resolution": "auto",
+  "resolutions": ["auto", "720p"],
+  "aspectRatio": "auto",
+  "aspectRatios": ["auto", "16:9"]
+}`,
+  audio: `{
+  "voice": "auto",
+  "voices": ["auto"]
+}`
+};
+
+const apiParamsPlaceholderByCapability: Record<string, string> = {
+  chat: `{
+  "temperature": 0.7,
+  "topP": 1,
+  "topK": 0,
+  "maxOutputTokens": 4096,
+  "frequencyPenalty": 0,
+  "presencePenalty": 0
+}`,
+  image: '{\n}',
+  video: '{}',
+  audio: '{}'
+};
+
+/** The capability switches that only apply to some kinds of model. */
+const CONDITIONAL_TOGGLES = [
+  {
+    name: 'supportsImageEdit',
+    label: 'Image editing',
+    capability: 'image'
+  },
+  {
+    name: 'supportsImageToVideo',
+    label: 'Image to video',
+    capability: 'video'
+  },
+  {
+    name: 'supportsVideoEdit',
+    label: 'Video editing',
+    capability: 'video'
+  },
+  {
+    name: 'supportsTranscription',
+    label: 'Transcription (STT)',
+    capability: 'audio'
+  }
+] as const;
+
+/** A JSON textarea's help bubble, showing the shape it expects. */
+const JsonHint = ({ label, example }: { label: string; example: string }) => (
+  <div className="flex items-center gap-2">
+    <Label>{label}</Label>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            className="text-muted-foreground/60 hover:text-muted-foreground"
+            aria-label={`${label} demo`}
+          >
+            <AlertCircle className="size-3.5" />
+          </button>
+        }
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={isPending || index === 0}
-        onClick={onMoveUp}
-      >
-        <ArrowUp className="size-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={isPending || index === bindings.length - 1}
-        onClick={onMoveDown}
-      >
-        <ArrowDown className="size-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={isPending || bindings.length === 1}
-        onClick={onRemove}
-      >
-        <Trash2 className="size-4" />
-      </Button>
-    </div>
-  );
-}
+      <TooltipContent className="max-w-sm">
+        <pre className="font-mono text-xs whitespace-pre-wrap">{example}</pre>
+      </TooltipContent>
+    </Tooltip>
+  </div>
+);
+
+const helper = createAppColumnHelper<Model>();
+
+const modelColumns = (actions: {
+  toggle: (model: Model, isEnabled: boolean) => void;
+  edit: (model: Model) => void;
+  remove: (id: string) => void;
+}) =>
+  helper.columns([
+    helper.display({
+      id: 'icon',
+      header: 'Icon',
+      meta: { headClassName: 'w-20' },
+      cell: ({ row }) =>
+        row.original.image ? (
+          <ModelIcon image={row.original.image} className="size-8" />
+        ) : (
+          <div className="size-8 rounded border bg-muted" />
+        )
+    }),
+    helper.accessor('name', {
+      header: 'Model',
+      cell: ({ row }) => (
+        <>
+          <div className="font-medium">{row.original.name}</div>
+          <div className="font-mono text-xs text-muted-foreground">
+            {row.original.modelId}
+          </div>
+        </>
+      )
+    }),
+    helper.accessor('aliases', {
+      header: 'Aliases',
+      meta: { cellClassName: 'text-sm text-muted-foreground' },
+      cell: ({ row }) => row.original.aliases?.join(', ') || '-'
+    }),
+    helper.display({
+      id: 'provider',
+      header: 'Provider',
+      meta: { cellClassName: 'text-sm' },
+      cell: ({ row }) => {
+        const bound = row.original.modelProviders ?? [];
+        return bound.length > 0
+          ? bound
+              .map(mp => mp.provider?.name)
+              .filter(Boolean)
+              .join(', ')
+          : row.original.provider?.name;
+      }
+    }),
+    helper.accessor('capability', {
+      header: 'Capability',
+      cell: ({ row }) => (
+        <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+          {row.original.capability}
+        </span>
+      )
+    }),
+    helper.accessor('isEnabled', {
+      header: 'Enabled',
+      meta: { align: 'center', headClassName: 'w-20' },
+      cell: ({ row }) => (
+        <Switch
+          checked={row.original.isEnabled}
+          onCheckedChange={checked => actions.toggle(row.original, checked)}
+        />
+      )
+    }),
+    helper.display({
+      id: 'actions',
+      header: 'Actions',
+      meta: {
+        align: 'right',
+        headClassName: 'w-24',
+        cellClassName: 'whitespace-nowrap'
+      },
+      cell: ({ row }) => (
+        <>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.edit(row.original)}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Edit Model</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.remove(row.original.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Delete Model</TooltipContent>
+          </Tooltip>
+        </>
+      )
+    })
+  ]);
 
 export default function ModelsPage() {
   const [isOpen, setIsOpen] = useState(false);
@@ -189,31 +365,23 @@ export default function ModelsPage() {
   const { data: models, isLoading } = useQuery(modelQueries.list());
   const { data: providers } = useQuery(providerQueries.list());
 
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
+
   const createMutation = useMutation({
     mutationFn: mutating(createModel),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
-      setIsOpen(false);
-      resetForm();
-    },
-    onError: error => toast.error(error.message)
+    onSuccess: invalidate
   });
 
   const updateMutation = useMutation({
     mutationFn: mutating(updateModel),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
-      setIsOpen(false);
-      setEditingId(null);
-      resetForm();
-    },
-    onError: error => toast.error(error.message)
+    onSuccess: invalidate
   });
 
   const deleteMutation = useMutation({
     mutationFn: mutating(deleteModel),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
+      invalidate();
       setDeleteId(null);
     },
     onError: error => toast.error(error.message)
@@ -221,120 +389,80 @@ export default function ModelsPage() {
 
   const toggleMutation = useMutation({
     mutationFn: mutating(toggleEnabledModel),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
-    },
+    onSuccess: invalidate,
     onError: error => toast.error(error.message)
   });
 
-  const [formData, setFormData] = useState({
-    name: '',
-    modelId: '',
-    capability: 'chat' as ModelCapability,
-    image: '',
-    aliases: '',
-    supportsVision: false,
-    supportsReasoning: false,
-    supportsImageEdit: false,
-    supportsImageToVideo: false,
-    supportsVideoEdit: false,
-    supportsTranscription: false,
-    isEnabled: true,
-    systemPrompt: '',
-    uiOptions: '',
-    apiParams: ''
+  const form = useAppForm({
+    defaultValues: EMPTY_FORM,
+    validators: { onChange: modelSchema },
+    onSubmit: async ({ value }) => {
+      // Validated above, so these parse. An absent field clears the stored
+      // value on an edit, and stays unset on a create.
+      const uiOptions = value.uiOptions
+        ? JSON.parse(value.uiOptions)
+        : editingId
+          ? null
+          : undefined;
+      const apiParams = value.apiParams
+        ? JSON.parse(value.apiParams)
+        : editingId
+          ? null
+          : undefined;
+      const systemPrompt = value.systemPrompt || (editingId ? null : undefined);
+      const aliases = value.aliases
+        ? value.aliases
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+        : editingId
+          ? []
+          : undefined;
+
+      const payload = {
+        ...value,
+        aliases,
+        systemPrompt,
+        uiOptions,
+        apiParams,
+        // The list's order is the failover order.
+        providers: value.providers
+          .filter(b => b.providerId)
+          .map((b, index) => ({
+            providerId: b.providerId,
+            priority: index,
+            isEnabled: b.isEnabled
+          }))
+      };
+
+      try {
+        if (editingId) {
+          await updateMutation.mutateAsync({ id: editingId, ...payload });
+        } else {
+          await createMutation.mutateAsync(payload);
+        }
+        setIsOpen(false);
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    }
   });
 
-  const [providerBindings, setProviderBindings] = useState<
-    ProviderBindingForm[]
-  >([]);
+  const openFor = (model: Model | null) => {
+    setEditingId(model?.id ?? null);
 
-  // Debounce the modelId before querying compatible providers, so typing in the
-  // Model ID field doesn't fan out a /models call to every provider per keystroke.
-  const [debouncedModelId, setDebouncedModelId] = useState('');
-  useEffect(() => {
-    const trimmed = formData.modelId.trim();
-    const timer = setTimeout(() => setDebouncedModelId(trimmed), 400);
-    return () => clearTimeout(timer);
-  }, [formData.modelId]);
+    if (!model) {
+      form.reset(EMPTY_FORM);
+      setIsOpen(true);
+      return;
+    }
 
-  // Providers that actually support the entered modelId — the only ones a
-  // binding may select (same-kind failover).
-  const { data: compatibleProviders } = useQuery({
-    ...providerQueries.compatible({ modelId: debouncedModelId }),
-    enabled: isOpen && !!debouncedModelId,
-    refetchOnWindowFocus: false,
-    retry: false
-  });
+    const bindings = (model.modelProviders ?? [])
+      .slice()
+      .sort((a, b) => a.priority - b.priority)
+      .map(b => ({ providerId: b.providerId, isEnabled: b.isEnabled }));
 
-  const uiOptionsPlaceholderByCapability: Record<string, string> = {
-    chat: `{
-  "reasoning": false
-}`,
-    image: `{
-  "size": "auto",
-  "sizes": ["auto", "1024x1024"],
-  "aspectRatio": "auto",
-  "aspectRatios": ["auto", "16:9"]
-}`,
-    video: `{
-  "duration": 6,
-  "durations": [4, 6, 8],
-  "resolution": "auto",
-  "resolutions": ["auto", "720p"],
-  "aspectRatio": "auto",
-  "aspectRatios": ["auto", "16:9"]
-}`,
-    audio: `{
-  "voice": "auto",
-  "voices": ["auto"]
-}`
-  };
-
-  const uiOptionsPlaceholder =
-    uiOptionsPlaceholderByCapability[formData.capability] ?? '{\n}';
-
-  const apiParamsPlaceholderByCapability: Record<string, string> = {
-    chat: `{
-  "temperature": 0.7,
-  "topP": 1,
-  "topK": 0,
-  "maxOutputTokens": 4096,
-  "frequencyPenalty": 0,
-  "presencePenalty": 0
-}`,
-    image: '{\n}',
-    video: '{}',
-    audio: '{}'
-  };
-
-  const apiParamsPlaceholder =
-    apiParamsPlaceholderByCapability[formData.capability] ?? '{}';
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      modelId: '',
-      capability: 'chat',
-      image: '',
-      aliases: '',
-      supportsVision: false,
-      supportsReasoning: false,
-      supportsImageEdit: false,
-      supportsImageToVideo: false,
-      supportsVideoEdit: false,
-      supportsTranscription: false,
-      isEnabled: true,
-      systemPrompt: '',
-      uiOptions: '',
-      apiParams: ''
-    });
-    setProviderBindings([{ providerId: '', isEnabled: true }]);
-  };
-
-  const handleEdit = (model: any) => {
-    setEditingId(model.id);
-    setFormData({
+    form.reset({
       name: model.name,
       modelId: model.modelId,
       capability: model.capability,
@@ -351,89 +479,46 @@ export default function ModelsPage() {
       uiOptions: model.uiOptions
         ? JSON.stringify(model.uiOptions, null, 2)
         : '',
-      apiParams: model.apiParams ? JSON.stringify(model.apiParams, null, 2) : ''
+      apiParams: model.apiParams
+        ? JSON.stringify(model.apiParams, null, 2)
+        : '',
+      providers:
+        bindings.length > 0
+          ? bindings
+          : [{ providerId: model.providerId || '', isEnabled: true }]
     });
-    const bindings: ProviderBindingForm[] = (model.modelProviders ?? [])
-      .slice()
-      .sort((a: any, b: any) => a.priority - b.priority)
-      .map((b: any) => ({
-        providerId: b.providerId,
-        isEnabled: b.isEnabled
-      }));
-    setProviderBindings(
-      bindings.length > 0
-        ? bindings
-        : [{ providerId: model.providerId || '', isEnabled: true }]
-    );
     setIsOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    let uiOptions: Record<string, unknown> | null | undefined;
-    let apiParams: Record<string, unknown> | null | undefined;
-    try {
-      if (formData.uiOptions) {
-        uiOptions = JSON.parse(formData.uiOptions);
-      } else {
-        uiOptions = editingId ? null : undefined;
-      }
-      if (formData.apiParams) {
-        apiParams = JSON.parse(formData.apiParams);
-      } else {
-        apiParams = editingId ? null : undefined;
-      }
-    } catch {
-      toast.error('Invalid JSON format');
-      return;
-    }
+  const columns = useMemo(
+    () =>
+      modelColumns({
+        toggle: (model, isEnabled) =>
+          toggleMutation.mutate({ id: model.id, isEnabled }),
+        edit: openFor,
+        remove: setDeleteId
+      }),
+    []
+  );
 
-    const systemPrompt =
-      formData.systemPrompt || (editingId ? null : undefined);
-    const aliases = formData.aliases
-      ? formData.aliases
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean)
-      : editingId
-        ? []
-        : undefined;
-    const providersPayload = providerBindings
-      .filter(b => b.providerId)
-      .map((b, index) => ({
-        providerId: b.providerId,
-        priority: index,
-        isEnabled: b.isEnabled
-      }));
-    if (providersPayload.length === 0) {
-      toast.error('At least one provider is required');
-      return;
-    }
-    const selectedProviderIds = providersPayload.map(b => b.providerId);
-    if (new Set(selectedProviderIds).size !== selectedProviderIds.length) {
-      toast.error('Each provider can only be added once');
-      return;
-    }
+  // Debounce the modelId before querying compatible providers, so typing in the
+  // Model ID field doesn't fan out a /models call to every provider per keystroke.
+  const typedModelId = useStore(form.store, state => state.values.modelId);
+  const [debouncedModelId, setDebouncedModelId] = useState('');
+  useEffect(() => {
+    const trimmed = typedModelId.trim();
+    const timer = setTimeout(() => setDebouncedModelId(trimmed), 400);
+    return () => clearTimeout(timer);
+  }, [typedModelId]);
 
-    const data = {
-      ...formData,
-      aliases,
-      systemPrompt,
-      uiOptions,
-      apiParams,
-      providers: providersPayload
-    };
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, ...data });
-    } else {
-      createMutation.mutate(
-        data as Parameters<typeof createMutation.mutate>[0]
-      );
-    }
-  };
-
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  // Providers that actually support the entered modelId — the only ones a
+  // binding may select (same-kind failover).
+  const { data: compatibleProviders } = useQuery({
+    ...providerQueries.compatible({ modelId: debouncedModelId }),
+    enabled: isOpen && !!debouncedModelId,
+    refetchOnWindowFocus: false,
+    retry: false
+  });
 
   const filteredModels = models?.filter(m => {
     const matchesCapability =
@@ -489,13 +574,7 @@ export default function ModelsPage() {
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger
             render={
-              <Button
-                className="gap-2"
-                onClick={() => {
-                  setEditingId(null);
-                  resetForm();
-                }}
-              >
+              <Button className="gap-2" onClick={() => openFor(null)}>
                 <Plus className="size-4" />
                 Add Model
               </Button>
@@ -507,495 +586,335 @@ export default function ModelsPage() {
                 {editingId ? 'Edit Model' : 'Add Model'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                form.handleSubmit();
+              }}
+              className="space-y-4"
+            >
               <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Display Name</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={e =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      placeholder="GPT-4o"
-                      required
-                      disabled={isPending}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="modelId">Model ID</Label>
-                    <Input
-                      id="modelId"
-                      value={formData.modelId}
-                      onChange={e =>
-                        setFormData({ ...formData, modelId: e.target.value })
-                      }
-                      placeholder="gpt-4o"
-                      required
-                      disabled={isPending || !!editingId}
-                    />
-                  </div>
+                  <form.AppField name="name">
+                    {field => (
+                      <field.TextField
+                        label="Display Name"
+                        placeholder="GPT-4o"
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="modelId">
+                    {field => (
+                      <field.TextField
+                        label="Model ID"
+                        placeholder="gpt-4o"
+                        // A model's id is its identity everywhere else, so an
+                        // existing one is not renamed here.
+                        disabled={!!editingId}
+                      />
+                    )}
+                  </form.AppField>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2 space-y-2">
                     <Label>Providers (priority order, auto failover)</Label>
-                    <div className="space-y-2">
-                      {providerBindings.map((binding, index) => (
-                        <ProviderBindingRow
-                          key={index}
-                          binding={binding}
-                          index={index}
-                          bindings={providerBindings}
-                          providers={compatibleProviders}
-                          allProviders={providers}
-                          isPending={isPending}
-                          onChange={patch =>
-                            setProviderBindings(prev =>
-                              prev.map((b, i) =>
-                                i === index ? { ...b, ...patch } : b
-                              )
-                            )
-                          }
-                          onMoveUp={() =>
-                            setProviderBindings(prev => {
-                              if (index === 0) return prev;
-                              const next = [...prev];
-                              [next[index - 1], next[index]] = [
-                                next[index],
-                                next[index - 1]
-                              ];
-                              return next;
-                            })
-                          }
-                          onMoveDown={() =>
-                            setProviderBindings(prev => {
-                              if (index === prev.length - 1) return prev;
-                              const next = [...prev];
-                              [next[index], next[index + 1]] = [
-                                next[index + 1],
-                                next[index]
-                              ];
-                              return next;
-                            })
-                          }
-                          onRemove={() =>
-                            setProviderBindings(prev =>
-                              prev.filter((_, i) => i !== index)
-                            )
-                          }
-                        />
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        disabled={isPending}
-                        onClick={() =>
-                          setProviderBindings(prev => [
-                            ...prev,
-                            { providerId: '', isEnabled: true }
-                          ])
-                        }
-                      >
-                        <Plus className="size-4" />
-                        Add provider
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="aliases">Model ID Aliases (optional)</Label>
-                    <Input
-                      id="aliases"
-                      value={formData.aliases}
-                      onChange={e =>
-                        setFormData({ ...formData, aliases: e.target.value })
-                      }
-                      placeholder="gpt-4, gpt-4-turbo"
-                      disabled={isPending}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="capability">Capability</Label>
-                    <Select
-                      value={formData.capability}
-                      onValueChange={onSelect(value =>
-                        setFormData({ ...formData, capability: value as any })
+                    <form.Field name="providers" mode="array">
+                      {providersField => (
+                        <div className="space-y-2">
+                          {providersField.state.value.map((binding, index) => {
+                            const options = compatibleProviders ?? [];
+                            // An already-bound provider that the current model
+                            // id is no longer compatible with still has to be
+                            // shown, or the row would look empty.
+                            const selectedMissing =
+                              !!binding.providerId &&
+                              !options.some(p => p.id === binding.providerId);
+                            const selectedName =
+                              providers?.find(p => p.id === binding.providerId)
+                                ?.name ?? binding.providerId;
+
+                            const selectOptions = [
+                              ...(selectedMissing
+                                ? [
+                                    {
+                                      value: binding.providerId,
+                                      label: selectedName
+                                    }
+                                  ]
+                                : []),
+                              ...options.map(p => ({
+                                value: p.id,
+                                label: p.name,
+                                disabled: providersField.state.value.some(
+                                  (b, i) => i !== index && b.providerId === p.id
+                                )
+                              }))
+                            ];
+
+                            return (
+                              <div
+                                key={index}
+                                className="flex items-center gap-2 rounded-md border p-2"
+                              >
+                                <form.AppField
+                                  name={`providers[${index}].providerId`}
+                                >
+                                  {field => (
+                                    <field.SelectField
+                                      placeholder="Select provider"
+                                      options={selectOptions}
+                                      fieldClassName="flex-1 space-y-0"
+                                    />
+                                  )}
+                                </form.AppField>
+                                <form.Field
+                                  name={`providers[${index}].isEnabled`}
+                                >
+                                  {field => (
+                                    <Switch
+                                      checked={field.state.value}
+                                      onCheckedChange={checked =>
+                                        field.handleChange(checked)
+                                      }
+                                    />
+                                  )}
+                                </form.Field>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={index === 0}
+                                  onClick={() =>
+                                    providersField.swapValues(index - 1, index)
+                                  }
+                                >
+                                  <ArrowUp className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={
+                                    index ===
+                                    providersField.state.value.length - 1
+                                  }
+                                  onClick={() =>
+                                    providersField.swapValues(index, index + 1)
+                                  }
+                                >
+                                  <ArrowDown className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={
+                                    providersField.state.value.length === 1
+                                  }
+                                  onClick={() =>
+                                    providersField.removeValue(index)
+                                  }
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() =>
+                              providersField.pushValue({
+                                providerId: '',
+                                isEnabled: true
+                              })
+                            }
+                          >
+                            <Plus className="size-4" />
+                            Add provider
+                          </Button>
+                          {providersField.state.meta.isTouched &&
+                            providersField.state.meta.errors[0] && (
+                              <p className="text-xs text-destructive">
+                                {String(
+                                  (
+                                    providersField.state.meta.errors[0] as {
+                                      message?: string;
+                                    }
+                                  )?.message ??
+                                    providersField.state.meta.errors[0]
+                                )}
+                              </p>
+                            )}
+                        </div>
                       )}
-                      disabled={isPending}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CAPABILITIES.map(cap => (
-                          <SelectItem key={cap.value} value={cap.value}>
-                            {cap.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    </form.Field>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="systemPrompt">
-                      System Prompt (optional)
-                    </Label>
-                    <Textarea
-                      id="systemPrompt"
-                      value={formData.systemPrompt}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          systemPrompt: e.target.value
-                        })
-                      }
-                      placeholder="Instructions prepended to every chat with this model. Supports {provider}, {modelId}, {date}."
-                      rows={4}
-                      disabled={isPending}
-                    />
-                  </div>
+                  <form.AppField name="aliases">
+                    {field => (
+                      <field.TextField
+                        label="Model ID Aliases (optional)"
+                        placeholder="gpt-4, gpt-4-turbo"
+                      />
+                    )}
+                  </form.AppField>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="image">Icon (optional)</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 shadow-sm">
-                      {formData.image ? (
-                        <ModelIcon image={formData.image} className="size-4" />
-                      ) : null}
-                    </div>
-                    <Input
-                      id="image"
-                      value={formData.image}
-                      onChange={e =>
-                        setFormData({ ...formData, image: e.target.value })
-                      }
-                      placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
-                      disabled={isPending}
-                    />
-                  </div>
-                  <IconPicker
-                    value={formData.image}
-                    onChange={value =>
-                      setFormData({
-                        ...formData,
-                        image: value
-                      })
-                    }
-                    disabled={isPending}
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <form.AppField name="capability">
+                    {field => (
+                      <field.SelectField
+                        label="Capability"
+                        options={CAPABILITY_OPTIONS}
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="systemPrompt">
+                    {field => (
+                      <field.TextareaField
+                        label="System Prompt (optional)"
+                        placeholder="Instructions prepended to every chat with this model. Supports {provider}, {modelId}, {date}."
+                        rows={4}
+                      />
+                    )}
+                  </form.AppField>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="uiOptions">UI Options (JSON)</Label>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              type="button"
-                              className="text-muted-foreground/60 hover:text-muted-foreground"
-                              aria-label="UI Options demo"
-                            >
-                              <AlertCircle className="size-3.5" />
-                            </button>
-                          }
+
+                <form.Field name="image">
+                  {field => (
+                    <div className="space-y-2">
+                      <Label htmlFor="image">Icon (optional)</Label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 shadow-sm">
+                          {field.state.value ? (
+                            <ModelIcon
+                              image={field.state.value}
+                              className="size-4"
+                            />
+                          ) : null}
+                        </div>
+                        <Input
+                          id="image"
+                          value={field.state.value}
+                          onChange={e => field.handleChange(e.target.value)}
+                          placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
                         />
-                        <TooltipContent className="max-w-sm">
-                          <pre className="font-mono text-xs whitespace-pre-wrap">
-                            {uiOptionsPlaceholder}
-                          </pre>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <Textarea
-                      id="uiOptions"
-                      value={formData.uiOptions}
-                      onChange={e =>
-                        setFormData({ ...formData, uiOptions: e.target.value })
-                      }
-                      placeholder={uiOptionsPlaceholder}
-                      className="font-mono break-all"
-                      rows={3}
-                      disabled={isPending}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="apiParams">API Params (JSON)</Label>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              type="button"
-                              className="text-muted-foreground/60 hover:text-muted-foreground"
-                              aria-label="API Params demo"
-                            >
-                              <AlertCircle className="size-3.5" />
-                            </button>
-                          }
-                        />
-                        <TooltipContent className="max-w-sm">
-                          <pre className="font-mono text-xs whitespace-pre-wrap">
-                            {apiParamsPlaceholder}
-                          </pre>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <Textarea
-                      id="apiParams"
-                      value={formData.apiParams}
-                      onChange={e =>
-                        setFormData({ ...formData, apiParams: e.target.value })
-                      }
-                      placeholder={apiParamsPlaceholder}
-                      className="font-mono break-all"
-                      rows={3}
-                      disabled={isPending}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="supportsVision"
-                      checked={formData.supportsVision}
-                      onCheckedChange={checked =>
-                        setFormData({ ...formData, supportsVision: checked })
-                      }
-                      disabled={isPending}
-                    />
-                    <Label htmlFor="supportsVision">Vision</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="supportsReasoning"
-                      checked={formData.supportsReasoning}
-                      onCheckedChange={checked =>
-                        setFormData({ ...formData, supportsReasoning: checked })
-                      }
-                      disabled={isPending}
-                    />
-                    <Label htmlFor="supportsReasoning">Reasoning</Label>
-                  </div>
-                  {formData.capability === 'image' && (
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="supportsImageEdit"
-                        checked={formData.supportsImageEdit}
-                        onCheckedChange={checked =>
-                          setFormData({
-                            ...formData,
-                            supportsImageEdit: checked
-                          })
-                        }
-                        disabled={isPending}
+                      </div>
+                      <IconPicker
+                        value={field.state.value}
+                        onChange={value => field.handleChange(value)}
                       />
-                      <Label htmlFor="supportsImageEdit">Image editing</Label>
                     </div>
                   )}
-                  {formData.capability === 'video' && (
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="supportsImageToVideo"
-                        checked={formData.supportsImageToVideo}
-                        onCheckedChange={checked =>
-                          setFormData({
-                            ...formData,
-                            supportsImageToVideo: checked
-                          })
-                        }
-                        disabled={isPending}
-                      />
-                      <Label htmlFor="supportsImageToVideo">
-                        Image to video
-                      </Label>
+                </form.Field>
+
+                <form.Subscribe selector={state => state.values.capability}>
+                  {capability => (
+                    <div className="grid grid-cols-1 gap-4">
+                      <form.AppField name="uiOptions">
+                        {field => (
+                          <field.TextareaField
+                            label={
+                              <JsonHint
+                                label="UI Options (JSON)"
+                                example={
+                                  uiOptionsPlaceholderByCapability[
+                                    capability
+                                  ] ?? '{\n}'
+                                }
+                              />
+                            }
+                            placeholder={
+                              uiOptionsPlaceholderByCapability[capability] ??
+                              '{\n}'
+                            }
+                            className="font-mono break-all"
+                            rows={3}
+                          />
+                        )}
+                      </form.AppField>
+                      <form.AppField name="apiParams">
+                        {field => (
+                          <field.TextareaField
+                            label={
+                              <JsonHint
+                                label="API Params (JSON)"
+                                example={
+                                  apiParamsPlaceholderByCapability[
+                                    capability
+                                  ] ?? '{}'
+                                }
+                              />
+                            }
+                            placeholder={
+                              apiParamsPlaceholderByCapability[capability] ??
+                              '{}'
+                            }
+                            className="font-mono break-all"
+                            rows={3}
+                          />
+                        )}
+                      </form.AppField>
                     </div>
                   )}
-                  {formData.capability === 'video' && (
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="supportsVideoEdit"
-                        checked={formData.supportsVideoEdit}
-                        onCheckedChange={checked =>
-                          setFormData({
-                            ...formData,
-                            supportsVideoEdit: checked
-                          })
-                        }
-                        disabled={isPending}
-                      />
-                      <Label htmlFor="supportsVideoEdit">Video editing</Label>
+                </form.Subscribe>
+
+                <form.Subscribe selector={state => state.values.capability}>
+                  {capability => (
+                    <div className="flex flex-wrap gap-4">
+                      <form.AppField name="supportsVision">
+                        {field => <field.SwitchField label="Vision" />}
+                      </form.AppField>
+                      <form.AppField name="supportsReasoning">
+                        {field => <field.SwitchField label="Reasoning" />}
+                      </form.AppField>
+                      {CONDITIONAL_TOGGLES.filter(
+                        toggle => toggle.capability === capability
+                      ).map(toggle => (
+                        <form.AppField key={toggle.name} name={toggle.name}>
+                          {field => <field.SwitchField label={toggle.label} />}
+                        </form.AppField>
+                      ))}
+                      <form.AppField name="isEnabled">
+                        {field => <field.SwitchField label="Enabled" />}
+                      </form.AppField>
                     </div>
                   )}
-                  {formData.capability === 'audio' && (
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="supportsTranscription"
-                        checked={formData.supportsTranscription}
-                        onCheckedChange={checked =>
-                          setFormData({
-                            ...formData,
-                            supportsTranscription: checked
-                          })
-                        }
-                        disabled={isPending}
-                      />
-                      <Label htmlFor="supportsTranscription">
-                        Transcription (STT)
-                      </Label>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="isEnabled"
-                      checked={formData.isEnabled}
-                      onCheckedChange={checked =>
-                        setFormData({ ...formData, isEnabled: checked })
-                      }
-                      disabled={isPending}
-                    />
-                    <Label htmlFor="isEnabled">Enabled</Label>
-                  </div>
-                </div>
+                </form.Subscribe>
               </div>
+
               <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsOpen(false)}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isPending} className="gap-2">
-                  {isPending && <Loader2 className="size-4 animate-spin" />}
-                  {isPending
-                    ? 'Saving...'
-                    : editingId
-                      ? 'Save Changes'
-                      : 'Create'}
-                </Button>
+                <form.Subscribe selector={state => state.isSubmitting}>
+                  {isSubmitting => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsOpen(false)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </form.Subscribe>
+                <form.AppForm>
+                  <form.SubmitButton>
+                    {editingId ? 'Save Changes' : 'Create'}
+                  </form.SubmitButton>
+                </form.AppForm>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="w-20 p-3 text-left text-sm font-medium">Icon</th>
-              <th className="p-3 text-left text-sm font-medium">Model</th>
-              <th className="p-3 text-left text-sm font-medium">Aliases</th>
-              <th className="p-3 text-left text-sm font-medium">Provider</th>
-              <th className="p-3 text-left text-sm font-medium">Capability</th>
-              <th className="w-20 p-3 text-center text-sm font-medium">
-                Enabled
-              </th>
-              <th className="w-24 p-3 text-right text-sm font-medium">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredModels?.map(model => (
-              <tr
-                key={model.id}
-                className="border-b transition-colors hover:bg-muted/30"
-              >
-                <td className="p-3">
-                  {model.image ? (
-                    <ModelIcon image={model.image} className="size-8" />
-                  ) : (
-                    <div className="size-8 rounded border bg-muted" />
-                  )}
-                </td>
-                <td className="p-3">
-                  <div className="font-medium">{model.name}</div>
-                  <div className="font-mono text-xs text-muted-foreground">
-                    {model.modelId}
-                  </div>
-                </td>
-                <td className="p-3 text-sm text-muted-foreground">
-                  {model.aliases?.join(', ') || '-'}
-                </td>
-                <td className="p-3 text-sm">
-                  {(model.modelProviders ?? []).length > 0
-                    ? (model.modelProviders ?? [])
-                        .map((mp: any) => mp.provider?.name)
-                        .filter(Boolean)
-                        .join(', ')
-                    : model.provider?.name}
-                </td>
-                <td className="p-3">
-                  <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    {model.capability}
-                  </span>
-                </td>
-                <td className="p-3 text-center">
-                  <Switch
-                    checked={model.isEnabled}
-                    onCheckedChange={checked =>
-                      toggleMutation.mutate({
-                        id: model.id,
-                        isEnabled: checked
-                      })
-                    }
-                  />
-                </td>
-                <td className="p-3 text-right whitespace-nowrap">
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(model)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Edit Model</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setDeleteId(model.id);
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Delete Model</TooltipContent>
-                  </Tooltip>
-                </td>
-              </tr>
-            ))}
-            {(!filteredModels || filteredModels.length === 0) && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="p-6 text-center text-muted-foreground"
-                >
-                  No models configured. Add your first model to get started.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={filteredModels}
+        empty="No models configured. Add your first model to get started."
+      />
 
       <AlertDialog
         open={!!deleteId}

@@ -8,7 +8,7 @@ import { onSelect } from '@/lib/select';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { quotaQueries } from '@/server/fn/quota';
-import { usageQueries } from '@/server/fn/usage';
+import { usageQueries, type adminUsageLog } from '@/server/fn/usage';
 import { userQueries } from '@/server/fn/user';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +20,10 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
 import {
   LimitsSkeleton,
   UsageModule,
@@ -243,6 +247,55 @@ export default function UserDetail({ userId }: { userId: string }) {
   );
 }
 
+type UsageLogRow = Awaited<ReturnType<typeof adminUsageLog>>['rows'][number];
+
+const helper = createAppColumnHelper<UsageLogRow>();
+
+/** The model cell doubles as a filter control, so it needs the setter. */
+const userLogColumns = (filterByModel: (modelId: string) => void) =>
+  helper.columns([
+    helper.accessor('createdAt', {
+      header: 'Time',
+      meta: { cellClassName: 'text-xs text-muted-foreground' },
+      cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
+    }),
+    helper.accessor('modelId', {
+      header: 'Model',
+      meta: { cellClassName: 'align-middle' },
+      cell: ({ row }) => (
+        <>
+          <div className="text-xs text-muted-foreground">
+            {row.original.capability}
+          </div>
+          <button
+            type="button"
+            onClick={() => filterByModel(row.original.modelId ?? '')}
+            className="block font-mono text-xs hover:text-primary"
+          >
+            {row.original.modelId ?? '—'}
+          </button>
+        </>
+      )
+    }),
+    helper.display({
+      id: 'quantity',
+      header: 'Quantity',
+      meta: { cellClassName: 'align-middle font-mono text-xs' },
+      cell: ({ row }) => <UsageQuantity row={row.original} />
+    }),
+    helper.display({
+      id: 'unitPrice',
+      header: 'Unit Price',
+      meta: { cellClassName: 'align-middle font-mono text-xs' },
+      cell: ({ row }) => <UsageUnitPrice row={row.original} />
+    }),
+    helper.accessor('cost', {
+      header: 'Cost',
+      meta: { align: 'right', cellClassName: 'font-mono text-sm' },
+      cell: ({ row }) => formatUsd(row.original.cost)
+    })
+  ]);
+
 function UserLogs({ userId, days }: { userId: string; days: number }) {
   const [modelId, setModelId] = useSearchFilter('model', '');
   const [capability, setCapability] = useSearchFilter('capability', '');
@@ -274,6 +327,15 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
     if (!data) return 1;
     return Math.max(1, Math.ceil(data.total / pageSize));
   }, [data]);
+
+  const columns = useMemo(
+    () =>
+      userLogColumns(nextModelId => {
+        setModelId(nextModelId);
+        setPage(1);
+      }),
+    []
+  );
 
   // Base UI's trigger renders the value, not the selected item's content, so
   // the value-to-label mapping is handed to it.
@@ -336,68 +398,13 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
           </Select>
         </div>
 
-        <div className="rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50">
-              <tr>
-                <th className="p-2 text-left font-medium">Time</th>
-                <th className="p-2 text-left font-medium">Model</th>
-                <th className="p-2 text-left font-medium">Quantity</th>
-                <th className="p-2 text-left font-medium">Unit Price</th>
-                <th className="p-2 text-right font-medium">Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="p-6 text-center text-muted-foreground"
-                  >
-                    Loading...
-                  </td>
-                </tr>
-              ) : data?.rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="p-6 text-center text-muted-foreground"
-                  >
-                    No records.
-                  </td>
-                </tr>
-              ) : (
-                data?.rows.map(r => (
-                  <tr key={r.id} className="border-b last:border-0">
-                    <td className="p-2 text-xs text-muted-foreground">
-                      {new Date(r.createdAt).toLocaleString()}
-                    </td>
-                    <td className="p-2 align-middle">
-                      <div className="text-xs text-muted-foreground">
-                        {r.capability}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setModelId(r.modelId ?? '');
-                          setPage(1);
-                        }}
-                        className="block font-mono text-xs hover:text-primary"
-                      >
-                        {r.modelId ?? '—'}
-                      </button>
-                    </td>
-                    <UsageQuantity row={r} />
-                    <UsageUnitPrice row={r} />
-                    <td className="p-2 text-right font-mono text-sm">
-                      {formatUsd(r.cost)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={isLoading ? undefined : data?.rows}
+          dense
+          empty={isLoading ? 'Loading...' : 'No records.'}
+          tableClassName="text-sm"
+        />
 
         {data && data.total > pageSize && (
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">

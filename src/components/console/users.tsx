@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { mutating } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';
 import { quotaQueries, removeUserQuota, setUserQuota } from '@/server/fn/quota';
-import { updateUserRole, userQueries } from '@/server/fn/user';
+import { updateUserRole, userQueries, type listUsers } from '@/server/fn/user';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -24,7 +24,14 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
 import { IconGoogle } from '@/components/icons';
+
+type User = Awaited<ReturnType<typeof listUsers>>[number];
+type QuotaOption = { id: string; name: string; isUnlimited: boolean };
 
 const ProviderIcon = ({ provider }: { provider: string }) => {
   switch (provider.toLowerCase()) {
@@ -41,6 +48,198 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
 };
 
 const QUOTA_NONE = '__none__';
+
+const formatDate = (date: Date | null) => {
+  if (!date) return 'Never';
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+const helper = createAppColumnHelper<User>();
+
+/**
+ * The role and quota cells write straight to the server, so the column list
+ * needs the mutations and the per-row "which one is saving" flags.
+ */
+const userColumns = (ctx: {
+  quotaOptions: Array<QuotaOption> | undefined;
+  quotaLabels: Record<string, string>;
+  updatingRoleUserId: string | null;
+  updatingQuotaUserId: string | null;
+  setRole: (user: User, role: 'user' | 'admin') => void;
+  setQuota: (user: User, quotaId: string) => void;
+}) =>
+  helper.columns([
+    helper.accessor('name', {
+      header: 'User',
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <Link
+            to="/console/users/$userId"
+            params={{ userId: user.id }}
+            className="flex items-center gap-3 hover:text-primary"
+          >
+            <div className="size-8 overflow-hidden rounded-full border bg-muted">
+              {user.image ? (
+                <img
+                  src={user.image}
+                  alt={user.name || ''}
+                  width={32}
+                  height={32}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <div className="flex size-full items-center justify-center text-xs font-medium text-muted-foreground">
+                  {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                </div>
+              )}
+            </div>
+            <span className="font-medium">{user.name || 'No name'}</span>
+          </Link>
+        );
+      }
+    }),
+    helper.accessor('email', {
+      header: 'Email',
+      meta: { cellClassName: 'text-sm text-muted-foreground' }
+    }),
+    helper.display({
+      id: 'provider',
+      header: 'Provider',
+      meta: { headClassName: 'w-32' },
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.original.accounts && row.original.accounts.length > 0 ? (
+            row.original.accounts.map((account, idx) => (
+              <ProviderIcon key={idx} provider={account.providerId} />
+            ))
+          ) : (
+            <span className="text-xs text-muted-foreground">-</span>
+          )}
+        </div>
+      )
+    }),
+    helper.accessor(row => row.plan?.name, {
+      id: 'plan',
+      header: 'Plan',
+      meta: {
+        align: 'center',
+        headClassName: 'w-28',
+        cellClassName: 'text-sm'
+      },
+      cell: ({ row }) => (
+        <span className={row.original.plan ? '' : 'text-muted-foreground'}>
+          {row.original.plan?.name ?? 'Free'}
+        </span>
+      )
+    }),
+    helper.accessor('emailVerified', {
+      header: 'Verified',
+      meta: { headClassName: 'w-32', cellClassName: 'text-sm' },
+      // Verification is a yes or no now, not a date: the auth library records
+      // whether an address was confirmed, not when. The column always asked
+      // "Verified".
+      cell: ({ row }) =>
+        row.original.emailVerified ? (
+          <Check className="size-4 text-muted-foreground" />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )
+    }),
+    helper.accessor('createdAt', {
+      header: 'Joined',
+      meta: { headClassName: 'w-32', cellClassName: 'text-sm' },
+      cell: ({ row }) => formatDate(row.original.createdAt)
+    }),
+    helper.accessor('role', {
+      header: 'Role',
+      meta: { align: 'center', headClassName: 'w-32' },
+      cell: ({ row }) => {
+        const user = row.original;
+        const saving = ctx.updatingRoleUserId === user.id;
+        return (
+          <div className="flex justify-center">
+            <Select
+              value={user.role}
+              disabled={saving}
+              onValueChange={onSelect(value =>
+                ctx.setRole(user, value as 'user' | 'admin')
+              )}
+            >
+              <SelectTrigger className="h-8 w-28">
+                <div className="flex items-center gap-2">
+                  {saving ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : user.role === 'admin' ? (
+                    <ShieldCheck className="size-3" />
+                  ) : (
+                    <UserIcon className="size-3" />
+                  )}
+                  <span>{user.role === 'admin' ? 'Admin' : 'User'}</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="size-3" />
+                    User
+                  </div>
+                </SelectItem>
+                <SelectItem value="admin">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="size-3" />
+                    Admin
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      }
+    }),
+    helper.accessor(row => row.quota?.id, {
+      id: 'quota',
+      header: 'Quota',
+      meta: { align: 'center', headClassName: 'w-40' },
+      cell: ({ row }) => {
+        const user = row.original;
+        const saving = ctx.updatingQuotaUserId === user.id;
+        return (
+          <div className="flex justify-center">
+            <Select
+              items={ctx.quotaLabels}
+              value={user.quota?.id ?? QUOTA_NONE}
+              disabled={saving || !ctx.quotaOptions?.length}
+              onValueChange={onSelect(value => ctx.setQuota(user, value))}
+            >
+              <SelectTrigger className="h-8 w-36">
+                {saving ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <SelectValue placeholder="None" />
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={QUOTA_NONE}>
+                  <span className="text-muted-foreground">None</span>
+                </SelectItem>
+                {ctx.quotaOptions?.map(q => (
+                  <SelectItem key={q.id} value={q.id}>
+                    {q.name}
+                    {q.isUnlimited ? ' (∞)' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      }
+    })
+  ]);
 
 export default function UsersPage() {
   const [search, setSearch] = useState('');
@@ -116,15 +315,6 @@ export default function UsersPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const formatDate = (date: Date | null) => {
-    if (!date) return 'Never';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
   // Base UI's trigger renders the value, not the selected item's content, so
   // the value-to-label mapping is handed to it.
   const quotaLabels = useMemo(
@@ -138,6 +328,29 @@ export default function UsersPage() {
       )
     }),
     [quotaOptions]
+  );
+
+  const columns = useMemo(
+    () =>
+      userColumns({
+        quotaOptions,
+        quotaLabels,
+        updatingRoleUserId,
+        updatingQuotaUserId,
+        setRole: (user, role) => {
+          setUpdatingRoleUserId(user.id);
+          updateRoleMutation.mutate({ id: user.id, role });
+        },
+        setQuota: (user, quotaId) => {
+          setUpdatingQuotaUserId(user.id);
+          if (quotaId === QUOTA_NONE) {
+            removeQuotaMutation.mutate({ userId: user.id });
+          } else {
+            setQuotaMutation.mutate({ userId: user.id, quotaId });
+          }
+        }
+      }),
+    [quotaOptions, quotaLabels, updatingRoleUserId, updatingQuotaUserId]
   );
 
   if (isLoading) {
@@ -167,191 +380,13 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="rounded-md border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="p-3 text-left text-sm font-medium">User</th>
-              <th className="p-3 text-left text-sm font-medium">Email</th>
-              <th className="w-32 p-3 text-left text-sm font-medium">
-                Provider
-              </th>
-              <th className="w-28 p-3 text-center text-sm font-medium">Plan</th>
-              <th className="w-32 p-3 text-left text-sm font-medium">
-                Verified
-              </th>
-              <th className="w-32 p-3 text-left text-sm font-medium">Joined</th>
-              <th className="w-32 p-3 text-center text-sm font-medium">Role</th>
-              <th className="w-40 p-3 text-center text-sm font-medium">
-                Quota
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {users?.map(user => (
-              <tr
-                key={user.id}
-                className="border-b transition-colors hover:bg-muted/30"
-              >
-                <td className="p-3">
-                  <Link
-                    to="/console/users/$userId"
-                    params={{ userId: user.id }}
-                    className="flex items-center gap-3 hover:text-primary"
-                  >
-                    <div className="size-8 overflow-hidden rounded-full border bg-muted">
-                      {user.image ? (
-                        <img
-                          src={user.image}
-                          alt={user.name || ''}
-                          width={32}
-                          height={32}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-full items-center justify-center text-xs font-medium text-muted-foreground">
-                          {user.name?.[0]?.toUpperCase() ||
-                            user.email[0].toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <span className="font-medium">
-                      {user.name || 'No name'}
-                    </span>
-                  </Link>
-                </td>
-                <td className="p-3 text-sm text-muted-foreground">
-                  {user.email}
-                </td>
-                <td className="p-3">
-                  <div className="flex items-center gap-2">
-                    {user.accounts && user.accounts.length > 0 ? (
-                      user.accounts.map((account, idx) => (
-                        <ProviderIcon key={idx} provider={account.providerId} />
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </div>
-                </td>
-                <td className="p-3 text-center text-sm">
-                  <span className={user.plan ? '' : 'text-muted-foreground'}>
-                    {user.plan?.name ?? 'Free'}
-                  </span>
-                </td>
-                <td className="p-3 text-sm">
-                  {/* Verification is a yes or no now, not a date: the auth
-                      library records whether an address was confirmed, not
-                      when. The column always asked "Verified". */}
-                  {user.emailVerified ? (
-                    <Check className="size-4 text-muted-foreground" />
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="p-3 text-sm">{formatDate(user.createdAt)}</td>
-                <td className="p-3 text-center">
-                  <div className="flex justify-center">
-                    <Select
-                      value={user.role}
-                      disabled={updatingRoleUserId === user.id}
-                      onValueChange={onSelect(value => {
-                        setUpdatingRoleUserId(user.id);
-                        updateRoleMutation.mutate({
-                          id: user.id,
-                          role: value as 'user' | 'admin'
-                        });
-                      })}
-                    >
-                      <SelectTrigger className="h-8 w-28">
-                        <div className="flex items-center gap-2">
-                          {updatingRoleUserId === user.id ? (
-                            <Loader2 className="size-3 animate-spin" />
-                          ) : user.role === 'admin' ? (
-                            <ShieldCheck className="size-3" />
-                          ) : (
-                            <UserIcon className="size-3" />
-                          )}
-                          <span>
-                            {user.role === 'admin' ? 'Admin' : 'User'}
-                          </span>
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="user">
-                          <div className="flex items-center gap-2">
-                            <UserIcon className="size-3" />
-                            User
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="admin">
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="size-3" />
-                            Admin
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </td>
-                <td className="p-3 text-center">
-                  <div className="flex justify-center">
-                    <Select
-                      items={quotaLabels}
-                      value={user.quota?.id ?? QUOTA_NONE}
-                      disabled={
-                        updatingQuotaUserId === user.id || !quotaOptions?.length
-                      }
-                      onValueChange={onSelect(value => {
-                        setUpdatingQuotaUserId(user.id);
-                        if (value === QUOTA_NONE) {
-                          removeQuotaMutation.mutate({ userId: user.id });
-                        } else {
-                          setQuotaMutation.mutate({
-                            userId: user.id,
-                            quotaId: value
-                          });
-                        }
-                      })}
-                    >
-                      <SelectTrigger className="h-8 w-36">
-                        {updatingQuotaUserId === user.id ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : (
-                          <SelectValue placeholder="None" />
-                        )}
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={QUOTA_NONE}>
-                          <span className="text-muted-foreground">None</span>
-                        </SelectItem>
-                        {quotaOptions?.map(q => (
-                          <SelectItem key={q.id} value={q.id}>
-                            {q.name}
-                            {q.isUnlimited ? ' (∞)' : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {(!users || users.length === 0) && (
-              <tr>
-                <td
-                  colSpan={8}
-                  className="p-6 text-center text-muted-foreground"
-                >
-                  {search
-                    ? 'No users found matching your search.'
-                    : 'No users found.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={users}
+        empty={
+          search ? 'No users found matching your search.' : 'No users found.'
+        }
+      />
     </div>
   );
 }

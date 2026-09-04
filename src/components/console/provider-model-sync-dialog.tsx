@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,7 +8,11 @@ import { CAPABILITIES } from '@/lib/constant';
 import { mutating, type Output } from '@/lib/mutation';
 import { onSelect } from '@/lib/select';
 import { modelQueries } from '@/server/fn/model';
-import { providerQueries, syncProviderModels } from '@/server/fn/provider';
+import {
+  providerQueries,
+  syncProviderModels,
+  type fetchProviderModels
+} from '@/server/fn/provider';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -26,6 +30,89 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
+
+type RemoteModel = Awaited<ReturnType<typeof fetchProviderModels>>[number];
+
+const helper = createAppColumnHelper<RemoteModel>();
+
+/**
+ * A model the provider reports. One that already exists in the model table is
+ * shown for context but cannot be selected again.
+ */
+const syncColumns = (ctx: {
+  selectedIds: Array<string>;
+  capabilities: Record<string, ModelCapability>;
+  allSelected: boolean;
+  hasNewModels: boolean;
+  isPending: boolean;
+  toggleAll: (checked: boolean) => void;
+  toggleOne: (modelId: string, checked: boolean) => void;
+  setCapability: (modelId: string, capability: ModelCapability) => void;
+}) =>
+  helper.columns([
+    helper.display({
+      id: 'select',
+      meta: {
+        headClassName: 'w-12 p-0',
+        cellClassName: 'w-12 p-0 align-middle'
+      },
+      header: () => (
+        <div className="flex min-h-11 items-center justify-center">
+          <Checkbox
+            checked={ctx.allSelected}
+            disabled={!ctx.hasNewModels}
+            onCheckedChange={checked => ctx.toggleAll(checked === true)}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex min-h-14 items-center justify-center">
+          <Checkbox
+            checked={ctx.selectedIds.includes(row.original.modelId)}
+            disabled={row.original.exists}
+            onCheckedChange={checked =>
+              ctx.toggleOne(row.original.modelId, checked === true)
+            }
+          />
+        </div>
+      )
+    }),
+    helper.accessor('modelId', {
+      header: 'Model',
+      cell: ({ row }) => (
+        <div className="font-mono text-sm">{row.original.modelId}</div>
+      )
+    }),
+    helper.display({
+      id: 'capability',
+      header: 'Capability',
+      meta: { headClassName: 'w-36', cellClassName: 'align-top' },
+      cell: ({ row }) => (
+        <Select
+          value={ctx.capabilities[row.original.modelId] ?? 'chat'}
+          onValueChange={onSelect(value =>
+            ctx.setCapability(row.original.modelId, value as ModelCapability)
+          )}
+          disabled={row.original.exists || ctx.isPending}
+        >
+          <SelectTrigger className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CAPABILITIES.map(capability => (
+              <SelectItem key={capability.value} value={capability.value}>
+                {capability.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )
+    })
+  ]);
 
 type ProviderModelSyncDialogProps = {
   open: boolean;
@@ -148,6 +235,28 @@ export function ProviderModelSyncDialog({
     }
   };
 
+  const columns = useMemo(
+    () =>
+      syncColumns({
+        selectedIds,
+        capabilities,
+        allSelected: allNewModelsSelected,
+        hasNewModels: newModels.length > 0,
+        isPending: syncMutation.isPending,
+        toggleAll: checked =>
+          setSelectedIds(checked ? newModels.map(model => model.modelId) : []),
+        toggleOne: toggleSelection,
+        setCapability: setModelCapability
+      }),
+    [
+      selectedIds,
+      capabilities,
+      allNewModelsSelected,
+      newModels,
+      syncMutation.isPending
+    ]
+  );
+
   const syncSelectedModels = () => {
     if (!providerId || !models) return;
 
@@ -204,82 +313,12 @@ export function ProviderModelSyncDialog({
               Loading models...
             </div>
           ) : models && models.length > 0 ? (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="w-12 p-0 text-sm font-medium">
-                    <div className="flex min-h-11 items-center justify-center">
-                      <Checkbox
-                        checked={allNewModelsSelected}
-                        disabled={!newModels.length}
-                        onCheckedChange={checked => {
-                          setSelectedIds(
-                            checked ? newModels.map(model => model.modelId) : []
-                          );
-                        }}
-                      />
-                    </div>
-                  </th>
-                  <th className="p-3 text-left text-sm font-medium">Model</th>
-                  <th className="w-36 p-3 text-left text-sm font-medium">
-                    Capability
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {models.map(model => {
-                  const isSelected = selectedIds.includes(model.modelId);
-
-                  return (
-                    <tr
-                      key={model.modelId}
-                      className="border-b transition-colors hover:bg-muted/30"
-                    >
-                      <td className="w-12 p-0 align-middle">
-                        <div className="flex min-h-14 items-center justify-center">
-                          <Checkbox
-                            checked={isSelected}
-                            disabled={model.exists}
-                            onCheckedChange={checked =>
-                              toggleSelection(model.modelId, checked === true)
-                            }
-                          />
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-mono text-sm">{model.modelId}</div>
-                      </td>
-                      <td className="p-3 align-top">
-                        <Select
-                          value={capabilities[model.modelId] ?? 'chat'}
-                          onValueChange={onSelect(value =>
-                            setModelCapability(
-                              model.modelId,
-                              value as ModelCapability
-                            )
-                          )}
-                          disabled={model.exists || syncMutation.isPending}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CAPABILITIES.map(capability => (
-                              <SelectItem
-                                key={capability.value}
-                                value={capability.value}
-                              >
-                                {capability.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              columns={columns}
+              data={models}
+              className="rounded-none border-0"
+              empty="No models returned from provider API."
+            />
           ) : (
             <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
               No models returned from provider API.

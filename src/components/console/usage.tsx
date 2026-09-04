@@ -8,7 +8,7 @@ import { onSelect } from '@/lib/select';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/fn/model';
-import { usageQueries } from '@/server/fn/usage';
+import { usageQueries, type adminUsageLog } from '@/server/fn/usage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,10 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
 import {
   DailyStackedChart,
   UsageModule,
@@ -32,6 +36,63 @@ const dayRangeLabels = {
   '7': 'Last 7 days',
   '30': 'Last 30 days'
 };
+
+type UsageLogRow = Awaited<ReturnType<typeof adminUsageLog>>['rows'][number];
+
+const helper = createAppColumnHelper<UsageLogRow>();
+
+const logColumns = helper.columns([
+  helper.accessor('createdAt', {
+    header: 'Time',
+    meta: { cellClassName: 'text-xs text-muted-foreground' },
+    cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
+  }),
+  helper.accessor('userName', {
+    header: 'User',
+    meta: { cellClassName: 'text-sm' },
+    cell: ({ row }) => (
+      <Link
+        to="/console/users/$userId"
+        params={{ userId: row.original.userId }}
+        className="hover:text-primary"
+      >
+        <div className="font-medium">{row.original.userName ?? 'Unknown'}</div>
+        <div className="text-xs text-muted-foreground">
+          {row.original.userEmail}
+        </div>
+      </Link>
+    )
+  }),
+  helper.accessor('modelId', {
+    header: 'Model',
+    meta: { cellClassName: 'align-middle' },
+    cell: ({ row }) => (
+      <>
+        <div className="text-xs text-muted-foreground">
+          {row.original.capability}
+        </div>
+        <div className="font-mono text-xs">{row.original.modelId ?? '—'}</div>
+      </>
+    )
+  }),
+  helper.display({
+    id: 'quantity',
+    header: 'Quantity',
+    meta: { cellClassName: 'align-middle font-mono text-xs' },
+    cell: ({ row }) => <UsageQuantity row={row.original} />
+  }),
+  helper.display({
+    id: 'unitPrice',
+    header: 'Unit Price',
+    meta: { cellClassName: 'align-middle font-mono text-xs' },
+    cell: ({ row }) => <UsageUnitPrice row={row.original} />
+  }),
+  helper.accessor('cost', {
+    header: 'Cost',
+    meta: { align: 'right', cellClassName: 'font-mono text-sm' },
+    cell: ({ row }) => formatUsd(row.original.cost)
+  })
+]);
 
 export default function UsagePage() {
   const queryClient = useQueryClient();
@@ -220,76 +281,13 @@ function UsageLog({ days }: { days: number }) {
           </Select>
         </div>
 
-        <div className="rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50">
-              <tr>
-                <th className="p-2 text-left font-medium">Time</th>
-                <th className="p-2 text-left font-medium">User</th>
-                <th className="p-2 text-left font-medium">Model</th>
-                <th className="p-2 text-left font-medium">Quantity</th>
-                <th className="p-2 text-left font-medium">Unit Price</th>
-                <th className="p-2 text-right font-medium">Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="p-6 text-center text-muted-foreground"
-                  >
-                    Loading...
-                  </td>
-                </tr>
-              ) : data?.rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="p-6 text-center text-muted-foreground"
-                  >
-                    No records.
-                  </td>
-                </tr>
-              ) : (
-                data?.rows.map(r => (
-                  <tr key={r.id} className="border-b last:border-0">
-                    <td className="p-2 text-xs text-muted-foreground">
-                      {new Date(r.createdAt).toLocaleString()}
-                    </td>
-                    <td className="p-2 text-sm">
-                      <Link
-                        to="/console/users/$userId"
-                        params={{ userId: r.userId }}
-                        className="hover:text-primary"
-                      >
-                        <div className="font-medium">
-                          {r.userName ?? 'Unknown'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {r.userEmail}
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="p-2 align-middle">
-                      <div className="text-xs text-muted-foreground">
-                        {r.capability}
-                      </div>
-                      <div className="font-mono text-xs">
-                        {r.modelId ?? '—'}
-                      </div>
-                    </td>
-                    <UsageQuantity row={r} />
-                    <UsageUnitPrice row={r} />
-                    <td className="p-2 text-right font-mono text-sm">
-                      {formatUsd(r.cost)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={logColumns}
+          data={isLoading ? undefined : data?.rows}
+          dense
+          empty={isLoading ? 'Loading...' : 'No records.'}
+          tableClassName="text-sm"
+        />
 
         {data && data.total > pageSize && (
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">

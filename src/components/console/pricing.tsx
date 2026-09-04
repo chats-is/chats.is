@@ -12,7 +12,8 @@ import {
   previewPricingSync,
   pricingQueries,
   runPricingSync,
-  upsertPricing
+  upsertPricing,
+  type listPricingWithModels
 } from '@/server/fn/pricing';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -38,6 +39,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { useAppForm } from '@/components/app-form';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
 import { ModelIcon } from '@/components/model-icon';
 
 type PricingSource = 'models.dev' | 'llm-metadata';
@@ -68,11 +74,15 @@ type PreviewRow = {
   >;
 };
 
-type EditState = {
+/** Which model the pricing dialog is pointed at. Its rates live in the form. */
+type EditTarget = {
   modelDbId: string;
   modelName: string;
-  modelId: string;
   capability: 'chat' | 'image' | 'video' | 'audio';
+};
+
+/** Every rate a model can carry, as typed. Blank means "not priced". */
+type PricingForm = {
   input: string;
   output: string;
   cacheRead: string;
@@ -85,6 +95,23 @@ type EditState = {
   audioOutput: string;
   audioCharacters: string;
   audioSeconds: string;
+};
+
+type PriceName = keyof PricingForm;
+
+const EMPTY_PRICING: PricingForm = {
+  input: '',
+  output: '',
+  cacheRead: '',
+  cacheWrite: '',
+  reasoning: '',
+  image: '',
+  video: '',
+  videoSeconds: '',
+  audioInput: '',
+  audioOutput: '',
+  audioCharacters: '',
+  audioSeconds: ''
 };
 
 const fromNum = (v: string | null | undefined) =>
@@ -180,6 +207,88 @@ function summarizePricing(
   return lines;
 }
 
+type PricingRow = Awaited<ReturnType<typeof listPricingWithModels>>[number];
+
+const helper = createAppColumnHelper<PricingRow>();
+
+const pricingColumns = (edit: (row: PricingRow) => void) =>
+  helper.columns([
+    helper.display({
+      id: 'icon',
+      header: 'Icon',
+      meta: { headClassName: 'w-20' },
+      cell: ({ row }) =>
+        row.original.image ? (
+          <ModelIcon image={row.original.image} className="size-8" />
+        ) : (
+          <div className="size-8 rounded border bg-muted" />
+        )
+    }),
+    helper.accessor('name', {
+      header: 'Model',
+      cell: ({ row }) => (
+        <>
+          <div className="font-medium">{row.original.name}</div>
+          <div className="font-mono text-xs text-muted-foreground">
+            {row.original.modelId}
+          </div>
+        </>
+      )
+    }),
+    helper.accessor(row => row.provider?.name, {
+      id: 'provider',
+      header: 'Provider',
+      meta: { cellClassName: 'text-sm' },
+      cell: ({ row }) => row.original.provider?.name ?? '-'
+    }),
+    helper.accessor('capability', {
+      header: 'Capability',
+      cell: ({ row }) => (
+        <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+          {row.original.capability}
+        </span>
+      )
+    }),
+    helper.display({
+      id: 'pricing',
+      header: 'Pricing',
+      meta: {
+        headClassName: 'w-56',
+        cellClassName: 'font-mono text-xs text-muted-foreground'
+      },
+      cell: ({ row }) => {
+        const lines = summarizePricing(
+          row.original.capability,
+          row.original.pricing
+        );
+        if (lines.length === 0) return '—';
+        return (
+          <div className="space-y-0.5">
+            {lines.map(line => (
+              <div key={line}>{line}</div>
+            ))}
+          </div>
+        );
+      }
+    }),
+    helper.accessor(row => row.pricing?.source, {
+      id: 'source',
+      header: 'Source',
+      meta: { align: 'right', cellClassName: 'text-xs text-muted-foreground' },
+      cell: ({ row }) => row.original.pricing?.source ?? '—'
+    }),
+    helper.display({
+      id: 'actions',
+      header: 'Actions',
+      meta: { align: 'right', headClassName: 'w-24' },
+      cell: ({ row }) => (
+        <Button variant="ghost" size="sm" onClick={() => edit(row.original)}>
+          <Pencil className="size-4" />
+        </Button>
+      )
+    })
+  ]);
+
 export default function PricingPage() {
   const queryClient = useQueryClient();
   const [filterCapability, setFilterCapability] = useSearchFilter(
@@ -187,7 +296,7 @@ export default function PricingPage() {
     'all'
   );
   const [search, setSearch] = useSearchFilter('q', '');
-  const [edit, setEdit] = useState<EditState | null>(null);
+  const [edit, setEdit] = useState<EditTarget | null>(null);
 
   // Source selection — held in the popover before opening preview.
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -249,12 +358,34 @@ export default function PricingPage() {
     });
   }, [rows, search, filterCapability]);
 
-  const openEdit = (row: NonNullable<typeof rows>[number]) => {
+  const form = useAppForm({
+    defaultValues: EMPTY_PRICING,
+    onSubmit: async ({ value }) => {
+      if (!edit) return;
+      // A blank field is not a zero rate — it means the model is not priced
+      // that way at all, so it is stored as null.
+      const rates = Object.fromEntries(
+        (Object.keys(value) as Array<PriceName>).map(name => [
+          name,
+          value[name] || null
+        ])
+      ) as Record<PriceName, string | null>;
+
+      await upsertMutation.mutateAsync({
+        modelDbId: edit.modelDbId,
+        ...rates,
+        source: 'manual'
+      });
+    }
+  });
+
+  const openEdit = (row: PricingRow) => {
     setEdit({
       modelDbId: row.id,
       modelName: row.name,
-      modelId: row.modelId,
-      capability: row.capability,
+      capability: row.capability
+    });
+    form.reset({
       input: fromNum(row.pricing?.input),
       output: fromNum(row.pricing?.output),
       cacheRead: fromNum(row.pricing?.cacheRead),
@@ -270,25 +401,42 @@ export default function PricingPage() {
     });
   };
 
-  const submit = () => {
-    if (!edit) return;
-    upsertMutation.mutate({
-      modelDbId: edit.modelDbId,
-      input: edit.input || null,
-      output: edit.output || null,
-      cacheRead: edit.cacheRead || null,
-      cacheWrite: edit.cacheWrite || null,
-      reasoning: edit.reasoning || null,
-      image: edit.image || null,
-      video: edit.video || null,
-      videoSeconds: edit.videoSeconds || null,
-      audioInput: edit.audioInput || null,
-      audioOutput: edit.audioOutput || null,
-      audioCharacters: edit.audioCharacters || null,
-      audioSeconds: edit.audioSeconds || null,
-      source: 'manual'
-    });
-  };
+  const columns = useMemo(() => pricingColumns(openEdit), []);
+
+  /**
+   * One rate. Several rates are mutually exclusive billing styles — typing in
+   * one clears the others, which `clears` names.
+   */
+  const PriceField = ({
+    name,
+    label,
+    placeholder = '0.00',
+    disabled,
+    clears
+  }: {
+    name: PriceName;
+    label: string;
+    placeholder?: string;
+    disabled?: boolean;
+    clears?: Array<PriceName>;
+  }) => (
+    <form.AppField
+      name={name}
+      listeners={{
+        onChange: () => clears?.forEach(other => form.setFieldValue(other, ''))
+      }}
+    >
+      {field => (
+        <field.TextField
+          label={label}
+          prefix="$"
+          inputMode="decimal"
+          placeholder={placeholder}
+          disabled={disabled}
+        />
+      )}
+    </form.AppField>
+  );
 
   const toggleSource = (src: PricingSource, on: boolean) => {
     setSelectedSources(prev => {
@@ -481,88 +629,7 @@ export default function PricingPage() {
         </Popover>
       </div>
 
-      <div className="rounded-md border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="w-20 p-3 text-left text-sm font-medium">Icon</th>
-              <th className="p-3 text-left text-sm font-medium">Model</th>
-              <th className="p-3 text-left text-sm font-medium">Provider</th>
-              <th className="p-3 text-left text-sm font-medium">Capability</th>
-              <th className="w-56 p-3 text-left text-sm font-medium">
-                Pricing
-              </th>
-              <th className="p-3 text-right text-sm font-medium">Source</th>
-              <th className="w-24 p-3 text-right text-sm font-medium">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(row => (
-              <tr
-                key={row.id}
-                className="border-b transition-colors hover:bg-muted/30"
-              >
-                <td className="p-3">
-                  {row.image ? (
-                    <ModelIcon image={row.image} className="size-8" />
-                  ) : (
-                    <div className="size-8 rounded border bg-muted" />
-                  )}
-                </td>
-                <td className="p-3">
-                  <div className="font-medium">{row.name}</div>
-                  <div className="font-mono text-xs text-muted-foreground">
-                    {row.modelId}
-                  </div>
-                </td>
-                <td className="p-3 text-sm">{row.provider?.name ?? '-'}</td>
-                <td className="p-3">
-                  <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    {row.capability}
-                  </span>
-                </td>
-                <td className="p-3 font-mono text-xs text-muted-foreground">
-                  {(() => {
-                    const lines = summarizePricing(row.capability, row.pricing);
-                    if (lines.length === 0) return '—';
-                    return (
-                      <div className="space-y-0.5">
-                        {lines.map(line => (
-                          <div key={line}>{line}</div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </td>
-                <td className="p-3 text-right text-xs text-muted-foreground">
-                  {row.pricing?.source ?? '—'}
-                </td>
-                <td className="p-3 text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openEdit(row)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="p-6 text-center text-muted-foreground"
-                >
-                  No models found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable columns={columns} data={filtered} empty="No models found." />
 
       <Dialog open={!!edit} onOpenChange={open => !open && setEdit(null)}>
         <DialogContent className="sm:max-w-2xl">
@@ -573,191 +640,161 @@ export default function PricingPage() {
             </DialogDescription>
           </DialogHeader>
           {edit && (
-            <div className="-mx-6 grid max-h-[60vh] grid-cols-2 gap-4 overflow-y-auto px-6">
-              {edit.capability === 'chat' && (
-                <>
-                  <Field
-                    label="Input / 1M tokens"
-                    value={edit.input}
-                    onChange={v => setEdit({ ...edit, input: v })}
-                  />
-                  <Field
-                    label="Output / 1M tokens"
-                    value={edit.output}
-                    onChange={v => setEdit({ ...edit, output: v })}
-                  />
-                  <Field
-                    label="Cache read / 1M tokens"
-                    value={edit.cacheRead}
-                    onChange={v => setEdit({ ...edit, cacheRead: v })}
-                  />
-                  <Field
-                    label="Cache write / 1M tokens"
-                    value={edit.cacheWrite}
-                    onChange={v => setEdit({ ...edit, cacheWrite: v })}
-                  />
-                  <Field
-                    label="Reasoning / 1M tokens"
-                    value={edit.reasoning}
-                    onChange={v => setEdit({ ...edit, reasoning: v })}
-                    placeholder="defaults to output rate"
-                  />
-                </>
-              )}
-              {edit.capability === 'image' && (
-                <>
-                  {/* Two mutually-exclusive billing styles. Typing in one side
-                      disables (and clears) the other. */}
-                  <Field
-                    label="Per image"
-                    value={edit.image}
-                    onChange={v =>
-                      setEdit({ ...edit, image: v, input: '', output: '' })
-                    }
-                    placeholder="per-image (DALL-E, imagen)"
-                    disabled={!!edit.input || !!edit.output}
-                  />
-                  <div className="col-span-2 text-xs text-muted-foreground">
-                    Or token-based billing (gpt-image-1) — set Input + Output
-                    instead of Per image:
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                form.handleSubmit();
+              }}
+            >
+              <form.Subscribe selector={state => state.values}>
+                {values => (
+                  <div className="-mx-6 grid max-h-[60vh] grid-cols-2 gap-4 overflow-y-auto px-6">
+                    {edit.capability === 'chat' && (
+                      <>
+                        <PriceField name="input" label="Input / 1M tokens" />
+                        <PriceField name="output" label="Output / 1M tokens" />
+                        <PriceField
+                          name="cacheRead"
+                          label="Cache read / 1M tokens"
+                        />
+                        <PriceField
+                          name="cacheWrite"
+                          label="Cache write / 1M tokens"
+                        />
+                        <PriceField
+                          name="reasoning"
+                          label="Reasoning / 1M tokens"
+                          placeholder="defaults to output rate"
+                        />
+                      </>
+                    )}
+                    {edit.capability === 'image' && (
+                      <>
+                        {/* Two mutually-exclusive billing styles. Typing in one
+                            side disables (and clears) the other. */}
+                        <PriceField
+                          name="image"
+                          label="Per image"
+                          placeholder="per-image (DALL-E, imagen)"
+                          disabled={!!values.input || !!values.output}
+                          clears={['input', 'output']}
+                        />
+                        <div className="col-span-2 text-xs text-muted-foreground">
+                          Or token-based billing (gpt-image-1) — set Input +
+                          Output instead of Per image:
+                        </div>
+                        <PriceField
+                          name="input"
+                          label="Input / 1M tokens"
+                          disabled={!!values.image}
+                          clears={['image']}
+                        />
+                        <PriceField
+                          name="output"
+                          label="Output / 1M tokens"
+                          disabled={!!values.image}
+                          clears={['image']}
+                        />
+                      </>
+                    )}
+                    {edit.capability === 'video' && (
+                      <>
+                        {/* Two mutually-exclusive billing styles. Typing in one
+                            side disables (and clears) the other. */}
+                        <PriceField
+                          name="video"
+                          label="Per video"
+                          placeholder="flat per clip (Kling, Sora base)"
+                          disabled={!!values.videoSeconds}
+                          clears={['videoSeconds']}
+                        />
+                        <PriceField
+                          name="videoSeconds"
+                          label="Video / second"
+                          placeholder="per second (Sora, Veo, Runway)"
+                          disabled={!!values.video}
+                          clears={['video']}
+                        />
+                      </>
+                    )}
+                    {edit.capability === 'audio' && (
+                      <>
+                        {/* Three mutually-exclusive billing styles. Typing in
+                            one style disables (and clears) the others. */}
+                        <PriceField
+                          name="audioCharacters"
+                          label="Per 1M characters"
+                          placeholder="classic TTS (tts-1, ElevenLabs)"
+                          disabled={
+                            !!values.audioInput ||
+                            !!values.audioOutput ||
+                            !!values.audioSeconds
+                          }
+                          clears={['audioInput', 'audioOutput', 'audioSeconds']}
+                        />
+                        <div className="col-span-2 text-xs text-muted-foreground">
+                          Or token-based billing (gpt-4o-mini-tts) — set Audio
+                          input + output instead of Per 1M characters:
+                        </div>
+                        <PriceField
+                          name="audioInput"
+                          label="Audio input / 1M tokens"
+                          disabled={
+                            !!values.audioCharacters || !!values.audioSeconds
+                          }
+                          clears={['audioCharacters', 'audioSeconds']}
+                        />
+                        <PriceField
+                          name="audioOutput"
+                          label="Audio output / 1M tokens"
+                          disabled={
+                            !!values.audioCharacters || !!values.audioSeconds
+                          }
+                          clears={['audioCharacters', 'audioSeconds']}
+                        />
+                        <div className="col-span-2 text-xs text-muted-foreground">
+                          Or per-second billing for STT models (whisper-1) — set
+                          Audio / second instead:
+                        </div>
+                        <PriceField
+                          name="audioSeconds"
+                          label="Audio / second"
+                          placeholder="per second of input audio (whisper-1: 0.0001)"
+                          disabled={
+                            !!values.audioCharacters ||
+                            !!values.audioInput ||
+                            !!values.audioOutput
+                          }
+                          clears={[
+                            'audioCharacters',
+                            'audioInput',
+                            'audioOutput'
+                          ]}
+                        />
+                      </>
+                    )}
                   </div>
-                  <Field
-                    label="Input / 1M tokens"
-                    value={edit.input}
-                    onChange={v => setEdit({ ...edit, input: v, image: '' })}
-                    disabled={!!edit.image}
-                  />
-                  <Field
-                    label="Output / 1M tokens"
-                    value={edit.output}
-                    onChange={v => setEdit({ ...edit, output: v, image: '' })}
-                    disabled={!!edit.image}
-                  />
-                </>
-              )}
-              {edit.capability === 'video' && (
-                <>
-                  {/* Two mutually-exclusive billing styles. Typing in one side
-                      disables (and clears) the other. */}
-                  <Field
-                    label="Per video"
-                    value={edit.video}
-                    onChange={v =>
-                      setEdit({ ...edit, video: v, videoSeconds: '' })
-                    }
-                    placeholder="flat per clip (Kling, Sora base)"
-                    disabled={!!edit.videoSeconds}
-                  />
-                  <Field
-                    label="Video / second"
-                    value={edit.videoSeconds}
-                    onChange={v =>
-                      setEdit({ ...edit, videoSeconds: v, video: '' })
-                    }
-                    placeholder="per second (Sora, Veo, Runway)"
-                    disabled={!!edit.video}
-                  />
-                </>
-              )}
-              {edit.capability === 'audio' && (
-                <>
-                  {/* Three mutually-exclusive billing styles. Typing in one
-                      style disables (and clears) the others. */}
-                  <Field
-                    label="Per 1M characters"
-                    value={edit.audioCharacters}
-                    onChange={v =>
-                      setEdit({
-                        ...edit,
-                        audioCharacters: v,
-                        audioInput: '',
-                        audioOutput: '',
-                        audioSeconds: ''
-                      })
-                    }
-                    placeholder="classic TTS (tts-1, ElevenLabs)"
-                    disabled={
-                      !!edit.audioInput ||
-                      !!edit.audioOutput ||
-                      !!edit.audioSeconds
-                    }
-                  />
-                  <div className="col-span-2 text-xs text-muted-foreground">
-                    Or token-based billing (gpt-4o-mini-tts) — set Audio input +
-                    output instead of Per 1M characters:
-                  </div>
-                  <Field
-                    label="Audio input / 1M tokens"
-                    value={edit.audioInput}
-                    onChange={v =>
-                      setEdit({
-                        ...edit,
-                        audioInput: v,
-                        audioCharacters: '',
-                        audioSeconds: ''
-                      })
-                    }
-                    disabled={!!edit.audioCharacters || !!edit.audioSeconds}
-                  />
-                  <Field
-                    label="Audio output / 1M tokens"
-                    value={edit.audioOutput}
-                    onChange={v =>
-                      setEdit({
-                        ...edit,
-                        audioOutput: v,
-                        audioCharacters: '',
-                        audioSeconds: ''
-                      })
-                    }
-                    disabled={!!edit.audioCharacters || !!edit.audioSeconds}
-                  />
-                  <div className="col-span-2 text-xs text-muted-foreground">
-                    Or per-second billing for STT models (whisper-1) — set Audio
-                    / second instead:
-                  </div>
-                  <Field
-                    label="Audio / second"
-                    value={edit.audioSeconds}
-                    onChange={v =>
-                      setEdit({
-                        ...edit,
-                        audioSeconds: v,
-                        audioCharacters: '',
-                        audioInput: '',
-                        audioOutput: ''
-                      })
-                    }
-                    placeholder="per second of input audio (whisper-1: 0.0001)"
-                    disabled={
-                      !!edit.audioCharacters ||
-                      !!edit.audioInput ||
-                      !!edit.audioOutput
-                    }
-                  />
-                </>
-              )}
-            </div>
+                )}
+              </form.Subscribe>
+              <DialogFooter className="mt-4">
+                <form.Subscribe selector={state => state.isSubmitting}>
+                  {isSubmitting => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEdit(null)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </form.Subscribe>
+                <form.AppForm>
+                  <form.SubmitButton>Save</form.SubmitButton>
+                </form.AppForm>
+              </DialogFooter>
+            </form>
           )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEdit(null)}
-              disabled={upsertMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={submit}
-              disabled={upsertMutation.isPending}
-              className="gap-2"
-            >
-              {upsertMutation.isPending && (
-                <Loader2 className="size-4 animate-spin" />
-              )}
-              Save
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1115,39 +1152,6 @@ function PreviewColgroup({ sources }: { sources: PricingSource[] }) {
         </Fragment>
       ))}
     </colgroup>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder = '0.00',
-  disabled = false
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="relative">
-        <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
-          $
-        </span>
-        <Input
-          inputMode="decimal"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          disabled={disabled}
-          className="pl-7"
-        />
-      </div>
-    </div>
   );
 }
 

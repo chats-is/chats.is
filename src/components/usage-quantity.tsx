@@ -2,8 +2,8 @@ import { type UsageRowLike } from '@/types';
 import { formatNumber, parseNumber } from '@/lib/utils';
 
 /**
- * Capability-aware "Quantity" cell for usage log tables. Returns a single
- * `<td>` (must be used directly inside `<tr>`).
+ * Capability-aware "Quantity" cell for usage log tables. Returns the cell's
+ * contents; the column definition that uses it owns the cell itself.
  *
  * Layouts:
  *   chat   → two lines inside one cell, " / " separated, label muted + value normal:
@@ -33,11 +33,11 @@ export function UsageQuantity({ row }: { row: UsageRowLike }) {
     if (cW > 0) bottom.push({ label: 'Cache Write', value: formatNumber(cW) });
 
     return (
-      <td className="p-2 text-left align-middle font-mono text-xs">
+      <>
         {top.length > 0 && <div>{renderPairs(top)}</div>}
         {bottom.length > 0 && <div>{renderPairs(bottom)}</div>}
         {top.length === 0 && bottom.length === 0 && '—'}
-      </td>
+      </>
     );
   }
 
@@ -56,16 +56,12 @@ export function UsageQuantity({ row }: { row: UsageRowLike }) {
       const o = parseNumber(row.outputTokens) ?? 0;
       if (i > 0) items.push({ label: 'Input', value: formatNumber(i) });
       if (o > 0) items.push({ label: 'Output', value: formatNumber(o) });
-      return (
-        <td className="p-2 text-left align-middle font-mono text-xs">
-          {renderPairs(items)}
-        </td>
-      );
+      return <>{renderPairs(items)}</>;
     }
 
     const n = parseNumber(row.imageCount) ?? 0;
     return (
-      <td className="p-2 text-left font-mono text-xs">
+      <>
         {n ? (
           <>
             <span>{formatNumber(n)}</span>
@@ -77,7 +73,7 @@ export function UsageQuantity({ row }: { row: UsageRowLike }) {
         ) : (
           '—'
         )}
-      </td>
+      </>
     );
   }
 
@@ -102,11 +98,7 @@ export function UsageQuantity({ row }: { row: UsageRowLike }) {
           <span className="text-muted-foreground"> s</span>
         </>
       );
-    return (
-      <td className="p-2 text-left font-mono text-xs">
-        {items.length ? joinWithSep(items) : '—'}
-      </td>
-    );
+    return <>{items.length ? joinWithSep(items) : '—'}</>;
   }
 
   // audio — per-character (classic TTS) or per-token (gpt-4o-mini-tts, omni)
@@ -135,11 +127,7 @@ export function UsageQuantity({ row }: { row: UsageRowLike }) {
         <span className="text-muted-foreground"> out</span>
       </>
     );
-  return (
-    <td className="p-2 text-left font-mono text-xs">
-      {items.length ? joinWithSep(items) : '—'}
-    </td>
-  );
+  return <>{items.length ? joinWithSep(items) : '—'}</>;
 }
 
 type Pair = { label: string; value: string };

@@ -1,4 +1,5 @@
-import { useState, type ChangeEvent } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
+import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,13 +11,13 @@ import {
 } from '@/types';
 import { ProviderTypes } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
-import { onSelect } from '@/lib/select';
 import {
   createProvider,
   deleteProvider,
   providerQueries,
   toggleEnabledProvider,
-  updateProvider
+  updateProvider,
+  type listProviders
 } from '@/server/fn/provider';
 import {
   AlertDialog,
@@ -38,13 +39,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -52,9 +46,236 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { useAppForm } from '@/components/app-form';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
 import { IconPicker } from '@/components/console/icon-picker';
 import { ProviderModelSyncDialog } from '@/components/console/provider-model-sync-dialog';
 import { ModelIcon } from '@/components/model-icon';
+
+type Provider = Awaited<ReturnType<typeof listProviders>>[number];
+
+type ProviderForm = {
+  name: string;
+  type: ProviderType;
+  apiKey: string;
+  vertexAuthMode: VertexAuthMode;
+  vertexLocation: string;
+  image: string;
+  baseUrl: string;
+  isEnabled: boolean;
+  apiOptions: string;
+};
+
+const EMPTY_FORM: ProviderForm = {
+  name: '',
+  type: 'openai',
+  apiKey: '',
+  vertexAuthMode: 'service_account',
+  vertexLocation: '',
+  image: '',
+  baseUrl: '',
+  isEnabled: true,
+  apiOptions: ''
+};
+
+const PROVIDER_TYPE_OPTIONS = ProviderTypes.map(t => ({
+  value: t.value,
+  label: t.label
+}));
+
+const VERTEX_AUTH_OPTIONS = [
+  { value: 'service_account', label: 'JSON' },
+  { value: 'api_key', label: 'API Key (Gemini only)' }
+];
+
+/** Parses to a JSON object (not an array, not a scalar). */
+const isJsonObject = (text: string): boolean => {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return (
+      typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** The service-account key stored on a provider, if it has one. */
+const vertexKeyOf = (provider: Provider | undefined) => {
+  const masked = provider?.maskedKey;
+  if (
+    provider?.type !== 'vertex' ||
+    typeof masked !== 'object' ||
+    masked === null ||
+    Array.isArray(masked) ||
+    typeof masked.location !== 'string' ||
+    typeof masked.credentials !== 'object' ||
+    masked.credentials === null ||
+    Array.isArray(masked.credentials)
+  ) {
+    return null;
+  }
+  return {
+    location: masked.location,
+    credentials: masked.credentials as VertexServiceAccountKey['credentials']
+  };
+};
+
+/**
+ * Which of a provider's rules apply depends on what is already stored — an
+ * edit may leave the secret untouched, a create may not — so the checks take
+ * the record being edited alongside the typed values.
+ */
+const validateProvider = (
+  value: ProviderForm,
+  editing: { id: string | null; vertexAuthMode: VertexAuthMode | null }
+) => {
+  const fields: Record<string, string> = {};
+  const apiKey = value.apiKey.trim();
+  const isVertex = value.type === 'vertex';
+  const isServiceAccount =
+    isVertex && value.vertexAuthMode === 'service_account';
+  const requiresJsonApiKey = isServiceAccount || value.type === 'bedrock';
+
+  if (!value.name.trim()) fields.name = 'Name is required';
+
+  if (requiresJsonApiKey && apiKey && !isJsonObject(apiKey)) {
+    fields.apiKey = 'API Key must be valid JSON for Vertex/Bedrock';
+  }
+
+  if (isServiceAccount) {
+    if (!value.vertexLocation.trim()) {
+      fields.vertexLocation = 'Vertex location is required';
+    }
+    if (!editing.id && !apiKey) {
+      fields.apiKey = 'Upload a Google Cloud credential JSON file';
+    } else if (
+      editing.id &&
+      !apiKey &&
+      editing.vertexAuthMode !== 'service_account'
+    ) {
+      fields.apiKey = 'Upload a Google Vertex AI credential JSON file.';
+    }
+  } else if (isVertex) {
+    if (editing.id && !apiKey && editing.vertexAuthMode !== 'api_key') {
+      fields.apiKey = 'Enter a Google Cloud API Key';
+    }
+    if (!editing.id && !apiKey) fields.apiKey = 'Enter a Google Cloud API Key';
+  } else if (!editing.id && !apiKey) {
+    fields.apiKey = 'API Key is required';
+  }
+
+  if (value.apiOptions.trim() && !isJsonObject(value.apiOptions)) {
+    fields.apiOptions = 'API Options must be a JSON object';
+  }
+
+  return Object.keys(fields).length > 0 ? { fields } : undefined;
+};
+
+const helper = createAppColumnHelper<Provider>();
+
+const providerColumns = (actions: {
+  toggle: (provider: Provider, isEnabled: boolean) => void;
+  sync: (id: string) => void;
+  edit: (provider: Provider) => void;
+  remove: (id: string) => void;
+}) =>
+  helper.columns([
+    helper.display({
+      id: 'icon',
+      header: 'Icon',
+      meta: { headClassName: 'w-20' },
+      cell: ({ row }) =>
+        row.original.image ? (
+          <ModelIcon image={row.original.image} className="size-8" />
+        ) : (
+          <div className="size-8 rounded border bg-muted" />
+        )
+    }),
+    helper.accessor('name', { header: 'Name' }),
+    helper.accessor('type', {
+      header: 'Type',
+      meta: { headClassName: 'w-28' },
+      cell: ({ row }) => (
+        <span className="rounded bg-muted px-2 py-1 text-xs">
+          {row.original.type}
+        </span>
+      )
+    }),
+    helper.accessor(row => row.models?.length || 0, {
+      id: 'models',
+      header: 'Models',
+      meta: { align: 'center', headClassName: 'w-20' }
+    }),
+    helper.accessor('isEnabled', {
+      header: 'Enabled',
+      meta: { align: 'center', headClassName: 'w-20' },
+      cell: ({ row }) => (
+        <Switch
+          checked={row.original.isEnabled}
+          onCheckedChange={checked => actions.toggle(row.original, checked)}
+        />
+      )
+    }),
+    helper.display({
+      id: 'actions',
+      header: 'Actions',
+      meta: {
+        align: 'right',
+        headClassName: 'w-36',
+        cellClassName: 'whitespace-nowrap'
+      },
+      cell: ({ row }) => (
+        <>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.sync(row.original.id)}
+                >
+                  <RefreshCw className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Sync API Models</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.edit(row.original)}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Edit Provider</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.remove(row.original.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Delete Provider</TooltipContent>
+          </Tooltip>
+        </>
+      )
+    })
+  ]);
 
 export default function ProvidersPage() {
   const [isOpen, setIsOpen] = useState(false);
@@ -69,31 +290,23 @@ export default function ProvidersPage() {
   const queryClient = useQueryClient();
   const { data: providers, isLoading } = useQuery(providerQueries.list());
 
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
+
   const createMutation = useMutation({
     mutationFn: mutating(createProvider),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
-      setIsOpen(false);
-      resetForm();
-    },
-    onError: error => toast.error(error.message)
+    onSuccess: invalidate
   });
 
   const updateMutation = useMutation({
     mutationFn: mutating(updateProvider),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
-      setIsOpen(false);
-      setEditingId(null);
-      resetForm();
-    },
-    onError: error => toast.error(error.message)
+    onSuccess: invalidate
   });
 
   const deleteMutation = useMutation({
     mutationFn: mutating(deleteProvider),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
+      invalidate();
       setDeleteId(null);
     },
     onError: error => toast.error(error.message)
@@ -101,70 +314,95 @@ export default function ProvidersPage() {
 
   const toggleMutation = useMutation({
     mutationFn: mutating(toggleEnabledProvider),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
-    },
+    onSuccess: invalidate,
     onError: error => toast.error(error.message)
   });
 
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'openai' as ProviderType,
-    apiKey: '',
-    vertexAuthMode: 'service_account' as VertexAuthMode,
-    vertexLocation: '',
-    image: '',
-    baseUrl: '',
-    isEnabled: true,
-    apiOptions: ''
+  const editingProvider = providers?.find(p => p.id === editingId);
+  const editingVertexKey = vertexKeyOf(editingProvider);
+  const editingVertexAuthMode: VertexAuthMode | null =
+    editingProvider?.type === 'vertex'
+      ? editingVertexKey
+        ? 'service_account'
+        : 'api_key'
+      : null;
+
+  const form = useAppForm({
+    defaultValues: EMPTY_FORM,
+    validators: {
+      onChange: ({ value }) =>
+        validateProvider(value, {
+          id: editingId,
+          vertexAuthMode: editingVertexAuthMode
+        })
+    },
+    onSubmit: async ({ value }) => {
+      let apiKey = value.apiKey.trim();
+
+      if (
+        value.type === 'vertex' &&
+        value.vertexAuthMode === 'service_account'
+      ) {
+        const location = value.vertexLocation.trim();
+        if (apiKey) {
+          apiKey = JSON.stringify({
+            location,
+            credentials: JSON.parse(
+              apiKey
+            ) as VertexServiceAccountKey['credentials']
+          });
+        } else if (editingId && editingVertexAuthMode === 'service_account') {
+          // The stored credentials stay put; only the location is resent.
+          apiKey = JSON.stringify({ location });
+        }
+      }
+
+      // create: omit the field (undefined); update: clear it (null)
+      const apiOptions = value.apiOptions
+        ? (JSON.parse(value.apiOptions) as Record<string, unknown>)
+        : editingId
+          ? null
+          : undefined;
+
+      const {
+        apiKey: _apiKey,
+        vertexAuthMode: _vertexAuthMode,
+        vertexLocation: _vertexLocation,
+        ...providerData
+      } = value;
+      const payload = {
+        ...providerData,
+        ...(apiKey && { apiKey }),
+        apiOptions
+      };
+
+      try {
+        if (editingId) {
+          await updateMutation.mutateAsync({ id: editingId, ...payload });
+        } else {
+          await createMutation.mutateAsync(
+            payload as Parameters<typeof createMutation.mutateAsync>[0]
+          );
+        }
+        setIsOpen(false);
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    }
   });
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      type: 'openai',
-      apiKey: '',
-      vertexAuthMode: 'service_account',
-      vertexLocation: '',
-      image: '',
-      baseUrl: '',
-      isEnabled: true,
-      apiOptions: ''
-    });
-    setVertexMaskedApiKey('');
-  };
+  const openFor = (provider: Provider | null) => {
+    setEditingId(provider?.id ?? null);
 
-  const modelSyncProvider = providers?.find(
-    provider => provider.id === modelSyncProviderId
-  );
+    if (!provider) {
+      form.reset(EMPTY_FORM);
+      setVertexMaskedApiKey('');
+      setIsOpen(true);
+      return;
+    }
 
-  const openModelSyncDialog = (providerId: string) => {
-    setModelSyncProviderId(providerId);
-  };
-
-  const closeModelSyncDialog = () => {
-    setModelSyncProviderId(null);
-  };
-
-  const handleEdit = (provider: any) => {
-    const maskedVertexKey =
-      provider.type === 'vertex' &&
-      typeof provider.maskedKey === 'object' &&
-      provider.maskedKey !== null &&
-      !Array.isArray(provider.maskedKey) &&
-      typeof provider.maskedKey.location === 'string' &&
-      typeof provider.maskedKey.credentials === 'object' &&
-      provider.maskedKey.credentials !== null &&
-      !Array.isArray(provider.maskedKey.credentials)
-        ? {
-            location: provider.maskedKey.location,
-            credentials: provider.maskedKey
-              .credentials as VertexServiceAccountKey['credentials']
-          }
-        : null;
-
-    setEditingId(provider.id);
-    setFormData({
+    const maskedVertexKey = vertexKeyOf(provider);
+    form.reset({
       name: provider.name,
       type: provider.type,
       apiKey: '',
@@ -185,20 +423,29 @@ export default function ProvidersPage() {
     setIsOpen(true);
   };
 
-  const handleTypeChange = (value: string) => {
-    const nextType = value as ProviderType;
+  const columns = useMemo(
+    () =>
+      providerColumns({
+        toggle: (provider, isEnabled) =>
+          toggleMutation.mutate({ id: provider.id, isEnabled }),
+        sync: setModelSyncProviderId,
+        edit: openFor,
+        remove: setDeleteId
+      }),
+    []
+  );
 
-    setFormData(current => ({
-      ...current,
-      type: nextType,
-      apiKey:
-        current.type === 'vertex' || nextType === 'vertex'
-          ? ''
-          : current.apiKey,
-      vertexAuthMode:
-        nextType === 'vertex' ? 'service_account' : current.vertexAuthMode,
-      vertexLocation: nextType === 'vertex' ? current.vertexLocation : ''
-    }));
+  // Changing the type invalidates the secret it was entered for.
+  const handleTypeChange = (nextType: ProviderType) => {
+    const currentType = form.getFieldValue('type');
+    if (currentType === 'vertex' || nextType === 'vertex') {
+      form.setFieldValue('apiKey', '');
+    }
+    if (nextType === 'vertex') {
+      form.setFieldValue('vertexAuthMode', 'service_account');
+    } else {
+      form.setFieldValue('vertexLocation', '');
+    }
     setVertexMaskedApiKey('');
   };
 
@@ -206,7 +453,6 @@ export default function ProvidersPage() {
     e: ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
 
     try {
@@ -234,10 +480,7 @@ export default function ProvidersPage() {
         return;
       }
 
-      setFormData(current => ({
-        ...current,
-        apiKey: JSON.stringify(credentials, null, 2)
-      }));
+      form.setFieldValue('apiKey', JSON.stringify(credentials, null, 2));
       setVertexMaskedApiKey('');
     } catch {
       toast.error('Invalid credential JSON file');
@@ -246,157 +489,18 @@ export default function ProvidersPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    let apiKey = formData.apiKey.trim();
-    let apiOptions: Record<string, unknown> | null | undefined;
-    const editingProvider = providers?.find(p => p.id === editingId);
-    const editingVertexKey =
-      editingProvider?.type === 'vertex' &&
-      typeof editingProvider.maskedKey === 'object' &&
-      editingProvider.maskedKey !== null &&
-      !Array.isArray(editingProvider.maskedKey) &&
-      typeof editingProvider.maskedKey.location === 'string' &&
-      typeof editingProvider.maskedKey.credentials === 'object' &&
-      editingProvider.maskedKey.credentials !== null &&
-      !Array.isArray(editingProvider.maskedKey.credentials)
-        ? {
-            location: editingProvider.maskedKey.location,
-            credentials: editingProvider.maskedKey
-              .credentials as VertexServiceAccountKey['credentials']
-          }
-        : null;
-    const editingVertexAuthMode =
-      editingProvider?.type === 'vertex'
-        ? editingVertexKey
-          ? 'service_account'
-          : 'api_key'
-        : null;
-    const requiresJsonApiKey =
-      (formData.type === 'vertex' &&
-        formData.vertexAuthMode === 'service_account') ||
-      formData.type === 'bedrock';
-    const vertexLocation = formData.vertexLocation.trim();
-
-    if (requiresJsonApiKey && apiKey) {
-      try {
-        const parsedApiKey = JSON.parse(apiKey) as unknown;
-
-        if (
-          typeof parsedApiKey !== 'object' ||
-          parsedApiKey === null ||
-          Array.isArray(parsedApiKey)
-        ) {
-          throw new Error('Provider secret must be a JSON object');
-        }
-      } catch {
-        toast.error('API Key must be valid JSON for Vertex/Bedrock');
-        return;
-      }
-    }
-
-    if (
-      formData.type === 'vertex' &&
-      formData.vertexAuthMode === 'service_account'
-    ) {
-      if (!vertexLocation) {
-        toast.error('Vertex location is required');
-        return;
-      }
-
-      if (!editingId && !apiKey) {
-        toast.error('Upload a Google Cloud credential JSON file');
-        return;
-      }
-
-      if (editingId && !apiKey && editingVertexAuthMode !== 'service_account') {
-        toast.error('Upload a Google Vertex AI credential JSON file.');
-        return;
-      }
-
-      if (apiKey) {
-        const credentials = JSON.parse(
-          apiKey
-        ) as VertexServiceAccountKey['credentials'];
-
-        apiKey = JSON.stringify({
-          location: vertexLocation,
-          credentials
-        });
-      } else if (editingId && editingVertexAuthMode === 'service_account') {
-        apiKey = JSON.stringify({
-          location: vertexLocation
-        });
-      }
-    }
-
-    if (
-      editingId &&
-      formData.type === 'vertex' &&
-      formData.vertexAuthMode === 'api_key' &&
-      !apiKey &&
-      editingVertexAuthMode !== 'api_key'
-    ) {
-      toast.error('Enter a Google Cloud API Key');
-      return;
-    }
-
-    try {
-      if (formData.apiOptions) {
-        apiOptions = JSON.parse(formData.apiOptions);
-        if (
-          typeof apiOptions !== 'object' ||
-          apiOptions === null ||
-          Array.isArray(apiOptions)
-        ) {
-          toast.error('API Options must be a JSON object');
-          return;
-        }
-      } else {
-        // create: omit the field (undefined); update: clear it (null)
-        apiOptions = editingId ? null : undefined;
-      }
-    } catch {
-      toast.error('Invalid JSON format');
-      return;
-    }
-
-    const {
-      apiKey: _apiKey,
-      vertexAuthMode: _vertexAuthMode,
-      vertexLocation: _vertexLocation,
-      ...providerData
-    } = formData;
-    const data = {
-      ...providerData,
-      ...(apiKey && { apiKey }),
-      apiOptions
-    };
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, ...data });
-    } else {
-      createMutation.mutate(
-        data as Parameters<typeof createMutation.mutate>[0]
-      );
-    }
-  };
-
-  const isPending = createMutation.isPending || updateMutation.isPending;
-  const isVertex = formData.type === 'vertex';
-  const isBedrock = formData.type === 'bedrock';
+  const shape = useStore(form.store, state => ({
+    type: state.values.type,
+    vertexAuthMode: state.values.vertexAuthMode
+  }));
+  const isVertex = shape.type === 'vertex';
+  const isBedrock = shape.type === 'bedrock';
   const isVertexServiceAccount =
-    isVertex && formData.vertexAuthMode === 'service_account';
-  const isVertexApiKey = isVertex && formData.vertexAuthMode === 'api_key';
-  const vertexCredentialValue =
-    isVertexServiceAccount && !formData.apiKey && vertexMaskedApiKey
-      ? vertexMaskedApiKey
-      : formData.apiKey;
-  const isMaskedVertexCredential =
-    isVertexServiceAccount && !formData.apiKey && !!vertexMaskedApiKey;
+    isVertex && shape.vertexAuthMode === 'service_account';
+  const isVertexApiKey = isVertex && shape.vertexAuthMode === 'api_key';
+  const requiresJsonApiKey = isVertexServiceAccount || isBedrock;
 
   const apiKeyPlaceholder = (() => {
-    const editingProvider = providers?.find(p => p.id === editingId);
     const maskedKey =
       typeof editingProvider?.maskedKey === 'string'
         ? editingProvider.maskedKey
@@ -415,8 +519,6 @@ export default function ProvidersPage() {
     }
     return editingId ? maskedKey : 'Enter API Key';
   })();
-
-  const requiresJsonApiKey = isVertexServiceAccount || isBedrock;
 
   const apiKeyHelpText = isVertexApiKey
     ? 'Google Cloud API key for Gemini on Vertex AI.'
@@ -456,13 +558,7 @@ export default function ProvidersPage() {
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger
             render={
-              <Button
-                className="gap-2"
-                onClick={() => {
-                  setEditingId(null);
-                  resetForm();
-                }}
-              >
+              <Button className="gap-2" onClick={() => openFor(null)}>
                 <Plus className="size-4" />
                 Add Provider
               </Button>
@@ -474,232 +570,203 @@ export default function ProvidersPage() {
                 {editingId ? 'Edit Provider' : 'Add Provider'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                form.handleSubmit();
+              }}
+              className="space-y-4"
+            >
               <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={e =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    placeholder="OpenAI"
-                    disabled={isPending}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={onSelect(handleTypeChange)}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ProviderTypes.map(id => (
-                        <SelectItem key={id.value} value={id.value}>
-                          {id.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  {isVertex ? (
-                    <>
-                      <Label htmlFor="vertexAuthMode">Authentication</Label>
-                      <Select
-                        value={formData.vertexAuthMode}
-                        onValueChange={onSelect(value =>
-                          setFormData(current => ({
-                            ...current,
-                            vertexAuthMode: value as VertexAuthMode,
-                            apiKey: ''
-                          }))
-                        )}
-                        disabled={isPending}
-                      >
-                        <SelectTrigger id="vertexAuthMode">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="service_account">JSON</SelectItem>
-                          <SelectItem value="api_key">
-                            API Key (Gemini only)
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </>
-                  ) : null}
-                </div>
-                <div className="space-y-2">
-                  {isVertexServiceAccount ? (
-                    <>
-                      <Label htmlFor="vertexCredentials">Credential File</Label>
-                      <Input
-                        key="vertex-service-account-file"
-                        id="vertexCredentials"
-                        type="file"
-                        accept=".json,application/json"
-                        onChange={handleVertexCredentialChange}
-                        disabled={isPending}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Upload a Google Vertex AI credential JSON file.
-                      </p>
-                      <Textarea
-                        id="apiKey"
-                        value={vertexCredentialValue}
-                        onChange={e =>
-                          setFormData({ ...formData, apiKey: e.target.value })
-                        }
-                        placeholder="{}"
-                        required={!editingId}
-                        disabled={isPending}
-                        readOnly={isMaskedVertexCredential}
-                        // Credentials are one unbroken token (a key, or JSON
-                        // wrapping a base64 blob). Without break-all there is no
-                        // wrap opportunity, and the shared Textarea's
-                        // field-sizing-content then grows it past the dialog.
-                        className="font-mono break-all"
-                        rows={6}
-                      />
-                    </>
-                  ) : isVertexApiKey ? (
-                    <>
-                      <Label htmlFor="apiKey">API Key</Label>
-                      <Input
-                        key="vertex-api-key-input"
-                        id="apiKey"
-                        value={formData.apiKey}
-                        onChange={e =>
-                          setFormData({ ...formData, apiKey: e.target.value })
-                        }
-                        placeholder={apiKeyPlaceholder}
-                        required={!editingId}
-                        disabled={isPending}
-                      />
-                      {apiKeyHelpText ? (
-                        <p className="text-xs text-muted-foreground">
-                          {apiKeyHelpText}
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <Label htmlFor="apiKey">API Key</Label>
-                      <Textarea
-                        id="apiKey"
-                        value={formData.apiKey}
-                        onChange={e =>
-                          setFormData({ ...formData, apiKey: e.target.value })
-                        }
-                        placeholder={apiKeyPlaceholder}
-                        required={!editingId}
-                        disabled={isPending}
-                        className="font-mono break-all"
-                        rows={requiresJsonApiKey ? 6 : 2}
-                      />
-                      {apiKeyHelpText ? (
-                        <p className="text-xs text-muted-foreground">
-                          {apiKeyHelpText}
-                        </p>
-                      ) : null}
-                    </>
+                <form.AppField name="name">
+                  {field => (
+                    <field.TextField label="Name" placeholder="OpenAI" />
                   )}
-                </div>
-                {isVertexServiceAccount ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="vertexLocation">Location</Label>
-                    <Input
-                      id="vertexLocation"
-                      value={formData.vertexLocation}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          vertexLocation: e.target.value
-                        })
-                      }
-                      placeholder="us-central1"
-                      disabled={isPending}
+                </form.AppField>
+
+                <form.AppField
+                  name="type"
+                  listeners={{
+                    onChange: ({ value }) => handleTypeChange(value)
+                  }}
+                >
+                  {field => (
+                    <field.SelectField
+                      label="Type"
+                      options={PROVIDER_TYPE_OPTIONS}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Enter the Google Vertex AI region, e.g. us-central1.
-                    </p>
-                  </div>
-                ) : null}
-                <div className="space-y-2">
-                  <Label htmlFor="baseUrl">Base URL (optional)</Label>
-                  <Input
-                    id="baseUrl"
-                    value={formData.baseUrl}
-                    onChange={e =>
-                      setFormData({ ...formData, baseUrl: e.target.value })
+                  )}
+                </form.AppField>
+
+                {isVertex && (
+                  <form.AppField
+                    name="vertexAuthMode"
+                    listeners={{
+                      onChange: () => form.setFieldValue('apiKey', '')
+                    }}
+                  >
+                    {field => (
+                      <field.SelectField
+                        label="Authentication"
+                        options={VERTEX_AUTH_OPTIONS}
+                      />
+                    )}
+                  </form.AppField>
+                )}
+
+                <form.Field name="apiKey">
+                  {field => {
+                    const error = field.state.meta.isTouched
+                      ? field.state.meta.errors[0]
+                      : null;
+                    const errorLine = error ? (
+                      <p className="text-xs text-destructive">
+                        {String(
+                          (error as { message?: string })?.message ?? error
+                        )}
+                      </p>
+                    ) : null;
+
+                    if (isVertexServiceAccount) {
+                      // With nothing newly typed, the stored credential is
+                      // shown masked and read-only — it is not re-sent.
+                      const masked = !field.state.value && !!vertexMaskedApiKey;
+                      return (
+                        <div className="space-y-2">
+                          <Label htmlFor="vertexCredentials">
+                            Credential File
+                          </Label>
+                          <Input
+                            key="vertex-service-account-file"
+                            id="vertexCredentials"
+                            type="file"
+                            accept=".json,application/json"
+                            onChange={handleVertexCredentialChange}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Upload a Google Vertex AI credential JSON file.
+                          </p>
+                          <Textarea
+                            id="apiKey"
+                            value={
+                              masked ? vertexMaskedApiKey : field.state.value
+                            }
+                            onChange={e => field.handleChange(e.target.value)}
+                            onBlur={field.handleBlur}
+                            placeholder="{}"
+                            readOnly={masked}
+                            aria-invalid={!!error}
+                            // Credentials are one unbroken token (a key, or JSON
+                            // wrapping a base64 blob). Without break-all there is
+                            // no wrap opportunity, and the shared Textarea's
+                            // field-sizing-content then grows it past the dialog.
+                            className="font-mono break-all"
+                            rows={6}
+                          />
+                          {errorLine}
+                        </div>
+                      );
                     }
-                    placeholder="https://"
-                    disabled={isPending}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="image">Icon (optional)</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 shadow-sm">
-                      {formData.image ? (
-                        <ModelIcon image={formData.image} className="size-4" />
-                      ) : null}
+
+                    return (
+                      <div className="space-y-2">
+                        <Label htmlFor="apiKey">API Key</Label>
+                        {isVertexApiKey ? (
+                          <Input
+                            key="vertex-api-key-input"
+                            id="apiKey"
+                            value={field.state.value}
+                            onChange={e => field.handleChange(e.target.value)}
+                            onBlur={field.handleBlur}
+                            placeholder={apiKeyPlaceholder}
+                            aria-invalid={!!error}
+                          />
+                        ) : (
+                          <Textarea
+                            id="apiKey"
+                            value={field.state.value}
+                            onChange={e => field.handleChange(e.target.value)}
+                            onBlur={field.handleBlur}
+                            placeholder={apiKeyPlaceholder}
+                            aria-invalid={!!error}
+                            className="font-mono break-all"
+                            rows={requiresJsonApiKey ? 6 : 2}
+                          />
+                        )}
+                        {apiKeyHelpText ? (
+                          <p className="text-xs text-muted-foreground">
+                            {apiKeyHelpText}
+                          </p>
+                        ) : null}
+                        {errorLine}
+                      </div>
+                    );
+                  }}
+                </form.Field>
+
+                {isVertexServiceAccount && (
+                  <form.AppField name="vertexLocation">
+                    {field => (
+                      <field.TextField
+                        label="Location"
+                        placeholder="us-central1"
+                        hint="Enter the Google Vertex AI region, e.g. us-central1."
+                      />
+                    )}
+                  </form.AppField>
+                )}
+
+                <form.AppField name="baseUrl">
+                  {field => (
+                    <field.TextField
+                      label="Base URL (optional)"
+                      placeholder="https://"
+                    />
+                  )}
+                </form.AppField>
+
+                <form.Field name="image">
+                  {field => (
+                    <div className="space-y-2">
+                      <Label htmlFor="image">Icon (optional)</Label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 shadow-sm">
+                          {field.state.value ? (
+                            <ModelIcon
+                              image={field.state.value}
+                              className="size-4"
+                            />
+                          ) : null}
+                        </div>
+                        <Input
+                          id="image"
+                          value={field.state.value}
+                          onChange={e => field.handleChange(e.target.value)}
+                          placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
+                        />
+                      </div>
+                      <IconPicker
+                        value={field.state.value}
+                        onChange={value => field.handleChange(value)}
+                      />
                     </div>
-                    <Input
-                      id="image"
-                      value={formData.image}
-                      onChange={e =>
-                        setFormData({ ...formData, image: e.target.value })
-                      }
-                      placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
-                      disabled={isPending}
+                  )}
+                </form.Field>
+
+                <form.AppField name="apiOptions">
+                  {field => (
+                    <field.TextareaField
+                      label="API Options (JSON)"
+                      placeholder="{}"
+                      className="font-mono break-all"
+                      rows={3}
                     />
-                  </div>
-                  <IconPicker
-                    value={formData.image}
-                    onChange={value =>
-                      setFormData({
-                        ...formData,
-                        image: value
-                      })
-                    }
-                    disabled={isPending}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiOptions">API Options (JSON)</Label>
-                  <Textarea
-                    id="apiOptions"
-                    value={formData.apiOptions}
-                    onChange={e =>
-                      setFormData({ ...formData, apiOptions: e.target.value })
-                    }
-                    placeholder="{}"
-                    disabled={isPending}
-                    className="font-mono break-all"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="isEnabled"
-                    checked={formData.isEnabled}
-                    onCheckedChange={checked =>
-                      setFormData({ ...formData, isEnabled: checked })
-                    }
-                    disabled={isPending}
-                  />
-                  <Label htmlFor="isEnabled">Enabled</Label>
-                </div>
+                  )}
+                </form.AppField>
+
+                <form.AppField name="isEnabled">
+                  {field => <field.SwitchField label="Enabled" />}
+                </form.AppField>
               </div>
               <div className="flex justify-end gap-2">
                 <Button
@@ -709,134 +776,26 @@ export default function ProvidersPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isPending} className="gap-2">
-                  {isPending && <Loader2 className="size-4 animate-spin" />}
-                  {isPending
-                    ? 'Saving...'
-                    : editingId
-                      ? 'Save Changes'
-                      : 'Create'}
-                </Button>
+                <form.AppForm>
+                  <form.SubmitButton>
+                    {editingId ? 'Save Changes' : 'Create'}
+                  </form.SubmitButton>
+                </form.AppForm>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="w-20 p-3 text-left text-sm font-medium">Icon</th>
-              <th className="p-3 text-left text-sm font-medium">Name</th>
-              <th className="w-28 p-3 text-left text-sm font-medium">Type</th>
-              <th className="w-20 p-3 text-center text-sm font-medium">
-                Models
-              </th>
-              <th className="w-20 p-3 text-center text-sm font-medium">
-                Enabled
-              </th>
-              <th className="w-36 p-3 text-right text-sm font-medium">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProviders?.map(provider => (
-              <tr
-                key={provider.id}
-                className="border-b transition-colors hover:bg-muted/30"
-              >
-                <td className="p-3">
-                  {provider.image ? (
-                    <ModelIcon image={provider.image} className="size-8" />
-                  ) : (
-                    <div className="size-8 rounded border bg-muted" />
-                  )}
-                </td>
-                <td className="p-3">{provider.name}</td>
-                <td className="p-3">
-                  <span className="rounded bg-muted px-2 py-1 text-xs">
-                    {provider.type}
-                  </span>
-                </td>
-                <td className="p-3 text-center">
-                  {provider.models?.length || 0}
-                </td>
-                <td className="p-3 text-center">
-                  <Switch
-                    checked={provider.isEnabled}
-                    onCheckedChange={checked =>
-                      toggleMutation.mutate({
-                        id: provider.id,
-                        isEnabled: checked
-                      })
-                    }
-                  />
-                </td>
-                <td className="p-3 text-right whitespace-nowrap">
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openModelSyncDialog(provider.id)}
-                        >
-                          <RefreshCw className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Sync API Models</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(provider)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Edit Provider</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setDeleteId(provider.id);
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Delete Provider</TooltipContent>
-                  </Tooltip>
-                </td>
-              </tr>
-            ))}
-            {(!filteredProviders || filteredProviders.length === 0) && (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="p-6 text-center text-muted-foreground"
-                >
-                  {search
-                    ? 'No providers found matching your search.'
-                    : 'No providers configured. Add your first provider to get started.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={filteredProviders}
+        empty={
+          search
+            ? 'No providers found matching your search.'
+            : 'No providers configured. Add your first provider to get started.'
+        }
+      />
 
       <AlertDialog
         open={!!deleteId}
@@ -876,11 +835,9 @@ export default function ProvidersPage() {
       <ProviderModelSyncDialog
         open={!!modelSyncProviderId}
         providerId={modelSyncProviderId}
-        providerName={modelSyncProvider?.name}
+        providerName={providers?.find(p => p.id === modelSyncProviderId)?.name}
         onOpenChange={open => {
-          if (!open) {
-            closeModelSyncDialog();
-          }
+          if (!open) setModelSyncProviderId(null);
         }}
       />
     </div>

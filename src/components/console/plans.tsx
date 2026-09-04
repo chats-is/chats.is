@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { z } from 'zod';
 
 import { mutating } from '@/lib/mutation';
-import { onSelect } from '@/lib/select';
 import {
   createPlan,
   deletePlan,
   planQueries,
-  updatePlan
+  updatePlan,
+  type listPlans
 } from '@/server/fn/plan';
 import { quotaQueries } from '@/server/fn/quota';
 import { userQueries } from '@/server/fn/user';
@@ -33,35 +34,115 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { useAppForm } from '@/components/app-form';
+import {
+  createAppColumnHelper,
+  DataTable
+} from '@/components/console/data-table';
 
-type FormState = {
-  name: string;
-  description: string;
-  quotaId: string;
-  displayOrder: string;
-};
+type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-const emptyForm: FormState = {
+const planSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
+  description: z.string(),
+  quotaId: z.string().min(1, 'Select a quota'),
+  displayOrder: z.string()
+});
+
+type PlanForm = z.infer<typeof planSchema>;
+
+const emptyForm: PlanForm = {
   name: '',
   description: '',
   quotaId: '',
   displayOrder: '0'
 };
+
+const helper = createAppColumnHelper<Plan>();
+
+const planColumns = (actions: {
+  edit: (plan: Plan) => void;
+  remove: (id: string) => void;
+}) =>
+  helper.columns([
+    helper.accessor('name', {
+      header: 'Name',
+      cell: ({ row }) => (
+        <>
+          <div className="font-medium">{row.original.name}</div>
+          {row.original.description && (
+            <div className="text-xs text-muted-foreground">
+              {row.original.description}
+            </div>
+          )}
+        </>
+      )
+    }),
+    helper.accessor(row => row.quota?.name, {
+      id: 'quota',
+      header: 'Quota',
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div className="font-medium">{row.original.quota?.name}</div>
+          {row.original.quota?.isUnlimited && (
+            <span className="mt-1 inline-block rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300">
+              Unlimited
+            </span>
+          )}
+        </div>
+      )
+    }),
+    helper.accessor('userCount', {
+      header: 'Users',
+      meta: { align: 'center', cellClassName: 'text-sm' }
+    }),
+    helper.display({
+      id: 'actions',
+      header: 'Actions',
+      meta: {
+        align: 'right',
+        headClassName: 'w-24',
+        cellClassName: 'whitespace-nowrap'
+      },
+      cell: ({ row }) => (
+        <>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.edit(row.original)}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Edit</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.remove(row.original.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
+        </>
+      )
+    })
+  ]);
 
 export default function PlansPage() {
   const queryClient = useQueryClient();
@@ -69,30 +150,22 @@ export default function PlansPage() {
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const create = useMutation({
     mutationFn: mutating(createPlan),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
-      setOpen(false);
-      setForm(emptyForm);
       toast.success('Plan created');
-    },
-    onError: e => toast.error(e.message)
+    }
   });
 
   const update = useMutation({
     mutationFn: mutating(updatePlan),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
-      setOpen(false);
-      setEditingId(null);
-      setForm(emptyForm);
       toast.success('Plan saved');
-    },
-    onError: e => toast.error(e.message)
+    }
   });
 
   const del = useMutation({
@@ -106,50 +179,56 @@ export default function PlansPage() {
     onError: e => toast.error(e.message)
   });
 
-  useEffect(() => {
-    if (!open) {
-      setEditingId(null);
-      setForm(emptyForm);
-    }
-  }, [open]);
+  const form = useAppForm({
+    defaultValues: emptyForm,
+    validators: { onChange: planSchema },
+    onSubmit: async ({ value }) => {
+      const payload = {
+        name: value.name.trim(),
+        description: value.description.trim() || null,
+        quotaId: value.quotaId,
+        displayOrder: Number(value.displayOrder) || 0
+      };
 
-  const startEdit = (plan: NonNullable<typeof plans>[number]) => {
-    setEditingId(plan.id);
-    setForm({
-      name: plan.name,
-      description: plan.description ?? '',
-      quotaId: plan.quotaId,
-      displayOrder: plan.displayOrder.toString()
-    });
+      try {
+        // Awaited so the form stays in its submitting state — and so the
+        // dialog closes only once the write has actually landed.
+        if (editingId) {
+          await update.mutateAsync({ id: editingId, ...payload });
+        } else {
+          await create.mutateAsync(payload);
+        }
+        setOpen(false);
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    }
+  });
+
+  // The dialog is a single form reused for "new" and "edit", so opening it is
+  // what decides which record it is pointed at.
+  const openFor = (plan: Plan | null) => {
+    setEditingId(plan?.id ?? null);
+    form.reset(
+      plan
+        ? {
+            name: plan.name,
+            description: plan.description ?? '',
+            quotaId: plan.quotaId,
+            displayOrder: plan.displayOrder.toString()
+          }
+        : emptyForm
+    );
     setOpen(true);
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.quotaId) {
-      toast.error('Please select a quota');
-      return;
-    }
-    const displayOrder = Number(form.displayOrder) || 0;
-    const payload = {
-      name: form.name.trim(),
-      description: form.description.trim() || null,
-      quotaId: form.quotaId,
-      displayOrder
-    };
+  const columns = useMemo(
+    () => planColumns({ edit: openFor, remove: setDeleteId }),
+    []
+  );
 
-    if (editingId) {
-      update.mutate({ id: editingId, ...payload });
-    } else {
-      create.mutate(payload);
-    }
-  };
-
-  const isPending = create.isPending || update.isPending;
-
-  // Base UI's trigger renders the value, not the selected item's content.
-  const quotaLabels = useMemo(
-    () => Object.fromEntries((quotaOptions ?? []).map(q => [q.id, q.name])),
+  const quotaSelectOptions = useMemo(
+    () => (quotaOptions ?? []).map(q => ({ value: q.id, label: q.name })),
     [quotaOptions]
   );
 
@@ -173,6 +252,7 @@ export default function PlansPage() {
                 title={
                   !quotaOptions?.length ? 'Create a Quota first' : undefined
                 }
+                onClick={() => openFor(null)}
               >
                 <Plus className="size-4" />
                 New Plan
@@ -186,165 +266,73 @@ export default function PlansPage() {
                 A plan is a named tier that references a Quota.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={submit} className="space-y-4">
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                form.handleSubmit();
+              }}
+              className="space-y-4"
+            >
               <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input
-                      value={form.name}
-                      onChange={e => setForm({ ...form, name: e.target.value })}
-                      placeholder="Pro"
-                      required
-                      disabled={isPending}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Display Order</Label>
-                    <Input
-                      type="number"
-                      value={form.displayOrder}
-                      onChange={e =>
-                        setForm({ ...form, displayOrder: e.target.value })
-                      }
-                      disabled={isPending}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description (optional)</Label>
-                  <Textarea
-                    value={form.description}
-                    onChange={e =>
-                      setForm({ ...form, description: e.target.value })
-                    }
-                    rows={2}
-                    disabled={isPending}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Quota</Label>
-                  <Select
-                    items={quotaLabels}
-                    value={form.quotaId}
-                    onValueChange={onSelect(v =>
-                      setForm({ ...form, quotaId: v })
+                  <form.AppField name="name">
+                    {field => (
+                      <field.TextField label="Name" placeholder="Pro" />
                     )}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a quota" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {quotaOptions?.map(q => (
-                        <SelectItem key={q.id} value={q.id}>
-                          {q.name}
-                          {q.isUnlimited ? ' (Unlimited)' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  </form.AppField>
+                  <form.AppField name="displayOrder">
+                    {field => (
+                      <field.TextField label="Display Order" type="number" />
+                    )}
+                  </form.AppField>
                 </div>
+                <form.AppField name="description">
+                  {field => (
+                    <field.TextareaField
+                      label="Description (optional)"
+                      rows={2}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="quotaId">
+                  {field => (
+                    <field.SelectField
+                      label="Quota"
+                      placeholder="Select a quota"
+                      options={quotaSelectOptions}
+                    />
+                  )}
+                </form.AppField>
               </div>
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isPending} className="gap-2">
-                  {isPending && <Loader2 className="size-4 animate-spin" />}
-                  {editingId ? 'Save Changes' : 'Create'}
-                </Button>
+                <form.Subscribe selector={state => state.isSubmitting}>
+                  {isSubmitting => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setOpen(false)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </form.Subscribe>
+                <form.AppForm>
+                  <form.SubmitButton>
+                    {editingId ? 'Save Changes' : 'Create'}
+                  </form.SubmitButton>
+                </form.AppForm>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="p-3 text-left text-sm font-medium">Name</th>
-              <th className="p-3 text-left text-sm font-medium">Quota</th>
-              <th className="p-3 text-center text-sm font-medium">Users</th>
-              <th className="w-24 p-3 text-right text-sm font-medium">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {plans?.map(plan => (
-              <tr
-                key={plan.id}
-                className="border-b transition-colors hover:bg-muted/30"
-              >
-                <td className="p-3">
-                  <div className="font-medium">{plan.name}</div>
-                  {plan.description && (
-                    <div className="text-xs text-muted-foreground">
-                      {plan.description}
-                    </div>
-                  )}
-                </td>
-                <td className="p-3 text-sm">
-                  <div className="font-medium">{plan.quota?.name}</div>
-                  {plan.quota?.isUnlimited && (
-                    <span className="mt-1 inline-block rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                      Unlimited
-                    </span>
-                  )}
-                </td>
-                <td className="p-3 text-center text-sm">{plan.userCount}</td>
-                <td className="p-3 text-right whitespace-nowrap">
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEdit(plan)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Edit</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteId(plan.id)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Delete</TooltipContent>
-                  </Tooltip>
-                </td>
-              </tr>
-            ))}
-            {(!plans || plans.length === 0) && (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="p-6 text-center text-muted-foreground"
-                >
-                  No plans yet. Create a Quota first, then add a plan.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={plans}
+        empty="No plans yet. Create a Quota first, then add a plan."
+      />
 
       <AlertDialog
         open={!!deleteId}
