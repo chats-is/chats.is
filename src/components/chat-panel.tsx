@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ChangeEvent, type ComponentProps } from 'react';
+import { type ChangeEvent, type ComponentProps } from 'react';
 import { ClientOnly } from '@tanstack/react-router';
 import { type UseChatHelpers } from '@ai-sdk/react';
 import { MessageSquare } from 'lucide-react';
@@ -13,19 +13,17 @@ import {
 import { EmptyScreen } from '@/components/empty-screen';
 import { Messages } from '@/components/messages';
 import { PromptSuggestions } from '@/components/prompt-suggestions';
+import ScrollContainer from '@/components/scroll-to-bottom';
 import { UsageLimitAlert } from '@/components/usage-limit-alert';
 
 // react-scroll-to-bottom measures the scroll container, so it can only run in
-// the browser. Keeping the wrapper's own signature means the call site below
-// reads exactly as it did.
-const LazyScrollToBottom = lazy(() => import('@/components/scroll-to-bottom'));
-
-function ScrollToBottom(props: ComponentProps<typeof LazyScrollToBottom>) {
+// the browser — which is the whole of the constraint, and ClientOnly is the
+// whole of the answer. Keeping the wrapper's own signature means the call site
+// below reads exactly as it did.
+function ScrollToBottom(props: ComponentProps<typeof ScrollContainer>) {
   return (
     <ClientOnly>
-      <Suspense fallback={null}>
-        <LazyScrollToBottom {...props} />
-      </Suspense>
+      <ScrollContainer {...props} />
     </ClientOnly>
   );
 }
