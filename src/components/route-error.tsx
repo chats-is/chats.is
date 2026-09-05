@@ -6,6 +6,9 @@ import {
 
 import { Button } from '@/components/ui/button';
 
+/** Replaced at build time, so the reason is not in the production bundle. */
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
 /**
  * What a route shows when it throws.
  *
@@ -15,6 +18,13 @@ import { Button } from '@/components/ui/button';
  * renders `route.errorComponent ?? router.defaultErrorComponent` on the spot,
  * and with neither set the router draws its own unstyled notice into the HTML.
  * Setting the default is what keeps that from reaching a page.
+ *
+ * The reason is shown in development and withheld in production, which costs
+ * nothing here: only a route's loader reaches this page, and no loader throws
+ * a message meant for a reader. The messages that are — "Quota not found",
+ * "At least one provider is required" — are raised by mutations, and those
+ * surface in a toast. What is left is a database that is down or a bug, which
+ * says nothing to the person looking at it and a little to anyone else.
  */
 export function RouteError({ error }: ErrorComponentProps) {
   const router = useRouter();
@@ -25,9 +35,11 @@ export function RouteError({ error }: ErrorComponentProps) {
         Something went wrong
       </h1>
 
-      {error.message && (
-        <p className="max-w-xl text-muted-foreground">{error.message}</p>
-      )}
+      <p className="max-w-xl text-muted-foreground">
+        {isDevelopment && error.message
+          ? error.message
+          : 'The page could not be loaded. Try again in a moment.'}
+      </p>
 
       <div className="mt-2 flex items-center gap-2">
         {/* Invalidating re-runs the loaders and hands the route a new match,
