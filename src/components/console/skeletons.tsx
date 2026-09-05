@@ -105,6 +105,26 @@ export function ConsoleCardsSkeleton({ count = 5 }: { count?: number }) {
 }
 
 /**
+ * Settings as the layout above it sees them: nav and panel both still to come.
+ * Once the settings route itself is loading, the nav is real and only
+ * `ConsoleSettingsPanelSkeleton` is needed.
+ */
+export function ConsoleSettingsSkeleton() {
+  return (
+    <div className="flex flex-col gap-0 lg:flex-row">
+      <nav className="flex w-full shrink-0 flex-col gap-1 lg:w-52">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-9 w-full" />
+        ))}
+      </nav>
+      <div className="min-w-0 flex-1 lg:pl-8">
+        <ConsoleSettingsPanelSkeleton />
+      </div>
+    </div>
+  );
+}
+
+/**
  * The settings panel the nav switches between — a run of labelled fields. The
  * nav itself is a static list, so the route shows the real one and only the
  * panel stands in.
@@ -144,4 +164,31 @@ export function ConsoleUsageSkeleton() {
       </section>
     </div>
   );
+}
+
+/**
+ * The stand-in for a console page named only by its address.
+ *
+ * The layout's own wait covers the whole content area, so the page's own
+ * pending component has not been reached yet — the layout is what has to know
+ * what is coming, and the address is all it has to go on. Each route still
+ * declares its own, more exact, placeholder for its own wait; this is the
+ * coarser guess made one level up, and a page not named here is a table,
+ * because most of the console is.
+ */
+export function ConsoleContentSkeleton({ pathname }: { pathname: string }) {
+  if (pathname === '/console' || pathname === '/console/') {
+    return <ConsoleCardsSkeleton />;
+  }
+  if (pathname.startsWith('/console/settings')) {
+    return <ConsoleSettingsSkeleton />;
+  }
+  // Usage, and a single user, are both a run of stats over a log.
+  if (
+    pathname.startsWith('/console/usage') ||
+    /^\/console\/users\/[^/]+$/.test(pathname)
+  ) {
+    return <ConsoleUsageSkeleton />;
+  }
+  return <ConsoleTableSkeleton />;
 }

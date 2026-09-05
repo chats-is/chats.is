@@ -2,35 +2,20 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
 
 import { pageTitle } from '@/lib/head';
-import { listModels } from '@/server/fn/model';
-import { getPromptStats } from '@/server/fn/prompt';
-import { listProviders } from '@/server/fn/provider';
-import { listSettings } from '@/server/fn/settings';
-import { getUserStats } from '@/server/fn/user';
+import { getConsoleOverview } from '@/server/fn/overview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConsoleCardsSkeleton } from '@/components/console/skeletons';
 
 export const Route = createFileRoute('/console/')({
-  loader: async () => {
-    const [providers, models, promptStats, settings, userStats] =
-      await Promise.all([
-        listProviders(),
-        listModels({ data: {} }),
-        getPromptStats(),
-        listSettings(),
-        getUserStats()
-      ]);
-
-    return { providers, models, promptStats, settings, userStats };
-  },
+  // Nine counts, counted by the database and carried by one call.
+  loader: () => getConsoleOverview(),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Console') }] }),
   pendingComponent: () => <ConsoleCardsSkeleton />,
   component: ConsoleHome
 });
 
 function ConsoleHome() {
-  const { providers, models, promptStats, settings, userStats } =
-    Route.useLoaderData();
+  const { providers, models, prompts, settings, users } = Route.useLoaderData();
 
   return (
     <div className="space-y-6">
@@ -42,9 +27,9 @@ function ConsoleHome() {
               <Zap className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{providers.length}</div>
+              <div className="text-2xl font-bold">{providers.total}</div>
               <p className="text-xs text-muted-foreground">
-                {providers.filter(p => p.isEnabled).length} enabled
+                {providers.enabled} enabled
               </p>
             </CardContent>
           </Card>
@@ -57,9 +42,9 @@ function ConsoleHome() {
               <Cpu className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{models.length}</div>
+              <div className="text-2xl font-bold">{models.total}</div>
               <p className="text-xs text-muted-foreground">
-                {models.filter(m => m.isEnabled).length} enabled
+                {models.enabled} enabled
               </p>
             </CardContent>
           </Card>
@@ -72,9 +57,9 @@ function ConsoleHome() {
               <Sparkles className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{promptStats.total}</div>
+              <div className="text-2xl font-bold">{prompts.total}</div>
               <p className="text-xs text-muted-foreground">
-                {promptStats.public} public / {promptStats.private} private
+                {prompts.public} public / {prompts.private} private
               </p>
             </CardContent>
           </Card>
@@ -87,7 +72,7 @@ function ConsoleHome() {
               <Settings className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{settings.length}</div>
+              <div className="text-2xl font-bold">{settings.total}</div>
               <p className="text-xs text-muted-foreground">
                 System configuration
               </p>
@@ -102,9 +87,9 @@ function ConsoleHome() {
               <Users className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{userStats.total}</div>
+              <div className="text-2xl font-bold">{users.total}</div>
               <p className="text-xs text-muted-foreground">
-                {userStats.admins} admins
+                {users.admins} admins
               </p>
             </CardContent>
           </Card>

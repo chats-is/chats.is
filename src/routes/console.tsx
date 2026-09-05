@@ -1,4 +1,9 @@
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useLocation
+} from '@tanstack/react-router';
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
@@ -9,7 +14,7 @@ import { userQueries } from '@/server/fn/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ConsoleHeader } from '@/components/console/header';
 import { Sidebar } from '@/components/console/sidebar';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { ConsoleContentSkeleton } from '@/components/console/skeletons';
 import { SettingsDialogProvider } from '@/components/settings-dialog';
 
 /**
@@ -58,13 +63,19 @@ function ConsoleShell({ children }: { children: React.ReactNode }) {
 /**
  * The wait for the console's own data. The shell is the real one, so what
  * arrives replaces the placeholder in the content area and leaves the chrome
- * alone. A table stands in for the page because most of the console is one;
- * a page shaped otherwise settles in when its own route resolves.
+ * alone.
+ *
+ * This wait covers the page's own, which has not been reached yet, so the
+ * placeholder is chosen from the address being navigated to rather than left
+ * as one shape for all of them — the home page is cards, and standing a table
+ * in front of it only to swap is worse than not standing anything in.
  */
 function ConsolePending() {
+  const pathname = useLocation({ select: l => l.pathname });
+
   return (
     <ConsoleShell>
-      <ConsoleTableSkeleton />
+      <ConsoleContentSkeleton pathname={pathname} />
     </ConsoleShell>
   );
 }
