@@ -9,6 +9,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/server/db';
 import { quotas, users } from '@/server/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
 
 const limitSchema = z.union([z.number().positive(), z.literal('')]).nullable();
 const limitToString = (v: number | null | ''): string | null => {
@@ -66,7 +67,7 @@ export const createQuota = createServerFn({ method: 'POST' })
     if (!data.isUnlimited) {
       const w = num(data.sevenDay);
       if (w === null || w <= 0) {
-        throw new Error(
+        throw new PublicError(
           'Weekly limit is required and must be positive (or toggle Unlimited).'
         );
       }
@@ -120,7 +121,7 @@ export const updateQuota = createServerFn({ method: 'POST' })
     const existing = await db.query.quotas.findFirst({
       where: eq(quotas.id, id)
     });
-    if (!existing) throw new Error('Quota not found');
+    if (!existing) throw new PublicError('Quota not found');
     const num = (
       v: number | null | '' | undefined,
       fallback: string | null
@@ -140,7 +141,7 @@ export const updateQuota = createServerFn({ method: 'POST' })
     if (!willBeUnlimited) {
       const w = num(updates.sevenDay, existing.sevenDay);
       if (w === null || w <= 0) {
-        throw new Error(
+        throw new PublicError(
           'Weekly limit is required and must be positive (or toggle Unlimited).'
         );
       }
@@ -166,7 +167,7 @@ export const deleteQuota = createServerFn({ method: 'POST' })
     // Also block deleting the system default quota.
     const defaultId = await getDefaultQuotaId();
     if (defaultId === data.id) {
-      throw new Error(
+      throw new PublicError(
         'Cannot delete the default quota. Set a different default first.'
       );
     }
@@ -207,7 +208,7 @@ export const setUserQuota = createServerFn({ method: 'POST' })
     const exists = await db.query.quotas.findFirst({
       where: eq(quotas.id, data.quotaId)
     });
-    if (!exists) throw new Error('Quota not found');
+    if (!exists) throw new PublicError('Quota not found');
     await db
       .update(users)
       .set({ quotaId: data.quotaId, updatedAt: new Date() })

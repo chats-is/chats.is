@@ -7,6 +7,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/server/db';
 import { chats, shares } from '@/server/db/schema';
 import { authedMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
 
 export const createShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
@@ -23,7 +24,7 @@ export const createShare = createServerFn({ method: 'POST' })
     });
 
     if (!chat) {
-      throw new Error('Chat not found');
+      throw new PublicError('Chat not found');
     }
 
     // Check if a share already exists for this chat

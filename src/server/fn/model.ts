@@ -7,6 +7,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/server/db';
 import { modelProviders, models } from '@/server/db/schema';
 import { adminMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
 
 const capabilitySchema = z.enum(['chat', 'image', 'video', 'audio']);
 
@@ -106,11 +107,11 @@ export const createModel = createServerFn({ method: 'POST' })
           ? [{ providerId: data.providerId }]
           : [];
     if (bindings.length === 0) {
-      throw new Error('At least one provider is required');
+      throw new PublicError('At least one provider is required');
     }
     const bindingProviderIds = bindings.map(b => b.providerId);
     if (new Set(bindingProviderIds).size !== bindingProviderIds.length) {
-      throw new Error('A provider can only be added once per model');
+      throw new PublicError('A provider can only be added once per model');
     }
     // Mirror the first ENABLED binding (fall back to the first) so the legacy
     // providerId never points at a disabled binding.
@@ -124,7 +125,7 @@ export const createModel = createServerFn({ method: 'POST' })
       where: eq(models.modelId, normalizedModelId)
     });
     if (existingModel) {
-      throw new Error(
+      throw new PublicError(
         'Model ID already exists; please choose a different Model ID'
       );
     }
@@ -237,7 +238,7 @@ export const updateModel = createServerFn({ method: 'POST' })
       where: eq(models.id, id)
     });
     if (!existingModel) {
-      throw new Error('Model not found');
+      throw new PublicError('Model not found');
     }
 
     const targetModelId = existingModel.modelId;
@@ -245,7 +246,7 @@ export const updateModel = createServerFn({ method: 'POST' })
     if (inputProviders && inputProviders.length > 0) {
       const ids = inputProviders.map(b => b.providerId);
       if (new Set(ids).size !== ids.length) {
-        throw new Error('A provider can only be added once per model');
+        throw new PublicError('A provider can only be added once per model');
       }
     }
 

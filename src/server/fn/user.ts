@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { db } from '@/server/db';
 import { accounts, chats, messages, users } from '@/server/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
 
 export const getMe = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
@@ -112,7 +113,7 @@ export const getUser = createServerFn({ method: 'GET' })
     const user = await db.select().from(users).where(eq(users.id, data.id));
 
     if (!user[0]) {
-      throw new Error('User not found');
+      throw new PublicError('User not found');
     }
 
     // Get linked accounts
@@ -155,7 +156,7 @@ export const updateUserRole = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     // Prevent admin from removing their own admin role
     if (context.user.id === data.id && data.role !== 'admin') {
-      throw new Error('Cannot remove your own admin role');
+      throw new PublicError('Cannot remove your own admin role');
     }
 
     const result = await db
@@ -173,7 +174,7 @@ export const deleteUser = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     // Prevent admin from deleting themselves
     if (context.user.id === data.id) {
-      throw new Error('Cannot delete your own account');
+      throw new PublicError('Cannot delete your own account');
     }
 
     // Check if user is admin
@@ -183,7 +184,7 @@ export const deleteUser = createServerFn({ method: 'POST' })
       .where(eq(users.id, data.id));
 
     if (user[0]?.role === 'admin') {
-      throw new Error('Cannot delete admin accounts');
+      throw new PublicError('Cannot delete admin accounts');
     }
 
     await db.delete(users).where(eq(users.id, data.id));

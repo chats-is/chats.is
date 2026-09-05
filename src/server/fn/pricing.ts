@@ -14,6 +14,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/server/db';
 import { modelPricings, models } from '@/server/db/schema';
 import { adminMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
 
 const sourceSchema = z.enum(['manual', 'models.dev', 'llm-metadata']);
 const syncSourceSchema = z.enum(['models.dev', 'llm-metadata']);
@@ -86,7 +87,7 @@ export const upsertPricing = createServerFn({ method: 'POST' })
     const model = await db.query.models.findFirst({
       where: eq(models.id, data.modelDbId)
     });
-    if (!model) throw new Error('Model not found');
+    if (!model) throw new PublicError('Model not found');
 
     // Capability-aware required-field check. Cache R/W are auto-defaulted
     // to 0 below, so they don't need to be in the required list. Reuses
@@ -101,7 +102,7 @@ export const upsertPricing = createServerFn({ method: 'POST' })
       data.image != null &&
       (data.input != null || data.output != null)
     ) {
-      throw new Error(
+      throw new PublicError(
         'Image pricing must be either Per image OR token-based (Input + Output), not both.'
       );
     }
@@ -114,14 +115,14 @@ export const upsertPricing = createServerFn({ method: 'POST' })
       data.audioSeconds != null
     ].filter(Boolean).length;
     if (cap === 'audio' && audioStyles > 1) {
-      throw new Error(
+      throw new PublicError(
         'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per second.'
       );
     }
 
     // Video is the same either/or: per-video (flat) OR per-second.
     if (cap === 'video' && data.video != null && data.videoSeconds != null) {
-      throw new Error(
+      throw new PublicError(
         'Video pricing must be either Per video OR Per second, not both.'
       );
     }
@@ -134,7 +135,7 @@ export const upsertPricing = createServerFn({ method: 'POST' })
         : undefined
     );
     if (missing.length > 0) {
-      throw new Error(
+      throw new PublicError(
         `Missing required price${missing.length > 1 ? 's' : ''} for ${cap} model: ${missing.join(', ')}.`
       );
     }

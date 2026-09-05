@@ -10,6 +10,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/server/db';
 import { models, providers } from '@/server/db/schema';
 import { adminMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
 
 export const listProviders = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
@@ -114,7 +115,7 @@ export const updateProvider = createServerFn({ method: 'POST' })
     });
 
     if (!existingProvider) {
-      throw new Error('Provider not found');
+      throw new PublicError('Provider not found');
     }
 
     const { id, apiKey, apiOptions, baseUrl, ...updates } = data;
@@ -147,7 +148,9 @@ export const updateProvider = createServerFn({ method: 'POST' })
             credentials: existingVertexKey.credentials
           });
         } else {
-          throw new Error('Invalid existing Google Vertex AI credentials');
+          throw new PublicError(
+            'Invalid existing Google Vertex AI credentials'
+          );
         }
       }
     }
@@ -201,7 +204,7 @@ export const fetchProviderModels = createServerFn({ method: 'GET' })
     });
 
     if (!provider) {
-      throw new Error('Provider not found');
+      throw new PublicError('Provider not found');
     }
 
     const apiModelIds = await getProviderModels(provider);
@@ -269,11 +272,11 @@ export const syncProviderModels = createServerFn({ method: 'POST' })
     });
 
     if (!provider) {
-      throw new Error('Provider not found');
+      throw new PublicError('Provider not found');
     }
 
     if (data.items.length === 0) {
-      throw new Error('No models selected');
+      throw new PublicError('No models selected');
     }
 
     const existingModels = await db.query.models.findMany({

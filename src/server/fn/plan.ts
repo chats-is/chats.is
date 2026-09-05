@@ -7,6 +7,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/server/db';
 import { plans, quotas, users } from '@/server/db/schema';
 import { adminMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
 
 /**
  * Public list (used by clients to display tier info in /settings/usage).
@@ -74,7 +75,7 @@ export const createPlan = createServerFn({ method: 'POST' })
     const quota = await db.query.quotas.findFirst({
       where: eq(quotas.id, data.quotaId)
     });
-    if (!quota) throw new Error('Quota not found');
+    if (!quota) throw new PublicError('Quota not found');
 
     await db.insert(plans).values({
       id,
@@ -108,7 +109,7 @@ export const updatePlan = createServerFn({ method: 'POST' })
       const quota = await db.query.quotas.findFirst({
         where: eq(quotas.id, updates.quotaId)
       });
-      if (!quota) throw new Error('Quota not found');
+      if (!quota) throw new PublicError('Quota not found');
       patch.quotaId = updates.quotaId;
     }
     if (updates.displayOrder !== undefined)
