@@ -4,6 +4,8 @@ import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 import { QueryClient } from '@tanstack/react-query';
 
+import { RouteError } from '@/components/route-error';
+
 import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
@@ -29,7 +31,12 @@ export function getRouter() {
     // not flash a placeholder, but a whole second of nothing reads as a click
     // that did not register. Long enough to skip the flash, short enough that
     // a slower load says something is happening.
-    defaultPendingMs: 150
+    defaultPendingMs: 150,
+    // The root route names this too, which is enough on the client, where an
+    // error climbs to the nearest boundary. On the server it does not climb:
+    // a match that errored renders its own route's error component or this
+    // one, and with neither the router draws an unstyled notice of its own.
+    defaultErrorComponent: RouteError
   });
 
   // Queries a loader resolved on the server travel with the page, so the

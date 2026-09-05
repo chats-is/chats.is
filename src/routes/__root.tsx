@@ -1,7 +1,6 @@
 import {
   createRootRouteWithContext,
   HeadContent,
-  Link,
   Scripts
 } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
@@ -11,6 +10,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { env } from '@/lib/env';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
+import { RouteError } from '@/components/route-error';
 import { RouterDevtools } from '@/components/router-devtools';
 import { TailwindIndicator } from '@/components/tailwind-indicator';
 
@@ -78,25 +78,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     shellComponent: RootDocument
   }
 );
-
-function RouteError({ error }: { error: Error }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center bg-background py-2">
-      <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
-        Something went wrong
-      </h1>
-      <p className="mt-4 max-w-xl text-center text-gray-600 dark:text-gray-400">
-        {error.message}
-      </p>
-      <Link
-        to="/"
-        className="mt-6 text-blue-500 hover:underline dark:text-blue-400"
-      >
-        Return Home
-      </Link>
-    </div>
-  );
-}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const { analytics } = Route.useLoaderData();
