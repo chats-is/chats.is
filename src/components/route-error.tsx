@@ -6,8 +6,13 @@ import {
 
 import { Button } from '@/components/ui/button';
 
-/** Replaced at build time, so the reason is not in the production bundle. */
-const isDevelopment = process.env.NODE_ENV !== 'production';
+/**
+ * Vite's own build-time flag, so the branch not taken is not in the bundle.
+ * `import.meta.env` rather than `process.env`: Start's execution model warns
+ * off module-scope `process.env` reads, which are undefined under edge SSR
+ * where env arrives per request.
+ */
+const isDevelopment = import.meta.env.DEV;
 
 /**
  * What a route shows when it throws.
