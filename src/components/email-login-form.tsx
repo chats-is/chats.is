@@ -177,7 +177,11 @@ export function EmailLoginForm({
               </InputOTPGroup>
             </InputOTP>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {/* Centred like everything else in this step: the message belongs to
+              the boxes above it, which sit in the middle of the card. */}
+          {error && (
+            <p className="text-center text-sm text-destructive">{error}</p>
+          )}
           <Button
             type="submit"
             size="lg"
