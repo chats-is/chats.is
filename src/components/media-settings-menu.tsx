@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
@@ -13,38 +13,142 @@ import {
   Settings2
 } from 'lucide-react';
 
-import { type ChatMessage } from '@/types';
+import { type ChatMessage, type Model } from '@/types';
+import {
+  allowedValues,
+  chooseValue,
+  defaultValue,
+  MediaOptionLabels,
+  optionLabel,
+  type MediaOptionKey
+} from '@/lib/media-settings';
+import { modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from '@/components/ui/popover';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-import { ModelMenu, type ModelOptions } from '@/components/model-menu';
 
-export interface MediaSettingsMenuProps extends Pick<
-  UseChatHelpers<ChatMessage>,
-  'status'
-> {}
+export interface MediaSettingsMenuProps
+  extends Pick<UseChatHelpers<ChatMessage>, 'status'> {}
 
-function SectionLabel({
+type OptionBinding = {
+  key: MediaOptionKey;
+  value: string | undefined;
+  onChange: (value: string) => void;
+};
+
+/**
+ * One kind of media — which model makes it, and how.
+ *
+ * A row rather than a panel: the name of the chosen model sits on the right,
+ * the way a setting shows its current value, and the choices open beside it.
+ * Seven of these stacked as panels outgrew the window; as rows they do not,
+ * and each list is only as long as its own choices.
+ */
+function MediaKind({
   icon,
-  children
+  label,
+  models,
+  modelId,
+  onModelChange,
+  options = [],
+  disabled
 }: {
   icon: React.ReactNode;
-  children: React.ReactNode;
+  label: string;
+  models: Array<Model>;
+  modelId: string | undefined;
+  onModelChange: (modelId: string) => void;
+  options?: Array<OptionBinding>;
+  disabled: boolean;
 }) {
+  // Falling back to the first model matches what generation does with an unset
+  // preference, so the row names the model that would actually run.
+  const selected =
+    models.find(model => modelMatchesId(model, modelId)) ?? models[0];
+  const uiOptions = selected?.uiOptions;
+
+  const rows = options
+    .map(option => ({ ...option, allowed: allowedValues(uiOptions, option.key) }))
+    .filter(option => option.allowed.length > 0);
+
+  // A model swap can strip an option of the value it was holding — one model's
+  // "4K" is another's nothing at all. Settle each back onto something this
+  // model accepts, or the request would carry a value the provider rejects.
+  useEffect(() => {
+    for (const row of rows) {
+      const next = chooseValue(
+        row.allowed,
+        row.value,
+        defaultValue(uiOptions, row.key)
+      );
+      if (next && next !== row.value) row.onChange(next);
+    }
+  });
+
   return (
-    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-      {icon}
-      {children}
-    </div>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger disabled={disabled}>
+        {icon}
+        <span className="whitespace-nowrap">{label}</span>
+        {/* The name gives way first: which kind of media this row sets is the
+            part that has to stay readable. */}
+        <span className="ml-auto min-w-0 truncate pl-3 text-xs text-muted-foreground">
+          {selected?.name}
+        </span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto">
+        <DropdownMenuRadioGroup
+          value={selected?.modelId ?? ''}
+          onValueChange={onModelChange}
+        >
+          {models.map(model => (
+            <DropdownMenuRadioItem key={model.modelId} value={model.modelId}>
+              {model.name}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        {rows.length > 0 && <DropdownMenuSeparator />}
+        {rows.map(row => (
+          <DropdownMenuSub key={row.key}>
+            <DropdownMenuSubTrigger>
+              <span className="whitespace-nowrap">
+                {MediaOptionLabels[row.key]}
+              </span>
+              <span className="ml-auto min-w-0 truncate pl-3 text-xs text-muted-foreground">
+                {row.value ? optionLabel(row.key, row.value) : null}
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto">
+              <DropdownMenuRadioGroup
+                value={row.value ?? ''}
+                onValueChange={row.onChange}
+              >
+                {row.allowed.map(value => (
+                  <DropdownMenuRadioItem key={value} value={value}>
+                    {optionLabel(row.key, value)}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }
 
@@ -63,49 +167,13 @@ function SectionLabel({
  * `mediaOptions`; an unset one falls back to the admin's default.
  */
 export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
-  // Prevent hydration mismatch with the Radix popover.
+  // Prevent hydration mismatch with the Radix menu.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const { imageModels, videoModels, ttsModels, sttModels } =
     useSystemSettings();
   const { preferences, setPreference } = usePreferences();
-
-  const handleImageOptionsChange = useCallback(
-    (options: ModelOptions) => {
-      if (options.size !== undefined) {
-        setPreference('imageSize', options.size);
-      }
-      if (options.aspectRatio !== undefined) {
-        setPreference('imageAspectRatio', options.aspectRatio);
-      }
-    },
-    [setPreference]
-  );
-
-  const handleVideoOptionsChange = useCallback(
-    (options: ModelOptions) => {
-      if (options.aspectRatio !== undefined) {
-        setPreference('videoAspectRatio', options.aspectRatio);
-      }
-      if (options.resolution !== undefined) {
-        setPreference('videoResolution', options.resolution);
-      }
-      if (options.duration !== undefined) {
-        setPreference('videoDuration', options.duration);
-      }
-    },
-    [setPreference]
-  );
-
-  const handleAudioOptionsChange = useCallback(
-    (options: ModelOptions) => {
-      if (options.voice !== undefined) {
-        setPreference('audioVoice', options.voice);
-      }
-    },
-    [setPreference]
-  );
 
   const hasImageModels = !!imageModels?.length;
   // Editing is a per-model capability, and few models have it — so which model
@@ -131,148 +199,149 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
     return <Skeleton className="size-9 rounded-full" />;
   }
 
+  const busy = status === 'submitted' || status === 'streaming';
+
   return (
-    <Popover>
+    <DropdownMenu>
       <Tooltip>
         <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
+          <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="outline"
               size="icon"
-              disabled={status === 'submitted' || status === 'streaming'}
+              disabled={busy}
               className="size-9 rounded-full text-muted-foreground shadow-none"
             >
               <Settings2 className="size-4" />
               <span className="sr-only">Media generation settings</span>
             </Button>
-          </PopoverTrigger>
+          </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent>Media generation settings</TooltipContent>
       </Tooltip>
-      <PopoverContent
-        align="start"
-        className="w-auto max-w-[calc(100vw-2rem)] space-y-4 p-4"
-      >
+      <DropdownMenuContent align="start" className="w-64">
         {hasImageModels && (
-          <div className="space-y-2">
-            <SectionLabel icon={<ImageIcon className="size-3.5" />}>
-              Image
-            </SectionLabel>
-            <ModelMenu
-              capability="image"
-              models={imageModels}
-              status={status}
-              modelId={preferences.imageModelId}
-              size={preferences.imageSize}
-              aspectRatio={preferences.imageAspectRatio}
-              onModelChange={modelId => setPreference('imageModelId', modelId)}
-              onOptionsChange={handleImageOptionsChange}
-            />
-          </div>
+          <MediaKind
+            icon={<ImageIcon />}
+            label="Image"
+            models={imageModels}
+            modelId={preferences.imageModelId}
+            onModelChange={modelId => setPreference('imageModelId', modelId)}
+            disabled={busy}
+            options={[
+              {
+                key: 'size',
+                value: preferences.imageSize,
+                onChange: value => setPreference('imageSize', value)
+              },
+              {
+                key: 'aspectRatio',
+                value: preferences.imageAspectRatio,
+                onChange: value => setPreference('imageAspectRatio', value)
+              }
+            ]}
+          />
         )}
         {editModels.length > 0 && (
-          <div className="space-y-2">
-            <SectionLabel icon={<Pencil className="size-3.5" />}>
-              Image editing
-            </SectionLabel>
-            <ModelMenu
-              capability="image"
-              models={editModels}
-              status={status}
-              modelId={preferences.imageEditModelId}
-              onModelChange={modelId =>
-                setPreference('imageEditModelId', modelId)
-              }
-            />
-          </div>
+          <MediaKind
+            icon={<Pencil />}
+            label="Image editing"
+            models={editModels}
+            modelId={preferences.imageEditModelId}
+            onModelChange={modelId =>
+              setPreference('imageEditModelId', modelId)
+            }
+            disabled={busy}
+          />
         )}
         {hasVideoModels && (
-          <div className="space-y-2">
-            <SectionLabel icon={<Clapperboard className="size-3.5" />}>
-              Video
-            </SectionLabel>
-            <ModelMenu
-              capability="video"
-              models={videoModels}
-              status={status}
-              modelId={preferences.videoModelId}
-              aspectRatio={preferences.videoAspectRatio}
-              resolution={preferences.videoResolution}
-              duration={preferences.videoDuration}
-              onModelChange={modelId => setPreference('videoModelId', modelId)}
-              onOptionsChange={handleVideoOptionsChange}
-            />
-          </div>
+          <MediaKind
+            icon={<Clapperboard />}
+            label="Video"
+            models={videoModels}
+            modelId={preferences.videoModelId}
+            onModelChange={modelId => setPreference('videoModelId', modelId)}
+            disabled={busy}
+            options={[
+              {
+                key: 'aspectRatio',
+                value: preferences.videoAspectRatio,
+                onChange: value => setPreference('videoAspectRatio', value)
+              },
+              {
+                key: 'resolution',
+                value: preferences.videoResolution,
+                onChange: value => setPreference('videoResolution', value)
+              },
+              {
+                key: 'duration',
+                value:
+                  preferences.videoDuration === undefined
+                    ? undefined
+                    : String(preferences.videoDuration),
+                onChange: value => setPreference('videoDuration', Number(value))
+              }
+            ]}
+          />
         )}
         {animateModels.length > 0 && (
-          <div className="space-y-2">
-            <SectionLabel icon={<ImagePlay className="size-3.5" />}>
-              Video from image
-            </SectionLabel>
-            {/* Model only: the options belong to the Video section above.
-                Two menus writing one set of preferences would let picking an
-                animator rewrite the generator's aspect ratio — and, when the
-                two models allow different values, leave the pair rewriting it
-                past each other for as long as this popover is open. */}
-            <ModelMenu
-              capability="video"
-              models={animateModels}
-              status={status}
-              modelId={preferences.videoImageModelId}
-              onModelChange={modelId =>
-                setPreference('videoImageModelId', modelId)
-              }
-            />
-          </div>
+          // Model only: the options belong to the Video row above. Two rows
+          // writing one set of preferences would let picking an animator
+          // rewrite the generator's aspect ratio — and, when the two models
+          // allow different values, leave the pair rewriting it past each
+          // other for as long as this menu is open.
+          <MediaKind
+            icon={<ImagePlay />}
+            label="Video from image"
+            models={animateModels}
+            modelId={preferences.videoImageModelId}
+            onModelChange={modelId =>
+              setPreference('videoImageModelId', modelId)
+            }
+            disabled={busy}
+          />
         )}
         {videoEditModels.length > 0 && (
-          <div className="space-y-2">
-            <SectionLabel icon={<Scissors className="size-3.5" />}>
-              Video editing
-            </SectionLabel>
-            <ModelMenu
-              capability="video"
-              models={videoEditModels}
-              status={status}
-              modelId={preferences.videoEditModelId}
-              onModelChange={modelId =>
-                setPreference('videoEditModelId', modelId)
-              }
-            />
-          </div>
+          <MediaKind
+            icon={<Scissors />}
+            label="Video editing"
+            models={videoEditModels}
+            modelId={preferences.videoEditModelId}
+            onModelChange={modelId =>
+              setPreference('videoEditModelId', modelId)
+            }
+            disabled={busy}
+          />
         )}
         {hasTtsModels && (
-          <div className="space-y-2">
-            <SectionLabel icon={<AudioLines className="size-3.5" />}>
-              Text → Speech
-            </SectionLabel>
-            <ModelMenu
-              capability="audio"
-              models={ttsModels}
-              status={status}
-              modelId={preferences.audioModelId}
-              voice={preferences.audioVoice}
-              onModelChange={modelId => setPreference('audioModelId', modelId)}
-              onOptionsChange={handleAudioOptionsChange}
-            />
-          </div>
+          <MediaKind
+            icon={<AudioLines />}
+            label="Text → Speech"
+            models={ttsModels}
+            modelId={preferences.audioModelId}
+            onModelChange={modelId => setPreference('audioModelId', modelId)}
+            disabled={busy}
+            options={[
+              {
+                key: 'voice',
+                value: preferences.audioVoice,
+                onChange: value => setPreference('audioVoice', value)
+              }
+            ]}
+          />
         )}
         {hasSttModels && (
-          <div className="space-y-2">
-            <SectionLabel icon={<Captions className="size-3.5" />}>
-              Speech → Text
-            </SectionLabel>
-            <ModelMenu
-              capability="audio"
-              models={sttModels}
-              status={status}
-              modelId={preferences.sttModelId}
-              onModelChange={modelId => setPreference('sttModelId', modelId)}
-            />
-          </div>
+          <MediaKind
+            icon={<Captions />}
+            label="Speech → Text"
+            models={sttModels}
+            modelId={preferences.sttModelId}
+            onModelChange={modelId => setPreference('sttModelId', modelId)}
+            disabled={busy}
+          />
         )}
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
