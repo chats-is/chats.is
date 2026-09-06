@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
@@ -64,7 +64,11 @@ export function useSettingsForm(keys: readonly string[]) {
   });
 
   const form = useAppForm({
-    defaultValues: {},
+    // Built on the first render rather than reset into place afterwards: the
+    // route prefetches this query, so the values are already in the cache when
+    // the form is created — including on the server, where an effect would
+    // never run and the page would have rendered a placeholder instead.
+    defaultValues: valuesOf(settings),
     onSubmit: async ({ value }) => {
       await mutation.mutateAsync(
         keys.map(key => ({
@@ -79,39 +83,44 @@ export function useSettingsForm(keys: readonly string[]) {
     }
   });
 
-  // Read inside the hydrate effect without making it a dependency — depending
-  // on it would re-run hydration on the very edit it is meant to protect.
+  // Read inside the effect without making it a dependency — depending on it
+  // would re-run the sync on the very edit it is meant to protect.
   const isDirty = useStore(form.store, state => state.isDirty);
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
 
-  // The values arrive in an effect, which runs after the first render with
-  // data. Until then the fields would mount against an empty form — React
-  // would call them uncontrolled and the page would flash blank — so the page
-  // keeps waiting until the form actually holds something.
-  const [isHydrated, setIsHydrated] = useState(false);
+  // Only for what arrives after that first render. `settings.list` refetches
+  // in the background (30s staleTime, and React Query refetches on window
+  // focus by default), which would otherwise leave the form showing values the
+  // server no longer has.
+  const settled = useRef(settings);
 
   useEffect(() => {
-    if (!settings) return;
-    // `settings.list` refetches in the background (30s staleTime, and React
-    // Query refetches on window focus by default), which would otherwise
-    // overwrite whatever the user has typed — silently, since the same pass
-    // would clear the dirty flag and disable Save. Leave edits alone; the next
-    // successful save re-hydrates from the server anyway.
+    if (!settings || settled.current === settings) return;
+    settled.current = settings;
+
+    // Leave edits alone: overwriting them would be silent, since the same pass
+    // clears the dirty flag and disables Save. The next successful save
+    // re-reads from the server anyway.
     if (isDirtyRef.current) return;
 
-    const flat: Record<string, string> = {};
-    settings.forEach(setting => {
-      flat[setting.key] = setting.value || '';
-    });
-    if (!flat['speech.enabled']) {
-      flat['speech.enabled'] = 'false';
-    }
-    form.reset(expand(flat));
-    setIsHydrated(true);
+    form.reset(valuesOf(settings));
   }, [settings, form]);
 
-  return { form, isLoading: isLoading || !isHydrated };
+  return { form, isLoading };
+}
+
+/** The rows as the form holds them: dotted keys expanded into an object. */
+function valuesOf(
+  settings: Array<{ key: string; value: string | null }> | undefined
+) {
+  const flat: Record<string, string> = {};
+  (settings ?? []).forEach(setting => {
+    flat[setting.key] = setting.value || '';
+  });
+  // A switch needs a side even before anyone has picked one.
+  flat['speech.enabled'] ||= 'false';
+  return expand(flat);
 }
 
 export function SettingsLoading() {
