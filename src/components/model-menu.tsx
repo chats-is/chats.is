@@ -360,9 +360,10 @@ export function ModelMenu({
           alignItemWithTrigger={false}
           // Grows to its widest row instead of being pinned to the trigger,
           // which is only as wide as a model name — the rows also carry an id
-          // and their badges. Capped so it cannot outgrow the window; past the
-          // cap the text truncates rather than running under the check.
-          className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+          // and their badges. The ceiling is the space the positioner reports
+          // it has, the same source as the height the popup already uses; past
+          // it the text truncates rather than running under the check.
+          className="w-auto max-w-(--available-width) min-w-(--anchor-width)"
         >
           {models &&
             models.length > 0 &&
