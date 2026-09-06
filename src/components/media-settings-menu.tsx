@@ -157,7 +157,11 @@ function MediaKind({
       <DropdownMenuSubTrigger disabled={disabled}>
         {icon}
         <span className="whitespace-nowrap">{label}</span>
-        <span className="ml-auto min-w-0 truncate pl-3 text-xs text-muted-foreground">
+        {/* `flex-1`, not `ml-auto`: the chevron after it already claims the
+            free space that way, and two claims split it — leaving every row's
+            model ending somewhere different. Filling the gap instead puts them
+            all on one right edge. */}
+        <span className="min-w-0 flex-1 truncate pl-3 text-right text-xs text-muted-foreground">
           {selected?.name}
         </span>
       </DropdownMenuSubTrigger>
