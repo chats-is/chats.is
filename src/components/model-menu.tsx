@@ -356,7 +356,14 @@ export function ModelMenu({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false}>
+        <SelectContent
+          alignItemWithTrigger={false}
+          // Grows to its widest row instead of being pinned to the trigger,
+          // which is only as wide as a model name — the rows also carry an id
+          // and their badges. Capped so it cannot outgrow the window; past the
+          // cap the text truncates rather than running under the check.
+          className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+        >
           {models &&
             models.length > 0 &&
             Object.entries(groupedModels).map(
@@ -389,7 +396,7 @@ export function ModelMenu({
                       // is not important. The badges pin theirs down to the
                       // paths: lucide strokes with `currentColor`, which each
                       // path resolves against its own colour, not the svg's.
-                      className="text-popover-foreground! data-selected:bg-accent"
+                      className="text-popover-foreground! data-selected:bg-accent [&>div]:min-w-0"
                     >
                       <span className="flex w-full items-start">
                         <ModelIcon
@@ -400,7 +407,7 @@ export function ModelMenu({
                           <span className="font-medium text-popover-foreground!">
                             {m.name}
                           </span>
-                          <span className="text-xs text-muted-foreground!">
+                          <span className="truncate text-xs text-muted-foreground!">
                             {m.modelId}
                           </span>
                         </span>
