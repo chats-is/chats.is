@@ -382,16 +382,25 @@ export function ModelMenu({
                       // here — the rules that used to sit on this line were
                       // written against Radix, whose attribute is different
                       // and whose children are the other way round.
-                      className="data-selected:bg-accent"
+                      // Only the background should change under the
+                      // cursor. The item repaints its whole subtree —
+                      // `focus:**:text-accent-foreground` — so every colour
+                      // inside is pinned with `!`, which wins because that rule
+                      // is not important. The badges pin theirs down to the
+                      // paths: lucide strokes with `currentColor`, which each
+                      // path resolves against its own colour, not the svg's.
+                      className="text-popover-foreground! data-selected:bg-accent"
                     >
                       <span className="flex w-full items-start">
                         <ModelIcon
                           image={m.image || m.provider?.image || null}
-                          className="mt-0.5 mr-2 size-4"
+                          className="mt-0.5 mr-2 size-4 text-popover-foreground!"
                         />
                         <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="font-medium">{m.name}</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="font-medium text-popover-foreground!">
+                            {m.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground!">
                             {m.modelId}
                           </span>
                         </span>
@@ -407,7 +416,7 @@ export function ModelMenu({
                                 <TooltipTrigger
                                   render={
                                     <span className="rounded bg-emerald-100 p-0.5 dark:bg-emerald-900/30">
-                                      <Pencil className="size-3 text-emerald-600 dark:text-emerald-400" />
+                                      <Pencil className="size-3 text-emerald-600! **:text-emerald-600! dark:text-emerald-400! dark:**:text-emerald-400!" />
                                     </span>
                                   }
                                 />
@@ -423,7 +432,7 @@ export function ModelMenu({
                                 <TooltipTrigger
                                   render={
                                     <span className="rounded bg-violet-100 p-0.5 dark:bg-violet-900/30">
-                                      <Scissors className="size-3 text-violet-600 dark:text-violet-400" />
+                                      <Scissors className="size-3 text-violet-600! **:text-violet-600! dark:text-violet-400! dark:**:text-violet-400!" />
                                     </span>
                                   }
                                 />
@@ -437,7 +446,7 @@ export function ModelMenu({
                                 <TooltipTrigger
                                   render={
                                     <span className="rounded bg-blue-100 p-0.5 dark:bg-blue-900/30">
-                                      <Eye className="size-3 text-blue-600 dark:text-blue-400" />
+                                      <Eye className="size-3 text-blue-600! **:text-blue-600! dark:text-blue-400! dark:**:text-blue-400!" />
                                     </span>
                                   }
                                 />
@@ -449,7 +458,7 @@ export function ModelMenu({
                                 <TooltipTrigger
                                   render={
                                     <span className="rounded bg-amber-100 p-0.5 dark:bg-amber-900/30">
-                                      <Lightbulb className="size-3 text-amber-600 dark:text-amber-400" />
+                                      <Lightbulb className="size-3 text-amber-600! **:text-amber-600! dark:text-amber-400! dark:**:text-amber-400!" />
                                     </span>
                                   }
                                 />
