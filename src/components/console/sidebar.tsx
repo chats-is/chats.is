@@ -43,7 +43,7 @@ export function Sidebar({
                 </Link>
               }
             />
-            <SidebarTrigger className="pointer-events-auto absolute top-1/2 right-0 z-10 hidden size-8 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:group-hover/menu-item:pointer-events-auto group-data-[collapsible=icon]:group-hover/menu-item:opacity-100 motion-reduce:transition-none md:flex" />
+            <SidebarTrigger className="pointer-events-auto absolute inset-y-0 right-0 z-10 my-auto hidden size-8 opacity-100 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:group-hover/menu-item:pointer-events-auto group-data-[collapsible=icon]:group-hover/menu-item:opacity-100 motion-reduce:transition-none md:flex" />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

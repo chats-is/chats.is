@@ -356,7 +356,15 @@ export function ModelMenu({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false}>
+        {/* The popup is as wide as its widest row, not as wide as the
+            trigger. shadcn pins it to the anchor, which is right for a select
+            of short labels and wrong here: a row carries a name, a model id
+            and its capability badges, and at the trigger's width they spill
+            out from under the check. */}
+        <SelectContent
+          alignItemWithTrigger={false}
+          className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+        >
           {models &&
             models.length > 0 &&
             Object.entries(groupedModels).map(
@@ -376,7 +384,13 @@ export function ModelMenu({
                       key={m.modelId}
                       value={m.modelId}
                       label={`${m.name} ${m.modelId}`}
-                      className="pr-2 data-checked:bg-accent [&>span:first-child]:hidden [&>span:last-child]:w-full"
+                      // `data-selected` is what Base UI marks the chosen row
+                      // with. Base UI also puts the check last and the item
+                      // already reserves room for it, so neither is overridden
+                      // here — the rules that used to sit on this line were
+                      // written against Radix, whose attribute is different
+                      // and whose children are the other way round.
+                      className="data-selected:bg-accent"
                     >
                       <span className="flex w-full items-start">
                         <ModelIcon
@@ -500,7 +514,15 @@ export function ModelMenu({
               {size ? ImageSizeLabels[size] || size : 'Size'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          {/* The popup is as wide as its widest row, not as wide as the
+            trigger. shadcn pins it to the anchor, which is right for a select
+            of short labels and wrong here: a row carries a name, a model id
+            and its capability badges, and at the trigger's width they spill
+            out from under the check. */}
+          <SelectContent
+            alignItemWithTrigger={false}
+            className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+          >
             {availableSizes.map(s => (
               <SelectItem key={s} value={s}>
                 {ImageSizeLabels[s] || s}
@@ -527,7 +549,15 @@ export function ModelMenu({
                   : 'Aspect'}
               </span>
             </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
+            {/* The popup is as wide as its widest row, not as wide as the
+            trigger. shadcn pins it to the anchor, which is right for a select
+            of short labels and wrong here: a row carries a name, a model id
+            and its capability badges, and at the trigger's width they spill
+            out from under the check. */}
+            <SelectContent
+              alignItemWithTrigger={false}
+              className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+            >
               {availableAspectRatios.map(r => (
                 <SelectItem key={r} value={r}>
                   {AspectRatioLabels[r] || r}
@@ -553,7 +583,15 @@ export function ModelMenu({
                 : 'Resolution'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          {/* The popup is as wide as its widest row, not as wide as the
+            trigger. shadcn pins it to the anchor, which is right for a select
+            of short labels and wrong here: a row carries a name, a model id
+            and its capability badges, and at the trigger's width they spill
+            out from under the check. */}
+          <SelectContent
+            alignItemWithTrigger={false}
+            className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+          >
             {availableResolutions.map(r => (
               <SelectItem key={r} value={r}>
                 {VideoResolutionLabels[r] || r}
@@ -580,7 +618,15 @@ export function ModelMenu({
               {duration !== undefined ? `${duration}s` : 'Duration'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          {/* The popup is as wide as its widest row, not as wide as the
+            trigger. shadcn pins it to the anchor, which is right for a select
+            of short labels and wrong here: a row carries a name, a model id
+            and its capability badges, and at the trigger's width they spill
+            out from under the check. */}
+          <SelectContent
+            alignItemWithTrigger={false}
+            className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+          >
             {availableDurations.map(d => (
               <SelectItem key={d} value={String(d)}>
                 {`${d}s`}
@@ -604,7 +650,15 @@ export function ModelMenu({
               {voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : 'Voice'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          {/* The popup is as wide as its widest row, not as wide as the
+            trigger. shadcn pins it to the anchor, which is right for a select
+            of short labels and wrong here: a row carries a name, a model id
+            and its capability badges, and at the trigger's width they spill
+            out from under the check. */}
+          <SelectContent
+            alignItemWithTrigger={false}
+            className="w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)"
+          >
             {availableVoices.map(v => (
               <SelectItem key={v} value={v}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
