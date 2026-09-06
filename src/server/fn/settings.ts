@@ -14,25 +14,6 @@ export const listSettings = createServerFn({ method: 'GET' })
     return await db.query.settings.findMany();
   });
 
-export const getSetting = createServerFn({ method: 'GET' })
-  .validator(z.object({ key: z.string().min(1) }))
-  .handler(async ({ data }) => {
-    return await db.query.settings.findFirst({
-      where: eq(settings.key, data.key)
-    });
-  });
-
-export const getSettingDefaults = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const allSettings = await db.query.settings.findMany();
-    const result: Record<string, string | null> = {};
-    for (const setting of allSettings) {
-      result[setting.key] = setting.value;
-    }
-    return result;
-  }
-);
-
 /**
  * Get complete system settings for client initialization
  * Includes all enabled models and default settings
@@ -127,24 +108,12 @@ export const settingsQueries = {
    *  invalidates them, so the two can never drift apart. */
   key: {
     list: () => ['settings', 'list'] as const,
-    get: () => ['settings', 'get'] as const,
-    defaults: () => ['settings', 'defaults'] as const,
     system: () => ['settings', 'system'] as const
   },
   list: () =>
     queryOptions({
       queryKey: [...settingsQueries.key.list()] as const,
       queryFn: () => listSettings()
-    }),
-  get: (input: { key: string }) =>
-    queryOptions({
-      queryKey: [...settingsQueries.key.get(), input] as const,
-      queryFn: () => getSetting({ data: input })
-    }),
-  defaults: () =>
-    queryOptions({
-      queryKey: [...settingsQueries.key.defaults()] as const,
-      queryFn: () => getSettingDefaults()
     }),
   system: () =>
     queryOptions({
