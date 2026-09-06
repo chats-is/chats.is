@@ -312,6 +312,17 @@ function SubmitButton({
   );
 }
 
+/**
+ * A form bound to `useAppForm` re-applies its options on every render, and
+ * that includes putting `defaultValues` back over the current values whenever
+ * the two differ and nothing has been typed yet. So `form.reset(record)` alone
+ * does not survive: the state change that opens a dialog is itself the next
+ * render, and the record is gone before it is seen.
+ *
+ * Where a form is opened on a record, hold those values in state and pass them
+ * as `defaultValues` as well as resetting to them. The option and the values
+ * are then the same object, and there is nothing left to put back.
+ */
 export const { useAppForm, withForm } = createFormHook({
   fieldContext,
   formContext,

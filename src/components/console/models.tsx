@@ -382,8 +382,10 @@ export default function ModelsPage() {
     onError: error => toast.error(error.message)
   });
 
+  const [defaults, setDefaults] = useState(EMPTY_FORM);
+
   const form = useAppForm({
-    defaultValues: EMPTY_FORM,
+    defaultValues: defaults,
     validators: { onChange: modelSchema },
     onSubmit: async ({ value }) => {
       // Validated above, so these parse. An absent field clears the stored
@@ -441,6 +443,7 @@ export default function ModelsPage() {
     setEditingId(model?.id ?? null);
 
     if (!model) {
+      setDefaults(EMPTY_FORM);
       form.reset(EMPTY_FORM);
       setIsOpen(true);
       return;
@@ -451,7 +454,7 @@ export default function ModelsPage() {
       .sort((a, b) => a.priority - b.priority)
       .map(b => ({ providerId: b.providerId, isEnabled: b.isEnabled }));
 
-    form.reset({
+    const values = {
       name: model.name,
       modelId: model.modelId,
       capability: model.capability,
@@ -475,7 +478,9 @@ export default function ModelsPage() {
         bindings.length > 0
           ? bindings
           : [{ providerId: model.providerId || '', isEnabled: true }]
-    });
+    };
+    setDefaults(values);
+    form.reset(values);
     setIsOpen(true);
   };
 

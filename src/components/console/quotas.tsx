@@ -307,8 +307,10 @@ export default function QuotasPage() {
     onError: e => toast.error(e.message)
   });
 
+  const [defaults, setDefaults] = useState(emptyForm);
+
   const form = useAppForm({
-    defaultValues: emptyForm,
+    defaultValues: defaults,
     validators: { onChange: quotaSchema },
     onSubmit: async ({ value }) => {
       const payload = {
@@ -335,19 +337,19 @@ export default function QuotasPage() {
 
   const openFor = (quota: Quota | null) => {
     setEditingId(quota?.id ?? null);
-    form.reset(
-      quota
-        ? {
-            name: quota.name,
-            description: quota.description ?? '',
-            role: detectRole(quota.fiveHour, quota.sevenDay),
-            sevenDay: fmtAmount(quota.sevenDay),
-            fiveHour: fmtAmount(quota.fiveHour),
-            isUnlimited: quota.isUnlimited,
-            allowedModelIds: quota.allowedModelIds ?? []
-          }
-        : emptyForm
-    );
+    const values = quota
+      ? {
+          name: quota.name,
+          description: quota.description ?? '',
+          role: detectRole(quota.fiveHour, quota.sevenDay),
+          sevenDay: fmtAmount(quota.sevenDay),
+          fiveHour: fmtAmount(quota.fiveHour),
+          isUnlimited: quota.isUnlimited,
+          allowedModelIds: quota.allowedModelIds ?? []
+        }
+      : emptyForm;
+    setDefaults(values);
+    form.reset(values);
     setOpen(true);
   };
 

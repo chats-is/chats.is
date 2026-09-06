@@ -322,8 +322,10 @@ export default function ProvidersPage() {
         : 'api_key'
       : null;
 
+  const [defaults, setDefaults] = useState(EMPTY_FORM);
+
   const form = useAppForm({
-    defaultValues: EMPTY_FORM,
+    defaultValues: defaults,
     validators: {
       onChange: ({ value }) =>
         validateProvider(value, {
@@ -390,6 +392,7 @@ export default function ProvidersPage() {
     setEditingId(provider?.id ?? null);
 
     if (!provider) {
+      setDefaults(EMPTY_FORM);
       form.reset(EMPTY_FORM);
       setVertexMaskedApiKey('');
       setIsOpen(true);
@@ -397,7 +400,7 @@ export default function ProvidersPage() {
     }
 
     const maskedVertexKey = vertexKeyOf(provider);
-    form.reset({
+    const values: ProviderForm = {
       name: provider.name,
       type: provider.type,
       apiKey: '',
@@ -409,7 +412,9 @@ export default function ProvidersPage() {
       apiOptions: provider.apiOptions
         ? JSON.stringify(provider.apiOptions, null, 2)
         : ''
-    });
+    };
+    setDefaults(values);
+    form.reset(values);
     setVertexMaskedApiKey(
       maskedVertexKey
         ? JSON.stringify(maskedVertexKey.credentials, null, 2)

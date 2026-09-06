@@ -256,8 +256,10 @@ export default function PromptsPage() {
     onError: error => toast.error(error.message)
   });
 
+  const [defaults, setDefaults] = useState(EMPTY_FORM);
+
   const form = useAppForm({
-    defaultValues: EMPTY_FORM,
+    defaultValues: defaults,
     validators: { onChange: promptSchema },
     onSubmit: async ({ value }) => {
       const tags = parseList(value.tags);
@@ -290,19 +292,19 @@ export default function PromptsPage() {
 
   const openFor = (prompt: AdminPrompt | null) => {
     setEditingPrompt(prompt);
-    form.reset(
-      prompt
-        ? {
-            name: prompt.name,
-            content: prompt.content,
-            image: prompt.image || '',
-            tags: joinList(prompt.tags),
-            providers: joinList(prompt.providers),
-            models: prompt.models || [],
-            visibility: prompt.visibility
-          }
-        : EMPTY_FORM
-    );
+    const values = prompt
+      ? {
+          name: prompt.name,
+          content: prompt.content,
+          image: prompt.image || '',
+          tags: joinList(prompt.tags),
+          providers: joinList(prompt.providers),
+          models: prompt.models || [],
+          visibility: prompt.visibility
+        }
+      : EMPTY_FORM;
+    setDefaults(values);
+    form.reset(values);
     setIsOpen(true);
   };
 

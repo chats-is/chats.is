@@ -354,8 +354,10 @@ export default function PricingPage() {
     });
   }, [rows, search, filterCapability]);
 
+  const [defaults, setDefaults] = useState(EMPTY_PRICING);
+
   const form = useAppForm({
-    defaultValues: EMPTY_PRICING,
+    defaultValues: defaults,
     onSubmit: async ({ value }) => {
       if (!edit) return;
       // A blank field is not a zero rate — it means the model is not priced
@@ -381,7 +383,7 @@ export default function PricingPage() {
       modelName: row.name,
       capability: row.capability
     });
-    form.reset({
+    const values = {
       input: fromNum(row.pricing?.input),
       output: fromNum(row.pricing?.output),
       cacheRead: fromNum(row.pricing?.cacheRead),
@@ -394,7 +396,9 @@ export default function PricingPage() {
       audioOutput: fromNum(row.pricing?.audioOutput),
       audioCharacters: fromNum(row.pricing?.audioCharacters),
       audioSeconds: fromNum(row.pricing?.audioSeconds)
-    });
+    };
+    setDefaults(values);
+    form.reset(values);
   };
 
   const columns = useMemo(() => pricingColumns(openEdit), []);

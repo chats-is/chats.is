@@ -176,8 +176,10 @@ export default function PlansPage() {
     onError: e => toast.error(e.message)
   });
 
+  const [defaults, setDefaults] = useState(emptyForm);
+
   const form = useAppForm({
-    defaultValues: emptyForm,
+    defaultValues: defaults,
     validators: { onChange: planSchema },
     onSubmit: async ({ value }) => {
       const payload = {
@@ -206,16 +208,16 @@ export default function PlansPage() {
   // what decides which record it is pointed at.
   const openFor = (plan: Plan | null) => {
     setEditingId(plan?.id ?? null);
-    form.reset(
-      plan
-        ? {
-            name: plan.name,
-            description: plan.description ?? '',
-            quotaId: plan.quotaId,
-            displayOrder: plan.displayOrder.toString()
-          }
-        : emptyForm
-    );
+    const values = plan
+      ? {
+          name: plan.name,
+          description: plan.description ?? '',
+          quotaId: plan.quotaId,
+          displayOrder: plan.displayOrder.toString()
+        }
+      : emptyForm;
+    setDefaults(values);
+    form.reset(values);
     setOpen(true);
   };
 
