@@ -31,8 +31,8 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ChatHeader } from '@/components/chat-header';
+import { GalleryGridSkeleton } from '@/components/gallery-skeleton';
 
 /** Hover corner actions — uniform across all card kinds: download and
  *  open-chat side by side at the top-right. `dark` for image/video overlays. */
@@ -457,11 +457,7 @@ export function LibraryView() {
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-5xl p-4">
           {isLoading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 8 }, (_, index) => (
-                <Skeleton key={index} className="aspect-square rounded-lg" />
-              ))}
-            </div>
+            <GalleryGridSkeleton />
           ) : items.length === 0 ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
               <LibraryBig className="size-12 opacity-50" />

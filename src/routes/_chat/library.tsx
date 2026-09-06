@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
 import { libraryQueries } from '@/server/fn/library';
-import { RoutePending } from '@/components/route-pending';
+import { GalleryPending } from '@/components/gallery-skeleton';
 import { LibraryView } from '@/components/library-view';
 
 export const Route = createFileRoute('/_chat/library')({
@@ -11,6 +11,6 @@ export const Route = createFileRoute('/_chat/library')({
       libraryQueries.list({ limit: 24 })
     ),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Library') }] }),
-  pendingComponent: RoutePending,
+  pendingComponent: () => <GalleryPending title="Library" />,
   component: LibraryView
 });

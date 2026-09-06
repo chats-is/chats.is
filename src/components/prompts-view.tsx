@@ -4,8 +4,8 @@ import { Sparkles } from 'lucide-react';
 
 import { setPendingPrompt } from '@/lib/pending-prompt';
 import { promptQueries, type listUsablePrompts } from '@/server/fn/prompt';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ChatHeader } from '@/components/chat-header';
+import { GalleryGridSkeleton } from '@/components/gallery-skeleton';
 
 type UsablePrompt = Awaited<ReturnType<typeof listUsablePrompts>>[number];
 
@@ -72,11 +72,7 @@ export function PromptsView() {
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-5xl p-4">
           {isLoading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 8 }, (_, index) => (
-                <Skeleton key={index} className="aspect-square rounded-lg" />
-              ))}
-            </div>
+            <GalleryGridSkeleton />
           ) : prompts?.length ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {prompts.map(prompt => (
