@@ -19,6 +19,9 @@ interface EmailLoginFormProps {
   setIsLoading?: (provider: string | null) => void;
 }
 
+/** How many digits the sign-in code has. */
+const CODE_LENGTH = 6;
+
 export function EmailLoginForm({
   className,
   redirectTo,
@@ -155,18 +158,22 @@ export function EmailLoginForm({
           </p>
           <div className="flex justify-center">
             <InputOTP
-              maxLength={6}
+              maxLength={CODE_LENGTH}
               value={code}
               onChange={setCode}
               disabled={loading}
             >
               <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
-                <InputOTPSlot index={3} />
-                <InputOTPSlot index={4} />
-                <InputOTPSlot index={5} />
+                {Array.from({ length: CODE_LENGTH }, (_, index) => (
+                  // Bigger than the default box: this is the only thing on the
+                  // screen at this point, and the digits are read back off a
+                  // phone one at a time.
+                  <InputOTPSlot
+                    key={index}
+                    index={index}
+                    className="size-12 text-lg"
+                  />
+                ))}
               </InputOTPGroup>
             </InputOTP>
           </div>
@@ -175,7 +182,7 @@ export function EmailLoginForm({
             type="submit"
             size="lg"
             className="w-full"
-            disabled={loading || code.length !== 6}
+            disabled={loading || code.length !== CODE_LENGTH}
           >
             {loading ? (
               <Loader2 className="size-4 animate-spin" />
