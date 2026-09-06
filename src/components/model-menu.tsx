@@ -3,12 +3,7 @@ import { usePreferences } from '@/contexts/preferences-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
 import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react';
 
-import { type ChatMessage, type Model, type ModelCapability } from '@/types';
-import {
-  AspectRatioLabels,
-  ImageSizeLabels,
-  VideoResolutionLabels
-} from '@/lib/constant';
+import { type ChatMessage, type Model } from '@/types';
 import { cn, modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,56 +27,28 @@ export interface ModelMenuProps extends Pick<
   UseChatHelpers<ChatMessage>,
   'status'
 > {
-  /** The capability type for model selection */
-  capability?: ModelCapability;
   /** Pre-filtered models to display */
   models: Model[];
   /** Current model value (controlled) */
   modelId: string;
   /** Callback when model changes */
   onModelChange: (modelId: string) => void;
-  /** Callback when model options change (like reasoning, size, aspectRatio, voice) */
+  /** Callback when model options change (like the reasoning toggle) */
   onOptionsChange?: (options: ModelOptions) => void;
-  /** Current size value (for image capability) */
-  size?: string;
-  /** Current aspect ratio value (for image & video capability) */
-  aspectRatio?: string;
-  /** Current resolution value (for video capability) */
-  resolution?: string;
-  /** Current duration value in seconds (for video capability) */
-  duration?: number;
-  /** Current voice value (for audio capability) */
-  voice?: string;
 }
 
 export interface ModelOptions {
   isReasoning?: boolean;
   supportsVision?: boolean;
   supportsReasoning?: boolean;
-  /** Size value (for image) */
-  size?: string;
-  /** AspectRatio value (for image & video) */
-  aspectRatio?: string;
-  /** Resolution value (for video) */
-  resolution?: string;
-  /** Duration value in seconds (for video) */
-  duration?: number;
-  /** Voice value (for audio) */
-  voice?: string;
 }
 
 export function ModelMenu({
   status,
-  capability = 'chat',
   models,
   modelId,
   onModelChange,
-  onOptionsChange,
-  size,
-  aspectRatio,
-  resolution,
-  duration,
-  voice
+  onOptionsChange
 }: ModelMenuProps) {
   // Prevent hydration mismatch with Radix Select
   const [mounted, setMounted] = useState(false);
@@ -98,173 +65,14 @@ export function ModelMenu({
     [models, modelId]
   );
 
-  // Get available options from selected model
-  const uiOptions = selectedModel?.uiOptions as Record<string, unknown> | null;
-  const defaultSize = typeof uiOptions?.size === 'string' ? uiOptions.size : '';
-  const availableSizes = useMemo(
-    () => (uiOptions?.sizes as string[]) || [],
-    [uiOptions?.sizes]
-  );
-  const defaultAspectRatio =
-    typeof uiOptions?.aspectRatio === 'string' ? uiOptions.aspectRatio : '';
-  const availableAspectRatios = useMemo(
-    () => (uiOptions?.aspectRatios as string[]) || [],
-    [uiOptions?.aspectRatios]
-  );
-  const defaultDuration = useMemo(() => {
-    const value = uiOptions?.duration;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-    return undefined;
-  }, [uiOptions?.duration]);
-  const availableDurations = useMemo(() => {
-    const values = uiOptions?.durations;
-    if (!Array.isArray(values)) return [];
-    return values
-      .map(v => (typeof v === 'number' ? v : Number(v)))
-      .filter(v => Number.isFinite(v));
-  }, [uiOptions?.durations]);
-  const defaultResolution =
-    typeof uiOptions?.resolution === 'string' ? uiOptions.resolution : '';
-  const availableResolutions = useMemo(
-    () => (uiOptions?.resolutions as string[]) || [],
-    [uiOptions?.resolutions]
-  );
-  const defaultVoice =
-    typeof uiOptions?.voice === 'string' ? uiOptions.voice : '';
-  const availableVoices = useMemo(
-    () => (uiOptions?.voices as string[]) || [],
-    [uiOptions?.voices]
-  );
-
-  // Notify parent of model capabilities and auto-select options
+  // Tell the composer whether this model takes images, so the attach button
+  // knows whether to offer them.
   useEffect(() => {
     if (!selectedModel) return;
-
-    // Notify supportsVision on mount and model change
     onOptionsChange?.({
       supportsVision: selectedModel.supportsVision ?? undefined
     });
-
-    // Auto-select default size, fallback to the first available option.
-    if (
-      capability === 'image' &&
-      availableSizes.length > 0 &&
-      (!size || !availableSizes.includes(size))
-    ) {
-      const nextSize = availableSizes.includes(preferences.imageSize)
-        ? preferences.imageSize
-        : availableSizes.includes(defaultSize)
-          ? defaultSize
-          : availableSizes[0];
-      if (nextSize !== size) {
-        onOptionsChange?.({ size: nextSize });
-      }
-    }
-
-    // Auto-select default aspectRatio, fallback to the first available option.
-    if (
-      (capability === 'image' || capability === 'video') &&
-      availableAspectRatios.length > 0 &&
-      (!aspectRatio || !availableAspectRatios.includes(aspectRatio))
-    ) {
-      const preferenceAspectRatio =
-        capability === 'image'
-          ? preferences.imageAspectRatio
-          : preferences.videoAspectRatio;
-      const nextAspectRatio = availableAspectRatios.includes(
-        preferenceAspectRatio
-      )
-        ? preferenceAspectRatio
-        : availableAspectRatios.includes(defaultAspectRatio)
-          ? defaultAspectRatio
-          : availableAspectRatios[0];
-      if (nextAspectRatio !== aspectRatio) {
-        onOptionsChange?.({ aspectRatio: nextAspectRatio });
-      }
-    }
-
-    // Auto-select default duration, fallback to the first available option.
-    if (
-      capability === 'video' &&
-      availableDurations.length > 0 &&
-      (duration === undefined || !availableDurations.includes(duration))
-    ) {
-      const preferred = preferences.videoDuration;
-      const nextDuration =
-        preferred !== undefined && availableDurations.includes(preferred)
-          ? preferred
-          : defaultDuration !== undefined &&
-              availableDurations.includes(defaultDuration)
-            ? defaultDuration
-            : availableDurations[0];
-      if (nextDuration !== duration) {
-        onOptionsChange?.({ duration: nextDuration });
-      }
-    }
-
-    // Auto-select default resolution, fallback to the first available option.
-    if (
-      capability === 'video' &&
-      availableResolutions.length > 0 &&
-      (!resolution || !availableResolutions.includes(resolution))
-    ) {
-      const nextResolution = availableResolutions.includes(
-        preferences.videoResolution
-      )
-        ? preferences.videoResolution
-        : availableResolutions.includes(defaultResolution)
-          ? defaultResolution
-          : availableResolutions[0];
-      if (nextResolution !== resolution) {
-        onOptionsChange?.({ resolution: nextResolution });
-      }
-    }
-
-    // Auto-select default voice, fallback to the first available option.
-    if (
-      capability === 'audio' &&
-      availableVoices.length > 0 &&
-      (!voice || !availableVoices.includes(voice))
-    ) {
-      const nextVoice = availableVoices.includes(preferences.audioVoice)
-        ? preferences.audioVoice
-        : availableVoices.includes(defaultVoice)
-          ? defaultVoice
-          : availableVoices[0];
-      if (nextVoice !== voice) {
-        onOptionsChange?.({ voice: nextVoice });
-      }
-    }
-  }, [
-    selectedModel,
-    capability,
-    size,
-    aspectRatio,
-    resolution,
-    duration,
-    voice,
-    availableSizes,
-    defaultSize,
-    availableAspectRatios,
-    defaultAspectRatio,
-    availableDurations,
-    defaultDuration,
-    availableResolutions,
-    defaultResolution,
-    availableVoices,
-    defaultVoice,
-    preferences.imageSize,
-    preferences.imageAspectRatio,
-    preferences.videoAspectRatio,
-    preferences.videoDuration,
-    preferences.videoResolution,
-    preferences.audioVoice,
-    onOptionsChange
-  ]);
+  }, [selectedModel, onOptionsChange]);
 
   if (!mounted) {
     return (
@@ -311,9 +119,7 @@ export function ModelMenu({
     }
   };
 
-  // Handler for reasoning toggle (only for chat capability)
   const handleReasoningToggle = () => {
-    if (capability !== 'chat') return;
     const newValue = !isReasoning;
     setIsReasoning(newValue);
     setPreference('chatReasoning', newValue);
@@ -383,9 +189,7 @@ export function ModelMenu({
                           className="mt-0.5 mr-2 size-4"
                         />
                         <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="font-medium">
-                            {m.name}
-                          </span>
+                          <span className="font-medium">{m.name}</span>
                           <span className="truncate text-xs text-muted-foreground">
                             {m.modelId}
                           </span>
@@ -456,7 +260,7 @@ export function ModelMenu({
         </SelectContent>
       </Select>
 
-      {capability === 'chat' && selectedModel?.uiOptions?.reasoning && (
+      {selectedModel?.uiOptions?.reasoning && (
         <Button
           type="button"
           variant="outline"
@@ -477,130 +281,6 @@ export function ModelMenu({
           />
           Think
         </Button>
-      )}
-
-      {/* Size selector for image capability */}
-      {capability === 'image' && availableSizes.length > 0 && (
-        <Select
-          disabled={isDisabled}
-          value={size || ''}
-          onValueChange={newSize => onOptionsChange?.({ size: newSize })}
-        >
-          <SelectTrigger className="h-9 rounded-full shadow-none">
-            <span className="text-sm">
-              {size ? ImageSizeLabels[size] || size : 'Size'}
-            </span>
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {availableSizes.map(s => (
-              <SelectItem key={s} value={s}>
-                {ImageSizeLabels[s] || s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {/* AspectRatio selector for image & video capability */}
-      {(capability === 'image' || capability === 'video') &&
-        availableAspectRatios.length > 0 && (
-          <Select
-            disabled={isDisabled}
-            value={aspectRatio || ''}
-            onValueChange={newRatio =>
-              onOptionsChange?.({ aspectRatio: newRatio })
-            }
-          >
-            <SelectTrigger className="h-9 rounded-full shadow-none">
-              <span className="text-sm">
-                {aspectRatio
-                  ? AspectRatioLabels[aspectRatio] || aspectRatio
-                  : 'Aspect'}
-              </span>
-            </SelectTrigger>
-            <SelectContent position="popper">
-              {availableAspectRatios.map(r => (
-                <SelectItem key={r} value={r}>
-                  {AspectRatioLabels[r] || r}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-      {/* Resolution selector for video capability */}
-      {capability === 'video' && availableResolutions.length > 0 && (
-        <Select
-          disabled={isDisabled}
-          value={resolution || ''}
-          onValueChange={newResolution =>
-            onOptionsChange?.({ resolution: newResolution })
-          }
-        >
-          <SelectTrigger className="h-9 rounded-full shadow-none">
-            <span className="text-sm">
-              {resolution
-                ? VideoResolutionLabels[resolution] || resolution
-                : 'Resolution'}
-            </span>
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {availableResolutions.map(r => (
-              <SelectItem key={r} value={r}>
-                {VideoResolutionLabels[r] || r}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {/* Duration selector for video capability */}
-      {capability === 'video' && availableDurations.length > 0 && (
-        <Select
-          disabled={isDisabled}
-          value={duration !== undefined ? String(duration) : ''}
-          onValueChange={newDuration => {
-            const parsed = Number(newDuration);
-            if (Number.isFinite(parsed)) {
-              onOptionsChange?.({ duration: parsed });
-            }
-          }}
-        >
-          <SelectTrigger className="h-9 rounded-full shadow-none">
-            <span className="text-sm">
-              {duration !== undefined ? `${duration}s` : 'Duration'}
-            </span>
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {availableDurations.map(d => (
-              <SelectItem key={d} value={String(d)}>
-                {`${d}s`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {/* Voice selector for audio capability */}
-      {capability === 'audio' && availableVoices.length > 0 && (
-        <Select
-          disabled={isDisabled}
-          value={voice || ''}
-          onValueChange={newVoice => onOptionsChange?.({ voice: newVoice })}
-        >
-          <SelectTrigger className="h-9 rounded-full shadow-none">
-            <span className="text-sm">
-              {voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : 'Voice'}
-            </span>
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {availableVoices.map(v => (
-              <SelectItem key={v} value={v}>
-                {v.charAt(0).toUpperCase() + v.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       )}
     </div>
   );
