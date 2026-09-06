@@ -82,7 +82,12 @@ export function UserMenu() {
             }
           />
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            // Width comes from the menu's own base style, which follows the
+            // trigger. The class that used to be here named a Radix variable
+            // this app does not define, and an undefined var voids the whole
+            // declaration — so it was overriding that base with `auto` and
+            // leaving the menu narrower than the button it hangs from.
+            className="min-w-56 rounded-lg"
             side={isMobile ? 'bottom' : isCollapsed ? 'right' : 'top'}
             align="end"
             sideOffset={4}
