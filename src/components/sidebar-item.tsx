@@ -37,14 +37,13 @@ export function SidebarItem({ chat }: SidebarItemProps) {
         isActive={chat.id === params.chatId || isOpen}
         tooltip={chat.title}
         className="group-hover/menu-item:bg-background group-hover/menu-item:shadow-sm hover:bg-background hover:shadow-sm data-[active=true]:bg-background data-[active=true]:shadow-sm dark:group-hover/menu-item:bg-accent dark:hover:bg-accent dark:data-[active=true]:bg-accent"
-
-        render={
-          <Link to="/chat/$chatId" params={{ chatId: chat.id }}>
-            <ChatTypeIcon type={chat.type} />
-            <span className="truncate">{chat.title}</span>
-          </Link>
-        }
-      />
+        asChild
+      >
+        <Link to="/chat/$chatId" params={{ chatId: chat.id }}>
+          <ChatTypeIcon type={chat.type} />
+          <span className="truncate">{chat.title}</span>
+        </Link>
+      </SidebarMenuButton>
       <SidebarActions chat={chat} onOpenChange={setIsOpen} />
     </SidebarMenuItem>
   );

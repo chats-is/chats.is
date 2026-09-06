@@ -11,7 +11,6 @@ import {
 import { toast } from 'sonner';
 
 import { type Artifact } from '@/types';
-import { onSelect } from '@/lib/select';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { Button } from '@/components/ui/button';
@@ -255,7 +254,7 @@ export function ArtifactViewer({
             {artifacts.length > 1 ? (
               <Select
                 value={artifact.id}
-                onValueChange={onSelect(value => onSelectArtifact?.(value))}
+                onValueChange={value => onSelectArtifact?.(value)}
                 disabled={isHeaderActionDisabled}
               >
                 <SelectTrigger className="h-6 w-fit max-w-full min-w-0 border-0 p-0 text-sm font-semibold shadow-none">
@@ -297,59 +296,53 @@ export function ArtifactViewer({
             {extraActions}
             {canCopyContent && (
               <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={headerActionButtonClassName}
-                      disabled={isHeaderActionDisabled}
-                      onClick={async () => {
-                        await copyToClipboard(artifact.content ?? '');
-                        toast.success('Copied');
-                      }}
-                    >
-                      <Copy className="size-4" />
-                      <span className="sr-only">Copy artifact</span>
-                    </Button>
-                  }
-                />
-                <TooltipContent>Copy</TooltipContent>
-              </Tooltip>
-            )}
-            <Tooltip>
-              <TooltipTrigger
-                render={
+                <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     className={headerActionButtonClassName}
-                    disabled={isHeaderActionDisabled || !canDownload}
-                    onClick={handleDownload}
+                    disabled={isHeaderActionDisabled}
+                    onClick={async () => {
+                      await copyToClipboard(artifact.content ?? '');
+                      toast.success('Copied');
+                    }}
                   >
-                    <Download className="size-4" />
-                    <span className="sr-only">Download artifact</span>
+                    <Copy className="size-4" />
+                    <span className="sr-only">Copy artifact</span>
                   </Button>
-                }
-              />
+                </TooltipTrigger>
+                <TooltipContent>Copy</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={headerActionButtonClassName}
+                  disabled={isHeaderActionDisabled || !canDownload}
+                  onClick={handleDownload}
+                >
+                  <Download className="size-4" />
+                  <span className="sr-only">Download artifact</span>
+                </Button>
+              </TooltipTrigger>
               <TooltipContent>Download</TooltipContent>
             </Tooltip>
             {onClose && (
               <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={headerActionButtonClassName}
-                      disabled={isHeaderActionDisabled}
-                      onClick={onClose}
-                    >
-                      <X className="size-4" />
-                      <span className="sr-only">Close</span>
-                    </Button>
-                  }
-                />
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={headerActionButtonClassName}
+                    disabled={isHeaderActionDisabled}
+                    onClick={onClose}
+                  >
+                    <X className="size-4" />
+                    <span className="sr-only">Close</span>
+                  </Button>
+                </TooltipTrigger>
                 <TooltipContent>Close</TooltipContent>
               </Tooltip>
             )}

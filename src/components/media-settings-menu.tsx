@@ -134,24 +134,20 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   return (
     <Popover>
       <Tooltip>
-        <TooltipTrigger
-          render={
-            <PopoverTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  disabled={status === 'submitted' || status === 'streaming'}
-                  className="size-9 rounded-full text-muted-foreground shadow-none"
-                >
-                  <Settings2 className="size-4" />
-                  <span className="sr-only">Media generation settings</span>
-                </Button>
-              }
-            />
-          }
-        />
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              disabled={status === 'submitted' || status === 'streaming'}
+              className="size-9 rounded-full text-muted-foreground shadow-none"
+            >
+              <Settings2 className="size-4" />
+              <span className="sr-only">Media generation settings</span>
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
         <TooltipContent>Media generation settings</TooltipContent>
       </Tooltip>
       <PopoverContent

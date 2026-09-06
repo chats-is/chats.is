@@ -175,33 +175,29 @@ const promptColumns = (ctx: {
       cell: ({ row }) => (
         <>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => ctx.edit(row.original)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => ctx.edit(row.original)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Edit Prompt</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => ctx.remove(row.original)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => ctx.remove(row.original)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Delete Prompt</TooltipContent>
           </Tooltip>
         </>
@@ -343,14 +339,12 @@ export default function PromptsPage() {
         </div>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger
-            render={
-              <Button className="gap-2" onClick={() => openFor(null)}>
-                <Plus className="size-4" />
-                Add Prompt
-              </Button>
-            }
-          />
+          <DialogTrigger asChild>
+            <Button className="gap-2" onClick={() => openFor(null)}>
+              <Plus className="size-4" />
+              Add Prompt
+            </Button>
+          </DialogTrigger>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>

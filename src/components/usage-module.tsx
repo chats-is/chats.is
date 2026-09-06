@@ -340,38 +340,31 @@ export function DailyStackedChart({
                         className="flex flex-1 items-end"
                         style={{ height: '100%' }}
                       >
-                        <HoverCard>
-                          <HoverCardTrigger
-                            delay={80}
-                            closeDelay={40}
-                            render={
-                              <div
-                                className="mx-auto flex w-1/2 max-w-5 cursor-pointer flex-col-reverse overflow-hidden rounded-t transition-[filter] hover:brightness-110"
-                                style={{ height: `${dayPct}%` }}
-                              >
-                                {d.groups
-                                  .slice()
-                                  .sort(
-                                    (a, b) => Number(b.cost) - Number(a.cost)
-                                  )
-                                  .map(g => {
-                                    const segPct =
-                                      (Number(g.cost) / dayTotal) * 100;
-                                    return (
-                                      <div
-                                        key={g.key}
-                                        style={{
-                                          height: `${segPct}%`,
-                                          background:
-                                            colorMap.color.get(g.key) ??
-                                            '#94a3b8'
-                                        }}
-                                      />
-                                    );
-                                  })}
-                              </div>
-                            }
-                          />
+                        <HoverCard openDelay={80} closeDelay={40}>
+                          <HoverCardTrigger asChild>
+                            <div
+                              className="mx-auto flex w-1/2 max-w-5 cursor-pointer flex-col-reverse overflow-hidden rounded-t transition-[filter] hover:brightness-110"
+                              style={{ height: `${dayPct}%` }}
+                            >
+                              {d.groups
+                                .slice()
+                                .sort((a, b) => Number(b.cost) - Number(a.cost))
+                                .map(g => {
+                                  const segPct =
+                                    (Number(g.cost) / dayTotal) * 100;
+                                  return (
+                                    <div
+                                      key={g.key}
+                                      style={{
+                                        height: `${segPct}%`,
+                                        background:
+                                          colorMap.color.get(g.key) ?? '#94a3b8'
+                                      }}
+                                    />
+                                  );
+                                })}
+                            </div>
+                          </HoverCardTrigger>
                           <HoverCardContent
                             side="left"
                             align="center"
@@ -594,16 +587,12 @@ export function UsageModule({
             <div className="text-sm font-medium text-muted-foreground">
               Tokens
             </div>
-            <HoverCard>
-              <HoverCardTrigger
-                delay={50}
-                closeDelay={50}
-                render={
-                  <div className="inline-block cursor-default text-2xl font-bold">
-                    {formatNumber(tokensTotal)}
-                  </div>
-                }
-              />
+            <HoverCard openDelay={50} closeDelay={50}>
+              <HoverCardTrigger asChild>
+                <div className="inline-block cursor-default text-2xl font-bold">
+                  {formatNumber(tokensTotal)}
+                </div>
+              </HoverCardTrigger>
               <HoverCardContent
                 side="bottom"
                 align="start"
@@ -777,22 +766,18 @@ function Sparkline({ points, color }: { points: SparkPoint[]; color: string }) {
         const left = `${(c.x / W) * 100}%`;
         const top = `${(c.y / H) * 100}%`;
         return (
-          <HoverCard key={i}>
-            <HoverCardTrigger
-              delay={50}
-              closeDelay={50}
-              render={
+          <HoverCard key={i} openDelay={50} closeDelay={50}>
+            <HoverCardTrigger asChild>
+              <div
+                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer p-1.5"
+                style={{ left, top }}
+              >
                 <div
-                  className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer p-1.5"
-                  style={{ left, top }}
-                >
-                  <div
-                    className="size-1.5 rounded-full ring-1 ring-background transition-all hover:size-2"
-                    style={{ backgroundColor: color }}
-                  />
-                </div>
-              }
-            />
+                  className="size-1.5 rounded-full ring-1 ring-background transition-all hover:size-2"
+                  style={{ backgroundColor: color }}
+                />
+              </div>
+            </HoverCardTrigger>
             <HoverCardContent
               side="left"
               align="center"

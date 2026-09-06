@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
-import { onSelect } from '@/lib/select';
 import { formatUsd } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
@@ -141,10 +140,6 @@ const fmt = (v: string | null | undefined): string | null => {
  *
  * Token rates are per 1M tokens; image/video/per-sec are per unit.
  */
-const capabilityFilterLabels = {
-  all: 'All Capabilities',
-  ...Object.fromEntries(CAPABILITIES.map(c => [c.value, c.label]))
-};
 
 function summarizePricing(
   capability: string,
@@ -549,11 +544,7 @@ export default function PricingPage() {
               className="pl-9"
             />
           </div>
-          <Select
-            items={capabilityFilterLabels}
-            value={filterCapability}
-            onValueChange={onSelect(setFilterCapability)}
-          >
+          <Select value={filterCapability} onValueChange={setFilterCapability}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -569,23 +560,21 @@ export default function PricingPage() {
         </div>
 
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger
-            render={
-              <Button
-                type="button"
-                className="gap-2"
-                disabled={previewLoading || syncMutation.isPending}
-              >
-                {previewLoading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="size-4" />
-                )}
-                Sync prices
-                <ChevronDown className="size-3 opacity-70" />
-              </Button>
-            }
-          />
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              className="gap-2"
+              disabled={previewLoading || syncMutation.isPending}
+            >
+              {previewLoading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
+              Sync prices
+              <ChevronDown className="size-3 opacity-70" />
+            </Button>
+          </PopoverTrigger>
           <PopoverContent align="end" className="w-64">
             <div className="space-y-3">
               <Label className="text-sm">Choose sources to sync</Label>

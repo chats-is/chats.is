@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { type ModelCapability } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating, type Output } from '@/lib/mutation';
-import { onSelect } from '@/lib/select';
 import { modelQueries } from '@/server/fn/model';
 import {
   providerQueries,
@@ -94,9 +93,9 @@ const syncColumns = (ctx: {
       cell: ({ row }) => (
         <Select
           value={ctx.capabilities[row.original.modelId] ?? 'chat'}
-          onValueChange={onSelect(value =>
+          onValueChange={value =>
             ctx.setCapability(row.original.modelId, value as ModelCapability)
-          )}
+          }
           disabled={row.original.exists || ctx.isPending}
         >
           <SelectTrigger className="w-32">

@@ -40,7 +40,7 @@ export function UserMenu() {
         <SidebarMenuItem>
           <SidebarMenuButton
             size="lg"
-            className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
             <Skeleton className="size-8 rounded-full" />
             <div className="grid flex-1 gap-1 text-left text-sm leading-tight">
@@ -59,35 +59,28 @@ export function UserMenu() {
     <SidebarMenu className="my-1">
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton
-                size="lg"
-                className="group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
-              >
-                <Avatar className="size-8 rounded-full border">
-                  <AvatarImage src={user.image || ''} alt={user.name || ''} />
-                  <AvatarFallback className="rounded-full">
-                    {user.name
-                      ? user.name.slice(0, 2).toUpperCase()
-                      : (user.email?.[0] || '?').toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4" />
-              </SidebarMenuButton>
-            }
-          />
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              className="group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <Avatar className="size-8 rounded-full border">
+                <AvatarImage src={user.image || ''} alt={user.name || ''} />
+                <AvatarFallback className="rounded-full">
+                  {user.name
+                    ? user.name.slice(0, 2).toUpperCase()
+                    : (user.email?.[0] || '?').toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">{user.name}</span>
+                <span className="truncate text-xs">{user.email}</span>
+              </div>
+              <ChevronsUpDown className="ml-auto size-4" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
           <DropdownMenuContent
-            // Width comes from the menu's own base style, which follows the
-            // trigger. The class that used to be here named a Radix variable
-            // this app does not define, and an undefined var voids the whole
-            // declaration — so it was overriding that base with `auto` and
-            // leaving the menu narrower than the button it hangs from.
-            className="min-w-56 rounded-lg"
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
             side={isMobile ? 'bottom' : isCollapsed ? 'right' : 'top'}
             align="end"
             sideOffset={4}
@@ -102,49 +95,40 @@ export function UserMenu() {
               </DropdownMenuItem>
             )}
             {user.admin && (
-              <DropdownMenuItem
-                render={
-                  <Link
-                    to="/console"
-                    className="flex w-full items-center gap-2"
-                  >
-                    <LayoutDashboard className="size-4" />
-                    Console
-                  </Link>
-                }
-              />
+              <DropdownMenuItem asChild>
+                <Link to="/console" className="flex w-full items-center gap-2">
+                  <LayoutDashboard className="size-4" />
+                  Console
+                </Link>
+              </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              render={
-                <Link
-                  to="/privacy"
-                  className="flex w-full items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <Shield className="size-4" />
-                    Privacy Policy
-                  </div>
-                  <ExternalLink className="size-4" />
-                </Link>
-              }
-            />
-            <DropdownMenuItem
-              render={
-                <a
-                  href="https://github.com/chats-is/chats.is"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex w-full items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <Github className="size-4" />
-                    GitHub
-                  </div>
-                  <ExternalLink className="size-4" />
-                </a>
-              }
-            />
+            <DropdownMenuItem asChild>
+              <Link
+                to="/privacy"
+                className="flex w-full items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <Shield className="size-4" />
+                  Privacy Policy
+                </div>
+                <ExternalLink className="size-4" />
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a
+                href="https://github.com/chats-is/chats.is"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <Github className="size-4" />
+                  GitHub
+                </div>
+                <ExternalLink className="size-4" />
+              </a>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() =>

@@ -31,19 +31,18 @@ export function Sidebar({
             <SidebarMenuButton
               size="lg"
               className="gap-1 p-0 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:group-hover/menu-item:opacity-0 hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground motion-reduce:transition-none"
-
-              render={
-                <Link to="/console">
-                  <div className="flex aspect-square size-8 items-center justify-center">
-                    <img src="/favicon.svg" alt="Logo" className="size-7" />
-                  </div>
-                  <div className="grid flex-1 text-left text-lg font-medium group-data-[collapsible=icon]:hidden">
-                    <span className="truncate">Console</span>
-                  </div>
-                </Link>
-              }
-            />
-            <SidebarTrigger className="pointer-events-auto absolute inset-y-0 right-0 z-10 my-auto hidden size-8 opacity-100 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:group-hover/menu-item:pointer-events-auto group-data-[collapsible=icon]:group-hover/menu-item:opacity-100 motion-reduce:transition-none md:flex" />
+              asChild
+            >
+              <Link to="/console">
+                <div className="flex aspect-square size-8 items-center justify-center">
+                  <img src="/favicon.svg" alt="Logo" className="size-7" />
+                </div>
+                <div className="grid flex-1 text-left text-lg font-medium group-data-[collapsible=icon]:hidden">
+                  <span className="truncate">Console</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+            <SidebarTrigger className="pointer-events-auto absolute top-1/2 right-0 z-10 hidden size-8 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:group-hover/menu-item:pointer-events-auto group-data-[collapsible=icon]:group-hover/menu-item:opacity-100 motion-reduce:transition-none md:flex" />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -63,14 +62,13 @@ export function Sidebar({
                       isActive={isActive}
                       tooltip={item.title}
                       className="hover:bg-background hover:shadow-sm data-[active=true]:bg-background data-[active=true]:shadow-sm dark:hover:bg-accent dark:data-[active=true]:bg-accent"
-
-                      render={
-                        <Link to={item.url}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </Link>
-                      }
-                    />
+                      asChild
+                    >
+                      <Link to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}

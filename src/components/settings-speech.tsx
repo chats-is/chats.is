@@ -2,7 +2,6 @@ import { useEffect, useMemo } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 
-import { onSelect } from '@/lib/select';
 import { Label as UiLabel } from '@/components/ui/label';
 import {
   Select,
@@ -62,7 +61,7 @@ export const SettingsSpeech = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between space-y-0">
         <UiLabel>Model</UiLabel>
-        <Select onValueChange={onSelect(handleModelChange)} value={speechModel}>
+        <Select onValueChange={handleModelChange} value={speechModel}>
           <SelectTrigger className="w-auto rounded-full">
             {/* Children override the placeholder whenever a value is set, so
                 an id that resolves to nothing would render an empty pill. */}
@@ -101,7 +100,7 @@ export const SettingsSpeech = () => {
       <div className="flex items-center justify-between space-y-0">
         <UiLabel>Voice</UiLabel>
         <Select
-          onValueChange={onSelect(handleVoiceChange)}
+          onValueChange={handleVoiceChange}
           value={speechVoice}
           disabled={availableVoices.length === 0}
         >

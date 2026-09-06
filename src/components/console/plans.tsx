@@ -113,31 +113,27 @@ const planColumns = (actions: {
       cell: ({ row }) => (
         <>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.edit(row.original)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.edit(row.original)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.remove(row.original.id)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.remove(row.original.id)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Delete</TooltipContent>
           </Tooltip>
         </>
@@ -241,21 +237,17 @@ export default function PlansPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-4">
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger
-            render={
-              <Button
-                className="gap-2"
-                disabled={!quotaOptions?.length}
-                title={
-                  !quotaOptions?.length ? 'Create a Quota first' : undefined
-                }
-                onClick={() => openFor(null)}
-              >
-                <Plus className="size-4" />
-                New Plan
-              </Button>
-            }
-          />
+          <DialogTrigger asChild>
+            <Button
+              className="gap-2"
+              disabled={!quotaOptions?.length}
+              title={!quotaOptions?.length ? 'Create a Quota first' : undefined}
+              onClick={() => openFor(null)}
+            >
+              <Plus className="size-4" />
+              New Plan
+            </Button>
+          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingId ? 'Edit Plan' : 'New Plan'}</DialogTitle>

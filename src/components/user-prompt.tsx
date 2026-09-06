@@ -390,48 +390,42 @@ export const UserPrompt = () => {
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
                     <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(prompt.content)}
-                          >
-                            <Copy className="size-4" />
-                          </Button>
-                        }
-                      />
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(prompt.content)}
+                        >
+                          <Copy className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
                       <TooltipContent>Copy Prompt</TooltipContent>
                     </Tooltip>
                     <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(prompt)}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                        }
-                      />
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(prompt)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
                       <TooltipContent>Edit Prompt</TooltipContent>
                     </Tooltip>
                     <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeleteId(prompt.id)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        }
-                      />
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteId(prompt.id)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
                       <TooltipContent>Delete Prompt</TooltipContent>
                     </Tooltip>
                   </td>

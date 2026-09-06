@@ -1,13 +1,15 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { v4 as uuidv4 } from 'uuid';
 
 import { type ChatMessage } from '@/types';
 import { type DBMessage } from '@/types/message';
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+/**
+ * Re-exported rather than reimplemented: shadcn's components now import `cn`
+ * from its own package, and two merge implementations would sooner or later
+ * disagree about which of two conflicting classes wins. One function, reached
+ * by both names.
+ */
+export { cn } from 'cn';
 
 export const fetcher = async (url: string) => {
   const res = await fetch(url);

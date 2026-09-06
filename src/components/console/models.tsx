@@ -16,7 +16,6 @@ import { z } from 'zod';
 
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
-import { onSelect } from '@/lib/select';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   createModel,
@@ -70,11 +69,6 @@ import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ModelIcon } from '@/components/model-icon';
 
 type Model = Awaited<ReturnType<typeof listModels>>[number];
-
-const capabilityFilterLabels = {
-  all: 'All Capabilities',
-  ...Object.fromEntries(CAPABILITIES.map(c => [c.value, c.label]))
-};
 
 const CAPABILITY_OPTIONS = CAPABILITIES.map(c => ({
   value: c.value,
@@ -224,17 +218,15 @@ const JsonHint = ({ label, example }: { label: string; example: string }) => (
   <div className="flex items-center gap-2">
     <Label>{label}</Label>
     <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            className="text-muted-foreground/60 hover:text-muted-foreground"
-            aria-label={`${label} demo`}
-          >
-            <AlertCircle className="size-3.5" />
-          </button>
-        }
-      />
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="text-muted-foreground/60 hover:text-muted-foreground"
+          aria-label={`${label} demo`}
+        >
+          <AlertCircle className="size-3.5" />
+        </button>
+      </TooltipTrigger>
       <TooltipContent className="max-w-sm">
         <pre className="font-mono text-xs whitespace-pre-wrap">{example}</pre>
       </TooltipContent>
@@ -320,31 +312,27 @@ const modelColumns = (actions: {
       cell: ({ row }) => (
         <>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.edit(row.original)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.edit(row.original)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Edit Model</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.remove(row.original.id)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.remove(row.original.id)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Delete Model</TooltipContent>
           </Tooltip>
         </>
@@ -549,11 +537,7 @@ export default function ModelsPage() {
               className="pl-9"
             />
           </div>
-          <Select
-            items={capabilityFilterLabels}
-            value={filterCapability}
-            onValueChange={onSelect(setFilterCapability)}
-          >
+          <Select value={filterCapability} onValueChange={setFilterCapability}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -569,14 +553,12 @@ export default function ModelsPage() {
         </div>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger
-            render={
-              <Button className="gap-2" onClick={() => openFor(null)}>
-                <Plus className="size-4" />
-                Add Model
-              </Button>
-            }
-          />
+          <DialogTrigger asChild>
+            <Button className="gap-2" onClick={() => openFor(null)}>
+              <Plus className="size-4" />
+              Add Model
+            </Button>
+          </DialogTrigger>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>

@@ -18,20 +18,18 @@ export function SidebarToggle({
 
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('size-9 [&_svg]:size-6', className)}
-            onClick={toggleSidebar}
-            {...props}
-          >
-            <PanelLeft />
-            <span className="sr-only">Toggle Sidebar</span>
-          </Button>
-        }
-      />
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('size-9 [&_svg]:size-6', className)}
+          onClick={toggleSidebar}
+          {...props}
+        >
+          <PanelLeft />
+          <span className="sr-only">Toggle Sidebar</span>
+        </Button>
+      </TooltipTrigger>
       <TooltipContent align="start">
         {isSidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
       </TooltipContent>

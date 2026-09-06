@@ -236,32 +236,28 @@ const quotaColumns = (actions: {
       cell: ({ row }) => (
         <>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.edit(row.original)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.edit(row.original)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={row.original.isDefault}
-                  onClick={() => actions.remove(row.original.id)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={row.original.isDefault}
+                onClick={() => actions.remove(row.original.id)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Delete</TooltipContent>
           </Tooltip>
         </>
@@ -378,14 +374,12 @@ export default function QuotasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-4">
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger
-            render={
-              <Button className="gap-2" onClick={() => openFor(null)}>
-                <Plus className="size-4" />
-                New Quota
-              </Button>
-            }
-          />
+          <DialogTrigger asChild>
+            <Button className="gap-2" onClick={() => openFor(null)}>
+              <Plus className="size-4" />
+              New Quota
+            </Button>
+          </DialogTrigger>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>

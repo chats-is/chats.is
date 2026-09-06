@@ -214,12 +214,9 @@ function SelectField({
     ? errorText(field.state.meta.errors)
     : null;
 
-  // Base UI's trigger renders the value, not the selected item's content, so
-  // it needs the value-to-label mapping handed to it.
-  const items = Object.fromEntries(options.map(o => [o.value, o.label]));
   const chosen = options.some(o => o.value === field.state.value)
     ? field.state.value
-    : null;
+    : undefined;
 
   return (
     <FieldShell
@@ -230,15 +227,13 @@ function SelectField({
       className={fieldClassName}
     >
       <Select
-        items={items}
-        // `null`, not `''`: an unset select is one with nothing chosen, not
-        // one holding an empty value of its own. A value that no longer names
-        // an option counts as unset too — otherwise the trigger renders blank
-        // with no hint that anything was ever chosen.
+        // `undefined`, not `''`: Radix keeps the empty string for clearing a
+        // select back to its placeholder, so it cannot also stand for a value.
+        // A value that no longer names an option counts as unset too —
+        // otherwise the trigger renders blank with no hint that anything was
+        // ever chosen.
         value={chosen}
-        onValueChange={value => {
-          if (value !== null) field.handleChange(value);
-        }}
+        onValueChange={value => field.handleChange(value)}
         disabled={disabled ?? isSubmitting}
       >
         <SelectTrigger

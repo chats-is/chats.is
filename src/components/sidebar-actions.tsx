@@ -62,20 +62,18 @@ export function SidebarActions({
   return (
     <>
       <DropdownMenu onOpenChange={onOpenChange}>
-        <DropdownMenuTrigger
-          render={
-            <SidebarMenuAction
-              showOnHover
-              className={cn(
-                'data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground data-open:opacity-100',
-                className
-              )}
-            >
-              <MoreVertical />
-              <span className="sr-only">More</span>
-            </SidebarMenuAction>
-          }
-        />
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuAction
+            showOnHover
+            className={cn(
+              'data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground data-[state=open]:opacity-100',
+              className
+            )}
+          >
+            <MoreVertical />
+            <span className="sr-only">More</span>
+          </SidebarMenuAction>
+        </DropdownMenuTrigger>
         <DropdownMenuContent sideOffset={8} align="start">
           <DropdownMenuItem
             className="flex items-center gap-2"

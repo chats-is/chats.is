@@ -232,45 +232,39 @@ const providerColumns = (actions: {
       cell: ({ row }) => (
         <>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.sync(row.original.id)}
-                >
-                  <RefreshCw className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.sync(row.original.id)}
+              >
+                <RefreshCw className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Sync API Models</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.edit(row.original)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.edit(row.original)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Edit Provider</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => actions.remove(row.original.id)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => actions.remove(row.original.id)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Delete Provider</TooltipContent>
           </Tooltip>
         </>
@@ -556,14 +550,12 @@ export default function ProvidersPage() {
         </div>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger
-            render={
-              <Button className="gap-2" onClick={() => openFor(null)}>
-                <Plus className="size-4" />
-                Add Provider
-              </Button>
-            }
-          />
+          <DialogTrigger asChild>
+            <Button className="gap-2" onClick={() => openFor(null)}>
+              <Plus className="size-4" />
+              Add Provider
+            </Button>
+          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>

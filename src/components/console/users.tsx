@@ -13,7 +13,6 @@ import {
 import { toast } from 'sonner';
 
 import { mutating } from '@/lib/mutation';
-import { onSelect } from '@/lib/select';
 import { quotaQueries, removeUserQuota, setUserQuota } from '@/server/fn/quota';
 import { updateUserRole, userQueries, type listUsers } from '@/server/fn/user';
 import { Input } from '@/components/ui/input';
@@ -67,7 +66,6 @@ const helper = createAppColumnHelper<User>();
  */
 const userColumns = (ctx: {
   quotaOptions: Array<QuotaOption> | undefined;
-  quotaLabels: Record<string, string>;
   updatingRoleUserId: string | null;
   updatingQuotaUserId: string | null;
   setRole: (user: User, role: 'user' | 'admin') => void;
@@ -167,9 +165,9 @@ const userColumns = (ctx: {
             <Select
               value={user.role}
               disabled={saving}
-              onValueChange={onSelect(value =>
+              onValueChange={value =>
                 ctx.setRole(user, value as 'user' | 'admin')
-              )}
+              }
             >
               <SelectTrigger className="h-8 w-28">
                 <div className="flex items-center gap-2">
@@ -212,10 +210,9 @@ const userColumns = (ctx: {
         return (
           <div className="flex justify-center">
             <Select
-              items={ctx.quotaLabels}
               value={user.quota?.id ?? QUOTA_NONE}
               disabled={saving || !ctx.quotaOptions?.length}
-              onValueChange={onSelect(value => ctx.setQuota(user, value))}
+              onValueChange={value => ctx.setQuota(user, value)}
             >
               <SelectTrigger className="h-8 w-36">
                 {saving ? (
@@ -316,26 +313,10 @@ export default function UsersPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Base UI's trigger renders the value, not the selected item's content, so
-  // the value-to-label mapping is handed to it.
-  const quotaLabels = useMemo(
-    () => ({
-      [QUOTA_NONE]: 'None',
-      ...Object.fromEntries(
-        (quotaOptions ?? []).map(q => [
-          q.id,
-          q.name + (q.isUnlimited ? ' (∞)' : '')
-        ])
-      )
-    }),
-    [quotaOptions]
-  );
-
   const columns = useMemo(
     () =>
       userColumns({
         quotaOptions,
-        quotaLabels,
         updatingRoleUserId,
         updatingQuotaUserId,
         setRole: (user, role) => {
@@ -351,7 +332,7 @@ export default function UsersPage() {
           }
         }
       }),
-    [quotaOptions, quotaLabels, updatingRoleUserId, updatingQuotaUserId]
+    [quotaOptions, updatingRoleUserId, updatingQuotaUserId]
   );
 
   if (isLoading) {

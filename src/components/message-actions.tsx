@@ -275,20 +275,18 @@ export function MessageActions({
         <>
           {isLastMessage && (
             <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 text-muted-foreground"
-                    onClick={() => reload(message)}
-                    disabled={status !== 'ready' && status !== 'error'}
-                  >
-                    <RefreshCw className="size-4" />
-                    <span className="sr-only">Retry</span>
-                  </Button>
-                }
-              />
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground"
+                  onClick={() => reload(message)}
+                  disabled={status !== 'ready' && status !== 'error'}
+                >
+                  <RefreshCw className="size-4" />
+                  <span className="sr-only">Retry</span>
+                </Button>
+              </TooltipTrigger>
               {/* The model name used to expand inline on hover, which resized
                   the button and shifted the row next to it. A tooltip keeps the
                   action bar's geometry fixed. */}

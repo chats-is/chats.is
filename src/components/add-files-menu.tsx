@@ -174,28 +174,24 @@ export function AddFilesMenu({
       />
       <DropdownMenu>
         <Tooltip>
-          <TooltipTrigger
-            render={
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    disabled={disabled || uploading}
-                    className="size-9 rounded-full text-muted-foreground shadow-none"
-                  >
-                    {uploading ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Plus className="size-4" />
-                    )}
-                    <span className="sr-only">Add to this message</span>
-                  </Button>
-                }
-              />
-            }
-          />
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled || uploading}
+                className="size-9 rounded-full text-muted-foreground shadow-none"
+              >
+                {uploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+                <span className="sr-only">Add to this message</span>
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
           <TooltipContent>Add to this message</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="start" className="w-56">

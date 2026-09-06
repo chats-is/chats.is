@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
-import { onSelect } from '@/lib/select';
 import { Button } from '@/components/ui/button';
 import { Label as UiLabel } from '@/components/ui/label';
 import {
@@ -39,11 +38,10 @@ export const SettingsGeneral = () => {
       <div className="flex items-center justify-between space-y-0">
         <UiLabel>Theme</UiLabel>
         <Select
-          onValueChange={onSelect(value => setTheme(value))}
-          // Controlled from the first render: Base UI reads `null` as "nothing
-          // chosen yet", where `undefined` would mean the select owns its own
-          // value — and the theme is not known until this mounts.
-          value={(mounted ? theme : null) ?? null}
+          onValueChange={value => setTheme(value)}
+          // The theme is not known until this mounts, and an unmounted read
+          // must not look like a chosen value.
+          value={mounted ? theme : undefined}
         >
           <SelectTrigger className="w-auto rounded-full capitalize">
             <SelectValue placeholder="Select a theme">

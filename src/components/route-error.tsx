@@ -53,7 +53,9 @@ export function RouteError({ error }: ErrorComponentProps) {
             it is absent on the server-rendered path, and on a loader error it
             would re-render straight back into the same failure. */}
         <Button onClick={() => router.invalidate()}>Try again</Button>
-        <Button variant="ghost" render={<Link to="/">Return home</Link>} />
+        <Button variant="ghost" asChild>
+          <Link to="/">Return home</Link>
+        </Button>
       </div>
     </div>
   );

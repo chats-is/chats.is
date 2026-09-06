@@ -70,26 +70,24 @@ export function ArtifactsPanel({
     isReactCodePreview(selected);
   const consoleButton = showConsole ? (
     <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              'size-7 text-muted-foreground',
-              consoleOpen && 'text-foreground'
-            )}
-            onClick={() => setConsoleOpen(o => !o)}
-          >
-            {consoleOpen ? (
-              <PanelBottomClose className="size-4" />
-            ) : (
-              <PanelBottomOpen className="size-4" />
-            )}
-            <span className="sr-only">Toggle console</span>
-          </Button>
-        }
-      />
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            'size-7 text-muted-foreground',
+            consoleOpen && 'text-foreground'
+          )}
+          onClick={() => setConsoleOpen(o => !o)}
+        >
+          {consoleOpen ? (
+            <PanelBottomClose className="size-4" />
+          ) : (
+            <PanelBottomOpen className="size-4" />
+          )}
+          <span className="sr-only">Toggle console</span>
+        </Button>
+      </TooltipTrigger>
       <TooltipContent>Console</TooltipContent>
     </Tooltip>
   ) : null;
@@ -103,19 +101,17 @@ export function ArtifactsPanel({
       <div className="flex h-full flex-col">
         <div className="sticky top-0 z-10 flex h-16 items-center justify-end border-b bg-background px-4">
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => onOpenChange(false)}
-                >
-                  <X className="size-4" />
-                  <span className="sr-only">Close</span>
-                </Button>
-              }
-            />
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => onOpenChange(false)}
+              >
+                <X className="size-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Close</TooltipContent>
           </Tooltip>
         </div>

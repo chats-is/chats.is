@@ -9,7 +9,6 @@ import {
   ImageSizeLabels,
   VideoResolutionLabels
 } from '@/lib/constant';
-import { onSelect } from '@/lib/select';
 import { cn, modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -333,7 +332,7 @@ export function ModelMenu({
       <Select
         disabled={isDisabled}
         value={selectedModel?.modelId || ''}
-        onValueChange={onSelect(handleModelChange)}
+        onValueChange={handleModelChange}
       >
         <SelectTrigger className="h-9 rounded-full border shadow-none hover:bg-accent disabled:hover:bg-transparent">
           <SelectValue
@@ -356,15 +355,7 @@ export function ModelMenu({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent
-          alignItemWithTrigger={false}
-          // Grows to its widest row instead of being pinned to the trigger,
-          // which is only as wide as a model name — the rows also carry an id
-          // and their badges. The ceiling is the space the positioner reports
-          // it has, the same source as the height the popup already uses; past
-          // it the text truncates rather than running under the check.
-          className="w-auto max-w-(--available-width) min-w-(--anchor-width)"
-        >
+        <SelectContent position="popper">
           {models &&
             models.length > 0 &&
             Object.entries(groupedModels).map(
@@ -383,32 +374,19 @@ export function ModelMenu({
                     <SelectItem
                       key={m.modelId}
                       value={m.modelId}
-                      label={`${m.name} ${m.modelId}`}
-                      // `data-selected` is what Base UI marks the chosen row
-                      // with. Base UI also puts the check last and the item
-                      // already reserves room for it, so neither is overridden
-                      // here — the rules that used to sit on this line were
-                      // written against Radix, whose attribute is different
-                      // and whose children are the other way round.
-                      // Only the background should change under the
-                      // cursor. The item repaints its whole subtree —
-                      // `focus:**:text-accent-foreground` — so every colour
-                      // inside is pinned with `!`, which wins because that rule
-                      // is not important. The badges pin theirs down to the
-                      // paths: lucide strokes with `currentColor`, which each
-                      // path resolves against its own colour, not the svg's.
-                      className="text-popover-foreground! data-selected:bg-accent [&>div]:min-w-0"
+                      textValue={`${m.name} ${m.modelId}`}
+                      className="data-[state=checked]:bg-accent"
                     >
                       <span className="flex w-full items-start">
                         <ModelIcon
                           image={m.image || m.provider?.image || null}
-                          className="mt-0.5 mr-2 size-4 text-popover-foreground!"
+                          className="mt-0.5 mr-2 size-4"
                         />
                         <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="font-medium text-popover-foreground!">
+                          <span className="font-medium">
                             {m.name}
                           </span>
-                          <span className="truncate text-xs text-muted-foreground!">
+                          <span className="truncate text-xs text-muted-foreground">
                             {m.modelId}
                           </span>
                         </span>
@@ -421,13 +399,11 @@ export function ModelMenu({
                             {(m.supportsImageEdit ||
                               m.supportsImageToVideo) && (
                               <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <span className="rounded bg-emerald-100 p-0.5 dark:bg-emerald-900/30">
-                                      <Pencil className="size-3 text-emerald-600! **:text-emerald-600! dark:text-emerald-400! dark:**:text-emerald-400!" />
-                                    </span>
-                                  }
-                                />
+                                <TooltipTrigger asChild>
+                                  <span className="rounded bg-emerald-100 p-0.5 dark:bg-emerald-900/30">
+                                    <Pencil className="size-3 text-emerald-600 dark:text-emerald-400" />
+                                  </span>
+                                </TooltipTrigger>
                                 <TooltipContent>
                                   {m.supportsImageToVideo
                                     ? 'Can animate an existing image'
@@ -437,13 +413,11 @@ export function ModelMenu({
                             )}
                             {m.supportsVideoEdit && (
                               <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <span className="rounded bg-violet-100 p-0.5 dark:bg-violet-900/30">
-                                      <Scissors className="size-3 text-violet-600! **:text-violet-600! dark:text-violet-400! dark:**:text-violet-400!" />
-                                    </span>
-                                  }
-                                />
+                                <TooltipTrigger asChild>
+                                  <span className="rounded bg-violet-100 p-0.5 dark:bg-violet-900/30">
+                                    <Scissors className="size-3 text-violet-600 dark:text-violet-400" />
+                                  </span>
+                                </TooltipTrigger>
                                 <TooltipContent>
                                   Can edit an existing video
                                 </TooltipContent>
@@ -451,25 +425,21 @@ export function ModelMenu({
                             )}
                             {m.supportsVision && (
                               <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <span className="rounded bg-blue-100 p-0.5 dark:bg-blue-900/30">
-                                      <Eye className="size-3 text-blue-600! **:text-blue-600! dark:text-blue-400! dark:**:text-blue-400!" />
-                                    </span>
-                                  }
-                                />
+                                <TooltipTrigger asChild>
+                                  <span className="rounded bg-blue-100 p-0.5 dark:bg-blue-900/30">
+                                    <Eye className="size-3 text-blue-600 dark:text-blue-400" />
+                                  </span>
+                                </TooltipTrigger>
                                 <TooltipContent>Supports vision</TooltipContent>
                               </Tooltip>
                             )}
                             {m.supportsReasoning && (
                               <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <span className="rounded bg-amber-100 p-0.5 dark:bg-amber-900/30">
-                                      <Lightbulb className="size-3 text-amber-600! **:text-amber-600! dark:text-amber-400! dark:**:text-amber-400!" />
-                                    </span>
-                                  }
-                                />
+                                <TooltipTrigger asChild>
+                                  <span className="rounded bg-amber-100 p-0.5 dark:bg-amber-900/30">
+                                    <Lightbulb className="size-3 text-amber-600 dark:text-amber-400" />
+                                  </span>
+                                </TooltipTrigger>
                                 <TooltipContent>
                                   Supports reasoning
                                 </TooltipContent>
@@ -514,16 +484,14 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={size || ''}
-          onValueChange={onSelect(newSize =>
-            onOptionsChange?.({ size: newSize })
-          )}
+          onValueChange={newSize => onOptionsChange?.({ size: newSize })}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
               {size ? ImageSizeLabels[size] || size : 'Size'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          <SelectContent position="popper">
             {availableSizes.map(s => (
               <SelectItem key={s} value={s}>
                 {ImageSizeLabels[s] || s}
@@ -539,9 +507,9 @@ export function ModelMenu({
           <Select
             disabled={isDisabled}
             value={aspectRatio || ''}
-            onValueChange={onSelect(newRatio =>
+            onValueChange={newRatio =>
               onOptionsChange?.({ aspectRatio: newRatio })
-            )}
+            }
           >
             <SelectTrigger className="h-9 rounded-full shadow-none">
               <span className="text-sm">
@@ -550,7 +518,7 @@ export function ModelMenu({
                   : 'Aspect'}
               </span>
             </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
+            <SelectContent position="popper">
               {availableAspectRatios.map(r => (
                 <SelectItem key={r} value={r}>
                   {AspectRatioLabels[r] || r}
@@ -565,9 +533,9 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={resolution || ''}
-          onValueChange={onSelect(newResolution =>
+          onValueChange={newResolution =>
             onOptionsChange?.({ resolution: newResolution })
-          )}
+          }
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
@@ -576,7 +544,7 @@ export function ModelMenu({
                 : 'Resolution'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          <SelectContent position="popper">
             {availableResolutions.map(r => (
               <SelectItem key={r} value={r}>
                 {VideoResolutionLabels[r] || r}
@@ -591,19 +559,19 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={duration !== undefined ? String(duration) : ''}
-          onValueChange={onSelect(newDuration => {
+          onValueChange={newDuration => {
             const parsed = Number(newDuration);
             if (Number.isFinite(parsed)) {
               onOptionsChange?.({ duration: parsed });
             }
-          })}
+          }}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
               {duration !== undefined ? `${duration}s` : 'Duration'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          <SelectContent position="popper">
             {availableDurations.map(d => (
               <SelectItem key={d} value={String(d)}>
                 {`${d}s`}
@@ -618,16 +586,14 @@ export function ModelMenu({
         <Select
           disabled={isDisabled}
           value={voice || ''}
-          onValueChange={onSelect(newVoice =>
-            onOptionsChange?.({ voice: newVoice })
-          )}
+          onValueChange={newVoice => onOptionsChange?.({ voice: newVoice })}
         >
           <SelectTrigger className="h-9 rounded-full shadow-none">
             <span className="text-sm">
               {voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : 'Voice'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          <SelectContent position="popper">
             {availableVoices.map(v => (
               <SelectItem key={v} value={v}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
