@@ -184,11 +184,7 @@ export function EmailLoginForm({
             className="w-full"
             disabled={loading || code.length !== CODE_LENGTH}
           >
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              'Verify & Sign In'
-            )}
+            {loading ? <Loader2 className="size-4 animate-spin" /> : 'Sign In'}
           </Button>
           <div className="flex items-center justify-between text-sm">
             <button
