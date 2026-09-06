@@ -71,20 +71,6 @@ export interface ModelOptions {
   voice?: string;
 }
 
-/**
- * How wide a popup opens.
- *
- * shadcn pins a select's popup to its trigger, which suits a list of short
- * labels beside a trigger that already shows one of them. Neither holds here:
- * a model row carries a name, an id and its capability badges, and the media
- * triggers read "Size" or "Aspect" until something is picked. Either way the
- * rows are wider than the button, and at the anchor's width they spill out
- * from under the check. So the popup takes its widest row, never narrower
- * than the trigger and never wider than the window.
- */
-const POPUP_WIDTH =
-  'w-auto max-w-[min(28rem,calc(100vw-2rem))] min-w-(--anchor-width)';
-
 export function ModelMenu({
   status,
   capability = 'chat',
@@ -370,7 +356,7 @@ export function ModelMenu({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false} className={POPUP_WIDTH}>
+        <SelectContent alignItemWithTrigger={false}>
           {models &&
             models.length > 0 &&
             Object.entries(groupedModels).map(
@@ -520,7 +506,7 @@ export function ModelMenu({
               {size ? ImageSizeLabels[size] || size : 'Size'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false} className={POPUP_WIDTH}>
+          <SelectContent alignItemWithTrigger={false}>
             {availableSizes.map(s => (
               <SelectItem key={s} value={s}>
                 {ImageSizeLabels[s] || s}
@@ -547,7 +533,7 @@ export function ModelMenu({
                   : 'Aspect'}
               </span>
             </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false} className={POPUP_WIDTH}>
+            <SelectContent alignItemWithTrigger={false}>
               {availableAspectRatios.map(r => (
                 <SelectItem key={r} value={r}>
                   {AspectRatioLabels[r] || r}
@@ -573,7 +559,7 @@ export function ModelMenu({
                 : 'Resolution'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false} className={POPUP_WIDTH}>
+          <SelectContent alignItemWithTrigger={false}>
             {availableResolutions.map(r => (
               <SelectItem key={r} value={r}>
                 {VideoResolutionLabels[r] || r}
@@ -600,7 +586,7 @@ export function ModelMenu({
               {duration !== undefined ? `${duration}s` : 'Duration'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false} className={POPUP_WIDTH}>
+          <SelectContent alignItemWithTrigger={false}>
             {availableDurations.map(d => (
               <SelectItem key={d} value={String(d)}>
                 {`${d}s`}
@@ -624,7 +610,7 @@ export function ModelMenu({
               {voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : 'Voice'}
             </span>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false} className={POPUP_WIDTH}>
+          <SelectContent alignItemWithTrigger={false}>
             {availableVoices.map(v => (
               <SelectItem key={v} value={v}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
