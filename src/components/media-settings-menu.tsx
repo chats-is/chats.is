@@ -5,6 +5,7 @@ import { type UseChatHelpers } from '@ai-sdk/react';
 import {
   AudioLines,
   Captions,
+  Check,
   Clapperboard,
   Image as ImageIcon,
   ImagePlay,
@@ -27,8 +28,9 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -52,12 +54,46 @@ type OptionBinding = {
 };
 
 /**
+ * A row that is one of a set: what it says, and a tick when it is the one in
+ * force.
+ *
+ * The tick sits at the end rather than in a reserved column at the start, so
+ * a row reads as its own content first — the same way the select beside this
+ * menu marks its choice.
+ */
+function ChoiceItem({
+  checked,
+  onSelect,
+  children
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <DropdownMenuItem
+      role="menuitemradio"
+      aria-checked={checked}
+      onSelect={onSelect}
+      className="gap-3"
+    >
+      <div className="min-w-0 flex-1">{children}</div>
+      {checked && <Check className="size-4 shrink-0" />}
+    </DropdownMenuItem>
+  );
+}
+
+/**
  * One kind of media — which model makes it, and how.
  *
  * A row rather than a panel: the name of the chosen model sits on the right,
  * the way a setting shows its current value, and the choices open beside it.
- * Seven of these stacked as panels outgrew the window; as rows they do not,
- * and each list is only as long as its own choices.
+ * Seven of these stacked as panels outgrew the window; as rows they do not.
+ *
+ * Everything that kind can be set to lives in that one panel — models grouped
+ * under the provider that serves them, then a group per generation option.
+ * Options are few and short, and a third level to reach three aspect ratios
+ * would cost more in aiming than it saves in height.
  */
 function MediaKind({
   icon,
@@ -83,7 +119,10 @@ function MediaKind({
   const uiOptions = selected?.uiOptions;
 
   const rows = options
-    .map(option => ({ ...option, allowed: allowedValues(uiOptions, option.key) }))
+    .map(option => ({
+      ...option,
+      allowed: allowedValues(uiOptions, option.key)
+    }))
     .filter(option => option.allowed.length > 0);
 
   // A model swap can strip an option of the value it was holding — one model's
@@ -100,52 +139,67 @@ function MediaKind({
     }
   });
 
+  // Grouped by provider, in the order the models arrive, so a provider that
+  // serves several of them is named once.
+  const byProvider = models.reduce<Array<[string, Array<Model>]>>(
+    (groups, model) => {
+      const name = model.provider?.name ?? 'Other';
+      const group = groups.find(([key]) => key === name);
+      if (group) group[1].push(model);
+      else groups.push([name, [model]]);
+      return groups;
+    },
+    []
+  );
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={disabled}>
         {icon}
         <span className="whitespace-nowrap">{label}</span>
-        {/* The name gives way first: which kind of media this row sets is the
-            part that has to stay readable. */}
         <span className="ml-auto min-w-0 truncate pl-3 text-xs text-muted-foreground">
           {selected?.name}
         </span>
       </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto">
-        <DropdownMenuRadioGroup
-          value={selected?.modelId ?? ''}
-          onValueChange={onModelChange}
-        >
-          {models.map(model => (
-            <DropdownMenuRadioItem key={model.modelId} value={model.modelId}>
-              {model.name}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-        {rows.length > 0 && <DropdownMenuSeparator />}
-        {rows.map(row => (
-          <DropdownMenuSub key={row.key}>
-            <DropdownMenuSubTrigger>
-              <span className="whitespace-nowrap">
-                {MediaOptionLabels[row.key]}
-              </span>
-              <span className="ml-auto min-w-0 truncate pl-3 text-xs text-muted-foreground">
-                {row.value ? optionLabel(row.key, row.value) : null}
-              </span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto">
-              <DropdownMenuRadioGroup
-                value={row.value ?? ''}
-                onValueChange={row.onChange}
+      <DropdownMenuSubContent className="max-h-(--radix-dropdown-menu-content-available-height) w-72 overflow-y-auto">
+        {byProvider.map(([provider, providerModels]) => (
+          <DropdownMenuGroup key={provider}>
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              {provider}
+            </DropdownMenuLabel>
+            {providerModels.map(model => (
+              <ChoiceItem
+                key={model.modelId}
+                checked={model.modelId === selected?.modelId}
+                onSelect={() => onModelChange(model.modelId)}
               >
-                {row.allowed.map(value => (
-                  <DropdownMenuRadioItem key={value} value={value}>
-                    {optionLabel(row.key, value)}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+                <div className="truncate">{model.name}</div>
+                {/* The id is what the request carries and what an admin
+                    configures against, so it is worth reading even when the
+                    display name already says enough. */}
+                <div className="truncate text-xs text-muted-foreground">
+                  {model.modelId}
+                </div>
+              </ChoiceItem>
+            ))}
+          </DropdownMenuGroup>
+        ))}
+        {rows.map(row => (
+          <DropdownMenuGroup key={row.key}>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              {MediaOptionLabels[row.key]}
+            </DropdownMenuLabel>
+            {row.allowed.map(value => (
+              <ChoiceItem
+                key={value}
+                checked={value === row.value}
+                onSelect={() => row.onChange(value)}
+              >
+                <div className="truncate">{optionLabel(row.key, value)}</div>
+              </ChoiceItem>
+            ))}
+          </DropdownMenuGroup>
         ))}
       </DropdownMenuSubContent>
     </DropdownMenuSub>
@@ -220,7 +274,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         </TooltipTrigger>
         <TooltipContent>Media generation settings</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align="start" className="w-64">
+      <DropdownMenuContent align="start" className="w-88">
         {hasImageModels && (
           <MediaKind
             icon={<ImageIcon />}
