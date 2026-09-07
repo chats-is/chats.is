@@ -138,7 +138,7 @@ describe('generateWithSora — Azure', () => {
       'sora-2',
       'a cat',
       azureProvider(),
-      '9:16',
+      '720x1280',
       undefined,
       8
     );
@@ -152,7 +152,8 @@ describe('generateWithSora — Azure', () => {
       apiVersion: 'preview'
     });
 
-    // Shared create path: deployment as model, bucketed seconds, mapped size.
+    // Shared create path: deployment as model, bucketed seconds, the size the
+    // model declared — Sora names its output by pixels, not by a ratio.
     expect(videosCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'sora-2',
@@ -199,7 +200,7 @@ describe('generateWithSora — direct OpenAI (unchanged)', () => {
       'sora-2',
       'a bird',
       { type: 'openai', apiKey: 'enc', baseUrl: null, apiOptions: null },
-      '16:9'
+      '1280x720'
     );
 
     expect(azureCtorArgs).toHaveLength(0);
@@ -210,6 +211,23 @@ describe('generateWithSora — direct OpenAI (unchanged)', () => {
     });
     expect(videosCreate).toHaveBeenCalledWith(
       expect.objectContaining({ size: '1280x720' })
+    );
+  });
+});
+
+describe('generateWithSora — size', () => {
+  it('sends no size when the model declares none', async () => {
+    await generateWithSora('sora-2', 'a bird', azureProvider());
+
+    const sent = videosCreate.mock.calls[0][0];
+    expect('size' in sent).toBe(false);
+  });
+
+  it('sends the size it was given, whatever the shape', async () => {
+    await generateWithSora('sora-2', 'a bird', azureProvider(), '1024x1792');
+
+    expect(videosCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ size: '1024x1792' })
     );
   });
 });

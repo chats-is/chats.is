@@ -8,6 +8,7 @@ import { DefaultChatTransport } from 'ai';
 import { toast } from 'sonner';
 
 import { type Artifact, type Attachment, type ChatMessage } from '@/types';
+import { resolveAutoOption } from '@/lib/media-options';
 import { takePendingPrompt } from '@/lib/pending-prompt';
 import {
   generateUUID,
@@ -15,7 +16,6 @@ import {
   modelMatchesId
 } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
-import { resolveAutoOption } from '@/lib/media-options';
 import { artifactQueries } from '@/server/fn/artifact';
 import {
   ResizableHandle,
@@ -132,6 +132,7 @@ export function ChatUI({
         video: preferences.videoModelId
           ? {
               modelId: preferences.videoModelId,
+              size: resolveAutoOption(preferences.videoSize),
               aspectRatio: resolveAutoOption(preferences.videoAspectRatio),
               resolution: resolveAutoOption(preferences.videoResolution),
               duration: resolveAutoOption(preferences.videoDuration)

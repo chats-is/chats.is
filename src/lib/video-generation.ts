@@ -106,16 +106,12 @@ export async function generateWithSora(
   model: string,
   prompt: string,
   provider: ProviderConfig,
-  aspectRatio?: `${number}:${number}`,
+  size?: string,
   resolution?: string,
   duration?: number,
   abortSignal?: AbortSignal
 ): Promise<VideoGenerationResult> {
   const openai = createOpenAIClient(provider);
-
-  // Determine video size based on aspect ratio
-  // Sora 2 supports: 720x1280, 1280x720, 1024x1792, 1792x1024
-  const size = aspectRatio === '9:16' ? '720x1280' : '1280x720';
 
   // Sora takes 4, 8 or 12; a request between them buys the next one up. A
   // duration through `pickDuration` is always settled; this path is also
@@ -129,7 +125,7 @@ export async function generateWithSora(
   const created = await openai.videos.create({
     model: model, // 'sora-2' | 'sora-2-pro'
     prompt,
-    size: size,
+    ...(size && { size: size as OpenAI.Videos.VideoSize }),
     seconds,
     ...(resolution && { resolution: resolution as any })
   });
@@ -202,6 +198,8 @@ export async function generateAndStoreVideo(args: {
   prompt: string;
   dbModel: Model;
   candidates: FailoverProvider[];
+  /** For a model that names its output by pixels — Sora takes this, not a ratio. */
+  size?: string;
   aspectRatio?: `${number}:${number}`;
   resolution?: string;
   duration?: number;
@@ -221,7 +219,7 @@ export async function generateAndStoreVideo(args: {
     abortSignal
   } = args;
   // Already settled by the pick* helpers against what the model declared.
-  const { aspectRatio, resolution, duration } = args;
+  const { size, aspectRatio, resolution, duration } = args;
   const modelId = dbModel.modelId;
 
   const { result, provider: usedProvider } = await runWithProviderFailover(
@@ -253,7 +251,7 @@ export async function generateAndStoreVideo(args: {
           modelId,
           prompt,
           provider,
-          aspectRatio,
+          size,
           resolution,
           duration,
           abortSignal

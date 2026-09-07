@@ -74,6 +74,12 @@ export const generateVideoInputSchema = z.object({
     .describe(
       'URL of an image from this conversation to animate — a user upload or an image generated earlier. Must be an image: to change an existing video, use edit_video instead. Omit to generate from the text alone.'
     ),
+  size: z
+    .string()
+    .optional()
+    .describe(
+      'Output size in pixels, for a model that names its output that way rather than by ratio. Pick from the available values when the wording implies one; omit otherwise'
+    ),
   aspectRatio: z
     .string()
     .optional()

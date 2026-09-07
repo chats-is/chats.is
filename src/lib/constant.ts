@@ -40,7 +40,9 @@ export const ImageSizeLabels: Record<string, string> = {
   '1536x1024': 'Landscape (1536x1024)',
   '1024x1536': 'Portrait (1024x1536)',
   '1792x1024': 'Landscape (1792x1024)',
-  '1024x1792': 'Portrait (1024x1792)'
+  '1024x1792': 'Portrait (1024x1792)',
+  '1280x720': 'Landscape (1280x720)',
+  '720x1280': 'Portrait (720x1280)'
 };
 
 /**

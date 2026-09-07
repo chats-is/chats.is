@@ -57,6 +57,7 @@ export type MediaToolsOptions = {
   imageEdit?: { modelId?: string };
   video?: {
     modelId?: string;
+    size?: string;
     aspectRatio?: string;
     resolution?: string;
     duration?: number;
@@ -378,6 +379,7 @@ export async function buildMediaTools(args: {
         (videoImage || dbModel.supportsImageToVideo
           ? 'Generate a short video from a text description, optionally animating an image from this conversation.'
           : 'Generate a short video from a text description.') +
+        optionsHint('sizes', dbModel.uiOptions?.sizes) +
         optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
         optionsHint('resolutions', dbModel.uiOptions?.resolutions) +
         optionsHint('durations (seconds)', dbModel.uiOptions?.durations),
@@ -425,6 +427,11 @@ export async function buildMediaTools(args: {
             dbModel: on.dbModel,
             candidates: on.candidates,
             inputImage,
+            size: pickSize(
+              input.size,
+              mediaOptions?.video?.size,
+              on.dbModel.uiOptions
+            ),
             aspectRatio: pickAspectRatio(
               input.aspectRatio,
               mediaOptions?.video?.aspectRatio,

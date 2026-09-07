@@ -24,6 +24,7 @@ export interface Preferences {
   videoModelId: string;
   videoImageModelId: string;
   videoEditModelId: string;
+  videoSize: string;
   videoAspectRatio: string;
   videoResolution: string;
   videoDuration?: number | 'auto';
@@ -122,6 +123,7 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
         defaults.videoEditModelId,
         videoEditModels
       ),
+      videoSize: '',
       videoAspectRatio: '',
       videoResolution: '',
       videoDuration: undefined,

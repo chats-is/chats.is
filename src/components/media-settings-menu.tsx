@@ -391,6 +391,11 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             disabled={busy}
             options={[
               {
+                key: 'size',
+                value: preferences.videoSize,
+                onChange: value => setPreference('videoSize', value)
+              },
+              {
                 key: 'aspectRatio',
                 value: preferences.videoAspectRatio,
                 onChange: value => setPreference('videoAspectRatio', value)
