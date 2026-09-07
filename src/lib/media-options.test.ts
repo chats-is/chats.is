@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type ModelUIOptions } from '@/types/model';
 
 import {
+  OPTION_DEFAULTS,
   pickAspectRatio,
   pickDuration,
   pickResolution,
@@ -39,13 +40,19 @@ describe('pickAspectRatio', () => {
     // Without an admin-declared list the model renders no selector, so a
     // request-body selection can only be a stale cross-model value — only the
     // model's own default applies.
-    expect(pickAspectRatio('21:9', '16:9', {})).toBeUndefined();
+    expect(pickAspectRatio('21:9', '16:9', {})).toBe(
+      OPTION_DEFAULTS.aspectRatio
+    );
     expect(pickAspectRatio('21:9', '16:9', { aspectRatio: '4:3' })).toBe('4:3');
   });
 
-  it('returns undefined when there are no options at all', () => {
-    expect(pickAspectRatio(undefined, undefined, null)).toBeUndefined();
-    expect(pickAspectRatio(undefined, undefined, {})).toBeUndefined();
+  it("ends in the app's own default when there are no options at all", () => {
+    expect(pickAspectRatio(undefined, undefined, null)).toBe(
+      OPTION_DEFAULTS.aspectRatio
+    );
+    expect(pickAspectRatio(undefined, undefined, {})).toBe(
+      OPTION_DEFAULTS.aspectRatio
+    );
   });
 
   it('uses the singular default when only it is set', () => {
@@ -64,7 +71,7 @@ describe('pickSize', () => {
   });
 
   it('ignores the user selection without a declared list (stale cross-model value)', () => {
-    expect(pickSize(undefined, '1024x1024', null)).toBeUndefined();
+    expect(pickSize(undefined, '1024x1024', null)).toBe(OPTION_DEFAULTS.size);
     expect(pickSize(undefined, '1024x1024', { size: '512x512' })).toBe(
       '512x512'
     );
@@ -135,11 +142,13 @@ describe("the 'auto' option", () => {
     ).toBe('2K');
   });
 
-  it('resolves to nothing only when the model declares nothing', () => {
-    expect(
-      pickAspectRatio(undefined, 'auto', { aspectRatio: 'auto' })
-    ).toBeUndefined();
-    expect(pickAspectRatio(undefined, 'auto', {})).toBeUndefined();
+  it("falls to the app's own default when the model declares nothing", () => {
+    expect(pickAspectRatio(undefined, 'auto', { aspectRatio: 'auto' })).toBe(
+      OPTION_DEFAULTS.aspectRatio
+    );
+    expect(pickAspectRatio(undefined, 'auto', {})).toBe(
+      OPTION_DEFAULTS.aspectRatio
+    );
   });
 
   it('works the same for a duration, whose values are numbers', () => {
@@ -176,7 +185,17 @@ describe('pickVoice', () => {
     expect(pickVoice(undefined, 'nova', uiOptions)).toBe('nova');
   });
 
-  it('returns undefined when the model declares no voices', () => {
-    expect(pickVoice(undefined, undefined, {})).toBeUndefined();
+  it("falls to the app's own default when the model declares no voices", () => {
+    expect(pickVoice(undefined, undefined, {})).toBe(OPTION_DEFAULTS.voice);
+  });
+
+  it('never returns nothing, whatever the model declares', () => {
+    for (const ui of [null, {}, { sizes: [] }, { aspectRatios: ['auto'] }]) {
+      expect(pickAspectRatio(undefined, undefined, ui)).toBeDefined();
+      expect(pickSize(undefined, undefined, ui)).toBeDefined();
+      expect(pickResolution(undefined, undefined, ui)).toBeDefined();
+      expect(pickDuration(undefined, undefined, ui)).toBeDefined();
+      expect(pickVoice(undefined, undefined, ui)).toBeDefined();
+    }
   });
 });

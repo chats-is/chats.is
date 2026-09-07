@@ -67,37 +67,69 @@ function pickOption<T extends string | number>(
   return chosen as Exclude<T, typeof AUTO_OPTION>;
 }
 
+/**
+ * The last step of the chain: what a generation uses when nothing above it
+ * said anything — no request, no selection, and a model that declares neither
+ * a list nor a default of its own.
+ *
+ * Belongs here rather than in each provider's call, which is where it used to
+ * live for one of them and nowhere for the rest. The point of the chain is
+ * that the value is settled before anyone talks to a provider, and a chain
+ * that can still end in nothing has not settled it.
+ *
+ * The values are chosen to be the safe end of every scale: the ratio the most
+ * models accept, and the smallest, shortest, cheapest of everything else.
+ * Nobody is surprised by a bill for these.
+ */
+export const OPTION_DEFAULTS = {
+  /** Square: the one ratio essentially every image and video model takes. */
+  aspectRatio: '1:1',
+  /** The smallest square in general use; 256 and 512 are DALL·E-2 vintage. */
+  size: '1024x1024',
+  /** The lowest rung this app names. */
+  resolution: '480p',
+  /** The shortest clip anything generates. */
+  duration: 4,
+  /** OpenAI's own default voice, which is the TTS this app is built against. */
+  voice: 'alloy'
+} as const;
+
 export function pickAspectRatio(
   requested: string | undefined,
   selected: string | undefined,
   uiOptions?: ModelUIOptions | null
-): `${number}:${number}` | undefined {
-  return pickOption(
+): `${number}:${number}` {
+  return (pickOption(
     requested,
     selected,
     uiOptions?.aspectRatios,
     uiOptions?.aspectRatio
-  ) as `${number}:${number}` | undefined;
+  ) ?? OPTION_DEFAULTS.aspectRatio) as `${number}:${number}`;
 }
 
 export function pickSize(
   requested: string | undefined,
   selected: string | undefined,
   uiOptions?: ModelUIOptions | null
-): string | undefined {
-  return pickOption(requested, selected, uiOptions?.sizes, uiOptions?.size);
+): string {
+  return (
+    pickOption(requested, selected, uiOptions?.sizes, uiOptions?.size) ??
+    OPTION_DEFAULTS.size
+  );
 }
 
 export function pickDuration(
   requested: number | undefined,
   selected: number | undefined,
   uiOptions?: ModelUIOptions | null
-): number | undefined {
-  return pickOption(
-    requested,
-    selected,
-    uiOptions?.durations,
-    uiOptions?.duration
+): number {
+  return (
+    pickOption(
+      requested,
+      selected,
+      uiOptions?.durations,
+      uiOptions?.duration
+    ) ?? OPTION_DEFAULTS.duration
   );
 }
 
@@ -105,12 +137,14 @@ export function pickResolution(
   requested: string | undefined,
   selected: string | undefined,
   uiOptions?: ModelUIOptions | null
-): string | undefined {
-  return pickOption(
-    requested,
-    selected,
-    uiOptions?.resolutions,
-    uiOptions?.resolution
+): string {
+  return (
+    pickOption(
+      requested,
+      selected,
+      uiOptions?.resolutions,
+      uiOptions?.resolution
+    ) ?? OPTION_DEFAULTS.resolution
   );
 }
 
@@ -118,6 +152,9 @@ export function pickVoice(
   requested: string | undefined,
   selected: string | undefined,
   uiOptions?: ModelUIOptions | null
-): string | undefined {
-  return pickOption(requested, selected, uiOptions?.voices, uiOptions?.voice);
+): string {
+  return (
+    pickOption(requested, selected, uiOptions?.voices, uiOptions?.voice) ??
+    OPTION_DEFAULTS.voice
+  );
 }

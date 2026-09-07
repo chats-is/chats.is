@@ -3,6 +3,7 @@ import OpenAI, { AzureOpenAI } from 'openai';
 
 import { type Model, type ProviderConfig } from '@/types';
 import { decrypt } from '@/lib/crypto';
+import { OPTION_DEFAULTS } from '@/lib/media-options';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getVideoModel,
@@ -117,16 +118,12 @@ export async function generateWithSora(
   const size = aspectRatio === '9:16' ? '720x1280' : '1280x720';
 
   // Sora takes 4, 8 or 12; a request between them buys the next one up. A
-  // duration this far down is already settled against what the model
-  // declared, so an absent one means a model that declared nothing — and the
-  // floor for that is ours to set, not the provider's. The shortest clip is
-  // the one nobody is surprised to be billed for.
+  // duration through `pickDuration` is always settled; this path is also
+  // reachable directly, and then the app's own default stands in rather than
+  // a number invented here.
+  const wanted = duration ?? OPTION_DEFAULTS.duration;
   const seconds: '4' | '8' | '12' =
-    duration === undefined || duration <= 4
-      ? '4'
-      : duration <= 8
-        ? '8'
-        : '12';
+    wanted <= 4 ? '4' : wanted <= 8 ? '8' : '12';
 
   // Create video generation request
   const created = await openai.videos.create({
