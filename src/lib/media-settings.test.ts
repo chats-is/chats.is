@@ -69,6 +69,12 @@ describe('optionLabel', () => {
     expect(optionLabel('duration', '8')).toBe('8s');
     expect(optionLabel('voice', 'marin')).toBe('Marin');
   });
+
+  it("reads auto as Auto, not 'autos'", () => {
+    expect(optionLabel('duration', 'auto')).toBe('Auto');
+    expect(optionLabel('size', 'auto')).toBe('Auto');
+    expect(optionLabel('voice', 'auto')).toBe('Auto');
+  });
 });
 
 describe('optionShape', () => {

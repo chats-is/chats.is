@@ -3,7 +3,6 @@ import OpenAI, { AzureOpenAI } from 'openai';
 
 import { type Model, type ProviderConfig } from '@/types';
 import { decrypt } from '@/lib/crypto';
-import { resolveAutoOption } from '@/lib/media-options';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getVideoModel,
@@ -117,13 +116,20 @@ export async function generateWithSora(
   // Sora 2 supports: 720x1280, 1280x720, 1024x1792, 1792x1024
   const size = aspectRatio === '9:16' ? '720x1280' : '1280x720';
 
-  // Determine duration in seconds (4, 8, or 12). This bucketed value is the
-  // billable duration — the raw request may be shorter or absent.
+  // Sora takes 4, 8 or 12; a request between them buys the next one up. A
+  // duration this far down is already settled against what the model
+  // declared, so an absent one means a model that declared nothing — and the
+  // floor for that is ours to set, not the provider's. The shortest clip is
+  // the one nobody is surprised to be billed for.
   const seconds: '4' | '8' | '12' =
-    duration && duration <= 4 ? '4' : duration && duration <= 8 ? '8' : '12';
+    duration === undefined || duration <= 4
+      ? '4'
+      : duration <= 8
+        ? '8'
+        : '12';
 
   // Create video generation request
-  const video = await openai.videos.create({
+  const created = await openai.videos.create({
     model: model, // 'sora-2' | 'sora-2-pro'
     prompt,
     size: size,
@@ -132,18 +138,23 @@ export async function generateWithSora(
   });
 
   // Poll for completion if not already completed.
-  if (video.status !== 'completed') {
-    await pollSoraJob(openai, video.id, MAX_POLL_ATTEMPTS, abortSignal);
-  }
+  const video =
+    created.status === 'completed'
+      ? created
+      : await pollSoraJob(openai, created.id, MAX_POLL_ATTEMPTS, abortSignal);
 
   // Download video content using the SDK
   const videoResponse = await openai.videos.downloadContent(video.id);
   const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
 
+  // Bill what Sora says it made, not what we asked for: with no `seconds` sent
+  // the length is Sora's to choose, and guessing it would bill the wrong clip.
+  const generated = Number(video.seconds);
+
   return {
     buffer: videoBuffer,
     mediaType: 'video/mp4',
-    seconds: Number(seconds)
+    seconds: Number.isFinite(generated) ? generated : Number(seconds)
   };
 }
 
@@ -155,7 +166,7 @@ async function pollSoraJob(
   jobId: string,
   maxAttempts = MAX_POLL_ATTEMPTS,
   abortSignal?: AbortSignal
-): Promise<void> {
+): Promise<OpenAI.Videos.Video> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     abortSignal?.throwIfAborted();
 
@@ -163,7 +174,7 @@ async function pollSoraJob(
     const video = await openai.videos.retrieve(jobId);
 
     if (video.status === 'completed') {
-      return;
+      return video;
     } else if (video.status === 'failed') {
       throw new Error(
         `Sora video generation failed: ${video.error?.message || 'Unknown error'}`
@@ -208,14 +219,12 @@ export async function generateAndStoreVideo(args: {
     prompt,
     dbModel,
     candidates,
-    duration,
     inputImage,
     inputVideoUrl,
     abortSignal
   } = args;
-  // 'auto' (admin-configurable option) means: let the provider decide.
-  const aspectRatio = resolveAutoOption(args.aspectRatio);
-  const resolution = resolveAutoOption(args.resolution);
+  // Already settled by the pick* helpers against what the model declared.
+  const { aspectRatio, resolution, duration } = args;
   const modelId = dbModel.modelId;
 
   const { result, provider: usedProvider } = await runWithProviderFailover(

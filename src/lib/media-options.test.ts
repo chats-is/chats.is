@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { type ModelUIOptions } from '@/types/model';
+
 import {
   pickAspectRatio,
   pickDuration,
@@ -100,15 +102,25 @@ describe("the 'auto' option", () => {
     aspectRatios: ['auto', '16:9', '9:16']
   };
 
-  it("is selected by default when the model's default is 'auto'", () => {
-    expect(pickAspectRatio(undefined, undefined, uiOptions)).toBe('auto');
+  it('is the absence of a choice, so the next step decides', () => {
+    // The model's own default is 'auto', which pins nothing either, so what
+    // is left is the first option the model actually offers.
+    expect(pickAspectRatio(undefined, undefined, uiOptions)).toBe('16:9');
   });
 
-  it('wins as an explicit user selection when listed', () => {
-    expect(pickAspectRatio(undefined, 'auto', uiOptions)).toBe('auto');
+  it('drops out when the user selects it, rather than winning', () => {
+    expect(pickAspectRatio(undefined, 'auto', uiOptions)).toBe('16:9');
   });
 
-  it('is ignored when the LLM requests it (omitting already means auto)', () => {
+  it('falls to the model default when there is a real one', () => {
+    const pinned = {
+      aspectRatio: '9:16',
+      aspectRatios: ['auto', '16:9', '9:16']
+    };
+    expect(pickAspectRatio(undefined, 'auto', pinned)).toBe('9:16');
+  });
+
+  it('is ignored when the LLM requests it', () => {
     expect(pickAspectRatio('auto', '16:9', uiOptions)).toBe('16:9');
   });
 
@@ -116,7 +128,37 @@ describe("the 'auto' option", () => {
     expect(pickAspectRatio('9:16', 'auto', uiOptions)).toBe('9:16');
   });
 
-  it('resolveAutoOption maps auto to undefined at the call boundary', () => {
+  it('never comes out the other side — the provider is not asked to decide', () => {
+    expect(pickAspectRatio(undefined, 'auto', uiOptions)).not.toBe('auto');
+    expect(
+      pickSize(undefined, 'auto', { size: 'auto', sizes: ['auto', '2K'] })
+    ).toBe('2K');
+  });
+
+  it('resolves to nothing only when the model declares nothing', () => {
+    expect(
+      pickAspectRatio(undefined, 'auto', { aspectRatio: 'auto' })
+    ).toBeUndefined();
+    expect(pickAspectRatio(undefined, 'auto', {})).toBeUndefined();
+  });
+
+  it('works the same for a duration, whose values are numbers', () => {
+    const durations: ModelUIOptions = {
+      duration: 'auto',
+      durations: ['auto', 4, 8, 12]
+    };
+    // Nothing selected — which is also what a menu set to Auto sends, since
+    // 'auto' does not travel — and a model default that pins nothing either.
+    expect(pickDuration(undefined, undefined, durations)).toBe(4);
+    // The LLM asking for a length still wins...
+    expect(pickDuration(8, undefined, durations)).toBe(8);
+    // ...and a length the model does not offer still does not.
+    expect(pickDuration(30, undefined, durations)).toBe(4);
+    // A pinned length the model does offer beats the fallthrough.
+    expect(pickDuration(undefined, 12, durations)).toBe(12);
+  });
+
+  it('resolveAutoOption maps auto to undefined', () => {
     expect(resolveAutoOption('auto')).toBeUndefined();
     expect(resolveAutoOption('16:9')).toBe('16:9');
     expect(resolveAutoOption(undefined)).toBeUndefined();

@@ -15,6 +15,7 @@ import {
   modelMatchesId
 } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
+import { resolveAutoOption } from '@/lib/media-options';
 import { artifactQueries } from '@/server/fn/artifact';
 import {
   ResizableHandle,
@@ -112,12 +113,17 @@ export function ChatUI({
       isReasoning: supportsReasoning ? isReasoning : undefined,
       // Media model selections for the chat media tools; the server falls
       // back to the admin-configured defaults when a modelId is empty.
+      //
+      // `auto` does not travel. It is how the menu says "I am not pinning
+      // this", and a request carries either a value the user pinned or
+      // nothing at all — the server settles the rest by precedence, and an
+      // 'auto' on the wire would only be a second spelling of nothing.
       mediaOptions: {
         image: preferences.imageModelId
           ? {
               modelId: preferences.imageModelId,
-              size: preferences.imageSize,
-              aspectRatio: preferences.imageAspectRatio
+              size: resolveAutoOption(preferences.imageSize),
+              aspectRatio: resolveAutoOption(preferences.imageAspectRatio)
             }
           : undefined,
         imageEdit: preferences.imageEditModelId
@@ -126,9 +132,9 @@ export function ChatUI({
         video: preferences.videoModelId
           ? {
               modelId: preferences.videoModelId,
-              aspectRatio: preferences.videoAspectRatio,
-              resolution: preferences.videoResolution,
-              duration: preferences.videoDuration
+              aspectRatio: resolveAutoOption(preferences.videoAspectRatio),
+              resolution: resolveAutoOption(preferences.videoResolution),
+              duration: resolveAutoOption(preferences.videoDuration)
             }
           : undefined,
         videoImage: preferences.videoImageModelId
@@ -140,7 +146,7 @@ export function ChatUI({
         audio: preferences.audioModelId
           ? {
               modelId: preferences.audioModelId,
-              voice: preferences.audioVoice
+              voice: resolveAutoOption(preferences.audioVoice)
             }
           : undefined,
         stt: preferences.sttModelId

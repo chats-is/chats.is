@@ -3,7 +3,6 @@ import '@tanstack/react-start/server-only';
 import { generateImage, generateText, type ModelMessage } from 'ai';
 
 import { type Model } from '@/types';
-import { resolveAutoOption } from '@/lib/media-options';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getImageModel,
@@ -40,9 +39,10 @@ export async function generateAndStoreImage(args: {
 }): Promise<ImageGenerationResult> {
   const { userId, prompt, dbModel, candidates, inputImages, abortSignal } =
     args;
-  // 'auto' (admin-configurable option) means: let the provider decide.
-  const size = resolveAutoOption(args.size);
-  const aspectRatio = resolveAutoOption(args.aspectRatio);
+  // Already settled: `pickSize` and `pickAspectRatio` chose from what the
+  // model declared, so anything undefined here is a model that declared
+  // nothing — not an 'auto' waiting to be unwrapped.
+  const { size, aspectRatio } = args;
   const modelId = dbModel.modelId;
 
   const { result, provider: usedProvider } = await runWithProviderFailover(

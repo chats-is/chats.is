@@ -4,6 +4,7 @@ import {
   ImageSizeLabels,
   VideoResolutionLabels
 } from '@/lib/constant';
+import { AUTO_OPTION } from '@/lib/media-options';
 
 /**
  * The generation options a media model exposes, as the settings menu needs
@@ -79,6 +80,9 @@ export function chooseValue(
 
 /** How a value reads in the menu — the admin's own wording where there is one. */
 export function optionLabel(key: MediaOptionKey, value: string): string {
+  // Ahead of the rest: a duration would otherwise read as 'autos'.
+  if (value === AUTO_OPTION) return 'Auto';
+
   switch (key) {
     case 'size':
       return ImageSizeLabels[value] ?? value;

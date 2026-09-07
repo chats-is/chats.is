@@ -8,55 +8,63 @@ import { type ModelUIOptions } from '@/types/model';
  */
 export const AUTO_OPTION = 'auto';
 
-/** Map the 'auto' option to undefined so the provider applies its own default. */
+/**
+ * Map the 'auto' option to undefined so the provider applies its own default.
+ *
+ * The return type drops the literal: a caller that has resolved a value is
+ * holding something the provider can take, and should not have to prove it
+ * again.
+ */
 export function resolveAutoOption<T extends string | number>(
   value: T | undefined
-): T | undefined {
-  return value === AUTO_OPTION ? undefined : value;
+): Exclude<T, typeof AUTO_OPTION> | undefined {
+  return value === AUTO_OPTION
+    ? undefined
+    : (value as Exclude<T, typeof AUTO_OPTION>);
 }
 
 /**
  * Resolve a generation option for a media generation call.
  *
- * With a declared allowed list (`uiOptions[listKey]`), precedence is:
- * LLM-requested value → user selection → model default → first option —
- * each accepted only when it appears in the list (admins constrain what a
- * model accepts and billing depends on it).
+ * Precedence is: LLM-requested value → user selection → model default →
+ * first option, each accepted only when the model's list allows it (admins
+ * constrain what a model accepts and billing depends on it).
  *
- * Without a list the model renders no selector, so the request-body
- * "selection" can only be a stale value carried over from another model —
- * requested/selected are ignored entirely and the model's own default (or
- * nothing, i.e. the provider default) applies.
+ * `auto` is not a value; it is the absence of one. Choosing it in the menu
+ * says "I am not pinning this", so it drops out at whichever step it appears
+ * — a request, a selection, a model default — and the next step decides. It
+ * is filtered from the list for the same reason, so "first option" means the
+ * first real one.
  *
- * An LLM-requested 'auto' is meaningless (omitting the field already means
- * auto) and is ignored; a selected/default 'auto' wins like any other value
- * and is resolved at the call boundary.
+ * What comes out is therefore something the model declared it accepts, chosen
+ * here rather than left to the provider. Only a model that declares nothing
+ * at all — no list and no default — resolves to `undefined`, and then the
+ * call site supplies its own value.
  */
 function pickOption<T extends string | number>(
   requested: T | undefined,
   selected: T | undefined,
-  allowed: T[] | undefined,
+  list: T[] | undefined,
   fallback: T | undefined
-): T | undefined {
-  requested = resolveAutoOption(requested);
+): Exclude<T, typeof AUTO_OPTION> | undefined {
+  const allowed = list?.filter(value => value !== AUTO_OPTION);
 
   if (!allowed?.length) {
-    return fallback;
+    return resolveAutoOption(fallback);
   }
 
   const isAllowed = (value: T | undefined): value is T =>
     value !== undefined && allowed.includes(value);
 
-  if (isAllowed(requested)) {
-    return requested;
-  }
-  if (isAllowed(selected)) {
-    return selected;
-  }
-  if (isAllowed(fallback)) {
-    return fallback;
-  }
-  return allowed[0];
+  const chosen = isAllowed(requested)
+    ? requested
+    : isAllowed(selected)
+      ? selected
+      : isAllowed(fallback)
+        ? fallback
+        : allowed[0];
+
+  return chosen as Exclude<T, typeof AUTO_OPTION>;
 }
 
 export function pickAspectRatio(

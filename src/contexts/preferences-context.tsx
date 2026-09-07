@@ -26,7 +26,7 @@ export interface Preferences {
   videoEditModelId: string;
   videoAspectRatio: string;
   videoResolution: string;
-  videoDuration?: number;
+  videoDuration?: number | 'auto';
   // Audio (TTS)
   audioModelId: string;
   audioVoice: string;

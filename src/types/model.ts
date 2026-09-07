@@ -10,8 +10,9 @@ export type ModelUIOptions = {
   sizes?: string[];
   aspectRatio?: string;
   aspectRatios?: string[];
-  duration?: number;
-  durations?: number[];
+  /** `'auto'` here means the same as it does for the others: send nothing. */
+  duration?: number | 'auto';
+  durations?: Array<number | 'auto'>;
   resolution?: string;
   resolutions?: string[];
   voice?: string;

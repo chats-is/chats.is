@@ -3,7 +3,6 @@ import '@tanstack/react-start/server-only';
 import { generateSpeech } from 'ai';
 
 import { type Model } from '@/types';
-import { resolveAutoOption } from '@/lib/media-options';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getSpeechModel,
@@ -31,7 +30,7 @@ export async function generateAndStoreSpeech(args: {
 }): Promise<SpeechGenerationResult> {
   const { userId, text, dbModel, candidates, abortSignal } = args;
   // 'auto' (admin-configurable option) means: let the provider decide.
-  const voice = resolveAutoOption(args.voice);
+  const { voice } = args;
   const modelId = dbModel.modelId;
 
   const { result: audio, provider: usedProvider } =

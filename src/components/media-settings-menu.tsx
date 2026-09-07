@@ -406,7 +406,13 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
                   preferences.videoDuration === undefined
                     ? undefined
                     : String(preferences.videoDuration),
-                onChange: value => setPreference('videoDuration', Number(value))
+                // 'auto' is a value like any other here; only the seconds
+                // need turning back into a number.
+                onChange: value =>
+                  setPreference(
+                    'videoDuration',
+                    value === 'auto' ? 'auto' : Number(value)
+                  )
               }
             ]}
           />
