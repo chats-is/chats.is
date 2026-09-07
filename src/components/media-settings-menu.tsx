@@ -13,9 +13,11 @@ import {
   Monitor,
   Pencil,
   RectangleHorizontal,
+  RectangleVertical,
   Scaling,
   Scissors,
   Settings2,
+  Square,
   type LucideIcon
 } from 'lucide-react';
 
@@ -26,7 +28,9 @@ import {
   defaultValue,
   MediaOptionLabels,
   optionLabel,
-  type MediaOptionKey
+  optionShape,
+  type MediaOptionKey,
+  type OptionShape
 } from '@/lib/media-settings';
 import { modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -62,6 +66,14 @@ const OptionIcons: Record<MediaOptionKey, LucideIcon> = {
   resolution: Monitor,
   duration: Clock,
   voice: AudioLines
+};
+
+/** A ratio shows its shape; everything else keeps an empty slot. */
+const ShapeIcons: Record<OptionShape, LucideIcon | null> = {
+  square: Square,
+  landscape: RectangleHorizontal,
+  portrait: RectangleVertical,
+  plain: null
 };
 
 type OptionBinding = {
@@ -234,18 +246,30 @@ function MediaKind({
                 </span>
                 {MediaOptionLabels[row.key]}
               </DropdownMenuLabel>
-              {row.allowed.map(value => (
-                <ChoiceItem
-                  key={value}
-                  // An empty slot where the models have their icon, so every
-                  // line in the panel starts its text at the same place.
-                  icon={<span className="size-4 shrink-0" />}
-                  checked={value === row.value}
-                  onSelect={() => row.onChange(value)}
-                >
-                  <div className="truncate">{optionLabel(row.key, value)}</div>
-                </ChoiceItem>
-              ))}
+              {row.allowed.map(value => {
+                const ShapeIcon = ShapeIcons[optionShape(row.key, value)];
+                return (
+                  <ChoiceItem
+                    key={value}
+                    // The slot is kept even where there is no mark for the
+                    // value, so every line in the panel starts its text at the
+                    // same place.
+                    icon={
+                      ShapeIcon ? (
+                        <ShapeIcon className="size-4 shrink-0" />
+                      ) : (
+                        <span className="size-4 shrink-0" />
+                      )
+                    }
+                    checked={value === row.value}
+                    onSelect={() => row.onChange(value)}
+                  >
+                    <div className="truncate">
+                      {optionLabel(row.key, value)}
+                    </div>
+                  </ChoiceItem>
+                );
+              })}
             </DropdownMenuGroup>
           );
         })}

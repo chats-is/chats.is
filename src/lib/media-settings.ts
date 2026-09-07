@@ -1,9 +1,9 @@
+import { type ModelUIOptions } from '@/types/model';
 import {
   AspectRatioLabels,
   ImageSizeLabels,
   VideoResolutionLabels
 } from '@/lib/constant';
-import { type ModelUIOptions } from '@/types/model';
 
 /**
  * The generation options a media model exposes, as the settings menu needs
@@ -18,11 +18,7 @@ import { type ModelUIOptions } from '@/types/model';
  * with; `duration` converts back to a number where it is stored.
  */
 export type MediaOptionKey =
-  | 'size'
-  | 'aspectRatio'
-  | 'resolution'
-  | 'duration'
-  | 'voice';
+  'size' | 'aspectRatio' | 'resolution' | 'duration' | 'voice';
 
 const LIST_KEY = {
   size: 'sizes',
@@ -95,4 +91,26 @@ export function optionLabel(key: MediaOptionKey, value: string): string {
     case 'voice':
       return value.charAt(0).toUpperCase() + value.slice(1);
   }
+}
+
+/**
+ * Which way round an aspect ratio comes out, so a menu can put that shape
+ * beside it.
+ *
+ * Only ratios: a size or a resolution is a quantity, and the label already
+ * carries the number that says how much. Anything else is `plain`, and the
+ * menu leaves the slot empty rather than inventing a picture for it.
+ */
+export type OptionShape = 'square' | 'landscape' | 'portrait' | 'plain';
+
+export function optionShape(key: MediaOptionKey, value: string): OptionShape {
+  if (key !== 'aspectRatio') return 'plain';
+
+  const parts = value.split(':');
+  if (parts.length !== 2) return 'plain';
+  const [w, h] = parts.map(Number);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    return 'plain';
+  }
+  return w === h ? 'square' : w > h ? 'landscape' : 'portrait';
 }

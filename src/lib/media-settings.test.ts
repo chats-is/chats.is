@@ -4,7 +4,8 @@ import {
   allowedValues,
   chooseValue,
   defaultValue,
-  optionLabel
+  optionLabel,
+  optionShape
 } from '@/lib/media-settings';
 
 describe('allowedValues', () => {
@@ -67,5 +68,27 @@ describe('optionLabel', () => {
   it('spells out durations and voices', () => {
     expect(optionLabel('duration', '8')).toBe('8s');
     expect(optionLabel('voice', 'marin')).toBe('Marin');
+  });
+});
+
+describe('optionShape', () => {
+  it('reads the way round from a ratio', () => {
+    expect(optionShape('aspectRatio', '1:1')).toBe('square');
+    expect(optionShape('aspectRatio', '16:9')).toBe('landscape');
+    expect(optionShape('aspectRatio', '9:16')).toBe('portrait');
+  });
+
+  it('leaves a quantity alone — the label already carries the number', () => {
+    expect(optionShape('size', '1024x1536')).toBe('plain');
+    expect(optionShape('size', '2K')).toBe('plain');
+    expect(optionShape('resolution', '1080p')).toBe('plain');
+    expect(optionShape('duration', '8')).toBe('plain');
+    expect(optionShape('voice', 'marin')).toBe('plain');
+  });
+
+  it('has no shape for auto, or for anything unparseable', () => {
+    expect(optionShape('aspectRatio', 'auto')).toBe('plain');
+    expect(optionShape('aspectRatio', 'wide')).toBe('plain');
+    expect(optionShape('aspectRatio', '0:1')).toBe('plain');
   });
 });
