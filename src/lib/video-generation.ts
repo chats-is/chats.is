@@ -3,7 +3,6 @@ import OpenAI, { AzureOpenAI } from 'openai';
 
 import { type Model, type ProviderConfig } from '@/types';
 import { decrypt } from '@/lib/crypto';
-import { OPTION_DEFAULTS } from '@/lib/media-options';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getVideoModel,
@@ -102,24 +101,24 @@ function createOpenAIClient(provider: ProviderConfig): OpenAI {
  * Generate video using OpenAI Sora 2 API
  * Documentation: https://platform.openai.com/docs/guides/video-generation
  */
-export async function generateWithSora(
-  model: string,
-  prompt: string,
-  provider: ProviderConfig,
-  size?: string,
-  resolution?: string,
-  duration?: number,
-  abortSignal?: AbortSignal
-): Promise<VideoGenerationResult> {
+export async function generateWithSora(args: {
+  model: string;
+  prompt: string;
+  provider: ProviderConfig;
+  /** Sora names its output by pixels; omitted where the model declares none. */
+  size?: string;
+  resolution?: string;
+  /** Required: the option chain settles this before anyone reaches a provider. */
+  duration: number;
+  abortSignal?: AbortSignal;
+}): Promise<VideoGenerationResult> {
+  const { model, prompt, provider, size, resolution, duration, abortSignal } =
+    args;
   const openai = createOpenAIClient(provider);
 
-  // Sora takes 4, 8 or 12; a request between them buys the next one up. A
-  // duration through `pickDuration` is always settled; this path is also
-  // reachable directly, and then the app's own default stands in rather than
-  // a number invented here.
-  const wanted = duration ?? OPTION_DEFAULTS.duration;
+  // Sora takes 4, 8 or 12; a request between them buys the next one up.
   const seconds: '4' | '8' | '12' =
-    wanted <= 4 ? '4' : wanted <= 8 ? '8' : '12';
+    duration <= 4 ? '4' : duration <= 8 ? '8' : '12';
 
   // Create video generation request
   const created = await openai.videos.create({
@@ -202,6 +201,7 @@ export async function generateAndStoreVideo(args: {
   size?: string;
   aspectRatio?: `${number}:${number}`;
   resolution?: string;
+  /** Absent only when editing, where the source video's length stands. */
   duration?: number;
   /** Animate this image instead of generating from the text alone. */
   inputImage?: { data: Uint8Array; mediaType: string };
@@ -247,15 +247,24 @@ export async function generateAndStoreVideo(args: {
             `${dbModel.name} cannot animate an image; it generates from text only.`
           );
         }
-        const soraResult = await generateWithSora(
-          modelId,
+        // Neither of the two cases that arrive without one, so the option
+        // chain has settled a duration. Stated rather than assumed — the
+        // alternative is a default down here, and defaults belong to the
+        // chain, not to one provider's call.
+        if (duration === undefined) {
+          throw new Error(
+            `${dbModel.name} needs a duration and none was settled.`
+          );
+        }
+        const soraResult = await generateWithSora({
+          model: modelId,
           prompt,
           provider,
           size,
           resolution,
           duration,
           abortSignal
-        );
+        });
         videoBuffer = soraResult.buffer;
         videoMediaType = soraResult.mediaType;
         // Sora returns no duration metadata — bill the bucketed duration the

@@ -134,14 +134,13 @@ beforeEach(() => {
 
 describe('generateWithSora — Azure', () => {
   it('uses the AzureOpenAI v1 client with a decrypted key and preview api-version', async () => {
-    const result = await generateWithSora(
-      'sora-2',
-      'a cat',
-      azureProvider(),
-      '720x1280',
-      undefined,
-      8
-    );
+    const result = await generateWithSora({
+      model: 'sora-2',
+      prompt: 'a cat',
+      provider: azureProvider(),
+      size: '720x1280',
+      duration: 8
+    });
 
     // No plain OpenAI client constructed; exactly one Azure client.
     expect(openaiCtorArgs).toHaveLength(0);
@@ -168,17 +167,25 @@ describe('generateWithSora — Azure', () => {
   });
 
   it('honors an apiVersion override from provider.apiOptions', async () => {
-    await generateWithSora(
-      'sora-2',
-      'a dog',
-      azureProvider({ apiOptions: { apiVersion: '2025-04-01-preview' } })
-    );
+    await generateWithSora({
+      model: 'sora-2',
+      prompt: 'a dog',
+      provider: azureProvider({
+        apiOptions: { apiVersion: '2025-04-01-preview' }
+      }),
+      duration: 4
+    });
 
     expect(azureCtorArgs[0].apiVersion).toBe('2025-04-01-preview');
   });
 
   it('takes the Azure path even when the deployment name lacks "sora"', async () => {
-    await generateWithSora('my-video-deploy', 'hi', azureProvider());
+    await generateWithSora({
+      model: 'my-video-deploy',
+      prompt: 'hi',
+      provider: azureProvider(),
+      duration: 4
+    });
 
     expect(azureCtorArgs).toHaveLength(1);
     expect(videosCreate).toHaveBeenCalledWith(
@@ -188,7 +195,12 @@ describe('generateWithSora — Azure', () => {
 
   it('throws a helpful error when the Azure endpoint URL is missing', async () => {
     await expect(
-      generateWithSora('sora-2', 'x', azureProvider({ baseUrl: null }))
+      generateWithSora({
+        model: 'sora-2',
+        prompt: 'x',
+        provider: azureProvider({ baseUrl: null }),
+        duration: 4
+      })
     ).rejects.toThrow(/Azure OpenAI Sora requires the provider endpoint URL/);
     expect(azureCtorArgs).toHaveLength(0);
   });
@@ -196,12 +208,18 @@ describe('generateWithSora — Azure', () => {
 
 describe('generateWithSora — direct OpenAI (unchanged)', () => {
   it('uses the plain OpenAI client, not Azure', async () => {
-    await generateWithSora(
-      'sora-2',
-      'a bird',
-      { type: 'openai', apiKey: 'enc', baseUrl: null, apiOptions: null },
-      '1280x720'
-    );
+    await generateWithSora({
+      model: 'sora-2',
+      prompt: 'a bird',
+      provider: {
+        type: 'openai',
+        apiKey: 'enc',
+        baseUrl: null,
+        apiOptions: null
+      },
+      size: '1280x720',
+      duration: 4
+    });
 
     expect(azureCtorArgs).toHaveLength(0);
     expect(openaiCtorArgs).toHaveLength(1);
@@ -217,14 +235,25 @@ describe('generateWithSora — direct OpenAI (unchanged)', () => {
 
 describe('generateWithSora — size', () => {
   it('sends no size when the model declares none', async () => {
-    await generateWithSora('sora-2', 'a bird', azureProvider());
+    await generateWithSora({
+      model: 'sora-2',
+      prompt: 'a bird',
+      provider: azureProvider(),
+      duration: 4
+    });
 
     const sent = videosCreate.mock.calls[0][0];
     expect('size' in sent).toBe(false);
   });
 
   it('sends the size it was given, whatever the shape', async () => {
-    await generateWithSora('sora-2', 'a bird', azureProvider(), '1024x1792');
+    await generateWithSora({
+      model: 'sora-2',
+      prompt: 'a bird',
+      provider: azureProvider(),
+      size: '1024x1792',
+      duration: 4
+    });
 
     expect(videosCreate).toHaveBeenCalledWith(
       expect.objectContaining({ size: '1024x1792' })
@@ -241,7 +270,12 @@ describe('generateWithSora — polling & errors', () => {
         .mockResolvedValueOnce({ id: 'job-1', status: 'in_progress' })
         .mockResolvedValueOnce({ id: 'job-1', status: 'completed' });
 
-      const pending = generateWithSora('sora-2', 'x', azureProvider());
+      const pending = generateWithSora({
+        model: 'sora-2',
+        prompt: 'x',
+        provider: azureProvider(),
+        duration: 4
+      });
       // Fire the 5s wait between the first (in_progress) and second poll.
       await vi.advanceTimersByTimeAsync(5000);
       const result = await pending;
@@ -259,7 +293,12 @@ describe('generateWithSora — polling & errors', () => {
       videosCreate.mockResolvedValue({ id: 'job-1', status: 'in_progress' });
       videosRetrieve.mockResolvedValue({ id: 'job-1', status: 'in_progress' });
 
-      const pending = generateWithSora('sora-2', 'x', azureProvider());
+      const pending = generateWithSora({
+        model: 'sora-2',
+        prompt: 'x',
+        provider: azureProvider(),
+        duration: 4
+      });
       const assertion = expect(pending).rejects.toThrow(VideoTimeoutError);
       // 30 attempts x 5s. The deadline has to stay well inside the chat route's
       // 300s budget — at the full budget Vercel kills the function first and
@@ -283,7 +322,12 @@ describe('generateWithSora — polling & errors', () => {
     });
 
     await expect(
-      generateWithSora('sora-2', 'x', azureProvider())
+      generateWithSora({
+        model: 'sora-2',
+        prompt: 'x',
+        provider: azureProvider(),
+        duration: 4
+      })
     ).rejects.toThrow(/Sora video generation failed: flagged content/);
   });
 
@@ -293,15 +337,13 @@ describe('generateWithSora — polling & errors', () => {
     ac.abort();
 
     await expect(
-      generateWithSora(
-        'sora-2',
-        'x',
-        azureProvider(),
-        undefined,
-        undefined,
-        undefined,
-        ac.signal
-      )
+      generateWithSora({
+        model: 'sora-2',
+        prompt: 'x',
+        provider: azureProvider(),
+        duration: 4,
+        abortSignal: ac.signal
+      })
     ).rejects.toThrow();
     expect(videosRetrieve).not.toHaveBeenCalled();
   });
@@ -331,7 +373,8 @@ describe('generateAndStoreVideo — routing & failover', () => {
       dbModel: model('grok-style-deploy'),
       candidates: [
         failover({ type: 'azure', baseUrl: 'https://r.openai.azure.com' })
-      ]
+      ],
+      duration: 4
     });
 
     expect(azureCtorArgs).toHaveLength(1);
@@ -362,7 +405,8 @@ describe('generateAndStoreVideo — routing & failover', () => {
         userId: 'u',
         prompt: 'p',
         dbModel: model('sora-2'),
-        candidates: [failover({ id: 'a' }), failover({ id: 'b' })]
+        candidates: [failover({ id: 'a' }), failover({ id: 'b' })],
+        duration: 4
       });
       const assertion = expect(pending).rejects.toThrow(VideoTimeoutError);
       await vi.advanceTimersByTimeAsync(30 * 5000);
