@@ -7,11 +7,16 @@ import {
   Captions,
   Check,
   Clapperboard,
+  Clock,
   Image as ImageIcon,
   ImagePlay,
+  Monitor,
   Pencil,
+  RectangleHorizontal,
+  Scaling,
   Scissors,
-  Settings2
+  Settings2,
+  type LucideIcon
 } from 'lucide-react';
 
 import { type ChatMessage, type Model } from '@/types';
@@ -43,9 +48,21 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { ModelIcon } from '@/components/model-icon';
 
-export interface MediaSettingsMenuProps
-  extends Pick<UseChatHelpers<ChatMessage>, 'status'> {}
+export interface MediaSettingsMenuProps extends Pick<
+  UseChatHelpers<ChatMessage>,
+  'status'
+> {}
+
+/** What each option is about, at a glance. */
+const OptionIcons: Record<MediaOptionKey, LucideIcon> = {
+  size: Scaling,
+  aspectRatio: RectangleHorizontal,
+  resolution: Monitor,
+  duration: Clock,
+  voice: AudioLines
+};
 
 type OptionBinding = {
   key: MediaOptionKey;
@@ -62,10 +79,12 @@ type OptionBinding = {
  * menu marks its choice.
  */
 function ChoiceItem({
+  icon,
   checked,
   onSelect,
   children
 }: {
+  icon?: React.ReactNode;
   checked: boolean;
   onSelect: () => void;
   children: React.ReactNode;
@@ -77,6 +96,7 @@ function ChoiceItem({
       onSelect={onSelect}
       className="gap-3"
     >
+      {icon}
       <div className="min-w-0 flex-1">{children}</div>
       {checked && <Check className="size-4 shrink-0" />}
     </DropdownMenuItem>
@@ -168,12 +188,27 @@ function MediaKind({
       <DropdownMenuSubContent className="max-h-(--radix-dropdown-menu-content-available-height) w-72 overflow-y-auto">
         {byProvider.map(([provider, providerModels]) => (
           <DropdownMenuGroup key={provider}>
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            <DropdownMenuLabel className="flex items-center gap-3 text-xs font-normal text-muted-foreground">
+              {/* A fixed slot rather than the icon itself: a provider with no
+                  image would otherwise pull its own heading left of every
+                  other line. */}
+              <span className="flex size-4 shrink-0 items-center justify-center">
+                <ModelIcon
+                  className="size-3.5 opacity-45 grayscale"
+                  image={providerModels[0]?.provider?.image ?? null}
+                />
+              </span>
               {provider}
             </DropdownMenuLabel>
             {providerModels.map(model => (
               <ChoiceItem
                 key={model.modelId}
+                icon={
+                  <ModelIcon
+                    className="size-4 shrink-0"
+                    image={model.image || model.provider?.image || null}
+                  />
+                }
                 checked={model.modelId === selected?.modelId}
                 onSelect={() => onModelChange(model.modelId)}
               >
@@ -188,23 +223,32 @@ function MediaKind({
             ))}
           </DropdownMenuGroup>
         ))}
-        {rows.map(row => (
-          <DropdownMenuGroup key={row.key}>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-              {MediaOptionLabels[row.key]}
-            </DropdownMenuLabel>
-            {row.allowed.map(value => (
-              <ChoiceItem
-                key={value}
-                checked={value === row.value}
-                onSelect={() => row.onChange(value)}
-              >
-                <div className="truncate">{optionLabel(row.key, value)}</div>
-              </ChoiceItem>
-            ))}
-          </DropdownMenuGroup>
-        ))}
+        {rows.map(row => {
+          const OptionIcon = OptionIcons[row.key];
+          return (
+            <DropdownMenuGroup key={row.key}>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="flex items-center gap-3 text-xs font-normal text-muted-foreground">
+                <span className="flex size-4 shrink-0 items-center justify-center">
+                  <OptionIcon className="size-3.5" />
+                </span>
+                {MediaOptionLabels[row.key]}
+              </DropdownMenuLabel>
+              {row.allowed.map(value => (
+                <ChoiceItem
+                  key={value}
+                  // An empty slot where the models have their icon, so every
+                  // line in the panel starts its text at the same place.
+                  icon={<span className="size-4 shrink-0" />}
+                  checked={value === row.value}
+                  onSelect={() => row.onChange(value)}
+                >
+                  <div className="truncate">{optionLabel(row.key, value)}</div>
+                </ChoiceItem>
+              ))}
+            </DropdownMenuGroup>
+          );
+        })}
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );
