@@ -95,12 +95,24 @@ export function UserMenu() {
               </DropdownMenuItem>
             )}
             {user.admin && (
-              <DropdownMenuItem asChild>
-                <Link to="/console" className="flex w-full items-center gap-2">
-                  <LayoutDashboard className="size-4" />
-                  Console
-                </Link>
-              </DropdownMenuItem>
+              <>
+                {/* Its own band: the console is a different part of the app,
+                    not another of this menu's own settings. The separator is
+                    conditional so it cannot open the menu with a rule. */}
+                {openSettings && <DropdownMenuSeparator />}
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/console"
+                    className="flex w-full items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <LayoutDashboard className="size-4" />
+                      Console
+                    </div>
+                    <ExternalLink className="size-4" />
+                  </Link>
+                </DropdownMenuItem>
+              </>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
