@@ -105,7 +105,13 @@ function ChoiceItem({
     <DropdownMenuItem
       role="menuitemradio"
       aria-checked={checked}
-      onSelect={onSelect}
+      // Stays open. Picking a model is usually the first half of the job —
+      // the options below it belong to that model, and a menu that closed
+      // would hide the ones the choice just brought into being.
+      onSelect={event => {
+        event.preventDefault();
+        onSelect();
+      }}
       className="gap-3"
     >
       {icon}
