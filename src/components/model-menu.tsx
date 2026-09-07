@@ -4,6 +4,8 @@ import { type UseChatHelpers } from '@ai-sdk/react';
 import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react';
 
 import { type ChatMessage, type Model } from '@/types';
+import { ReasoningEffortLabels } from '@/lib/constant';
+import { chooseValue } from '@/lib/media-settings';
 import { cn, modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -132,6 +134,16 @@ export function ModelMenu({
 
   const isDisabled =
     status === 'submitted' || status === 'streaming' || !models?.length;
+
+  // How hard to think, where the model gives a say. Switching models can
+  // leave a level the new one does not offer, so what is shown is settled
+  // against its list rather than read straight from the preference.
+  const efforts = selectedModel?.uiOptions?.efforts ?? [];
+  const effort = chooseValue(
+    efforts,
+    preferences.chatEffort,
+    selectedModel?.uiOptions?.effort
+  );
 
   return (
     <div className="flex items-center space-x-2">
@@ -281,6 +293,27 @@ export function ModelMenu({
           />
           Think
         </Button>
+      )}
+
+      {efforts.length > 0 && (
+        <Select
+          disabled={isDisabled}
+          value={effort ?? ''}
+          onValueChange={value => setPreference('chatEffort', value)}
+        >
+          <SelectTrigger className="h-9 rounded-full shadow-none">
+            <span className="text-sm">
+              {effort ? (ReasoningEffortLabels[effort] ?? effort) : 'Effort'}
+            </span>
+          </SelectTrigger>
+          <SelectContent position="popper">
+            {efforts.map(value => (
+              <SelectItem key={value} value={value}>
+                {ReasoningEffortLabels[value] ?? value}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
     </div>
   );

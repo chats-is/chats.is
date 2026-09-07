@@ -67,6 +67,18 @@ export const AspectRatioLabels: Record<string, string> = {
 };
 
 /**
+ * Reasoning effort labels mapping
+ */
+export const ReasoningEffortLabels: Record<string, string> = {
+  none: 'None',
+  minimal: 'Minimal',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Extra High'
+};
+
+/**
  * Video resolution labels mapping
  */
 export const VideoResolutionLabels: Record<string, string> = {

@@ -17,8 +17,31 @@ export type ModelUIOptions = {
   resolutions?: string[];
   voice?: string;
   voices?: string[];
+  /**
+   * How hard the model should think. The values are the AI SDK's own — it
+   * hands them to whichever provider is behind the model, so nothing here
+   * translates them into one vendor's spelling.
+   */
+  effort?: ReasoningEffort;
+  efforts?: ReasoningEffort[];
+  /** Whether to show the thinking, not whether to do any. */
   reasoning?: boolean;
 };
+
+/**
+ * What the AI SDK will take for `reasoning`, and hand to whichever provider
+ * is behind the model. `'provider-default'` is its way of saying "you decide",
+ * which is where an effort nobody pinned ends up.
+ */
+export type SentEffort =
+  'provider-default' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+/**
+ * What an admin lists and a user picks. No `'auto'` among them: a level is
+ * either named or not chosen, and the chain already ends in the provider's
+ * own default for the second case.
+ */
+export type ReasoningEffort = Exclude<SentEffort, 'provider-default'>;
 
 // API parameters for model configuration
 export type ModelAPIParams = {

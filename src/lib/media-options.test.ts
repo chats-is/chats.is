@@ -6,6 +6,7 @@ import {
   OPTION_DEFAULTS,
   pickAspectRatio,
   pickDuration,
+  pickEffort,
   pickResolution,
   pickSize,
   pickVoice,
@@ -171,6 +172,36 @@ describe("the 'auto' option", () => {
     expect(resolveAutoOption('auto')).toBeUndefined();
     expect(resolveAutoOption('16:9')).toBe('16:9');
     expect(resolveAutoOption(undefined)).toBeUndefined();
+  });
+});
+
+describe('pickEffort', () => {
+  const ui: ModelUIOptions = {
+    effort: 'medium',
+    efforts: ['low', 'medium', 'high', 'xhigh']
+  };
+
+  it('uses what the user pinned', () => {
+    expect(pickEffort(undefined, 'high', ui)).toBe('high');
+  });
+
+  it('falls to the model default when nothing is pinned', () => {
+    expect(pickEffort(undefined, undefined, ui)).toBe('medium');
+  });
+
+  it('ignores a level this model does not offer', () => {
+    expect(pickEffort(undefined, 'minimal', ui)).toBe('medium');
+  });
+
+  it('falls to the first level listed when there is no model default', () => {
+    expect(pickEffort(undefined, undefined, { efforts: ['low', 'high'] })).toBe(
+      'low'
+    );
+  });
+
+  it("leaves it to the provider where the model says nothing — the SDK's own word for it", () => {
+    expect(pickEffort(undefined, 'high', {})).toBe('provider-default');
+    expect(pickEffort(undefined, undefined, null)).toBe('provider-default');
   });
 });
 

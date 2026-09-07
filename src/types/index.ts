@@ -23,7 +23,9 @@ export type {
   ModelCapability,
   ModelUIOptions,
   ModelAPIParams,
-  ModelProvider
+  ModelProvider,
+  ReasoningEffort,
+  SentEffort
 } from './model';
 export type {
   ProviderConfig,

@@ -33,6 +33,7 @@ import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
 import { buildMediaTools, type MediaToolsOptions } from '@/lib/chat-tools';
 import { normalizeChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
+import { pickEffort } from '@/lib/media-options';
 import { preflightCheck } from '@/lib/preflight';
 import {
   AllProvidersFailedError,
@@ -79,6 +80,7 @@ type PostData = {
   userMessage: Omit<ChatMessage, 'role'> & { role: 'user' };
   parentMessageId?: string;
   isReasoning?: boolean;
+  effort?: string;
   mediaOptions?: MediaToolsOptions;
 };
 
@@ -138,8 +140,14 @@ async function POST({ request: req }: { request: Request }) {
 
   const json: PostData = await req.json();
   const id = json.id || generateUUID();
-  const { modelId, userMessage, parentMessageId, isReasoning, mediaOptions } =
-    json;
+  const {
+    modelId,
+    userMessage,
+    parentMessageId,
+    isReasoning,
+    effort,
+    mediaOptions
+  } = json;
 
   if (!modelId || !userMessage) {
     return Response.json({ error: 'Invalid request.' }, { status: 400 });
@@ -767,6 +775,10 @@ async function POST({ request: req }: { request: Request }) {
                 [failoverProvider.type]: failoverProvider.apiOptions
               } as any
             }),
+            // The chain has already settled this against what the model
+            // declared; the SDK hands it to whichever provider is behind the
+            // model, so nothing here spells it that vendor's way.
+            reasoning: pickEffort(undefined, effort, dbModel.uiOptions),
             temperature: dbModel.apiParams?.temperature,
             topP: dbModel.apiParams?.topP,
             topK: dbModel.apiParams?.topK,

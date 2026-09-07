@@ -14,7 +14,12 @@ import {
   type PgColumn
 } from 'drizzle-orm/pg-core';
 
-import { type ChatMessage, type ChatType, type ProviderType } from '@/types';
+import {
+  type ChatMessage,
+  type ChatType,
+  type ProviderType,
+  type ReasoningEffort
+} from '@/types';
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -451,6 +456,8 @@ export const models = createTable(
       resolutions?: Array<string>;
       voice?: string;
       voices?: Array<string>;
+      effort?: ReasoningEffort;
+      efforts?: Array<ReasoningEffort>;
       reasoning?: boolean;
     }>(),
     apiParams: jsonb('api_params').$type<{

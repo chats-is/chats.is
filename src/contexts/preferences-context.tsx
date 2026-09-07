@@ -15,6 +15,7 @@ export interface Preferences {
   // Chat
   chatModelId: string;
   chatReasoning: boolean;
+  chatEffort: string;
   // Image
   imageModelId: string;
   imageEditModelId: string;
@@ -100,6 +101,7 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       // Chat
       chatModelId: systemDefault(defaults.chatModelId, chatModels),
       chatReasoning: true,
+      chatEffort: '',
       // Generation options are left empty until the user picks one. A
       // hardcoded seed is indistinguishable from a choice the user made, and
       // both `ModelMenu` and the server's `pickOption` prefer a selection over

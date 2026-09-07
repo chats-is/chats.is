@@ -111,6 +111,7 @@ export function ChatUI({
     () => ({
       modelId: currentModelId,
       isReasoning: supportsReasoning ? isReasoning : undefined,
+      effort: resolveAutoOption(preferences.chatEffort),
       // Media model selections for the chat media tools; the server falls
       // back to the admin-configured defaults when a modelId is empty.
       //
@@ -159,11 +160,13 @@ export function ChatUI({
       currentModelId,
       supportsReasoning,
       isReasoning,
+      preferences.chatEffort,
       preferences.imageModelId,
       preferences.imageSize,
       preferences.imageAspectRatio,
       preferences.imageEditModelId,
       preferences.videoModelId,
+      preferences.videoSize,
       preferences.videoAspectRatio,
       preferences.videoResolution,
       preferences.videoDuration,

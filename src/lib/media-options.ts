@@ -1,4 +1,8 @@
-import { type ModelUIOptions } from '@/types/model';
+import {
+  type ModelUIOptions,
+  type ReasoningEffort,
+  type SentEffort
+} from '@/types/model';
 
 /**
  * 'auto' is a regular option value that admins put in a model's `uiOptions`
@@ -91,7 +95,9 @@ export const OPTION_DEFAULTS = {
   /** The shortest clip anything generates. */
   duration: 4,
   /** OpenAI's own default voice, which is the TTS this app is built against. */
-  voice: 'alloy'
+  voice: 'alloy',
+  /** The provider's own idea of how hard to think, which is the safe end. */
+  effort: 'provider-default'
 } as const;
 
 export function pickAspectRatio(
@@ -145,6 +151,32 @@ export function pickResolution(
       uiOptions?.resolutions,
       uiOptions?.resolution
     ) ?? OPTION_DEFAULTS.resolution
+  );
+}
+
+/**
+ * How hard the model should think.
+ *
+ * The values go straight to the AI SDK, which hands them to whichever
+ * provider is behind the model — so an effort settled here needs no
+ * translation into one vendor's spelling. Nothing pinned means
+ * `'provider-default'`, the SDK's own way of saying the same.
+ */
+export function pickEffort(
+  requested: string | undefined,
+  selected: string | undefined,
+  uiOptions?: ModelUIOptions | null
+): SentEffort {
+  // The two inputs are strings off the wire; the cast only lets them be
+  // compared against the declared list, which is what decides whether either
+  // is used at all.
+  return (
+    pickOption(
+      requested as ReasoningEffort | undefined,
+      selected as ReasoningEffort | undefined,
+      uiOptions?.efforts,
+      uiOptions?.effort
+    ) ?? OPTION_DEFAULTS.effort
   );
 }
 
