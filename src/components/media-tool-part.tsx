@@ -47,7 +47,7 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
   }
 
   // A failed tool renders nothing. The model is told what went wrong and says
-  // so in its reply, which is a sentence the reader still understands a week
+  // so in its reply, which is a sentence the user still understands a week
   // later — unlike a chip repeating a provider's wording about a condition
   // that has since passed. The error stays in the part either way: the model
   // needs it on the next turn, and it is what a support question is answered

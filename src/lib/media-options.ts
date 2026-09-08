@@ -38,7 +38,7 @@ export function resolveAutoOption<T extends string | number>(
  * what they wanted. The model's request is a guess made from the wording —
  * and it guesses even when the wording says nothing, picking a value out of
  * the list the tool description shows it. Letting that overrule a menu the
- * reader set on purpose makes the menu unreliable, and for a duration it
+ * user set on purpose makes the menu unreliable, and for a duration it
  * silently changes the bill. A menu left on `auto` is not a selection, so
  * the model still decides wherever nobody pinned anything.
  *

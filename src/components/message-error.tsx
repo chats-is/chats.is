@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
  * A failure rendered inside the message thread.
  *
  * Every in-thread failure goes through this one component so they are
- * indistinguishable to the reader, whatever produced them: a media tool's
+ * indistinguishable to the user, whatever produced them: a media tool's
  * `ToolErrorOutput`, the AI SDK's own `errorText` when a tool throws, or a
  * request the server refused before any of that (see `chatRequestErrorMessage`).
  *

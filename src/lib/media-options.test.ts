@@ -19,7 +19,7 @@ describe('pickAspectRatio', () => {
     aspectRatios: ['16:9', '1:1', '9:16']
   };
 
-  it('honors what the reader picked, over what the model asked for', () => {
+  it('honors what the user picked, over what the model asked for', () => {
     // The menu is the only step where someone said what they wanted; the
     // model's request is a guess it makes even from wording that says
     // nothing.
@@ -90,7 +90,7 @@ describe('pickSize', () => {
 describe('pickDuration', () => {
   const uiOptions = { duration: 6, durations: [4, 6, 8] };
 
-  it('keeps the duration the reader picked, whatever the model asked for', () => {
+  it('keeps the duration the user picked, whatever the model asked for', () => {
     // The case that made this the order: a model volunteered 8s over a menu
     // set to 4s, on a prompt that mentioned no length — and a duration is
     // what the bill is measured in.

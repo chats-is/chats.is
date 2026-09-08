@@ -4,7 +4,7 @@
  * A server function's error travels to the browser intact — that is how a
  * refused mutation reaches its toast. But the same road carries the ones
  * nobody wrote: a database that is down, a column that was renamed, a driver
- * quoting a connection string. Those say nothing to a reader and a little to
+ * quoting a connection string. Those say nothing to a user and a little to
  * anyone else, so the boundary in `src/start.ts` replaces them and keeps the
  * original for the log.
  *

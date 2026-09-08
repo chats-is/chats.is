@@ -323,7 +323,7 @@ export function UiOptionsField({
       {capability === 'chat' && (
         // A row of values like the others, holding the one value there is:
         // the chat's own Think button, offered or not. It does not show the
-        // thinking — it decides whether the reader gets the switch that does.
+        // thinking — it decides whether the user gets the switch that does.
         <div className={cn('space-y-2', !supportsReasoning && 'opacity-50')}>
           <Label>Thinking control</Label>
           <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input p-2 shadow-xs dark:bg-input/30">

@@ -26,7 +26,7 @@ const isDevelopment = import.meta.env.DEV;
  *
  * The reason is shown in development and withheld in production, which costs
  * nothing here: only a route's loader reaches this page, and no loader throws
- * a message meant for a reader. The messages that are — "Quota not found",
+ * a message meant for a user. The messages that are — "Quota not found",
  * "At least one provider is required" — are raised by mutations, and those
  * surface in a toast. What is left is a database that is down or a bug, which
  * says nothing to the person looking at it and a little to anyone else.
