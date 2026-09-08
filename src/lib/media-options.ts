@@ -30,9 +30,17 @@ export function resolveAutoOption<T extends string | number>(
 /**
  * Resolve a generation option for a media generation call.
  *
- * Precedence is: LLM-requested value → user selection → model default →
+ * Precedence is: user selection → LLM-requested value → model default →
  * first option, each accepted only when the model's list allows it (admins
  * constrain what a model accepts and billing depends on it).
+ *
+ * The selection comes first because it is the only step where someone said
+ * what they wanted. The model's request is a guess made from the wording —
+ * and it guesses even when the wording says nothing, picking a value out of
+ * the list the tool description shows it. Letting that overrule a menu the
+ * reader set on purpose makes the menu unreliable, and for a duration it
+ * silently changes the bill. A menu left on `auto` is not a selection, so
+ * the model still decides wherever nobody pinned anything.
  *
  * `auto` is not a value; it is the absence of one. Choosing it in the menu
  * says "I am not pinning this", so it drops out at whichever step it appears
@@ -60,10 +68,10 @@ function pickOption<T extends string | number>(
   const isAllowed = (value: T | undefined): value is T =>
     value !== undefined && allowed.includes(value);
 
-  const chosen = isAllowed(requested)
-    ? requested
-    : isAllowed(selected)
-      ? selected
+  const chosen = isAllowed(selected)
+    ? selected
+    : isAllowed(requested)
+      ? requested
       : isAllowed(fallback)
         ? fallback
         : allowed[0];

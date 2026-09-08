@@ -19,12 +19,20 @@ describe('pickAspectRatio', () => {
     aspectRatios: ['16:9', '1:1', '9:16']
   };
 
-  it('honors a requested value when it is in the allowed list', () => {
-    expect(pickAspectRatio('9:16', '16:9', uiOptions)).toBe('9:16');
+  it('honors what the reader picked, over what the model asked for', () => {
+    // The menu is the only step where someone said what they wanted; the
+    // model's request is a guess it makes even from wording that says
+    // nothing.
+    expect(pickAspectRatio('9:16', '16:9', uiOptions)).toBe('16:9');
   });
 
-  it('falls back to the user selection when the requested value is not allowed', () => {
-    expect(pickAspectRatio('21:9', '1:1', uiOptions)).toBe('1:1');
+  it('lets the model choose where the menu pinned nothing', () => {
+    // Which is what a menu on Auto sends: no selection at all.
+    expect(pickAspectRatio('9:16', undefined, uiOptions)).toBe('9:16');
+  });
+
+  it('falls back to the request when the selection is not allowed', () => {
+    expect(pickAspectRatio('1:1', '21:9', uiOptions)).toBe('1:1');
   });
 
   it('falls back to the model default when neither requested nor selected is allowed', () => {
@@ -82,8 +90,11 @@ describe('pickSize', () => {
 describe('pickDuration', () => {
   const uiOptions = { duration: 6, durations: [4, 6, 8] };
 
-  it('honors an allowed requested duration', () => {
-    expect(pickDuration(8, 4, uiOptions)).toBe(8);
+  it('keeps the duration the reader picked, whatever the model asked for', () => {
+    // The case that made this the order: a model volunteered 8s over a menu
+    // set to 4s, on a prompt that mentioned no length — and a duration is
+    // what the bill is measured in.
+    expect(pickDuration(8, 4, uiOptions)).toBe(4);
   });
 
   it('rejects an out-of-list duration in favor of the selection', () => {
@@ -98,7 +109,9 @@ describe('pickDuration', () => {
 describe('pickResolution', () => {
   it('resolves through the same precedence', () => {
     const uiOptions = { resolution: '720p', resolutions: ['720p', '1080p'] };
-    expect(pickResolution('1080p', '720p', uiOptions)).toBe('1080p');
+    // Selection first, then the request, then the model's own default.
+    expect(pickResolution('1080p', '720p', uiOptions)).toBe('720p');
+    expect(pickResolution('1080p', undefined, uiOptions)).toBe('1080p');
     expect(pickResolution('4k', '1080p', uiOptions)).toBe('1080p');
     expect(pickResolution('4k', '480p', uiOptions)).toBe('720p');
   });
