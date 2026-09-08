@@ -129,9 +129,13 @@ export function optionLabel(key: MediaOptionKey, value: string): string {
 export type OptionShape = 'square' | 'landscape' | 'portrait' | 'plain';
 
 export function optionShape(key: MediaOptionKey, value: string): OptionShape {
-  if (key !== 'aspectRatio') return 'plain';
+  // A ratio is written `w:h` and a pixel size `w x h`; both say which way
+  // round the output comes out, which is the only thing the icon draws. A
+  // resolution or a duration says how much, not which way, and gets nothing.
+  const separator = key === 'aspectRatio' ? ':' : key === 'size' ? 'x' : null;
+  if (!separator) return 'plain';
 
-  const parts = value.split(':');
+  const parts = value.split(separator);
   if (parts.length !== 2) return 'plain';
   const [w, h] = parts.map(Number);
   if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {

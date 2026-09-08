@@ -95,8 +95,15 @@ describe('optionShape', () => {
     expect(optionShape('aspectRatio', '9:16')).toBe('portrait');
   });
 
+  it('reads it from a pixel size too', () => {
+    expect(optionShape('size', '1024x1024')).toBe('square');
+    expect(optionShape('size', '1536x1024')).toBe('landscape');
+    expect(optionShape('size', '1024x1536')).toBe('portrait');
+  });
+
   it('leaves a quantity alone — the label already carries the number', () => {
-    expect(optionShape('size', '1024x1536')).toBe('plain');
+    // A size that names a tier rather than two sides says nothing about which
+    // way round the output comes out.
     expect(optionShape('size', '2K')).toBe('plain');
     expect(optionShape('resolution', '1080p')).toBe('plain');
     expect(optionShape('duration', '8')).toBe('plain');
