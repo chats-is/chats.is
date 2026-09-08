@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
+  Image as ImageIcon,
   Loader2,
   Pencil,
   Plus,
@@ -14,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { type ModelCapability, type ProviderType } from '@/types';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { useSearchFilter } from '@/hooks/use-search-filter';
@@ -47,6 +49,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -64,8 +72,9 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { IconPicker } from '@/components/console/icon-picker';
+import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { UiOptionsField } from '@/components/console/ui-options-field';
 import { ModelIcon } from '@/components/model-icon';
 
 type Model = Awaited<ReturnType<typeof listModels>>[number];
@@ -149,30 +158,6 @@ const EMPTY_FORM: ModelForm = {
   uiOptions: '',
   apiParams: '',
   providers: [{ providerId: '', isEnabled: true }]
-};
-
-const uiOptionsPlaceholderByCapability: Record<string, string> = {
-  chat: `{
-  "reasoning": false
-}`,
-  image: `{
-  "size": "auto",
-  "sizes": ["auto", "1024x1024"],
-  "aspectRatio": "auto",
-  "aspectRatios": ["auto", "16:9"]
-}`,
-  video: `{
-  "duration": 6,
-  "durations": [4, 6, 8],
-  "resolution": "auto",
-  "resolutions": ["auto", "720p"],
-  "aspectRatio": "auto",
-  "aspectRatios": ["auto", "16:9"]
-}`,
-  audio: `{
-  "voice": "auto",
-  "voices": ["auto"]
-}`
 };
 
 const apiParamsPlaceholderByCapability: Record<string, string> = {
@@ -601,142 +586,14 @@ export default function ModelsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-2">
-                    <Label>Providers (priority order, auto failover)</Label>
-                    <form.Field name="providers" mode="array">
-                      {providersField => (
-                        <div className="space-y-2">
-                          {providersField.state.value.map((binding, index) => {
-                            const options = compatibleProviders ?? [];
-                            // An already-bound provider that the current model
-                            // id is no longer compatible with still has to be
-                            // shown, or the row would look empty.
-                            const selectedMissing =
-                              !!binding.providerId &&
-                              !options.some(p => p.id === binding.providerId);
-                            const selectedName =
-                              providers?.find(p => p.id === binding.providerId)
-                                ?.name ?? binding.providerId;
-
-                            const selectOptions = [
-                              ...(selectedMissing
-                                ? [
-                                    {
-                                      value: binding.providerId,
-                                      label: selectedName
-                                    }
-                                  ]
-                                : []),
-                              ...options.map(p => ({
-                                value: p.id,
-                                label: p.name,
-                                disabled: providersField.state.value.some(
-                                  (b, i) => i !== index && b.providerId === p.id
-                                )
-                              }))
-                            ];
-
-                            return (
-                              <div
-                                key={index}
-                                className="flex items-center gap-2 rounded-md border p-2"
-                              >
-                                <form.AppField
-                                  name={`providers[${index}].providerId`}
-                                >
-                                  {field => (
-                                    <field.SelectField
-                                      placeholder="Select provider"
-                                      options={selectOptions}
-                                      fieldClassName="flex-1 space-y-0"
-                                    />
-                                  )}
-                                </form.AppField>
-                                <form.Field
-                                  name={`providers[${index}].isEnabled`}
-                                >
-                                  {field => (
-                                    <Switch
-                                      checked={field.state.value}
-                                      onCheckedChange={checked =>
-                                        field.handleChange(checked)
-                                      }
-                                    />
-                                  )}
-                                </form.Field>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={index === 0}
-                                  onClick={() =>
-                                    providersField.swapValues(index - 1, index)
-                                  }
-                                >
-                                  <ArrowUp className="size-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={
-                                    index ===
-                                    providersField.state.value.length - 1
-                                  }
-                                  onClick={() =>
-                                    providersField.swapValues(index, index + 1)
-                                  }
-                                >
-                                  <ArrowDown className="size-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={
-                                    providersField.state.value.length === 1
-                                  }
-                                  onClick={() =>
-                                    providersField.removeValue(index)
-                                  }
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </div>
-                            );
-                          })}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() =>
-                              providersField.pushValue({
-                                providerId: '',
-                                isEnabled: true
-                              })
-                            }
-                          >
-                            <Plus className="size-4" />
-                            Add provider
-                          </Button>
-                          {providersField.state.meta.isTouched &&
-                            providersField.state.meta.errors[0] && (
-                              <p className="text-xs text-destructive">
-                                {String(
-                                  (
-                                    providersField.state.meta.errors[0] as {
-                                      message?: string;
-                                    }
-                                  )?.message ??
-                                    providersField.state.meta.errors[0]
-                                )}
-                              </p>
-                            )}
-                        </div>
-                      )}
-                    </form.Field>
-                  </div>
+                  <form.AppField name="capability">
+                    {field => (
+                      <field.SelectField
+                        label="Capability"
+                        options={CAPABILITY_OPTIONS}
+                      />
+                    )}
+                  </form.AppField>
                   <form.AppField name="aliases">
                     {field => (
                       <field.TextField
@@ -747,126 +604,316 @@ export default function ModelsPage() {
                   </form.AppField>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <form.AppField name="capability">
-                    {field => (
-                      <field.SelectField
-                        label="Capability"
-                        options={CAPABILITY_OPTIONS}
-                      />
-                    )}
-                  </form.AppField>
-                  <form.AppField name="systemPrompt">
-                    {field => (
-                      <field.TextareaField
-                        label="System Prompt (optional)"
-                        placeholder="Instructions prepended to every chat with this model. Supports {provider}, {modelId}, {date}."
-                        rows={4}
-                      />
-                    )}
-                  </form.AppField>
-                </div>
-
-                <form.Field name="image">
-                  {field => (
+                <form.Field name="providers" mode="array">
+                  {providersField => (
                     <div className="space-y-2">
-                      <Label htmlFor="image">Icon (optional)</Label>
-                      <div className="flex items-center gap-2">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 shadow-sm">
-                          {field.state.value ? (
-                            <ModelIcon
-                              image={field.state.value}
-                              className="size-4"
-                            />
-                          ) : null}
-                        </div>
-                        <Input
-                          id="image"
-                          value={field.state.value}
-                          onChange={e => field.handleChange(e.target.value)}
-                          placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
-                        />
+                      <div className="flex items-center justify-between gap-2">
+                        <Label>Providers (priority order, auto failover)</Label>
+                        {/* Beside the heading rather than under the list: the
+                            list grows, and a button that moves down the
+                            dialog every time one is added is a moving
+                            target. */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="-my-1 h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                          onClick={() =>
+                            providersField.pushValue({
+                              providerId: '',
+                              isEnabled: true
+                            })
+                          }
+                        >
+                          <Plus className="size-4" />
+                          Add
+                        </Button>
                       </div>
-                      <IconPicker
-                        value={field.state.value}
-                        onChange={value => field.handleChange(value)}
-                      />
+                      <div className="space-y-1">
+                        {providersField.state.value.map((binding, index) => {
+                          const options = compatibleProviders ?? [];
+                          // An already-bound provider that the current model
+                          // id is no longer compatible with still has to be
+                          // shown, or the row would look empty.
+                          const selectedMissing =
+                            !!binding.providerId &&
+                            !options.some(p => p.id === binding.providerId);
+                          const selectedName =
+                            providers?.find(p => p.id === binding.providerId)
+                              ?.name ?? binding.providerId;
+
+                          const selectOptions = [
+                            ...(selectedMissing
+                              ? [
+                                  {
+                                    value: binding.providerId,
+                                    label: selectedName
+                                  }
+                                ]
+                              : []),
+                            ...options.map(p => ({
+                              value: p.id,
+                              label: p.name,
+                              disabled: providersField.state.value.some(
+                                (b, i) => i !== index && b.providerId === p.id
+                              )
+                            }))
+                          ];
+
+                          return (
+                            <div
+                              key={index}
+                              className="flex items-center gap-1"
+                            >
+                              <form.AppField
+                                name={`providers[${index}].providerId`}
+                              >
+                                {field => (
+                                  <field.SelectField
+                                    placeholder="Select provider"
+                                    options={selectOptions}
+                                    fieldClassName="flex-1 space-y-0"
+                                  />
+                                )}
+                              </form.AppField>
+                              <form.Field
+                                name={`providers[${index}].isEnabled`}
+                              >
+                                {field => (
+                                  // A bare switch sits shorter than the
+                                  // controls beside it; the shell gives it
+                                  // their height and their border.
+                                  <div className="flex h-9 items-center rounded-md border border-input px-2.5 shadow-xs dark:bg-input/30">
+                                    <Switch
+                                      checked={field.state.value}
+                                      onCheckedChange={checked =>
+                                        field.handleChange(checked)
+                                      }
+                                    />
+                                  </div>
+                                )}
+                              </form.Field>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="size-9 text-muted-foreground"
+                                disabled={index === 0}
+                                onClick={() =>
+                                  providersField.swapValues(index - 1, index)
+                                }
+                              >
+                                <ArrowUp className="size-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="size-9 text-muted-foreground"
+                                disabled={
+                                  index ===
+                                  providersField.state.value.length - 1
+                                }
+                                onClick={() =>
+                                  providersField.swapValues(index, index + 1)
+                                }
+                              >
+                                <ArrowDown className="size-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="size-9 text-muted-foreground hover:text-destructive"
+                                disabled={
+                                  providersField.state.value.length === 1
+                                }
+                                onClick={() =>
+                                  providersField.removeValue(index)
+                                }
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        {providersField.state.meta.isTouched &&
+                          providersField.state.meta.errors[0] && (
+                            <p className="text-xs text-destructive">
+                              {String(
+                                (
+                                  providersField.state.meta.errors[0] as {
+                                    message?: string;
+                                  }
+                                )?.message ??
+                                  providersField.state.meta.errors[0]
+                              )}
+                            </p>
+                          )}
+                      </div>
                     </div>
                   )}
                 </form.Field>
 
-                <form.Subscribe selector={state => state.values.capability}>
-                  {capability => (
-                    <div className="grid grid-cols-1 gap-4">
-                      <form.AppField name="uiOptions">
-                        {field => (
-                          <field.TextareaField
-                            label={
-                              <JsonHint
-                                label="UI Options (JSON)"
-                                example={
-                                  uiOptionsPlaceholderByCapability[
-                                    capability
-                                  ] ?? '{\n}'
-                                }
+                <form.AppField name="systemPrompt">
+                  {field => (
+                    <field.TextareaField
+                      label="System Prompt (optional)"
+                      placeholder="Instructions prepended to every chat with this model. Supports {provider}, {modelId}, {date}."
+                      rows={4}
+                    />
+                  )}
+                </form.AppField>
+
+                <form.Subscribe
+                  selector={state =>
+                    state.values.modelId || state.values.name || ''
+                  }
+                >
+                  {identity => (
+                    <form.Field name="image">
+                      {field => (
+                        <div className="space-y-2">
+                          <Label htmlFor="image">Icon (optional)</Label>
+                          {/* The preview is the way in: the catalogue is
+                              long and only wanted for a moment, so it lives
+                              behind the thing it sets rather than under it. */}
+                          <Popover>
+                            {/* The whole row anchors it, not the swatch that
+                                opens it — that is what makes
+                                `--radix-popover-trigger-width` the width of
+                                the field instead of the width of a button. */}
+                            <PopoverAnchor asChild>
+                              <div className="flex items-center gap-2">
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    aria-label="Choose an icon"
+                                    className="flex size-9 shrink-0 items-center justify-center rounded-md border border-input bg-transparent shadow-xs transition-[color,box-shadow] outline-none hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+                                  >
+                                    {field.state.value ? (
+                                      <ModelIcon
+                                        image={field.state.value}
+                                        className="size-4"
+                                      />
+                                    ) : (
+                                      <ImageIcon className="size-4 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                </PopoverTrigger>
+                                <Input
+                                  id="image"
+                                  value={field.state.value}
+                                  onChange={e =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                  placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
+                                />
+                              </div>
+                            </PopoverAnchor>
+                            {/* Not portalled: the dialog's scroll lock only
+                                lets the wheel through inside its own content,
+                                and a portalled popover lands outside it. */}
+                            <PopoverContent
+                              side="top"
+                              align="start"
+                              portal={false}
+                              className="w-(--radix-popover-trigger-width) p-0"
+                            >
+                              <IconPicker
+                                value={field.state.value}
+                                onChange={value => field.handleChange(value)}
+                                initialSearch={iconSearchSeed(identity)}
                               />
-                            }
-                            placeholder={
-                              uiOptionsPlaceholderByCapability[capability] ??
-                              '{\n}'
-                            }
-                            className="font-mono break-all"
-                            rows={3}
-                          />
-                        )}
-                      </form.AppField>
-                      <form.AppField name="apiParams">
-                        {field => (
-                          <field.TextareaField
-                            label={
-                              <JsonHint
-                                label="API Params (JSON)"
-                                example={
-                                  apiParamsPlaceholderByCapability[
-                                    capability
-                                  ] ?? '{}'
-                                }
-                              />
-                            }
-                            placeholder={
-                              apiParamsPlaceholderByCapability[capability] ??
-                              '{}'
-                            }
-                            className="font-mono break-all"
-                            rows={3}
-                          />
-                        )}
-                      </form.AppField>
-                    </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      )}
+                    </form.Field>
                   )}
                 </form.Subscribe>
 
-                <form.Subscribe selector={state => state.values.capability}>
-                  {capability => (
-                    <div className="flex flex-wrap gap-4">
-                      <form.AppField name="supportsVision">
-                        {field => <field.SwitchField label="Vision" />}
-                      </form.AppField>
-                      <form.AppField name="supportsReasoning">
-                        {field => <field.SwitchField label="Reasoning" />}
-                      </form.AppField>
-                      {CONDITIONAL_TOGGLES.filter(
-                        toggle => toggle.capability === capability
-                      ).map(toggle => (
-                        <form.AppField key={toggle.name} name={toggle.name}>
-                          {field => <field.SwitchField label={toggle.label} />}
+                {/* One string rather than an object, so the subscription
+                    re-renders on a real change and not on every keystroke
+                    that rebuilds the providers array. */}
+                <form.Subscribe
+                  selector={state =>
+                    [
+                      state.values.capability,
+                      state.values.providers.map(b => b.providerId).join(','),
+                      String(state.values.supportsReasoning)
+                    ].join('|')
+                  }
+                >
+                  {key => {
+                    const [capability, providerIds, reasoning] = key.split('|');
+                    const providerTypes = providerIds
+                      .split(',')
+                      .map(id => providers?.find(p => p.id === id)?.type)
+                      .filter((type): type is ProviderType => !!type);
+
+                    return (
+                      <div className="grid grid-cols-1 gap-4">
+                        {/* Every switch together, under the icon and above
+                            the options: Reasoning decides whether two of
+                            those options are reachable at all, so it has to
+                            be read before them. */}
+                        <div className="flex flex-wrap gap-4">
+                          <form.AppField name="isEnabled">
+                            {field => <field.SwitchField label="Enabled" />}
+                          </form.AppField>
+                          <form.AppField name="supportsVision">
+                            {field => <field.SwitchField label="Vision" />}
+                          </form.AppField>
+                          <form.AppField name="supportsReasoning">
+                            {field => <field.SwitchField label="Reasoning" />}
+                          </form.AppField>
+                          {CONDITIONAL_TOGGLES.filter(
+                            toggle => toggle.capability === capability
+                          ).map(toggle => (
+                            <form.AppField key={toggle.name} name={toggle.name}>
+                              {field => (
+                                <field.SwitchField label={toggle.label} />
+                              )}
+                            </form.AppField>
+                          ))}
+                        </div>
+                        <form.Field name="uiOptions">
+                          {field => (
+                            <UiOptionsField
+                              value={field.state.value}
+                              onChange={value => field.handleChange(value)}
+                              capability={capability as ModelCapability}
+                              providerTypes={providerTypes}
+                              supportsReasoning={reasoning === 'true'}
+                            />
+                          )}
+                        </form.Field>
+                        <form.AppField name="apiParams">
+                          {field => (
+                            <field.TextareaField
+                              label={
+                                <JsonHint
+                                  label="API Params (JSON)"
+                                  example={
+                                    apiParamsPlaceholderByCapability[
+                                      capability
+                                    ] ?? '{}'
+                                  }
+                                />
+                              }
+                              placeholder={
+                                apiParamsPlaceholderByCapability[capability] ??
+                                '{}'
+                              }
+                              className="font-mono break-all"
+                              rows={3}
+                            />
+                          )}
                         </form.AppField>
-                      ))}
-                      <form.AppField name="isEnabled">
-                        {field => <field.SwitchField label="Enabled" />}
-                      </form.AppField>
-                    </div>
-                  )}
+                      </div>
+                    );
+                  }}
                 </form.Subscribe>
               </div>
 

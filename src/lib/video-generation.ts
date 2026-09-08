@@ -10,6 +10,7 @@ import {
   runWithProviderFailover,
   type FailoverProvider
 } from '@/lib/provider';
+import { toRequestParts } from '@/lib/provider-vocab';
 import { resolveVideoSeconds } from '@/lib/video-usage';
 
 /**
@@ -107,13 +108,11 @@ export async function generateWithSora(args: {
   provider: ProviderConfig;
   /** Sora names its output by pixels; omitted where the model declares none. */
   size?: string;
-  resolution?: string;
   /** Required: the option chain settles this before anyone reaches a provider. */
   duration: number;
   abortSignal?: AbortSignal;
 }): Promise<VideoGenerationResult> {
-  const { model, prompt, provider, size, resolution, duration, abortSignal } =
-    args;
+  const { model, prompt, provider, size, duration, abortSignal } = args;
   const openai = createOpenAIClient(provider);
 
   // Sora takes 4, 8 or 12; a request between them buys the next one up.
@@ -125,8 +124,7 @@ export async function generateWithSora(args: {
     model: model, // 'sora-2' | 'sora-2-pro'
     prompt,
     ...(size && { size: size as OpenAI.Videos.VideoSize }),
-    seconds,
-    ...(resolution && { resolution: resolution as any })
+    seconds
   });
 
   // Poll for completion if not already completed.
@@ -260,8 +258,11 @@ export async function generateAndStoreVideo(args: {
           model: modelId,
           prompt,
           provider,
-          size,
-          resolution,
+          // Through the same catalogue as every other provider, even though
+          // this call bypasses the AI SDK: a size Sora does not name is one
+          // it would reject.
+          size: toRequestParts(provider.type, 'video', { size }).top.size as
+            string | undefined,
           duration,
           abortSignal
         });
@@ -282,11 +283,19 @@ export async function generateAndStoreVideo(args: {
           );
         }
 
+        // Duration, aspect ratio and resolution are inherited from the source
+        // when editing, so the provider ignores them — don't send any.
+        const parts = inputVideoUrl
+          ? { top: {}, provider: {}, imageConfig: {} }
+          : toRequestParts(provider.type, 'video', {
+              aspectRatio,
+              resolution,
+              duration
+            });
+
         const providerOpts = {
           ...provider.apiOptions,
-          // Duration, aspect ratio and resolution are inherited from the source
-          // when editing, so the provider ignores them — don't send one.
-          ...(resolution && !inputVideoUrl && { resolution }),
+          ...parts.provider,
           ...(inputVideoUrl && { videoUrl: inputVideoUrl })
         };
         // The AI SDK polls the provider internally with no ceiling of its
@@ -308,7 +317,7 @@ export async function generateAndStoreVideo(args: {
             prompt: inputImage
               ? { image: inputImage.data, text: prompt }
               : prompt,
-            ...(inputVideoUrl ? {} : { aspectRatio, duration }),
+            ...parts.top,
             abortSignal: signal,
             ...(Object.keys(providerOpts).length > 0 && {
               providerOptions: {

@@ -36,6 +36,12 @@ export const generateImageInputSchema = z.object({
     .optional()
     .describe(
       'Image size like "1024x1024" — pick from the available values when the user\'s wording implies one; omit otherwise'
+    ),
+  resolution: z
+    .string()
+    .optional()
+    .describe(
+      'Image resolution like "2K" — pick from the available values when the user\'s wording implies one (e.g. 高清); omit otherwise'
     )
 });
 

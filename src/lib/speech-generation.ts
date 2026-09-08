@@ -9,6 +9,7 @@ import {
   runWithProviderFailover,
   type FailoverProvider
 } from '@/lib/provider';
+import { defaultVoice } from '@/lib/provider-vocab';
 
 export type SpeechGenerationResult = StoredMedia & {
   characters: number;
@@ -29,7 +30,9 @@ export async function generateAndStoreSpeech(args: {
   abortSignal?: AbortSignal;
 }): Promise<SpeechGenerationResult> {
   const { userId, text, dbModel, candidates, abortSignal } = args;
-  // 'auto' (admin-configurable option) means: let the provider decide.
+  // Settled against what the model declared, or undefined when it declared
+  // nothing — in which case the provider reached below supplies the fixed
+  // fallback, since the three vendors share no voice name.
   const { voice } = args;
   const modelId = dbModel.modelId;
 
@@ -38,7 +41,7 @@ export async function generateAndStoreSpeech(args: {
       const { audio } = await generateSpeech({
         model: getSpeechModel(provider, modelId),
         text,
-        voice,
+        voice: voice ?? defaultVoice(provider.type),
         outputFormat: 'mp3',
         abortSignal,
         ...(provider.apiOptions && {

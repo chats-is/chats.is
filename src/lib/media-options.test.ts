@@ -216,8 +216,8 @@ describe('pickVoice', () => {
     expect(pickVoice(undefined, 'nova', uiOptions)).toBe('nova');
   });
 
-  it("falls to the app's own default when the model declares no voices", () => {
-    expect(pickVoice(undefined, undefined, {})).toBe(OPTION_DEFAULTS.voice);
+  it('leaves the voice to the provider when the model declares none', () => {
+    expect(pickVoice(undefined, undefined, {})).toBeUndefined();
   });
 
   it('never returns nothing, whatever the model declares', () => {
@@ -226,7 +226,9 @@ describe('pickVoice', () => {
       expect(pickSize(undefined, undefined, ui)).toBeDefined();
       expect(pickResolution(undefined, undefined, ui)).toBeDefined();
       expect(pickDuration(undefined, undefined, ui)).toBeDefined();
-      expect(pickVoice(undefined, undefined, ui)).toBeDefined();
+      // Voice is the exception: the fixed fallback is the provider's own
+      // name for its default, so it is filled in one step later.
+      expect(pickVoice(undefined, undefined, ui)).toBeUndefined();
     }
   });
 });

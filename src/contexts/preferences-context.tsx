@@ -21,6 +21,7 @@ export interface Preferences {
   imageEditModelId: string;
   imageSize: string;
   imageAspectRatio: string;
+  imageResolution: string;
   // Video
   videoModelId: string;
   videoImageModelId: string;
@@ -114,6 +115,7 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       imageEditModelId: systemDefault(defaults.imageEditModelId, editModels),
       imageSize: '',
       imageAspectRatio: '',
+      imageResolution: '',
       // Video
       videoModelId: systemDefault(defaults.videoModelId, videoModels),
       // Its own choice: only some video models take an image as the first frame.

@@ -21,7 +21,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 
-import { type ChatMessage, type Model } from '@/types';
+import { type ChatMessage, type Model, type ProviderType } from '@/types';
 import {
   allowedValues,
   chooseValue,
@@ -32,6 +32,7 @@ import {
   type MediaOptionKey,
   type OptionShape
 } from '@/lib/media-settings';
+import { vocabularyFor } from '@/lib/provider-vocab';
 import { modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -156,10 +157,29 @@ function MediaKind({
     models.find(model => modelMatchesId(model, modelId)) ?? models[0];
   const uiOptions = selected?.uiOptions;
 
+  // The same catalogue the console offers an admin, applied again here: a
+  // model configured before it closed can still carry values its providers
+  // have no parameter for, and a row for one of those would promise a setting
+  // that never leaves the browser.
+  const providerTypes = (
+    selected?.providers?.length
+      ? selected.providers.map(binding => binding.provider?.type)
+      : [selected?.provider?.type]
+  ).filter((type): type is ProviderType => !!type);
+
+  // Undefined, not an empty vocabulary, when nothing is known about the
+  // providers: `{}` reads as "this provider accepts nothing" and would empty
+  // the menu, and a model whose bindings are all disabled is the case that
+  // gets there.
+  const vocabulary =
+    selected && providerTypes.length > 0
+      ? vocabularyFor(providerTypes, selected.capability)
+      : undefined;
+
   const rows = options
     .map(option => ({
       ...option,
-      allowed: allowedValues(uiOptions, option.key)
+      allowed: allowedValues(uiOptions, option.key, vocabulary)
     }))
     .filter(option => option.allowed.length > 0);
 
@@ -371,6 +391,11 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
                 key: 'aspectRatio',
                 value: preferences.imageAspectRatio,
                 onChange: value => setPreference('imageAspectRatio', value)
+              },
+              {
+                key: 'resolution',
+                value: preferences.imageResolution,
+                onChange: value => setPreference('imageResolution', value)
               }
             ]}
           />

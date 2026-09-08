@@ -9,8 +9,9 @@ import {
 } from '@/lib/media-settings';
 
 describe('allowedValues', () => {
-  it('reads the list an admin put on the model', () => {
+  it('reads the list an admin put on the model, behind an Auto', () => {
     expect(allowedValues({ sizes: ['1K', '2K'] }, 'size')).toEqual([
+      'auto',
       '1K',
       '2K'
     ]);
@@ -18,14 +19,24 @@ describe('allowedValues', () => {
 
   it('renders numeric durations as the strings a radio group compares', () => {
     expect(allowedValues({ durations: [5, 10] }, 'duration')).toEqual([
+      'auto',
       '5',
       '10'
+    ]);
+  });
+
+  it('offers one Auto, whatever a model configured earlier still carries', () => {
+    expect(allowedValues({ sizes: ['auto', '1K'] }, 'size')).toEqual([
+      'auto',
+      '1K'
     ]);
   });
 
   it('is empty where the model gives no say, so no row is offered', () => {
     expect(allowedValues({ sizes: ['1K'] }, 'resolution')).toEqual([]);
     expect(allowedValues(null, 'size')).toEqual([]);
+    // An Auto with nothing to be an alternative to is not a row either.
+    expect(allowedValues({ sizes: ['auto'] }, 'size')).toEqual([]);
   });
 });
 

@@ -52,7 +52,12 @@ import {
 } from '@/lib/video-generation';
 
 export type MediaToolsOptions = {
-  image?: { modelId?: string; size?: string; aspectRatio?: string };
+  image?: {
+    modelId?: string;
+    size?: string;
+    aspectRatio?: string;
+    resolution?: string;
+  };
   /** Editing an existing image is its own model choice — few can do it. */
   imageEdit?: { modelId?: string };
   video?: {
@@ -261,7 +266,11 @@ export async function buildMediaTools(args: {
     const runImage = async (
       on: ResolvedMediaModel,
       prompt: string,
-      requested: { aspectRatio?: string; size?: string },
+      requested: {
+        aspectRatio?: string;
+        size?: string;
+        resolution?: string;
+      },
       inputImages: Array<{ data: Uint8Array; mediaType: string }> | undefined,
       abortSignal: AbortSignal | undefined
     ): Promise<MediaToolOutput> => {
@@ -283,6 +292,11 @@ export async function buildMediaTools(args: {
           aspectRatio: pickAspectRatio(
             requested.aspectRatio,
             mediaOptions?.image?.aspectRatio,
+            dbModel.uiOptions
+          ),
+          resolution: pickResolution(
+            requested.resolution,
+            mediaOptions?.image?.resolution,
             dbModel.uiOptions
           ),
           inputImages,
@@ -321,13 +335,18 @@ export async function buildMediaTools(args: {
         description:
           'Generate a new image from a text description.' +
           optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
-          optionsHint('sizes', dbModel.uiOptions?.sizes),
+          optionsHint('sizes', dbModel.uiOptions?.sizes) +
+          optionsHint('resolutions', dbModel.uiOptions?.resolutions),
         inputSchema: generateImageInputSchema,
         execute: (input, { abortSignal }) =>
           runImage(
             image,
             input.prompt,
-            { aspectRatio: input.aspectRatio, size: input.size },
+            {
+              aspectRatio: input.aspectRatio,
+              size: input.size,
+              resolution: input.resolution
+            },
             undefined,
             abortSignal
           )

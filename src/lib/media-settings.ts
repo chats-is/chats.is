@@ -5,6 +5,7 @@ import {
   VideoResolutionLabels
 } from '@/lib/constant';
 import { AUTO_OPTION } from '@/lib/media-options';
+import { type Vocabulary } from '@/lib/provider-vocab';
 
 /**
  * The generation options a media model exposes, as the settings menu needs
@@ -37,16 +38,36 @@ export const MediaOptionLabels: Record<MediaOptionKey, string> = {
   voice: 'Voice'
 };
 
-/** The values this model allows for an option, in the order the admin listed. */
+/**
+ * The values this model allows for an option, in the order the admin listed,
+ * behind an Auto the menu adds itself.
+ *
+ * Auto is not one of the values a model can declare — the vocabulary an admin
+ * picks from holds only things a provider would accept, and Auto is the
+ * absence of a choice rather than a thing to send. It belongs to every option
+ * that has a list at all, so it is added here instead of being typed into
+ * each model and forgotten in some.
+ */
 export function allowedValues(
   uiOptions: ModelUIOptions | null | undefined,
-  key: MediaOptionKey
+  key: MediaOptionKey,
+  vocabulary?: Vocabulary
 ): Array<string> {
   const list = uiOptions?.[LIST_KEY[key]];
   if (!Array.isArray(list)) return [];
-  return list
+  // With a vocabulary in hand the menu offers only what the model's providers
+  // can be sent — an option they have no parameter for shows no row at all,
+  // rather than one whose value is quietly dropped on the way out.
+  const catalogue = vocabulary?.[key]?.map(String);
+  if (vocabulary && !catalogue) return [];
+  const values = list
     .map(value => (typeof value === 'number' ? String(value) : value))
-    .filter((value): value is string => typeof value === 'string');
+    .filter((value): value is string => typeof value === 'string')
+    // Filtered rather than trusted: models configured before the vocabulary
+    // closed still carry an 'auto' of their own.
+    .filter(value => value !== AUTO_OPTION)
+    .filter(value => !catalogue || catalogue.includes(value));
+  return values.length > 0 ? [AUTO_OPTION, ...values] : [];
 }
 
 /** The value this model prefers when nothing has been chosen. */

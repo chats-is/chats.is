@@ -226,35 +226,40 @@ function SelectField({
       error={error}
       className={fieldClassName}
     >
-      <Select
-        // `undefined`, not `''`: Radix keeps the empty string for clearing a
-        // select back to its placeholder, so it cannot also stand for a value.
-        // A value that no longer names an option counts as unset too —
-        // otherwise the trigger renders blank with no hint that anything was
-        // ever chosen.
-        value={chosen}
-        onValueChange={value => field.handleChange(value)}
-        disabled={disabled ?? isSubmitting}
-      >
-        <SelectTrigger
-          id={field.name}
-          aria-invalid={!!error}
-          className={cn('w-full', className)}
+      {/* Wrapped: Radix puts a hidden native select beside the trigger, and
+          the shell's vertical rhythm would otherwise count it as a second
+          control and leave a gap under the field. */}
+      <div>
+        <Select
+          // `undefined`, not `''`: Radix keeps the empty string for clearing a
+          // select back to its placeholder, so it cannot also stand for a
+          // value. A value that no longer names an option counts as unset
+          // too — otherwise the trigger renders blank with no hint that
+          // anything was ever chosen.
+          value={chosen}
+          onValueChange={value => field.handleChange(value)}
+          disabled={disabled ?? isSubmitting}
         >
-          {triggerContent ?? <SelectValue placeholder={placeholder} />}
-        </SelectTrigger>
-        <SelectContent>
-          {options.map(option => (
-            <SelectItem
-              key={option.value}
-              value={option.value}
-              disabled={option.disabled}
-            >
-              {option.node ?? option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <SelectTrigger
+            id={field.name}
+            aria-invalid={!!error}
+            className={cn('w-full', className)}
+          >
+            {triggerContent ?? <SelectValue placeholder={placeholder} />}
+          </SelectTrigger>
+          <SelectContent>
+            {options.map(option => (
+              <SelectItem
+                key={option.value}
+                value={option.value}
+                disabled={option.disabled}
+              >
+                {option.node ?? option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </FieldShell>
   );
 }

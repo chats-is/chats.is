@@ -1,7 +1,15 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import {
+  Image as ImageIcon,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -39,6 +47,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -51,7 +65,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { IconPicker } from '@/components/console/icon-picker';
+import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
 import { ProviderModelSyncDialog } from '@/components/console/provider-model-sync-dialog';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ModelIcon } from '@/components/model-icon';
@@ -722,33 +736,75 @@ export default function ProvidersPage() {
                   )}
                 </form.AppField>
 
-                <form.Field name="image">
-                  {field => (
-                    <div className="space-y-2">
-                      <Label htmlFor="image">Icon (optional)</Label>
-                      <div className="flex items-center gap-2">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 shadow-sm">
-                          {field.state.value ? (
-                            <ModelIcon
-                              image={field.state.value}
-                              className="size-4"
-                            />
-                          ) : null}
+                <form.Subscribe
+                  selector={state => state.values.type || state.values.name}
+                >
+                  {identity => (
+                    <form.Field name="image">
+                      {field => (
+                        <div className="space-y-2">
+                          <Label htmlFor="image">Icon (optional)</Label>
+                          {/* The preview is the way in: the catalogue is
+                              long and only wanted for a moment, so it lives
+                              behind the thing it sets rather than under it. */}
+                          <Popover>
+                            {/* The whole row anchors it, not the swatch that
+                                opens it — that is what makes
+                                `--radix-popover-trigger-width` the width of
+                                the field instead of the width of a button. */}
+                            <PopoverAnchor asChild>
+                              <div className="flex items-center gap-2">
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    aria-label="Choose an icon"
+                                    className="flex size-9 shrink-0 items-center justify-center rounded-md border border-input bg-transparent shadow-xs transition-[color,box-shadow] outline-none hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+                                  >
+                                    {field.state.value ? (
+                                      <ModelIcon
+                                        image={field.state.value}
+                                        className="size-4"
+                                      />
+                                    ) : (
+                                      <ImageIcon className="size-4 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                </PopoverTrigger>
+                                <Input
+                                  id="image"
+                                  value={field.state.value}
+                                  onChange={e =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                  placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
+                                />
+                              </div>
+                            </PopoverAnchor>
+                            {/* Not portalled: the dialog's scroll lock only
+                                lets the wheel through inside its own content,
+                                and a portalled popover lands outside it. */}
+                            <PopoverContent
+                              side="top"
+                              align="start"
+                              portal={false}
+                              className="w-(--radix-popover-trigger-width) p-0"
+                            >
+                              <IconPicker
+                                value={field.state.value}
+                                onChange={value => field.handleChange(value)}
+                                initialSearch={iconSearchSeed(identity)}
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
-                        <Input
-                          id="image"
-                          value={field.state.value}
-                          onChange={e => field.handleChange(e.target.value)}
-                          placeholder="https:// or Base64 or IconName (e.g. Gemini.Color)"
-                        />
-                      </div>
-                      <IconPicker
-                        value={field.state.value}
-                        onChange={value => field.handleChange(value)}
-                      />
-                    </div>
+                      )}
+                    </form.Field>
                   )}
-                </form.Field>
+                </form.Subscribe>
+
+                <form.AppField name="isEnabled">
+                  {field => <field.SwitchField label="Enabled" />}
+                </form.AppField>
 
                 <form.AppField name="apiOptions">
                   {field => (
@@ -759,10 +815,6 @@ export default function ProvidersPage() {
                       rows={3}
                     />
                   )}
-                </form.AppField>
-
-                <form.AppField name="isEnabled">
-                  {field => <field.SwitchField label="Enabled" />}
                 </form.AppField>
               </div>
               <div className="flex justify-end gap-2">

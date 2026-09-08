@@ -778,7 +778,14 @@ async function POST({ request: req }: { request: Request }) {
             // The chain has already settled this against what the model
             // declared; the SDK hands it to whichever provider is behind the
             // model, so nothing here spells it that vendor's way.
-            reasoning: pickEffort(undefined, effort, dbModel.uiOptions),
+            //
+            // A model whose Reasoning switch is off does not think at all, so
+            // there is no level to ask for — the switch is the source of
+            // truth, and options left over from before it was turned off are
+            // not an instruction.
+            reasoning: dbModel.supportsReasoning
+              ? pickEffort(undefined, effort, dbModel.uiOptions)
+              : undefined,
             temperature: dbModel.apiParams?.temperature,
             topP: dbModel.apiParams?.topP,
             topK: dbModel.apiParams?.topK,

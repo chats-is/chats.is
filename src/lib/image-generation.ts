@@ -10,6 +10,7 @@ import {
   runWithProviderFailover,
   type FailoverProvider
 } from '@/lib/provider';
+import { toRequestParts } from '@/lib/provider-vocab';
 
 export type InputImage = {
   data: Uint8Array | string;
@@ -34,20 +35,34 @@ export async function generateAndStoreImage(args: {
   candidates: FailoverProvider[];
   size?: `${number}x${number}` | string;
   aspectRatio?: `${number}:${number}`;
+  resolution?: string;
   inputImages?: InputImage[];
   abortSignal?: AbortSignal;
 }): Promise<ImageGenerationResult> {
   const { userId, prompt, dbModel, candidates, inputImages, abortSignal } =
     args;
-  // Already settled: `pickSize` and `pickAspectRatio` chose from what the
-  // model declared, so anything undefined here is a model that declared
-  // nothing — not an 'auto' waiting to be unwrapped.
-  const { size, aspectRatio } = args;
+  // Already settled: the `pick*` helpers chose from what the model declared,
+  // so anything undefined here is a model that declared nothing — not an
+  // 'auto' waiting to be unwrapped. Which of them a given provider can
+  // actually take, and under what name, is `toRequestParts`' business.
+  const { size, aspectRatio, resolution } = args;
   const modelId = dbModel.modelId;
 
   const { result, provider: usedProvider } = await runWithProviderFailover(
     candidates,
     async provider => {
+      // Gemini generates images inside a text turn and reads its settings
+      // from a nested object; every other path uses the image API.
+      const inline = provider.type === 'google' && modelId.startsWith('gemini');
+      // Same settled values every time; where they land depends on which
+      // provider this attempt reached, and by which call.
+      const parts = toRequestParts(
+        provider.type,
+        'image',
+        { size, aspectRatio, resolution },
+        { inline }
+      );
+
       let imageBase64: string;
       let imageMediaType: string;
       // Token counts for token-billed image models (e.g. gpt-image-1).
@@ -58,7 +73,7 @@ export async function generateAndStoreImage(args: {
 
       // Gemini serves images via generateText (multi-modal); other providers
       // use the generateImage API.
-      if (provider.type === 'google' && modelId.startsWith('gemini')) {
+      if (inline) {
         const messages: ModelMessage[] = [
           {
             role: 'user',
@@ -86,10 +101,7 @@ export async function generateAndStoreImage(args: {
           providerOptions: {
             [provider.type]: {
               ...provider.apiOptions,
-              imageConfig: {
-                ...(aspectRatio && { aspectRatio }),
-                ...(size && { imageSize: size })
-              }
+              imageConfig: parts.imageConfig
             }
           } as any
         });
@@ -107,9 +119,7 @@ export async function generateAndStoreImage(args: {
         outputTokens = genResult.usage?.outputTokens;
       } else {
         // Standard image models use generateImage API
-        const standardSize = size?.includes('x')
-          ? (size as `${number}x${number}`)
-          : undefined;
+        const providerOpts = { ...provider.apiOptions, ...parts.provider };
 
         const { image, usage } = await generateImage({
           model: getImageModel(provider, modelId),
@@ -117,12 +127,11 @@ export async function generateAndStoreImage(args: {
             ? { text: prompt, images: inputImages.map(image => image.data) }
             : prompt,
           n: 1,
-          size: standardSize,
-          aspectRatio,
+          ...parts.top,
           abortSignal,
-          ...(provider.apiOptions && {
+          ...(Object.keys(providerOpts).length > 0 && {
             providerOptions: {
-              [provider.type]: provider.apiOptions
+              [provider.type]: providerOpts
             }
           })
         });

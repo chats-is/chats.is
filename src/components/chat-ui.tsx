@@ -124,7 +124,8 @@ export function ChatUI({
           ? {
               modelId: preferences.imageModelId,
               size: resolveAutoOption(preferences.imageSize),
-              aspectRatio: resolveAutoOption(preferences.imageAspectRatio)
+              aspectRatio: resolveAutoOption(preferences.imageAspectRatio),
+              resolution: resolveAutoOption(preferences.imageResolution)
             }
           : undefined,
         imageEdit: preferences.imageEditModelId
@@ -164,6 +165,7 @@ export function ChatUI({
       preferences.imageModelId,
       preferences.imageSize,
       preferences.imageAspectRatio,
+      preferences.imageResolution,
       preferences.imageEditModelId,
       preferences.videoModelId,
       preferences.videoSize,

@@ -94,8 +94,6 @@ export const OPTION_DEFAULTS = {
   resolution: '480p',
   /** The shortest clip anything generates. */
   duration: 4,
-  /** OpenAI's own default voice, which is the TTS this app is built against. */
-  voice: 'alloy',
   /** The provider's own idea of how hard to think, which is the safe end. */
   effort: 'provider-default'
 } as const;
@@ -180,13 +178,18 @@ export function pickEffort(
   );
 }
 
+/**
+ * Which voice to speak in.
+ *
+ * The one option with no project-wide fixed value at the end: OpenAI's
+ * `alloy`, Google's `Kore` and xAI's `eve` name nothing in common, so a
+ * model that declares no voices leaves this undefined and the provider
+ * actually reached fills it in from `defaultVoice`.
+ */
 export function pickVoice(
   requested: string | undefined,
   selected: string | undefined,
   uiOptions?: ModelUIOptions | null
-): string {
-  return (
-    pickOption(requested, selected, uiOptions?.voices, uiOptions?.voice) ??
-    OPTION_DEFAULTS.voice
-  );
+): string | undefined {
+  return pickOption(requested, selected, uiOptions?.voices, uiOptions?.voice);
 }

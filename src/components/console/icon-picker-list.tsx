@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { toc } from '@lobehub/icons';
-import { Check } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { ModelIcon } from '@/components/model-icon';
@@ -9,6 +9,8 @@ type IconPickerProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  /** What to search for on open — usually a word out of the model's own id. */
+  initialSearch?: string;
 };
 
 const ICON_LIST = (
@@ -43,33 +45,63 @@ const ICON_LIST = (
 export default function IconPickerList({
   value,
   onChange,
-  disabled
+  disabled,
+  initialSearch
 }: IconPickerProps) {
-  const [iconSearch, setIconSearch] = useState('');
+  // Seeded rather than empty: the picker opens inside a model's own form, so
+  // the icons worth seeing first are the ones named after it. The seed only
+  // survives until the first keystroke, which is what `touched` marks.
+  const [iconSearch, setIconSearch] = useState(initialSearch ?? '');
+  const [touched, setTouched] = useState(false);
 
   const filteredIcons = useMemo(() => {
     const query = iconSearch.trim().toLowerCase();
     if (!query) return ICON_LIST;
-    return ICON_LIST.filter(icon => {
+    const matches = ICON_LIST.filter(icon => {
       return (
         icon.value.toLowerCase().includes(query) ||
         icon.id.toLowerCase().includes(query) ||
         icon.title.toLowerCase().includes(query)
       );
     });
-  }, [iconSearch]);
+    // A guess that matches nothing should not look like an empty catalogue.
+    return matches.length === 0 && !touched ? ICON_LIST : matches;
+  }, [iconSearch, touched]);
 
   return (
-    <div className="rounded-md border shadow-sm">
-      <Input
-        placeholder="Search icons..."
-        value={iconSearch}
-        onChange={e => setIconSearch(e.target.value)}
-        disabled={disabled}
-        className="border-0 shadow-none focus-visible:ring-0"
-      />
+    <div className="overflow-hidden">
+      <div className="relative">
+        <Input
+          placeholder="Search icons..."
+          value={iconSearch}
+          onChange={e => {
+            setTouched(true);
+            setIconSearch(e.target.value);
+          }}
+          disabled={disabled}
+          className="border-0 pr-9 shadow-none focus-visible:ring-0"
+        />
+        {iconSearch && (
+          // The search arrives already filled in, so the way back to the whole
+          // catalogue has to be one click rather than nine backspaces.
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => {
+              setTouched(true);
+              setIconSearch('');
+            }}
+            disabled={disabled}
+            className="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
       <div className="mx-3 h-px bg-border" />
-      <div className="mt-2 grid max-h-28 grid-cols-6 gap-2 overflow-auto p-3">
+      {/* Three rows then scroll: 3 × 2.5rem of button, 2 × 0.5rem of gap and
+          the 1.5rem this container pads with come to exactly 10rem. */}
+      <div className="grid max-h-40 grid-cols-8 gap-2 overflow-y-auto p-3">
         {filteredIcons.map(icon => (
           <button
             key={icon.value}

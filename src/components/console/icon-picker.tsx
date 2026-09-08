@@ -7,6 +7,8 @@ type IconPickerProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  /** What to search for on open — usually a word out of the model's own id. */
+  initialSearch?: string;
 };
 
 /**
@@ -17,6 +19,18 @@ type IconPickerProps = {
 const IconPickerList = lazy(
   () => import('@/components/console/icon-picker-list')
 );
+
+/**
+ * The word to search the icon catalogue for when the picker opens.
+ *
+ * A model id is a name and a version — `grok-4.6`, `gpt-image-1` — and only
+ * the name half is ever an icon. Taking the first run of letters gets it, and
+ * gets nothing useful for an id that starts with a number, which the picker
+ * treats as no guess at all.
+ */
+export function iconSearchSeed(identity: string): string {
+  return identity.match(/[a-zA-Z]+/)?.[0] ?? '';
+}
 
 export function IconPicker(props: IconPickerProps) {
   return (

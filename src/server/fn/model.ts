@@ -3,6 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { EFFORTS } from '@/lib/provider-vocab';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/server/db';
 import { modelProviders, models } from '@/server/db/schema';
@@ -78,6 +79,10 @@ export const createModel = createServerFn({ method: 'POST' })
           resolutions: z.array(z.string()).optional(),
           voice: z.string().optional(),
           voices: z.array(z.string()).optional(),
+          // Effort is the one option every provider spells the same way, so
+          // unlike its neighbours it can be checked against the list itself.
+          effort: z.enum(EFFORTS).optional(),
+          efforts: z.array(z.enum(EFFORTS)).optional(),
           reasoning: z.boolean().optional()
         })
         .strict()
@@ -205,6 +210,10 @@ export const updateModel = createServerFn({ method: 'POST' })
           resolutions: z.array(z.string()).optional(),
           voice: z.string().optional(),
           voices: z.array(z.string()).optional(),
+          // Effort is the one option every provider spells the same way, so
+          // unlike its neighbours it can be checked against the list itself.
+          effort: z.enum(EFFORTS).optional(),
+          efforts: z.array(z.enum(EFFORTS)).optional(),
           reasoning: z.boolean().optional()
         })
         .strict()
