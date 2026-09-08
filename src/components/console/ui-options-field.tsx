@@ -2,7 +2,11 @@ import { useMemo } from 'react';
 
 import { type ModelCapability, type ProviderType } from '@/types';
 import { ReasoningEffortLabels } from '@/lib/constant';
-import { vocabularyFor, type VocabField } from '@/lib/provider-vocab';
+import {
+  vocabularyFor,
+  type VocabField,
+  type Vocabulary
+} from '@/lib/provider-vocab';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import {
@@ -84,6 +88,40 @@ const defaultState = (set: boolean) =>
     ? 'border-input bg-secondary font-medium text-secondary-foreground'
     : 'border-dashed border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground';
 
+/**
+ * Drop everything the model's providers have no say in.
+ *
+ * What is stored should be what the model actually accepts. A key for a field
+ * outside the vocabulary has no row in this editor and so can never be
+ * corrected by hand — an image model on xAI keeps a `sizes` its provider
+ * ignores, and the stored options go on claiming a setting that never leaves
+ * the browser. Pruning on the way out means one edit settles it.
+ */
+export function pruneToVocabulary(
+  options: Record<string, unknown>,
+  vocabulary: Vocabulary,
+  capability: ModelCapability
+): Record<string, unknown> {
+  // An empty vocabulary is "nothing is known about the providers" — while the
+  // provider list is still loading, say — not "the providers accept nothing".
+  // Pruning against it would throw away a model's whole configuration.
+  if (Object.keys(vocabulary).length === 0) return options;
+
+  const keep = new Set<string>();
+  for (const field of FIELD_ORDER) {
+    if (!vocabulary[field]) continue;
+    keep.add(KEYS[field].list);
+    keep.add(KEYS[field].single);
+  }
+  // Not an option with values, so it has no entry in the catalogue; it is
+  // still a chat model's to declare.
+  if (capability === 'chat') keep.add('reasoning');
+
+  return Object.fromEntries(
+    Object.entries(options).filter(([key]) => keep.has(key))
+  );
+}
+
 function chipLabel(field: VocabField, value: OptionValue): string {
   if (field === 'effort')
     return ReasoningEffortLabels[String(value)] ?? String(value);
@@ -139,8 +177,8 @@ export function UiOptionsField({
     // An empty object is stored as an empty field, which is how the form
     // already says "this model declares nothing".
     const cleaned = Object.fromEntries(
-      Object.entries(next).filter(([, v]) =>
-        Array.isArray(v) ? v.length > 0 : v !== undefined
+      Object.entries(pruneToVocabulary(next, vocabulary, capability)).filter(
+        ([, v]) => (Array.isArray(v) ? v.length > 0 : v !== undefined)
       )
     );
     onChange(
