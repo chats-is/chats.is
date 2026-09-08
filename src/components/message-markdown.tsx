@@ -1,11 +1,41 @@
 import React from 'react';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 
 import { CodeBlock } from '@/components/codeblock';
 import { MemoizedReactMarkdown } from '@/components/markdown';
 
 interface MessageMarkdownProps {
   content: string;
+}
+
+/**
+ * Rewrite LaTeX's own delimiters into the ones `remark-math` reads.
+ *
+ * Models write mathematics both ways — `\(x\)` and `$x$` — often in the same
+ * answer, and remark-math only knows the dollar form. Without this the other
+ * half arrives on screen as its own source code.
+ *
+ * Fenced and inline code are left alone: `\(` inside a code sample is code,
+ * not mathematics, and rewriting it would corrupt what the user asked to
+ * see verbatim.
+ */
+const CODE_SPAN = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/;
+
+export function normalizeMath(content: string): string {
+  return content
+    .split(CODE_SPAN)
+    .map((part, index) =>
+      // The split keeps the delimiters, and every captured group lands on an
+      // odd index — those are the code spans, passed through untouched.
+      index % 2 === 1
+        ? part
+        : part
+            .replace(/\\\[([\s\S]*?)\\\]/g, (_, body) => `$$${body}$$`)
+            .replace(/\\\(([\s\S]*?)\\\)/g, (_, body) => `$${body}$`)
+    )
+    .join('');
 }
 
 export function MessageMarkdown({ content }: MessageMarkdownProps) {
@@ -16,7 +46,8 @@ export function MessageMarkdown({ content }: MessageMarkdownProps) {
   return (
     <div className="prose wrap-break-word dark:prose-invert prose-p:leading-relaxed prose-pre:bg-transparent prose-pre:p-0 prose-hr:my-3 [&_blockquote_p:first-of-type]:before:content-none [&_blockquote_p:last-of-type]:after:content-none [&_li_p]:my-0!">
       <MemoizedReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           code({ className, children, ...props }) {
             const childArray = React.Children.toArray(children);
@@ -62,7 +93,7 @@ export function MessageMarkdown({ content }: MessageMarkdownProps) {
           }
         }}
       >
-        {content}
+        {normalizeMath(content)}
       </MemoizedReactMarkdown>
     </div>
   );

@@ -2,6 +2,9 @@
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/geist-mono';
 @import 'tw-animate-css';
+/* KaTeX ships its own typography; the message renderer turns `$…$` and
+   `\(…\)` into markup that needs it. */
+@import 'katex/dist/katex.min.css';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
