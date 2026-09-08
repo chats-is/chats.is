@@ -29,19 +29,19 @@ export const generateImageInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Aspect ratio like "16:9" — pick from the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16, square → 1:1); omit otherwise'
+      'Aspect ratio like "16:9" — suggest one of the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16, square → 1:1); omit otherwise. A ratio the user set in the app wins over this.'
     ),
   size: z
     .string()
     .optional()
     .describe(
-      'Image size like "1024x1024" — pick from the available values when the user\'s wording implies one; omit otherwise'
+      'Image size like "1024x1024" — suggest one of the available values when the user\'s wording implies one; omit otherwise. A size the user set in the app wins over this.'
     ),
   resolution: z
     .string()
     .optional()
     .describe(
-      'Image resolution like "2K" — pick from the available values when the user\'s wording implies one (e.g. 高清); omit otherwise'
+      'Image resolution like "2K" — suggest one of the available values when the user\'s wording implies one (e.g. 高清); omit otherwise. A resolution the user set in the app wins over this.'
     )
 });
 
@@ -90,19 +90,19 @@ export const generateVideoInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Aspect ratio like "16:9" — pick from the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16); omit otherwise'
+      'Aspect ratio like "16:9" — suggest one of the available values when the user\'s wording implies a format (e.g. portrait/竖版 → 9:16); omit otherwise. A ratio the user set in the app wins over this.'
     ),
   resolution: z
     .string()
     .optional()
     .describe(
-      'Resolution like "1080p" — pick from the available values when the user\'s wording implies one (e.g. 高清); omit otherwise'
+      'Resolution like "1080p" — suggest one of the available values when the user\'s wording implies one (e.g. 高清); omit otherwise. A resolution the user set in the app wins over this.'
     ),
   duration: z
     .number()
     .optional()
     .describe(
-      "Duration in seconds — pick the closest available value when the user's wording implies a length; omit otherwise"
+      "Duration in seconds — suggest the closest available value when the user's wording implies a length; omit otherwise. A duration the user set in the app wins over this, and it decides the cost."
     )
 });
 
@@ -115,7 +115,7 @@ export const textToSpeechInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Voice name — pick from the available values when the user's wording implies a voice style; omit otherwise"
+      "Voice name — suggest one of the available values when the user's wording implies a voice style; omit otherwise. A voice the user set in the app wins over this."
     )
 });
 
