@@ -58,6 +58,16 @@ const FIELD_ORDER: VocabField[] = [
 type OptionValue = string | number;
 
 /**
+ * Stands for "no default of its own" in the default picker.
+ *
+ * Radix will not take an empty string as an item value, and a picker with no
+ * way back would strand the first choice made in it. Named Auto because that
+ * is what having no default does: the menu opens on Auto, and the chain
+ * settles the value from there.
+ */
+const NO_DEFAULT = '__auto__';
+
+/**
  * One shape for every pill in this editor, values and the default alike. The
  * default's own control hides the chevron a Select would draw: it is the same
  * kind of thing as the values beside it, and a second shape would say
@@ -219,7 +229,7 @@ export function UiOptionsField({
   const setDefault = (field: VocabField, option: string) => {
     const { single } = KEYS[field];
     const draft = { ...parsed };
-    if (!option) delete draft[single];
+    if (!option || option === NO_DEFAULT) delete draft[single];
     else draft[single] = field === 'duration' ? Number(option) : option;
     write(draft);
   };
@@ -274,7 +284,7 @@ export function UiOptionsField({
                     <SelectTrigger
                       className={cn(CHIP, defaultState(current !== undefined))}
                     >
-                      <SelectValue placeholder="No default" />
+                      <SelectValue placeholder="Auto" />
                     </SelectTrigger>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -282,6 +292,7 @@ export function UiOptionsField({
                   </TooltipContent>
                 </Tooltip>
                 <SelectContent>
+                  <SelectItem value={NO_DEFAULT}>Auto</SelectItem>
                   {selected.map(option => (
                     <SelectItem key={String(option)} value={String(option)}>
                       {chipLabel(field, option)}
