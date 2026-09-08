@@ -47,8 +47,14 @@ import {
   getTitleSettings
 } from '@/lib/queries';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
+import { BASE_SYSTEM_PROMPT } from '@/lib/system-prompt';
 import { recordChatUsage } from '@/lib/usage';
-import { convertToChatMessages, formatString, generateUUID } from '@/lib/utils';
+import {
+  convertToChatMessages,
+  formatLocalTime,
+  formatString,
+  generateUUID
+} from '@/lib/utils';
 import { db } from '@/server/db';
 import {
   artifacts as artifactsTable,
@@ -81,6 +87,10 @@ type PostData = {
   parentMessageId?: string;
   isReasoning?: boolean;
   effort?: string;
+  /** IANA zone from the browser, so "now" can be told in the user's terms. */
+  timeZone?: string;
+  /** The browser's preferred language, e.g. `zh-CN`. */
+  language?: string;
   mediaOptions?: MediaToolsOptions;
 };
 
@@ -146,6 +156,8 @@ async function POST({ request: req }: { request: Request }) {
     parentMessageId,
     isReasoning,
     effort,
+    timeZone,
+    language,
     mediaOptions
   } = json;
 
@@ -365,20 +377,29 @@ async function POST({ request: req }: { request: Request }) {
         chatMessages
       })
     ]);
-    const systemMessage = systemPromptContent
-      ? formatString(systemPromptContent, {
-          provider: dbModel.provider?.name || '',
-          modelId,
-          date: new Date().toISOString()
-        })
-      : undefined;
+    // Only the app's own part is a template. What an admin wrote, and what
+    // the model carries, follow it verbatim.
+    const systemMessage = [
+      formatString(BASE_SYSTEM_PROMPT, {
+        provider: dbModel.provider?.name || '',
+        modelId,
+        // The server's clock, told in the user's zone. Sending their own
+        // timestamp would carry their clock's errors with it; sending UTC
+        // makes "today" wrong for most of the world.
+        datetime: formatLocalTime(timeZone),
+        language: language || ''
+      }),
+      systemPromptContent
+    ]
+      .filter((part): part is string => !!part?.trim())
+      .join('\n\n');
     const completedArtifacts = new Map<string, Artifact>();
     const completedArtifactOrder: string[] = [];
 
     // A stream that fails part-way still persists what it had written, and the
     // SDK's error chunk never becomes a message part — so without this the
     // answer is stored truncated with nothing to say it was cut off, and the
-    // reader takes the fragment for the whole reply.
+    // user takes the fragment for the whole reply.
     let streamFailed = false;
     const recordStreamError = (error: unknown) => {
       const message = streamErrorMessage(error);

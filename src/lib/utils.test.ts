@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatLocalTime,
   formatNumber,
+  formatString,
   formatUsd,
   parseNumber,
   reportWindowStart
@@ -80,5 +82,47 @@ describe('reportWindowStart', () => {
     );
     expect(diffDays).toBe(6);
     expect(start.getHours()).toBe(0);
+  });
+});
+
+describe('formatString', () => {
+  it('fills the placeholders it has values for', () => {
+    expect(formatString('{a} and {b}', { a: '1', b: '2' })).toBe('1 and 2');
+  });
+
+  it('leaves a name it has no value for as it stands', () => {
+    // Better a visible `{nope}` than a silent hole where one was meant.
+    expect(formatString('{a} {nope}', { a: '1' })).toBe('1 {nope}');
+  });
+
+  it('does not substitute into what it just substituted', () => {
+    // Replacing one name at a time let an earlier value that happened to
+    // contain a placeholder be replaced again by a later one — and some of
+    // these values now come from the browser.
+    expect(
+      formatString('{language} at {date}', {
+        language: '{date}',
+        date: 'noon'
+      })
+    ).toBe('{date} at noon');
+  });
+
+  it('writes an absent value as nothing', () => {
+    expect(formatString('[{a}]', { a: undefined })).toBe('[]');
+  });
+});
+
+describe('formatLocalTime', () => {
+  it('tells the time in the zone it was given', () => {
+    const tokyo = formatLocalTime('Asia/Tokyo');
+    const la = formatLocalTime('America/Los_Angeles');
+    expect(tokyo).not.toBe(la);
+    // Not an ISO timestamp — a sentence someone can read.
+    expect(tokyo).not.toMatch(/T\d\d:/);
+  });
+
+  it('falls back to ISO with no zone, or with one that does not exist', () => {
+    expect(formatLocalTime()).toMatch(/^\d{4}-\d\d-\d\dT/);
+    expect(formatLocalTime('Mars/Olympus_Mons')).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
 });

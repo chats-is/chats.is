@@ -75,20 +75,55 @@ export function reportWindowStart(days: number): Date {
   );
 }
 
+/**
+ * Fill `{name}` placeholders from `args`.
+ *
+ * One pass, not one pass per name: replacing in turn lets an earlier value
+ * that happens to contain `{something}` be replaced again by a later one, and
+ * some of these values come from the browser. A name with no entry is left as
+ * it stands, so a stray brace reads as itself rather than vanishing.
+ */
 export function formatString(
   formatString: string,
   args: Record<string, any>
 ): string {
-  let formattedString = formatString;
+  return formatString.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    name in args ? String(args[name] ?? '') : whole
+  );
+}
 
-  for (const name in args) {
-    const placeholder = `{${name}}`;
-    const value = args[name];
-
-    formattedString = formattedString.replaceAll(placeholder, value);
+/**
+ * The current moment, told in `timeZone` when the browser named one.
+ *
+ * The server's clock decides *when*; the browser only decides *where* — a
+ * timestamp taken from the client would carry that machine's clock error into
+ * the prompt, and UTC would put "today" a day out for much of the world.
+ *
+ * The weekday is there because "what day is it" is asked more often than the
+ * date; the zone because an hour without one is worth little; and no seconds,
+ * which nothing in a conversation turns on. 24-hour, so there is no am/pm to
+ * misread.
+ */
+export function formatLocalTime(timeZone?: string | null): string {
+  const now = new Date();
+  if (!timeZone) return now.toISOString();
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZoneName: 'short'
+    }).format(now);
+  } catch {
+    // An unknown zone throws rather than falling back, and a prompt is not
+    // worth failing a chat over.
+    return now.toISOString();
   }
-
-  return formattedString;
 }
 
 export function getMostRecentUserMessage(messages: ChatMessage[]) {

@@ -16,9 +16,8 @@ export function PromptsSettings() {
             {field => (
               <field.TextareaField
                 label="Default Chat System Prompt"
-                placeholder="Fallback system prompt for chat models that don't define their own. Supports {provider}, {modelId}, {date}."
+                placeholder="Added to every chat, after the app's own system prompt and before the model's own."
                 rows={4}
-                hint="The default system prompt used for new chat conversations."
               />
             )}
           </form.AppField>

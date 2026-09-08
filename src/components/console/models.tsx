@@ -759,7 +759,7 @@ export default function ModelsPage() {
                   {field => (
                     <field.TextareaField
                       label="System Prompt (optional)"
-                      placeholder="Instructions prepended to every chat with this model. Supports {provider}, {modelId}, {date}."
+                      placeholder="Instructions for this model, added after the app's own system prompt."
                       rows={4}
                     />
                   )}

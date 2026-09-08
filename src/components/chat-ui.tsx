@@ -112,6 +112,12 @@ export function ChatUI({
       modelId: currentModelId,
       isReasoning: supportsReasoning ? isReasoning : undefined,
       effort: resolveAutoOption(preferences.chatEffort),
+      // Where and in what language the user is, so the system prompt can say
+      // "now" in their terms and answer in their language when the message
+      // itself gives no clue. Read off the machine rather than stored
+      // on the account, since that is what they describe.
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      language: navigator.language,
       // Media model selections for the chat media tools; the server falls
       // back to the admin-configured defaults when a modelId is empty.
       //

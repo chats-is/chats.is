@@ -192,13 +192,15 @@ export const getTitleSettings = perRequest('getTitleSettings', async () => {
 export const getSystemPrompt = perRequest(
   'getSystemPrompt',
   async (modelSystemPrompt?: string | null): Promise<string | null> => {
-    // The model carries its own inline system prompt; fall back to the global
-    // default chat system prompt setting when the model leaves it empty.
-    if (modelSystemPrompt && modelSystemPrompt.trim()) {
-      return modelSystemPrompt;
-    }
+    // Joined, not chosen between. The global prompt carries what holds for
+    // every model — how to format, what this app is — and a model that adds
+    // instructions of its own should not thereby lose them. It comes first so
+    // the model's own words, being the more specific, get the last say.
     const values = await getSettings(['default.chat.systemPrompt']);
-    return values['default.chat.systemPrompt'] || null;
+    const parts = [values['default.chat.systemPrompt'], modelSystemPrompt]
+      .map(part => part?.trim())
+      .filter((part): part is string => !!part);
+    return parts.length > 0 ? parts.join('\n\n') : null;
   }
 );
 
