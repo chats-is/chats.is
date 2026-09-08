@@ -13,9 +13,7 @@ export function GeneralSettings() {
         <h2 className="mb-4 text-lg font-semibold">Application</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <form.AppField name="app.name">
-            {field => (
-              <field.TextField label="App Name" placeholder="Chats.is" />
-            )}
+            {field => <field.TextField label="App Name" placeholder="Chats" />}
           </form.AppField>
           <form.AppField name="app.subtitle">
             {field => (

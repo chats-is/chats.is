@@ -7,6 +7,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { type QueryClient } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 
+import { DEFAULT_APP_NAME } from '@/lib/constant';
 import { env } from '@/lib/env';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
@@ -60,7 +61,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
             media: '(prefers-color-scheme: dark)',
             content: 'black'
           },
-          { title: appName ? `${appName} - ${appSubtitle}` : 'chats.is' },
+          {
+            title: appName ? `${appName} - ${appSubtitle}` : DEFAULT_APP_NAME
+          },
           { name: 'description', content: appDescription }
         ],
         links: [

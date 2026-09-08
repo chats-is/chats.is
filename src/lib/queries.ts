@@ -3,6 +3,11 @@ import '@tanstack/react-start/server-only';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
 import { type ResolvedSource } from '@/types';
+import {
+  DEFAULT_APP_DESCRIPTION,
+  DEFAULT_APP_NAME,
+  DEFAULT_APP_SUBTITLE
+} from '@/lib/constant';
 import { perRequest } from '@/lib/request-cache';
 import { parseNumber } from '@/lib/utils';
 import { db } from '@/server/db';
@@ -243,11 +248,6 @@ const getSettings = perRequest(
 // ============================================================================
 // App Defaults
 // ============================================================================
-
-const DEFAULT_APP_NAME = 'Chats.is';
-const DEFAULT_APP_SUBTITLE = 'AI Chatbot';
-const DEFAULT_APP_DESCRIPTION =
-  'Chats.is empowers you to inquire, receive immediate responses, and engage in dynamic conversations with AI. Offering access to GPT, Claude, Gemini, and an array of other models, Chats.is provides a seamless and interactive experience for all your conversational needs.';
 
 // ============================================================================
 // High-level Service Functions

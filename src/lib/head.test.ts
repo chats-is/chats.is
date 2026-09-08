@@ -27,13 +27,13 @@ describe('pageTitle', () => {
 
 describe('appName', () => {
   it('falls back before the settings have loaded', () => {
-    expect(appName([])).toBe('Chats.is');
-    expect(appName([{}])).toBe('Chats.is');
-    expect(appName([{ loaderData: undefined }])).toBe('Chats.is');
+    expect(appName([])).toBe('Chats');
+    expect(appName([{}])).toBe('Chats');
+    expect(appName([{ loaderData: undefined }])).toBe('Chats');
   });
 
   it('falls back when the installation has been named an empty string', () => {
-    expect(appName([rootMatch('')])).toBe('Chats.is');
+    expect(appName([rootMatch('')])).toBe('Chats');
   });
 });
 

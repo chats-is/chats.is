@@ -2,6 +2,18 @@ import { type MediaToolName } from '@/types/chat-tools';
 import { type ModelCapability } from '@/types/model';
 
 /**
+ * What this installation calls itself before an admin says otherwise.
+ *
+ * Read from here by both the settings query and the title builder — they used
+ * to keep a copy each, with a comment on one asking that they be kept in
+ * step, which is the kind of promise a rename breaks quietly.
+ */
+export const DEFAULT_APP_NAME = 'Chats';
+export const DEFAULT_APP_SUBTITLE = 'Your AI Assistant';
+export const DEFAULT_APP_DESCRIPTION =
+  'Chats is an AI assistant that answers questions, writes, makes images and video, and turns ideas into code you can run.';
+
+/**
  * Provider types for the console
  */
 export const ProviderTypes = [

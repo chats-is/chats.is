@@ -8,8 +8,7 @@
  * here and the routes call it.
  */
 
-/** Matches the fallback in `getAppSettings`, for before the settings arrive. */
-const FALLBACK_APP_NAME = 'Chats.is';
+import { DEFAULT_APP_NAME } from '@/lib/constant';
 
 /** The shape a route's head needs out of the root match. */
 type RootLoaderData = {
@@ -25,7 +24,7 @@ type RootLoaderData = {
  */
 export function appName(matches: Array<{ loaderData?: unknown }>): string {
   const root = matches[0]?.loaderData as RootLoaderData | undefined;
-  return root?.settings?.appName || FALLBACK_APP_NAME;
+  return root?.settings?.appName || DEFAULT_APP_NAME;
 }
 
 /** `Page - App`, or just `App` for a page that does not name itself. */
