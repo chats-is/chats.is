@@ -423,7 +423,14 @@ export default function PricingPage() {
     <form.AppField
       name={name}
       listeners={{
-        onChange: () => clears?.forEach(other => form.setFieldValue(other, ''))
+        // Guarded: clearing counts as a change, so two fields that clear each
+        // other would take turns doing it forever. Skipping the write when
+        // there is nothing to clear ends the exchange after one step — and
+        // stops the recursion from wiping what was just typed.
+        onChange: () =>
+          clears?.forEach(other => {
+            if (form.getFieldValue(other)) form.setFieldValue(other, '');
+          })
       }}
     >
       {field => (
