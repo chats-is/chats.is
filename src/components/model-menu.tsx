@@ -193,7 +193,13 @@ export function ModelMenu({
                       key={m.modelId}
                       value={m.modelId}
                       textValue={`${m.name} ${m.modelId}`}
-                      className="data-[state=checked]:bg-accent"
+                      // No tick, and no room kept for one: the row it is on
+                      // is already shaded, and the space at the right belongs
+                      // to the badges that say what the model can do. Radix
+                      // wraps the row in a span of its own that sizes to its
+                      // content, so it has to be stretched or the badges sit
+                      // against the name rather than the edge.
+                      className="pr-2 data-[state=checked]:bg-accent [&>[data-slot=select-item-indicator]]:hidden [&>span:last-child]:w-full"
                     >
                       <span className="flex w-full items-start">
                         <ModelIcon
@@ -272,40 +278,24 @@ export function ModelMenu({
         </SelectContent>
       </Select>
 
-      {selectedModel?.uiOptions?.reasoning && (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isDisabled}
-          className={cn(
-            'h-9 rounded-full px-3 font-normal text-muted-foreground shadow-none hover:text-muted-foreground',
-            {
-              'border-muted-foreground/30 bg-muted text-foreground hover:text-foreground':
-                isReasoning
-            }
-          )}
-          onClick={handleReasoningToggle}
-        >
-          <Lightbulb
-            className={
-              isReasoning ? 'fill-muted-foreground' : 'fill-muted-foreground/30'
-            }
-          />
-          Think
-        </Button>
-      )}
-
       {efforts.length > 0 && (
         <Select
           disabled={isDisabled}
           value={effort ?? ''}
           onValueChange={value => setPreference('chatEffort', value)}
         >
-          <SelectTrigger className="h-9 rounded-full shadow-none">
-            <span className="text-sm">
-              {effort ? (ReasoningEffortLabels[effort] ?? effort) : 'Effort'}
-            </span>
-          </SelectTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SelectTrigger className="h-9 rounded-full shadow-none">
+                <span className="text-sm">
+                  {effort
+                    ? (ReasoningEffortLabels[effort] ?? effort)
+                    : 'Effort'}
+                </span>
+              </SelectTrigger>
+            </TooltipTrigger>
+            <TooltipContent>How hard the model thinks</TooltipContent>
+          </Tooltip>
           <SelectContent position="popper">
             {efforts.map(value => (
               <SelectItem key={value} value={value}>
@@ -314,6 +304,51 @@ export function ModelMenu({
             ))}
           </SelectContent>
         </Select>
+      )}
+
+      {selectedModel?.uiOptions?.reasoning && (
+        <Tooltip>
+          {/* Wrapped in a span: a disabled button takes no pointer events, and
+              the tooltip is most wanted exactly when it is disabled. */}
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                variant="outline"
+                // Think decides whether the thinking is streamed back, and at the
+                // `none` level there is none to stream. Disabled rather than
+                // hidden: the model still offers the control, it just has nothing
+                // to act on until the effort says otherwise.
+                disabled={isDisabled || effort === 'none'}
+                className={cn(
+                  'h-9 rounded-full px-3 font-normal text-muted-foreground shadow-none hover:text-muted-foreground',
+                  {
+                    'border-muted-foreground/30 bg-muted text-foreground hover:text-foreground':
+                      isReasoning && effort !== 'none'
+                  }
+                )}
+                onClick={handleReasoningToggle}
+              >
+                <Lightbulb
+                  className={
+                    // Lit, in the same amber the model list uses to mark a model
+                    // that thinks. Only the glass fills — the outline stays the
+                    // button's own colour.
+                    isReasoning && effort !== 'none'
+                      ? 'fill-amber-300 dark:fill-amber-200'
+                      : 'fill-muted-foreground/30'
+                  }
+                />
+                Think
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {effort === 'none'
+              ? 'Nothing to show at effort None'
+              : 'Show the thinking'}
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
