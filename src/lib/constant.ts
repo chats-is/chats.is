@@ -8,10 +8,10 @@ import { type ModelCapability } from '@/types/model';
  * to keep a copy each, with a comment on one asking that they be kept in
  * step, which is the kind of promise a rename breaks quietly.
  */
-export const DEFAULT_APP_NAME = 'Chats';
+export const DEFAULT_APP_NAME = 'Chats.is';
 export const DEFAULT_APP_SUBTITLE = 'Your AI Assistant';
 export const DEFAULT_APP_DESCRIPTION =
-  'Chats is an AI assistant that answers questions, writes, makes images and video, and turns ideas into code you can run.';
+  'Chats.is is an AI assistant that answers questions, writes, makes images and video, and turns ideas into code you can run.';
 
 /**
  * Provider types for the console

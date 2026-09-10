@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_APP_NAME } from '@/lib/constant';
+
 import { appName, formatTitle, pageTitle } from './head';
 
 /** What the root route's loader returns, as a child route's `matches` sees it. */
@@ -26,14 +28,16 @@ describe('pageTitle', () => {
 });
 
 describe('appName', () => {
+  // Against the constant, not a copy of its value: the point of the test is
+  // that the fallback is reached, and a rename should not have to visit here.
   it('falls back before the settings have loaded', () => {
-    expect(appName([])).toBe('Chats');
-    expect(appName([{}])).toBe('Chats');
-    expect(appName([{ loaderData: undefined }])).toBe('Chats');
+    expect(appName([])).toBe(DEFAULT_APP_NAME);
+    expect(appName([{}])).toBe(DEFAULT_APP_NAME);
+    expect(appName([{ loaderData: undefined }])).toBe(DEFAULT_APP_NAME);
   });
 
   it('falls back when the installation has been named an empty string', () => {
-    expect(appName([rootMatch('')])).toBe('Chats');
+    expect(appName([rootMatch('')])).toBe(DEFAULT_APP_NAME);
   });
 });
 
