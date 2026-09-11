@@ -48,7 +48,7 @@ export default [
   {
     ignores: [
       'eslint.config.js',
-      'prettier.config.js',
+      'prettier.config.mjs',
       '.output/**',
       '.nitro/**',
       // Installed by the shadcn CLI and left exactly as installed — --fix must

@@ -2,15 +2,11 @@
   "name": "chats.is",
   "private": true,
   "type": "module",
-  "imports": {
-    "#/*": "./src/*"
-  },
   "scripts": {
     "dev": "vite dev --port 3000",
-    "generate-routes": "tsr generate",
     "build": "vite build",
     "vercel-build": "drizzle-kit migrate && vite build",
-    "preview": "vite preview",
+    "start": "node .output/server/index.mjs",
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
@@ -19,8 +15,7 @@
     "db:studio": "drizzle-kit studio",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "format:write": "prettier --write \"**/*.{ts,tsx,md}\""
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.72",
@@ -117,7 +112,6 @@
     "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
     "@tanstack/devtools-vite": "^0.8.5",
     "@tanstack/eslint-config": "latest",
-    "@tanstack/router-cli": "^1.167.33",
     "@types/node": "^22.20.1",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
