@@ -3,21 +3,21 @@ import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 import { format } from 'date-fns';
 
-import { convertToChatMessages } from '@/lib/utils';
 import { pageTitle } from '@/lib/head';
-import { getSystemSettingsFn } from '@/server/fn/settings';
+import { convertToChatMessages } from '@/lib/utils';
+import { settingsQueries } from '@/server/fn/settings';
 import { getSharedChat } from '@/server/fn/share';
 import { RoutePending } from '@/components/route-pending';
 import { SharedChatView } from '@/components/shared-chat-view';
 
 /** A share link is public: no guard above it, and none needed. */
 export const Route = createFileRoute('/share/$id')({
-  loader: async ({ params }) => {
+  loader: async ({ context, params }) => {
     // The settings do not depend on the chat, so both are asked for at once
     // rather than one after the other.
     const [chat, settings] = await Promise.all([
       getSharedChat({ data: { id: params.id } }),
-      getSystemSettingsFn()
+      context.queryClient.ensureQueryData(settingsQueries.system())
     ]);
 
     if (!chat) {

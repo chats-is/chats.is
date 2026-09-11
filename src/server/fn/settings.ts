@@ -120,7 +120,8 @@ export const settingsQueries = {
    *  invalidates them, so the two can never drift apart. */
   key: {
     list: () => ['settings', 'list'] as const,
-    system: () => ['settings', 'system'] as const
+    system: () => ['settings', 'system'] as const,
+    app: () => ['settings', 'app'] as const
   },
   list: () =>
     queryOptions({
@@ -131,5 +132,11 @@ export const settingsQueries = {
     queryOptions({
       queryKey: [...settingsQueries.key.system()] as const,
       queryFn: () => getSystemSettingsFn()
+    }),
+  /** The installation's own name and description, read by the root route. */
+  app: () =>
+    queryOptions({
+      queryKey: [...settingsQueries.key.app()] as const,
+      queryFn: () => getAppSettingsFn()
     })
 };

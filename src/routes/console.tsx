@@ -9,7 +9,7 @@ import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
 import { pageTitle } from '@/lib/head';
 import { sessionQueries } from '@/server/fn/auth';
-import { getSystemSettingsFn } from '@/server/fn/settings';
+import { settingsQueries } from '@/server/fn/settings';
 import { userQueries } from '@/server/fn/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ConsoleHeader } from '@/components/console/header';
@@ -32,7 +32,7 @@ export const Route = createFileRoute('/console')({
   },
   loader: async ({ context }) => {
     const [settings] = await Promise.all([
-      getSystemSettingsFn(),
+      context.queryClient.ensureQueryData(settingsQueries.system()),
       // The console header names the signed-in admin on every page.
       context.queryClient.ensureQueryData(userQueries.me())
     ]);

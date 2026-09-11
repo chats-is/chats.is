@@ -57,7 +57,11 @@ export function useSettingsForm(keys: readonly string[]) {
   const mutation = useMutation({
     mutationFn: mutating(bulkUpdateSettings),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: settingsQueries.key.list() });
+      // Every reader of the settings table, not only the list this form
+      // edits: the app's name and the system settings are the same rows read
+      // from elsewhere, out of the same cache, and a save that cleared only
+      // this page would leave them showing what was there before.
+      queryClient.invalidateQueries({ queryKey: settingsQueries.all() });
       toast.success('Settings saved successfully');
     },
     onError: error => toast.error(error.message)

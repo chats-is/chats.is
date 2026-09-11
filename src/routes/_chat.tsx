@@ -4,7 +4,7 @@ import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
 import { sessionQueries } from '@/server/fn/auth';
-import { getSystemSettingsFn } from '@/server/fn/settings';
+import { settingsQueries } from '@/server/fn/settings';
 import { userQueries } from '@/server/fn/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { SettingsDialogProvider } from '@/components/settings-dialog';
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/_chat')({
   // from the browser once the page has already drawn.
   loader: async ({ context }) => {
     const [settings] = await Promise.all([
-      getSystemSettingsFn(),
+      context.queryClient.ensureQueryData(settingsQueries.system()),
       context.queryClient.ensureQueryData(userQueries.me())
     ]);
     return settings;

@@ -7,7 +7,7 @@ import { type QueryClient } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 
 import { DEFAULT_APP_NAME } from '@/lib/constant';
-import { getAppSettingsFn } from '@/server/fn/settings';
+import { settingsQueries } from '@/server/fn/settings';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
 import { RouteError } from '@/components/route-error';
@@ -18,7 +18,8 @@ import appCss from '../styles.css?url';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
-    loader: () => getAppSettingsFn(),
+    loader: ({ context }) =>
+      context.queryClient.ensureQueryData(settingsQueries.app()),
     head: ({ loaderData }) => {
       const { appName, appSubtitle, appDescription } = loaderData ?? {};
       return {
