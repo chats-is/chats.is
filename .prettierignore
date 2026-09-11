@@ -5,6 +5,10 @@ node_modules
 pnpm-lock.yaml
 src/routeTree.gen.ts
 
+# Written by drizzle-kit, and rewritten on every `db:generate`. Formatting
+# them only means the next generate undoes it.
+src/server/db/migrations
+
 # Installed by the shadcn CLI and left exactly as installed. Where Base UI
 # differs from what a call site expected, the call site adapts.
 src/components/ui

@@ -3,7 +3,9 @@ import { createFileRoute } from '@tanstack/react-router';
 import { pageTitle } from '@/lib/head';
 
 export const Route = createFileRoute('/privacy')({
-  head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Privacy Policy') }] }),
+  head: ({ matches }) => ({
+    meta: [{ title: pageTitle(matches, 'Privacy Policy') }]
+  }),
   component: PrivacyPage
 });
 

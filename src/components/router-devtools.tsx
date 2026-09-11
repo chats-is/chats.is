@@ -1,5 +1,5 @@
-import { TanStackDevtools } from '@tanstack/react-devtools';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
+import { TanStackDevtools } from '@tanstack/react-devtools';
 
 /**
  * The router's own inspector — which routes matched, what each loader is doing,

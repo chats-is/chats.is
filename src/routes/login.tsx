@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { env } from '@/lib/env';
 import { pageTitle } from '@/lib/head';
 import { sessionQueries } from '@/server/fn/auth';
-import { RoutePending } from '@/components/route-pending';
 import { LoginForm } from '@/components/login-form';
+import { RoutePending } from '@/components/route-pending';
 
 /** Which ways in are configured; the form shows only those. */
 const getSignInMethods = createServerFn({ method: 'GET' }).handler(
