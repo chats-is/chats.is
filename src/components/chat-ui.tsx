@@ -99,9 +99,10 @@ export function ChatUI({
 
   useEffect(() => {
     session.isNew = false;
+    if (initialTitle) session.title = initialTitle;
     retainChatSession(id);
     return () => releaseChatSession(id);
-  }, [id, session]);
+  }, [id, session, initialTitle]);
 
   // Track the current model (for next submission)
   // Priority: initialChat.modelId (if valid) > preferences
@@ -294,22 +295,37 @@ export function ChatUI({
       if (dataPart.type === 'data-chat' && dataPart.data) {
         const chatData = dataPart.data;
         if (chatData.title) {
-          if (!title && isShowingRef.current) {
-            // A navigation, said as one. Writing the address bar directly is
-            // the same thing here — TanStack patches `history.replaceState`,
-            // so the router re-matches either way — except that passing `{}`
-            // as the state wipes the key and index it keeps on the entry,
-            // leaving the next push with a NaN index and back/forward reading
-            // as a jump. `resetScroll: false` because the reader is watching a
-            // reply arrive, not arriving at a new page.
-            void router.navigate({
-              to: '/chat/$chatId',
-              params: { chatId: id },
-              replace: true,
-              resetScroll: false
-            });
+          if (!title) {
+            // Newly named, so it belongs in the sidebar…
             refreshChats();
+
+            // …and at its own address — but only if the reader is still on
+            // the page that composed it, and is not already there. A turn
+            // goes on streaming after its page is gone, and a reply finishing
+            // in the background must not move anybody.
+            if (
+              isShowingRef.current &&
+              window.location.pathname !== `/chat/${id}`
+            ) {
+              // A navigation, said as one. Writing the address bar directly
+              // is the same thing here — TanStack patches
+              // `history.replaceState`, so the router re-matches either way —
+              // except that passing `{}` as the state wipes the key and index
+              // it keeps on the entry, leaving the next push with a NaN index
+              // and back/forward reading as a jump. `resetScroll: false`
+              // because the reader is watching a reply arrive, not arriving
+              // at a new page.
+              void router.navigate({
+                to: '/chat/$chatId',
+                params: { chatId: id },
+                replace: true,
+                resetScroll: false
+              });
+            }
           }
+          // Kept on the session too: the next page to show this chat may
+          // arrive before the server's copy does.
+          session.title = chatData.title;
           setTitle(chatData.title);
         }
         // Clear previous model ref on success

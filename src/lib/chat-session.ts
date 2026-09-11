@@ -35,6 +35,13 @@ export interface ChatSession {
    */
   isNew: boolean;
   /**
+   * What the chat is called, once anything knows. The server names a new
+   * conversation mid-stream, and the page that hears it is not always the page
+   * that ends up showing it — so the name is kept with the conversation rather
+   * than in the state of whichever page happened to be mounted.
+   */
+  title?: string;
+  /**
    * What the *currently mounted* page wants sent with the next turn — model,
    * reasoning, media options. The session outlives any one mount, so this is
    * re-stated on every render rather than captured when the chat was built.
@@ -173,6 +180,16 @@ export function getChatSession(
   // here would let a discarded render pin one for the life of the tab.
   scheduleRelease(id);
   return session;
+}
+
+/**
+ * The session for `id` if there is one, without starting one. For a page that
+ * wants to know whether a conversation is already in flight before it decides
+ * what to draw.
+ */
+export function peekChatSession(id: string): ChatSession | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return sessions.get(id);
 }
 
 /**
