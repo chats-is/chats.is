@@ -15,9 +15,15 @@ export function getRouter() {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        // The server already fetched what a loader asked for; refetching it the
-        // moment the page hydrates would throw that away.
-        staleTime: 30 * 1000,
+        // No blanket freshness window. One was kept here to stop a page from
+        // asking again the moment it hydrated, but it answered for every
+        // query alike — settings, the model catalogue, the history, the
+        // library — and they go out of date at wildly different rates. What it
+        // bought was a saved request; what it cost was every page quietly
+        // showing what it had last seen, with nothing to make it look again.
+        // Opening a page asks. A query that really is settled can say so where
+        // it is defined.
+        //
         // Coming back to the tab is not a request for fresh data. It reloads
         // lists under the reader's cursor, restarts work a dialog was in the
         // middle of, and asks the database for everything on screen at once —
