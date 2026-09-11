@@ -6,6 +6,7 @@ import {
   useRef,
   useState
 } from 'react';
+import { useRouter } from '@tanstack/react-router';
 import { useArtifact } from '@/contexts/artifact-context';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
@@ -48,6 +49,7 @@ export function ChatUI({
   initialArtifacts = []
 }: ChatUIProps) {
   const { refreshChats } = useChats();
+  const router = useRouter();
 
   // Get from contexts
   const { chatModels } = useSystemSettings();
@@ -293,7 +295,19 @@ export function ChatUI({
         const chatData = dataPart.data;
         if (chatData.title) {
           if (!title && isShowingRef.current) {
-            window.history.replaceState({}, '', `/chat/${id}`);
+            // A navigation, said as one. Writing the address bar directly is
+            // the same thing here — TanStack patches `history.replaceState`,
+            // so the router re-matches either way — except that passing `{}`
+            // as the state wipes the key and index it keeps on the entry,
+            // leaving the next push with a NaN index and back/forward reading
+            // as a jump. `resetScroll: false` because the reader is watching a
+            // reply arrive, not arriving at a new page.
+            void router.navigate({
+              to: '/chat/$chatId',
+              params: { chatId: id },
+              replace: true,
+              resetScroll: false
+            });
             refreshChats();
           }
           setTitle(chatData.title);
