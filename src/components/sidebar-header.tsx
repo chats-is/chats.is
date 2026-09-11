@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router';
-import { useSystemSettings } from '@/contexts/system-settings-context';
+
+import { useAppName } from '@/lib/head';
 
 export function SidebarHeader() {
-  const { appName } = useSystemSettings();
+  const appName = useAppName();
 
   return (
     <Link

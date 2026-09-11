@@ -8,11 +8,13 @@
  * here and the routes call it.
  */
 
+import { useMatches } from '@tanstack/react-router';
+
 import { DEFAULT_APP_NAME } from '@/lib/constant';
 
 /** The shape a route's head needs out of the root match. */
 type RootLoaderData = {
-  settings?: { appName?: string };
+  appName?: string;
 };
 
 /**
@@ -24,7 +26,20 @@ type RootLoaderData = {
  */
 export function appName(matches: Array<{ loaderData?: unknown }>): string {
   const root = matches[0]?.loaderData as RootLoaderData | undefined;
-  return root?.settings?.appName || DEFAULT_APP_NAME;
+  return root?.appName || DEFAULT_APP_NAME;
+}
+
+/**
+ * The same name, for a component rather than a route's `head`.
+ *
+ * The installation names itself once, in the root route's loader, and every
+ * reader takes it from there — a component included, so that a header and a
+ * tab title can never disagree about what this app is called.
+ */
+export function useAppName(): string {
+  // Selected rather than read whole: `useMatches` changes on every navigation,
+  // and a header does not want to re-render because a different page loaded.
+  return useMatches({ select: matches => appName(matches) });
 }
 
 /** `Page - App`, or just `App` for a page that does not name itself. */

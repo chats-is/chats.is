@@ -3,12 +3,11 @@ import {
   HeadContent,
   Scripts
 } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
 import { type QueryClient } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 
 import { DEFAULT_APP_NAME } from '@/lib/constant';
-import { env } from '@/lib/env';
+import { getAppSettingsFn } from '@/server/fn/settings';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
 import { RouteError } from '@/components/route-error';
@@ -17,32 +16,11 @@ import { TailwindIndicator } from '@/components/tailwind-indicator';
 
 import appCss from '../styles.css?url';
 
-/** The installation names itself; the title and description follow from that. */
-const getAppSettings = createServerFn({ method: 'GET' }).handler(async () => {
-  const { getAppSettings } = await import('@/lib/queries');
-  return getAppSettings();
-});
-
-/** Analytics is configured by environment, and only the two ids reach the page. */
-const getAnalytics = createServerFn({ method: 'GET' }).handler(async () => ({
-  scriptUrl: env.UMAMI_SCRIPT_URL ?? null,
-  websiteId: env.UMAMI_WEBSITE_ID ?? null
-}));
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
-    // Neither depends on the other; asking one after the other made the first
-    // page wait for two round trips instead of one.
-    loader: async () => {
-      const [settings, analytics] = await Promise.all([
-        getAppSettings(),
-        getAnalytics()
-      ]);
-      return { settings, analytics };
-    },
+    loader: () => getAppSettingsFn(),
     head: ({ loaderData }) => {
-      const { appName, appSubtitle, appDescription } =
-        loaderData?.settings ?? {};
+      const { appName, appSubtitle, appDescription } = loaderData ?? {};
       return {
         meta: [
           { charSet: 'utf-8' },
@@ -83,18 +61,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const { analytics } = Route.useLoaderData();
+  const { umamiScriptUrl, umamiWebsiteId } = Route.useLoaderData();
 
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <HeadContent />
-        {analytics.scriptUrl && analytics.websiteId && (
-          <script
-            defer
-            src={analytics.scriptUrl}
-            data-website-id={analytics.websiteId}
-          />
+        {umamiScriptUrl && umamiWebsiteId && (
+          <script defer src={umamiScriptUrl} data-website-id={umamiWebsiteId} />
         )}
       </head>
       <body className="h-full scroll-smooth font-sans antialiased">

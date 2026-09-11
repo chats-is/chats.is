@@ -17,7 +17,14 @@ export function getRouter() {
       queries: {
         // The server already fetched what a loader asked for; refetching it the
         // moment the page hydrates would throw that away.
-        staleTime: 30 * 1000
+        staleTime: 30 * 1000,
+        // Coming back to the tab is not a request for fresh data. It reloads
+        // lists under the reader's cursor, restarts work a dialog was in the
+        // middle of, and asks the database for everything on screen at once —
+        // for data that changes when someone changes it, not while nobody is
+        // looking. Several components had already turned this off one at a
+        // time; it is one decision, so it is made once.
+        refetchOnWindowFocus: false
       }
     }
   });

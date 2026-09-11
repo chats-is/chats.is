@@ -494,9 +494,7 @@ export default function ModelsPage() {
   // binding may select (same-kind failover).
   const { data: compatibleProviders } = useQuery({
     ...providerQueries.compatible({ modelId: debouncedModelId }),
-    enabled: isOpen && !!debouncedModelId,
-    refetchOnWindowFocus: false,
-    retry: false
+    enabled: isOpen && !!debouncedModelId
   });
 
   const filteredModels = models?.filter(m => {

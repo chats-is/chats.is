@@ -6,7 +6,7 @@ import { appName, formatTitle, pageTitle } from './head';
 
 /** What the root route's loader returns, as a child route's `matches` sees it. */
 const rootMatch = (name?: string) => ({
-  loaderData: { settings: { appName: name }, analytics: {} }
+  loaderData: { appName: name }
 });
 
 describe('pageTitle', () => {
@@ -21,8 +21,8 @@ describe('pageTitle', () => {
   });
 
   it('reads the root match, not the route calling it', () => {
-    // The leaf's own loader data must not be mistaken for the settings.
-    const leaf = { loaderData: { settings: { appName: 'Wrong' } } };
+    // The leaf's own loader data must not be mistaken for the root's.
+    const leaf = { loaderData: { appName: 'Wrong' } };
     expect(pageTitle([rootMatch('Acme'), leaf], 'Users')).toBe('Users - Acme');
   });
 });

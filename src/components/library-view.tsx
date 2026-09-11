@@ -442,11 +442,7 @@ export function LibraryView() {
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       ...libraryQueries.list({ limit: 24 }),
-      getNextPageParam: page => page.nextCursor,
-      // Refocusing would serially replay every loaded page — not worth it
-      // for an archive view.
-      refetchOnWindowFocus: false,
-      staleTime: 60_000
+      getNextPageParam: page => page.nextCursor
     });
 
   const items = data?.pages.flatMap(page => page.items) ?? [];

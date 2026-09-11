@@ -60,11 +60,7 @@ function PromptCard({ prompt }: { prompt: UsablePrompt }) {
 }
 
 export function PromptsView() {
-  const { data: prompts, isLoading } = useQuery({
-    ...promptQueries.usable(),
-    refetchOnWindowFocus: false,
-    staleTime: 60_000
-  });
+  const { data: prompts, isLoading } = useQuery(promptQueries.usable());
 
   return (
     <div className="flex size-full flex-col">

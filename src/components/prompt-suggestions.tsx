@@ -49,10 +49,7 @@ export function PromptSuggestions({
   onInsert,
   disabled = false
 }: PromptSuggestionsProps) {
-  const { data: prompts } = useQuery({
-    ...promptQueries.usable(),
-    refetchOnWindowFocus: false
-  });
+  const { data: prompts } = useQuery(promptQueries.usable());
 
   // Shuffled once per query result rather than per render — re-picking as the
   // user types would shuffle the cards under their cursor.

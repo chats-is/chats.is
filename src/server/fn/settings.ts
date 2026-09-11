@@ -15,6 +15,18 @@ export const listSettings = createServerFn({ method: 'GET' })
   });
 
 /**
+ * What the document itself needs: the name the installation gives itself,
+ * which the title and description follow from, and the two ids that decide
+ * whether an analytics script is written into the page.
+ */
+export const getAppSettingsFn = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const { getAppSettings } = await import('@/lib/queries');
+    return getAppSettings();
+  }
+);
+
+/**
  * Get complete system settings for client initialization
  * Includes all enabled models and default settings
  */

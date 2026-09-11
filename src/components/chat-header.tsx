@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { useRouter } from '@tanstack/react-router';
-import { useSystemSettings } from '@/contexts/system-settings-context';
 import { PlusCircle } from 'lucide-react';
 
-import { formatTitle } from '@/lib/head';
+import { formatTitle, useAppName } from '@/lib/head';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
@@ -12,7 +11,7 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ title }: ChatHeaderProps) {
-  const { appName } = useSystemSettings();
+  const appName = useAppName();
   const router = useRouter();
 
   const handleNewChat = () => {

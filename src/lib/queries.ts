@@ -253,17 +253,26 @@ const getSettings = perRequest(
 // High-level Service Functions
 // ============================================================================
 
+/**
+ * What the document itself needs: the name the installation gives itself,
+ * which the title and description follow from, and the two ids that decide
+ * whether an analytics script is written into the page.
+ */
 export const getAppSettings = perRequest('getAppSettings', async () => {
-  const values = await getSettings([
-    'app.name',
-    'app.subtitle',
-    'app.description'
+  // `env` is imported here rather than at the top of the file: importing it
+  // validates the whole environment, and this module is pulled in by tests
+  // that have no environment to validate.
+  const [{ env }, values] = await Promise.all([
+    import('@/lib/env'),
+    getSettings(['app.name', 'app.subtitle', 'app.description'])
   ]);
 
   return {
     appName: values['app.name'] || DEFAULT_APP_NAME,
     appSubtitle: values['app.subtitle'] || DEFAULT_APP_SUBTITLE,
-    appDescription: values['app.description'] || DEFAULT_APP_DESCRIPTION
+    appDescription: values['app.description'] || DEFAULT_APP_DESCRIPTION,
+    umamiScriptUrl: env.UMAMI_SCRIPT_URL ?? null,
+    umamiWebsiteId: env.UMAMI_WEBSITE_ID ?? null
   };
 });
 
@@ -271,9 +280,6 @@ export async function getSystemSettings() {
   const [allModels, values] = await Promise.all([
     getAllModels(),
     getSettings([
-      'app.name',
-      'app.subtitle',
-      'app.description',
       'speech.enabled',
       'default.chat.modelId',
       'default.image.modelId',
@@ -287,9 +293,6 @@ export async function getSystemSettings() {
   ]);
 
   return {
-    appName: values['app.name'] || DEFAULT_APP_NAME,
-    appSubtitle: values['app.subtitle'] || DEFAULT_APP_SUBTITLE,
-    appDescription: values['app.description'] || DEFAULT_APP_DESCRIPTION,
     speechEnabled: values['speech.enabled'] === 'true',
     chatModels: allModels.filter(m => m.capability === 'chat'),
     imageModels: allModels.filter(m => m.capability === 'image'),

@@ -139,11 +139,7 @@ export function ProviderModelSyncDialog({
     isFetching
   } = useQuery({
     ...providerQueries.remoteModels({ providerId: providerId || '' }),
-    enabled: open && !!providerId,
-    retry: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
-    refetchOnWindowFocus: false
+    enabled: open && !!providerId
   });
 
   const syncMutation = useMutation({

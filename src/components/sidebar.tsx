@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Link } from '@tanstack/react-router';
-import { useSystemSettings } from '@/contexts/system-settings-context';
 
+import { useAppName } from '@/lib/head';
 import { Separator } from '@/components/ui/separator';
 import {
   SidebarContent,
@@ -21,7 +21,7 @@ import { UserMenu } from '@/components/user-menu';
 export function Sidebar({
   ...props
 }: React.ComponentProps<typeof SidebarPrimitive>) {
-  const { appName } = useSystemSettings();
+  const appName = useAppName();
 
   return (
     <SidebarPrimitive collapsible="icon" {...props}>

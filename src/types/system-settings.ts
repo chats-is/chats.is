@@ -12,9 +12,6 @@ export interface SystemDefaults {
 }
 
 export interface SystemSettings {
-  appName: string;
-  appSubtitle: string;
-  appDescription: string;
   speechEnabled: boolean;
   chatModels: Model[];
   imageModels: Model[];

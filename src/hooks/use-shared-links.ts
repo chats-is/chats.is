@@ -8,8 +8,7 @@ export function useSharedLinks(page: number = 0, limit: number = 5) {
   const queryClient = useQueryClient();
 
   const { data, error, isLoading, refetch } = useQuery({
-    ...shareQueries.list({ limit, offset }),
-    staleTime: 1000 * 60 * 5
+    ...shareQueries.list({ limit, offset })
   });
 
   const deleteMutation = useMutation({

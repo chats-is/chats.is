@@ -30,7 +30,6 @@ export const sessionQueries = {
   me: () =>
     queryOptions({
       queryKey: sessionQueries.key.me(),
-      queryFn: () => requireUser(),
-      staleTime: 5 * 60 * 1000
+      queryFn: () => requireUser()
     })
 };

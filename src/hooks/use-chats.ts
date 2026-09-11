@@ -30,10 +30,7 @@ export function useChatsInfinite() {
     hasNextPage,
     isError,
     error
-  } = useInfiniteQuery({
-    ...historyQuery(),
-    refetchOnWindowFocus: false
-  });
+  } = useInfiniteQuery(historyQuery());
 
   const chats = data ? data.pages.flat() : [];
 

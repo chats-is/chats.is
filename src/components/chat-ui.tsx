@@ -208,10 +208,7 @@ export function ChatUI({
       size: artifact.size ?? null,
       createdAt: artifact.createdAt,
       updatedAt: artifact.updatedAt
-    })),
-    // We invalidate these explicitly when a turn finishes; don't also refetch
-    // on window focus (it churns artifacts/versions and the preview).
-    refetchOnWindowFocus: false
+    }))
   });
 
   const queryClient = useQueryClient();

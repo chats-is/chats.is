@@ -90,9 +90,8 @@ export function useSettingsForm(keys: readonly string[]) {
   isDirtyRef.current = isDirty;
 
   // Only for what arrives after that first render. `settings.list` refetches
-  // in the background (30s staleTime, and React Query refetches on window
-  // focus by default), which would otherwise leave the form showing values the
-  // server no longer has.
+  // in the background once it is stale and the view is mounted again, which
+  // would otherwise leave the form showing values the server no longer has.
   const settled = useRef(settings);
 
   useEffect(() => {
