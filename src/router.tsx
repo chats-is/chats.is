@@ -34,6 +34,10 @@ export function getRouter() {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreload: 'intent',
+    // Start the moment the pointer lands, rather than after the usual pause:
+    // the thing being preloaded is the conversation a click is about to ask
+    // for, and half a hover is the difference between it being ready and not.
+    defaultPreloadDelay: 0,
     // A route's pending state is held back for a moment so a fast load does
     // not flash a placeholder, but a whole second of nothing reads as a click
     // that did not register. Long enough to skip the flash, short enough that
