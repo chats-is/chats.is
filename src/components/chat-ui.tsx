@@ -1,20 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { useArtifact } from '@/contexts/artifact-context';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { useChat } from '@ai-sdk/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { DefaultChatTransport } from 'ai';
 import { toast } from 'sonner';
 
 import { type Artifact, type Attachment, type ChatMessage } from '@/types';
+import {
+  getChatSession,
+  releaseChatSession,
+  retainChatSession
+} from '@/lib/chat-session';
 import { resolveAutoOption } from '@/lib/media-options';
 import { takePendingPrompt } from '@/lib/pending-prompt';
-import {
-  generateUUID,
-  getMostRecentUserMessage,
-  modelMatchesId
-} from '@/lib/utils';
+import { modelMatchesId } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
 import { artifactQueries } from '@/server/fn/artifact';
 import {
@@ -60,6 +67,39 @@ export function ChatUI({
     handleStreamPart,
     setArtifactsFromServer
   } = useArtifact();
+
+  // The conversation itself — messages, status, the stream in flight — lives
+  // outside the router, so moving from `/` to `/chat/<id>` mid-turn does not
+  // take the reply with it.
+  const session = useMemo(
+    () => getChatSession(id, initialMessages),
+    // `initialMessages` seeds a chat the first time it is opened; an id that
+    // already has a session is further along than anything the loader holds.
+    [id]
+  );
+
+  // Read before the session has been mounted on, and only ever once.
+  const [canResume] = useState(() => session.isNew);
+
+  // Whether this page is still the one showing the chat. A turn goes on
+  // streaming after its page is gone — that is the point of the session — and
+  // the bookkeeping it does then (the sidebar, the artifact list) is welcome.
+  // Moving the reader is not: someone who opened the library while the first
+  // reply was being written should stay in the library.
+  const isShowingRef = useRef(true);
+
+  useEffect(() => {
+    isShowingRef.current = true;
+    return () => {
+      isShowingRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    session.isNew = false;
+    retainChatSession(id);
+    return () => releaseChatSession(id);
+  }, [id, session]);
 
   // Track the current model (for next submission)
   // Priority: initialChat.modelId (if valid) > preferences
@@ -185,12 +225,13 @@ export function ChatUI({
       preferences.sttModelId
     ]
   );
-  const chatRequestBodyRef = useRef(chatRequestBody);
-
-  // Keep ref in sync with the latest request body
-  useEffect(() => {
-    chatRequestBodyRef.current = chatRequestBody;
-  }, [chatRequestBody]);
+  // The session outlives this component (see `@/lib/chat-session`), so what it
+  // should send is re-stated here rather than captured when it was built.
+  // Layout effect: a submit can follow the render that changed the model
+  // closely enough that a passive effect would still be waiting.
+  useLayoutEffect(() => {
+    session.requestBody = chatRequestBody;
+  }, [session, chatRequestBody]);
 
   const artifactsQuery = useQuery({
     ...artifactQueries.list({ chatId: id }),
@@ -223,34 +264,20 @@ export function ChatUI({
     sendMessage,
     error
   } = useChat<ChatMessage>({
-    id,
-    messages: initialMessages,
+    chat: session.chat,
     experimental_throttle: 100,
-    generateId: generateUUID,
     // Re-attach to an in-progress generation after a page refresh. Server
-    // resume is a no-op when REDIS_URL is unset, so this stays safe.
-    resume: true,
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-      prepareSendMessagesRequest({ messages, body }) {
-        const userMessage = getMostRecentUserMessage(messages);
-        return {
-          body: {
-            id,
-            userMessage,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            ...chatRequestBodyRef.current,
-            ...body
-          }
-        };
-      },
-      // Resume hits the same route as a GET; pass the chat id as a query
-      // param so the handler knows which stream to re-attach to.
-      prepareReconnectToStreamRequest({ id, api }) {
-        return { api: `${api}?chatId=${id}` };
-      }
-    }),
-    onData: dataPart => {
+    // resume is a no-op when REDIS_URL is unset, so this stays safe — and it
+    // is skipped for a session that is already carrying the turn.
+    resume: canResume
+  });
+
+  // Handed to the session rather than baked into it, so a turn that started on
+  // one page goes on reporting to whichever page is showing it now. Written in
+  // a layout effect: the page being replaced tears down first, and a passive
+  // effect would leave the stream talking to nobody in between.
+  useLayoutEffect(() => {
+    session.handlers.onData = dataPart => {
       // A refused turn arrives as a normal 200 stream, so onError never runs.
       // Undo the optimistic model switch here instead — the request was often
       // refused *because* of the model that was just picked, and leaving the
@@ -265,7 +292,7 @@ export function ChatUI({
       if (dataPart.type === 'data-chat' && dataPart.data) {
         const chatData = dataPart.data;
         if (chatData.title) {
-          if (!title) {
+          if (!title && isShowingRef.current) {
             window.history.replaceState({}, '', `/chat/${id}`);
             refreshChats();
           }
@@ -275,8 +302,9 @@ export function ChatUI({
         previousModelRef.current = null;
       }
       handleStreamPart(dataPart, id);
-    },
-    onError: () => {
+    };
+
+    session.handlers.onError = () => {
       // Not toasted: `error` is rendered in the thread by <Messages>, where it
       // sits next to the message it answers and does not disappear. Showing
       // both would repeat one failure twice.
@@ -286,7 +314,7 @@ export function ChatUI({
         previousModelRef.current = null;
       }
       void artifactsQuery.refetch();
-    }
+    };
   });
 
   useEffect(() => {
