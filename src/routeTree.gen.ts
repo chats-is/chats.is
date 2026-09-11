@@ -18,7 +18,7 @@ import { Route as ChatIndexRouteImport } from './routes/_chat/index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat/library'
 import { Route as ChatPromptsRouteImport } from './routes/_chat/prompts'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
-import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiFilesRouteRouteImport } from './routes/api/files/route'
 import { Route as ApiSpeechRouteImport } from './routes/api/speech'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
 import { Route as ConsoleModelsRouteImport } from './routes/console/models'
@@ -86,7 +86,7 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiFilesRoute = ApiFilesRouteImport.update({
+const ApiFilesRouteRoute = ApiFilesRouteRouteImport.update({
   id: '/api/files',
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
@@ -164,7 +164,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 const ApiFilesUploadRoute = ApiFilesUploadRouteImport.update({
   id: '/upload',
   path: '/upload',
-  getParentRoute: () => ApiFilesRoute,
+  getParentRoute: () => ApiFilesRouteRoute,
 } as any)
 const ConsoleSettingsIndexRoute = ConsoleSettingsIndexRouteImport.update({
   id: '/',
@@ -208,10 +208,10 @@ export interface FileRoutesByFullPath {
   '/console': typeof ConsoleRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/api/files': typeof ApiFilesRouteRouteWithChildren
   '/library': typeof ChatLibraryRoute
   '/prompts': typeof ChatPromptsRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/files': typeof ApiFilesRouteWithChildren
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/plans': typeof ConsolePlansRoute
@@ -239,10 +239,10 @@ export interface FileRoutesByTo {
   '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/api/files': typeof ApiFilesRouteRouteWithChildren
   '/library': typeof ChatLibraryRoute
   '/prompts': typeof ChatPromptsRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/files': typeof ApiFilesRouteWithChildren
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/plans': typeof ConsolePlansRoute
@@ -273,10 +273,10 @@ export interface FileRoutesById {
   '/console': typeof ConsoleRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/api/files': typeof ApiFilesRouteRouteWithChildren
   '/_chat/library': typeof ChatLibraryRoute
   '/_chat/prompts': typeof ChatPromptsRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/files': typeof ApiFilesRouteWithChildren
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/plans': typeof ConsolePlansRoute
@@ -309,10 +309,10 @@ export interface FileRouteTypes {
     | '/console'
     | '/login'
     | '/privacy'
+    | '/api/files'
     | '/library'
     | '/prompts'
     | '/api/chat'
-    | '/api/files'
     | '/api/speech'
     | '/console/models'
     | '/console/plans'
@@ -340,10 +340,10 @@ export interface FileRouteTypes {
     | '/artifact-preview-frame'
     | '/login'
     | '/privacy'
+    | '/api/files'
     | '/library'
     | '/prompts'
     | '/api/chat'
-    | '/api/files'
     | '/api/speech'
     | '/console/models'
     | '/console/plans'
@@ -373,10 +373,10 @@ export interface FileRouteTypes {
     | '/console'
     | '/login'
     | '/privacy'
+    | '/api/files'
     | '/_chat/library'
     | '/_chat/prompts'
     | '/api/chat'
-    | '/api/files'
     | '/api/speech'
     | '/console/models'
     | '/console/plans'
@@ -408,8 +408,8 @@ export interface RootRouteChildren {
   ConsoleRoute: typeof ConsoleRouteWithChildren
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
+  ApiFilesRouteRoute: typeof ApiFilesRouteRouteWithChildren
   ApiChatRoute: typeof ApiChatRoute
-  ApiFilesRoute: typeof ApiFilesRouteWithChildren
   ApiSpeechRoute: typeof ApiSpeechRoute
   ShareIdRoute: typeof ShareIdRoute
   ApiArtifactsPreviewRoute: typeof ApiArtifactsPreviewRoute
@@ -485,7 +485,7 @@ declare module '@tanstack/react-router' {
       id: '/api/files'
       path: '/api/files'
       fullPath: '/api/files'
-      preLoaderRoute: typeof ApiFilesRouteImport
+      preLoaderRoute: typeof ApiFilesRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/speech': {
@@ -591,7 +591,7 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/api/files/upload'
       preLoaderRoute: typeof ApiFilesUploadRouteImport
-      parentRoute: typeof ApiFilesRoute
+      parentRoute: typeof ApiFilesRouteRoute
     }
     '/console/settings/': {
       id: '/console/settings/'
@@ -712,16 +712,16 @@ const ConsoleRouteChildren: ConsoleRouteChildren = {
 const ConsoleRouteWithChildren =
   ConsoleRoute._addFileChildren(ConsoleRouteChildren)
 
-interface ApiFilesRouteChildren {
+interface ApiFilesRouteRouteChildren {
   ApiFilesUploadRoute: typeof ApiFilesUploadRoute
 }
 
-const ApiFilesRouteChildren: ApiFilesRouteChildren = {
+const ApiFilesRouteRouteChildren: ApiFilesRouteRouteChildren = {
   ApiFilesUploadRoute: ApiFilesUploadRoute,
 }
 
-const ApiFilesRouteWithChildren = ApiFilesRoute._addFileChildren(
-  ApiFilesRouteChildren,
+const ApiFilesRouteRouteWithChildren = ApiFilesRouteRoute._addFileChildren(
+  ApiFilesRouteRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
@@ -730,8 +730,8 @@ const rootRouteChildren: RootRouteChildren = {
   ConsoleRoute: ConsoleRouteWithChildren,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
+  ApiFilesRouteRoute: ApiFilesRouteRouteWithChildren,
   ApiChatRoute: ApiChatRoute,
-  ApiFilesRoute: ApiFilesRouteWithChildren,
   ApiSpeechRoute: ApiSpeechRoute,
   ShareIdRoute: ShareIdRoute,
   ApiArtifactsPreviewRoute: ApiArtifactsPreviewRoute,
