@@ -5,8 +5,8 @@ import { z } from 'zod';
 
 import { EFFORTS } from '@/lib/provider-vocab';
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { modelProviders, models } from '@/server/db/schema';
+import { db } from '@/db';
+import { modelProviders, models } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 

@@ -6,8 +6,8 @@ import { z } from 'zod';
 import { getDefaultQuotaId } from '@/lib/queries';
 import { getUserQuota, validateQuotaLimits } from '@/lib/quota';
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { quotas, users } from '@/server/db/schema';
+import { db } from '@/db';
+import { quotas, users } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 

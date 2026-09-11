@@ -4,8 +4,8 @@ import { asc, desc, eq, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { prompts } from '@/server/db/schema';
+import { db } from '@/db';
+import { prompts } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 
 const labelArraySchema = z.array(z.string()).nullable().optional();

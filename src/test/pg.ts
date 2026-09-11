@@ -2,7 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 
-import * as schema from '@/server/db/schema';
+import * as schema from '@/db/schema';
 
 /**
  * Spin up an in-process Postgres (PGlite, WASM) with the real migrations
@@ -13,6 +13,6 @@ import * as schema from '@/server/db/schema';
 export async function makeTestDb() {
   const client = new PGlite();
   const db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: 'src/server/db/migrations' });
+  await migrate(db, { migrationsFolder: 'src/db/migrations' });
   return { db, client };
 }

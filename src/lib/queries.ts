@@ -10,7 +10,7 @@ import {
 } from '@/lib/constant';
 import { perRequest } from '@/lib/request-cache';
 import { parseNumber } from '@/lib/utils';
-import { db } from '@/server/db';
+import { db } from '@/db';
 import {
   models,
   quotas,
@@ -19,7 +19,7 @@ import {
   users,
   type modelProviders,
   type providers
-} from '@/server/db/schema';
+} from '@/db/schema';
 
 // ============================================================================
 // Types

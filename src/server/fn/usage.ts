@@ -4,8 +4,8 @@ import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type UsageRow, type UserUsageRow } from '@/types';
-import { db } from '@/server/db';
-import { models, providers, usage, users } from '@/server/db/schema';
+import { db } from '@/db';
+import { models, providers, usage, users } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 
 // `from` is an absolute instant computed client-side from the user's LOCAL

@@ -4,8 +4,8 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { chatTypeSchema, messageSchema } from '@/types';
-import { db } from '@/server/db';
-import { artifacts, chats, messages } from '@/server/db/schema';
+import { db } from '@/db';
+import { artifacts, chats, messages } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
 
 export const createChat = createServerFn({ method: 'POST' })

@@ -6,9 +6,8 @@ import { count, eq } from 'drizzle-orm';
 
 import { sendVerificationCode } from '@/lib/email';
 import { env } from '@/lib/env';
-
-import { db } from './db';
-import { accounts, sessions, users, verifications } from './db/schema';
+import { db } from '@/db';
+import { accounts, sessions, users, verifications } from '@/db/schema';
 
 /**
  * Two rules the app depends on, stated here because nothing else enforces them:

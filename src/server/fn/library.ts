@@ -5,8 +5,8 @@ import { z } from 'zod';
 
 import { mediaToolNames } from '@/types';
 import { extractLibraryMedia, type LibraryMediaItem } from '@/lib/library';
-import { db } from '@/server/db';
-import { artifacts, messages } from '@/server/db/schema';
+import { db } from '@/db';
+import { artifacts, messages } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
 
 /** Cards only render a snippet; the full body is fetched on download. */
@@ -27,7 +27,7 @@ export type LibraryItem =
 
 // Single source: the media tool list lives in types/chat-tools.ts. NOTE: this
 // jsonpath also appears in the partial index that accelerates the query
-// (server/db/migrations) — keep them in sync when tools are added.
+// (db/migrations) — keep them in sync when tools are added.
 const MEDIA_PARTS_JSONPATH = `$[*] ? (@.type == "file" || @.type like_regex "^tool-(${mediaToolNames.join('|')})$")`;
 
 /**

@@ -9,8 +9,8 @@ import {
   type PricingRecord
 } from '@/types';
 import { parseNumber } from '@/lib/utils';
-import { db } from '@/server/db';
-import { modelPricings, models } from '@/server/db/schema';
+import { db } from '@/db';
+import { modelPricings, models } from '@/db/schema';
 
 const EMPTY_SNAPSHOT: PriceSnapshot = {
   inputPrice: null,

@@ -2,7 +2,7 @@ import { type UIMessage } from 'ai';
 import { type InferSelectModel } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { type messages } from '@/server/db/schema';
+import { type messages } from '@/db/schema';
 
 import { type ChatTools } from './chat-tools';
 import {

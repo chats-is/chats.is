@@ -55,12 +55,12 @@ import {
   formatString,
   generateUUID
 } from '@/lib/utils';
-import { db } from '@/server/db';
+import { db } from '@/db';
 import {
   artifacts as artifactsTable,
   chats as chatsTable,
   messages as messagesTable
-} from '@/server/db/schema';
+} from '@/db/schema';
 import { createChat, getChat, updateChat } from '@/server/fn/chat';
 import {
   createMessages,

@@ -11,8 +11,8 @@ import {
   syncPricing
 } from '@/lib/pricing-sync';
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { modelPricings, models } from '@/server/db/schema';
+import { db } from '@/db';
+import { modelPricings, models } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 

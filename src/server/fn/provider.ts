@@ -7,8 +7,8 @@ import { type VertexServiceAccountKey } from '@/types';
 import { decrypt, encrypt, maskedKey } from '@/lib/crypto';
 import { getProviderModels, toProviderModelId } from '@/lib/provider';
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { models, providers } from '@/server/db/schema';
+import { db } from '@/db';
+import { models, providers } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 

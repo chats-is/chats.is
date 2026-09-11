@@ -16,8 +16,8 @@ import {
   resolveModelByKey
 } from '@/lib/pricing';
 import { generateUUID, parseNumber } from '@/lib/utils';
-import { db } from '@/server/db';
-import { usage } from '@/server/db/schema';
+import { db } from '@/db';
+import { usage } from '@/db/schema';
 
 /**
  * Compute cost and insert a usage row for a chat completion.

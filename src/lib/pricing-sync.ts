@@ -9,8 +9,8 @@ import {
 } from '@/types';
 import { BedrockModels, VertexAIModels } from '@/lib/constant';
 import { generateUUID, parseNumber } from '@/lib/utils';
-import { db } from '@/server/db';
-import { modelPricings, models } from '@/server/db/schema';
+import { db } from '@/db';
+import { modelPricings, models } from '@/db/schema';
 
 const SOURCE_URLS: Record<PricingSource, string> = {
   'models.dev': 'https://models.dev/api.json',

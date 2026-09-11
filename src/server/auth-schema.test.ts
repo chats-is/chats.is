@@ -7,7 +7,7 @@ import {
 import { getTableColumns } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 
-import { accounts, sessions, users, verifications } from './db/schema';
+import { accounts, sessions, users, verifications } from '@/db/schema';
 
 /**
  * Holds our tables to what better-auth actually requires.

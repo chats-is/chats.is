@@ -3,8 +3,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { eq, like, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { db } from '@/server/db';
-import { accounts, chats, messages, users } from '@/server/db/schema';
+import { db } from '@/db';
+import { accounts, chats, messages, users } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 

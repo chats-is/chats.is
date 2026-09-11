@@ -4,8 +4,8 @@ import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { plans, quotas, users } from '@/server/db/schema';
+import { db } from '@/db';
+import { plans, quotas, users } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 

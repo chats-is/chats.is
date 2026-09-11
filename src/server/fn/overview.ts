@@ -2,14 +2,8 @@ import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { sql } from 'drizzle-orm';
 
-import { db } from '@/server/db';
-import {
-  models,
-  prompts,
-  providers,
-  settings,
-  users
-} from '@/server/db/schema';
+import { db } from '@/db';
+import { models, prompts, providers, settings, users } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 
 /**

@@ -4,8 +4,8 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { messageSchema } from '@/types';
-import { db } from '@/server/db';
-import { artifacts, messages } from '@/server/db/schema';
+import { db } from '@/db';
+import { artifacts, messages } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
 
 export const listMessages = createServerFn({ method: 'GET' })

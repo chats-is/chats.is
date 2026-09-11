@@ -18,14 +18,14 @@ import {
   recordImageUsage,
   recordVideoUsage
 } from '@/lib/usage';
-import * as schema from '@/server/db/schema';
+import * as schema from '@/db/schema';
 
 import { makeTestDb } from '../test/pg';
 
 // Point the app's db at an in-process Postgres (PGlite) with real migrations.
 // getUserUsageWindows / getUserResolvedQuota / assertQuota all import this.
 const h = vi.hoisted(() => ({ db: undefined as any }));
-vi.mock('@/server/db', () => ({
+vi.mock('@/db', () => ({
   get db() {
     return h.db;
   }

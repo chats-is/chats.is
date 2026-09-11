@@ -5,7 +5,7 @@ import { emailOTP } from 'better-auth/plugins/email-otp';
 import { count, eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { accounts, sessions, users, verifications } from './db/schema';
+import { accounts, sessions, users, verifications } from '@/db/schema';
 
 /**
  * The auth stack against a real Postgres engine with the real migrations

@@ -12,9 +12,9 @@ import {
   pricingMissingFields
 } from './pricing';
 
-// pricing.ts imports `@/server/db` (which opens a Neon Pool + validates env)
+// pricing.ts imports `@/db` (which opens a Neon Pool + validates env)
 // at module load. The cost functions under test never touch the DB, so stub it.
-vi.mock('@/server/db', () => ({ db: {}, modelPricings: {}, models: {} }));
+vi.mock('@/db', () => ({ db: {}, modelPricings: {}, models: {} }));
 
 /** Build a full PricingRecord with all rates null, overriding only what a test needs. */
 function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {

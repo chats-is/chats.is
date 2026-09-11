@@ -22,6 +22,7 @@ const config = {
     '^@/types',
     '^@/lib/(.*)$',
     '^@/hooks/(.*)$',
+    '^@/db(.*)$',
     '^@/server/(.*)$',
     '^@/components/ui/(.*)$',
     '^@/components/(.*)$',

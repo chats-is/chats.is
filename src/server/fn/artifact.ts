@@ -3,8 +3,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { db } from '@/server/db';
-import { artifacts } from '@/server/db/schema';
+import { db } from '@/db';
+import { artifacts } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
 
 /** Single artifact with full content — used by Library downloads (the list

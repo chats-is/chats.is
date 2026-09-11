@@ -4,8 +4,8 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { settings } from '@/server/db/schema';
+import { db } from '@/db';
+import { settings } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 
 export const listSettings = createServerFn({ method: 'GET' })

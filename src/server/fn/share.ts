@@ -4,8 +4,8 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { generateUUID } from '@/lib/utils';
-import { db } from '@/server/db';
-import { chats, shares } from '@/server/db/schema';
+import { db } from '@/db';
+import { chats, shares } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 
