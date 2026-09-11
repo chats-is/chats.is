@@ -17,9 +17,10 @@ import { Sidebar } from '@/components/sidebar';
  * so a signed-out visitor is sent to sign in instead of watching a page render
  * whose every read would then be refused.
  */
-// No pending component on this layout either. It wraps ChatUI, and an
-// invalidated match skips the usual grace period entirely — so "New chat",
-// which invalidates as it navigates, would blank the whole shell at once.
+// No pending component on this layout either. It wraps the sidebar and
+// whichever page is open, so standing in for it while one chat's data loads
+// would take the whole shell down with it — and an invalidated match skips the
+// usual grace period, so it would not even be brief.
 export const Route = createFileRoute('/_chat')({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(sessionQueries.me());
