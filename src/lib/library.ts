@@ -12,7 +12,10 @@ export type LibraryMediaItem = {
   kind: 'image' | 'video' | 'audio';
   url: string;
   mediaType: string;
-  /** Generation prompt (media tools) or filename (legacy file parts). */
+  /**
+   * What the message said when it produced this — the same words that sit
+   * beside the media in the chat.
+   */
   title?: string;
   chatId: string | null;
   messageId: string;
@@ -45,6 +48,21 @@ export function extractLibraryMedia(message: {
 }): LibraryMediaItem[] {
   const items: LibraryMediaItem[] = [];
 
+  /**
+   * What the message says, and only that.
+   *
+   * Not the prompt the model wrote for the image tool: that is an argument to
+   * a tool call, never shown in the chat, and a card titled with it says
+   * something the reader has never seen. Not the reasoning either, which the
+   * chat keeps folded away under "Thoughts" — a library is not the place it
+   * gets unfolded. What is left is the reply the media arrived with.
+   */
+  const said = (message.parts ?? [])
+    .filter(part => part.type === 'text')
+    .map(part => part.text)
+    .join('\n')
+    .trim();
+
   (message.parts ?? []).forEach((part, index) => {
     let url: string | undefined;
     let mediaType: string | undefined;
@@ -53,7 +71,7 @@ export function extractLibraryMedia(message: {
     if (part.type === 'file' && part.url) {
       url = part.url;
       mediaType = part.mediaType;
-      title = part.filename;
+      title = said || part.filename;
     } else if (
       MEDIA_TOOL_PART_TYPES.has(part.type) &&
       'output' in part &&
@@ -63,11 +81,7 @@ export function extractLibraryMedia(message: {
       if (output.status !== 'done') return;
       url = output.url;
       mediaType = output.mediaType;
-      const input =
-        'input' in part
-          ? (part.input as { prompt?: string; text?: string } | undefined)
-          : undefined;
-      title = input?.prompt ?? input?.text ?? output.filename;
+      title = said || output.filename;
     }
 
     if (!url || !mediaType) return;
