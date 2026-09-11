@@ -19,10 +19,10 @@ export const listSettings = createServerFn({ method: 'GET' })
  * which the title and description follow from, and the two ids that decide
  * whether an analytics script is written into the page.
  */
-export const getAppSettingsFn = createServerFn({ method: 'GET' }).handler(
+export const getAppSettings = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const { getAppSettings } = await import('@/lib/queries');
-    return getAppSettings();
+    const { getAppSettings: readAppSettings } = await import('@/lib/queries');
+    return readAppSettings();
   }
 );
 
@@ -30,10 +30,11 @@ export const getAppSettingsFn = createServerFn({ method: 'GET' }).handler(
  * Get complete system settings for client initialization
  * Includes all enabled models and default settings
  */
-export const getSystemSettingsFn = createServerFn({ method: 'GET' }).handler(
+export const getSystemSettings = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const { getSystemSettings } = await import('@/lib/queries');
-    return getSystemSettings();
+    const { getSystemSettings: readSystemSettings } =
+      await import('@/lib/queries');
+    return readSystemSettings();
   }
 );
 
@@ -131,12 +132,12 @@ export const settingsQueries = {
   system: () =>
     queryOptions({
       queryKey: [...settingsQueries.key.system()] as const,
-      queryFn: () => getSystemSettingsFn()
+      queryFn: () => getSystemSettings()
     }),
   /** The installation's own name and description, read by the root route. */
   app: () =>
     queryOptions({
       queryKey: [...settingsQueries.key.app()] as const,
-      queryFn: () => getAppSettingsFn()
+      queryFn: () => getAppSettings()
     })
 };

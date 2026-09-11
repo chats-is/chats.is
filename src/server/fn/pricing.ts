@@ -7,7 +7,7 @@ import { type PricingRecord } from '@/types';
 import { pricingMissingFields } from '@/lib/pricing';
 import {
   previewSync,
-  searchRemotePricing,
+  searchRemotePricing as searchPricingCatalog,
   syncPricing
 } from '@/lib/pricing-sync';
 import { generateUUID } from '@/lib/utils';
@@ -231,7 +231,7 @@ export const runPricingSync = createServerFn({ method: 'POST' })
  * Search remote pricing catalog by free-text query.
  * Useful for admin UI autocomplete.
  */
-export const searchRemotePricingFn = createServerFn({ method: 'GET' })
+export const searchRemotePricing = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(
     z.object({
@@ -241,7 +241,7 @@ export const searchRemotePricingFn = createServerFn({ method: 'GET' })
     })
   )
   .handler(async ({ data }) => {
-    return await searchRemotePricing({
+    return await searchPricingCatalog({
       source: data.source,
       query: data.query,
       limit: data.limit
@@ -274,6 +274,6 @@ export const pricingQueries = {
   }) =>
     queryOptions({
       queryKey: [...pricingQueries.key.searchRemote(), input] as const,
-      queryFn: () => searchRemotePricingFn({ data: { limit: 50, ...input } })
+      queryFn: () => searchRemotePricing({ data: { limit: 50, ...input } })
     })
 };
