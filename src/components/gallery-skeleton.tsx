@@ -11,11 +11,19 @@ import { ChatHeader } from '@/components/chat-header';
 export function GalleryGridSkeleton() {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      {Array.from({ length: 8 }, (_, index) => (
-        <Skeleton key={index} className="aspect-square rounded-lg" />
-      ))}
+      <GalleryCardSkeletons count={8} />
     </div>
   );
+}
+
+/**
+ * The cards alone, for a grid that already exists — the page being fetched,
+ * taking its place at the end of the one on screen.
+ */
+export function GalleryCardSkeletons({ count }: { count: number }) {
+  return Array.from({ length: count }, (_, index) => (
+    <Skeleton key={index} className="aspect-square rounded-lg" aria-hidden />
+  ));
 }
 
 /**

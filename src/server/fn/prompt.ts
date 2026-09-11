@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { asc, desc, eq, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -34,7 +34,14 @@ const promptUpdateSchema = z.object({
   displayOrder: z.number().int().optional()
 });
 
-const promptOrderBy = [asc(prompts.displayOrder), desc(prompts.createdAt)];
+// `id` last so the order is total: prompts seeded together share a display
+// order and a creation time, and paging by row offset over an order that
+// leaves ties unbroken can repeat a row on one page and skip it on the next.
+const promptOrderBy = [
+  asc(prompts.displayOrder),
+  desc(prompts.createdAt),
+  asc(prompts.id)
+];
 
 const promptOwner = {
   user: {
@@ -108,8 +115,21 @@ export const listPrompts = createServerFn({ method: 'GET' })
 // Prompts the user can insert: their own (any visibility) + all public ones.
 export const listUsablePrompts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .handler(async ({ context }) => {
+  // Paged for the gallery, whole for the composer's suggestions: without a
+  // limit this returns everything, which is what a handful of suggestions is
+  // picked from.
+  .validator(
+    z
+      .object({
+        limit: z.number().min(1).max(100).optional(),
+        cursor: z.number().min(0).nullish()
+      })
+      .optional()
+  )
+  .handler(async ({ data, context }) => {
     return await db.query.prompts.findMany({
+      limit: data?.limit,
+      offset: data?.cursor ?? 0,
       columns: {
         id: true,
         name: true,
@@ -234,7 +254,8 @@ export const promptQueries = {
     stats: () => ['prompt', 'stats'] as const,
     adminList: () => ['prompt', 'adminList'] as const,
     list: () => ['prompt', 'list'] as const,
-    usable: () => ['prompt', 'usable'] as const
+    usable: () => ['prompt', 'usable'] as const,
+    usableInfinite: () => ['prompt', 'usableInfinite'] as const
   },
   stats: () =>
     queryOptions({
@@ -255,5 +276,17 @@ export const promptQueries = {
     queryOptions({
       queryKey: [...promptQueries.key.usable()] as const,
       queryFn: () => listUsablePrompts()
+    }),
+  /** The gallery scrolls; the cursor is the row offset, as the sidebar's is. */
+  usableInfinite: ({ limit = 24 }: { limit?: number } = {}) =>
+    infiniteQueryOptions({
+      queryKey: [...promptQueries.key.usableInfinite(), limit] as const,
+      queryFn: ({ pageParam }) =>
+        listUsablePrompts({ data: { limit, cursor: pageParam } }),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length < limit
+          ? undefined
+          : allPages.reduce((count, page) => count + page.length, 0)
     })
 };

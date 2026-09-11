@@ -8,7 +8,6 @@ import {
   FileText,
   Image as ImageIcon,
   LibraryBig,
-  Loader2,
   MessageSquare,
   Pause,
   Play,
@@ -21,9 +20,9 @@ import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 import { getArtifactLanguageLabel } from '@/lib/code-language';
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
 import { formatMediaTime } from '@/lib/utils';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { artifactQueries } from '@/server/fn/artifact';
 import { libraryQueries, type LibraryItem } from '@/server/fn/library';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogClose,
@@ -32,7 +31,10 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog';
 import { ChatHeader } from '@/components/chat-header';
-import { GalleryGridSkeleton } from '@/components/gallery-skeleton';
+import {
+  GalleryCardSkeletons,
+  GalleryGridSkeleton
+} from '@/components/gallery-skeleton';
 
 /** Hover corner actions — uniform across all card kinds: download and
  *  open-chat side by side at the top-right. `dark` for image/video overlays. */
@@ -438,19 +440,28 @@ function LibraryCard({ item }: { item: LibraryItem }) {
   );
 }
 
+/** One row of the widest grid, so a page on its way reads as a row of cards. */
+const NEXT_PAGE_PLACEHOLDER_CARDS = 4;
+
 export function LibraryView() {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       ...libraryQueries.list({ limit: 24 }),
       getNextPageParam: page => page.nextCursor
     });
 
+  useInfiniteScroll(scrollRef, {
+    enabled: !!hasNextPage && !isFetchingNextPage && !isLoading,
+    onLoadMore: fetchNextPage
+  });
+
   const items = data?.pages.flatMap(page => page.items) ?? [];
 
   return (
     <div className="flex size-full flex-col">
       <ChatHeader title="Library" />
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
         <div className="mx-auto w-full max-w-5xl p-4">
           {isLoading ? (
             <GalleryGridSkeleton />
@@ -462,28 +473,15 @@ export function LibraryView() {
               </p>
             </div>
           ) : (
-            <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {items.map(item => (
-                  <LibraryCard key={`${item.type}-${item.id}`} item={item} />
-                ))}
-              </div>
-              {hasNextPage && (
-                <div className="mt-6 mb-3 flex justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="gap-2"
-                  >
-                    {isFetchingNextPage && (
-                      <Loader2 className="size-4 animate-spin" />
-                    )}
-                    Load more
-                  </Button>
-                </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {items.map(item => (
+                <LibraryCard key={`${item.type}-${item.id}`} item={item} />
+              ))}
+              {/* The page being fetched, in the grid it is joining. */}
+              {isFetchingNextPage && (
+                <GalleryCardSkeletons count={NEXT_PAGE_PLACEHOLDER_CARDS} />
               )}
-            </>
+            </div>
           )}
         </div>
       </div>

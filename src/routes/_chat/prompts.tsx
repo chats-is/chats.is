@@ -7,7 +7,9 @@ import { PromptsView } from '@/components/prompts-view';
 
 export const Route = createFileRoute('/_chat/prompts')({
   loader: ({ context }) =>
-    context.queryClient.ensureQueryData(promptQueries.usable()),
+    context.queryClient.ensureInfiniteQueryData(
+      promptQueries.usableInfinite({ limit: 24 })
+    ),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Prompts') }] }),
   pendingComponent: () => <GalleryPending title="Prompts" />,
   component: PromptsView

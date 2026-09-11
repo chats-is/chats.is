@@ -1,11 +1,16 @@
+import { useRef } from 'react';
 import { useRouter } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 
 import { setPendingPrompt } from '@/lib/pending-prompt';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { promptQueries, type listUsablePrompts } from '@/server/fn/prompt';
 import { ChatHeader } from '@/components/chat-header';
-import { GalleryGridSkeleton } from '@/components/gallery-skeleton';
+import {
+  GalleryCardSkeletons,
+  GalleryGridSkeleton
+} from '@/components/gallery-skeleton';
 
 type UsablePrompt = Awaited<ReturnType<typeof listUsablePrompts>>[number];
 
@@ -59,21 +64,37 @@ function PromptCard({ prompt }: { prompt: UsablePrompt }) {
   );
 }
 
+/** One row of the widest grid, so a page on its way reads as a row of cards. */
+const NEXT_PAGE_PLACEHOLDER_CARDS = 4;
+
 export function PromptsView() {
-  const { data: prompts, isLoading } = useQuery(promptQueries.usable());
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery(promptQueries.usableInfinite({ limit: 24 }));
+
+  useInfiniteScroll(scrollRef, {
+    enabled: !!hasNextPage && !isFetchingNextPage && !isLoading,
+    onLoadMore: fetchNextPage
+  });
+
+  const prompts = data?.pages.flat() ?? [];
 
   return (
     <div className="flex size-full flex-col">
       <ChatHeader title="Prompts" />
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
         <div className="mx-auto w-full max-w-5xl p-4">
           {isLoading ? (
             <GalleryGridSkeleton />
-          ) : prompts?.length ? (
+          ) : prompts.length ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {prompts.map(prompt => (
                 <PromptCard key={prompt.id} prompt={prompt} />
               ))}
+              {/* The page being fetched, in the grid it is joining. */}
+              {isFetchingNextPage && (
+                <GalleryCardSkeletons count={NEXT_PAGE_PLACEHOLDER_CARDS} />
+              )}
             </div>
           ) : (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
