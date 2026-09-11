@@ -26,6 +26,7 @@ export function useChatsInfinite() {
     data,
     isLoading,
     isFetching,
+    isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
     isError,
@@ -38,6 +39,10 @@ export function useChatsInfinite() {
     chats: chats as Chat[],
     isLoading,
     isValidating: isFetching,
+    // Distinct from `isValidating`, which is true for any request in flight —
+    // including the refetch that follows renaming or deleting a chat. Only a
+    // page being added to the end of the list belongs at the end of the list.
+    isLoadingMore: isFetchingNextPage,
     fetchNextPage,
     hasMore: hasNextPage,
     isError,
