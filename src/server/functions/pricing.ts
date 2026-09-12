@@ -10,37 +10,29 @@ import {
   syncTargetSchema
 } from '@/types/pricing';
 import { adminMiddleware } from '@/server/middleware';
-import {
-  deletePricing as deletePricingRow,
-  listModelsWithPricing,
-  upsertModelPricing
-} from '@/server/services/pricing';
-import {
-  previewSync,
-  searchRemotePricing as searchPricingCatalog,
-  syncPricing
-} from '@/server/services/pricing-sync';
+import * as pricing from '@/server/services/pricing';
+import * as pricingSync from '@/server/services/pricing-sync';
 
 export const listPricingWithModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(pricingListSchema)
-  .handler(({ data }) => listModelsWithPricing(data));
+  .handler(({ data }) => pricing.listPricingWithModels(data));
 
 export const upsertPricing = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(pricingUpsertSchema)
-  .handler(({ data }) => upsertModelPricing(data));
+  .handler(({ data }) => pricing.upsertPricing(data));
 
 export const deletePricing = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(pricingIdSchema)
-  .handler(({ data }) => deletePricingRow(data.id));
+  .handler(({ data }) => pricing.deletePricing(data.id));
 
 /** What would change if we synced pricing from a remote source. */
 export const previewPricingSync = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(syncTargetSchema)
-  .handler(({ data }) => previewSync(data));
+  .handler(({ data }) => pricingSync.previewPricingSync(data));
 
 /**
  * Sync pricing from a remote source. Omitting modelDbIds syncs every model;
@@ -49,13 +41,13 @@ export const previewPricingSync = createServerFn({ method: 'POST' })
 export const runPricingSync = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(syncRunSchema)
-  .handler(({ data }) => syncPricing(data));
+  .handler(({ data }) => pricingSync.runPricingSync(data));
 
 /** Free-text search of the remote catalogue, for the admin autocomplete. */
 export const searchRemotePricing = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(remoteSearchSchema)
-  .handler(({ data }) => searchPricingCatalog(data));
+  .handler(({ data }) => pricingSync.searchRemotePricing(data));
 
 export const pricingQueries = {
   all: () => ['pricing'] as const,

@@ -13,7 +13,7 @@ import { models, prompts, providers, settings, users } from '@/db/schema';
  * joining each provider's models along the way, none of which was ever looked
  * at. These are counts, so the database counts them.
  */
-export async function countConsoleEntities() {
+export async function getConsoleOverview() {
   const count = sql<number>`count(*)`.mapWith(Number);
 
   const [providerRows, modelRows, promptRows, settingRows, userRows] =

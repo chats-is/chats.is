@@ -222,3 +222,16 @@ export const modelToggleSchema = z.object({
 
 /** Addressing a model by its business key rather than its row id. */
 export const modelRefSchema = z.object({ modelId: z.string().min(1) });
+
+/** Which of a provider's models to bring into this install. */
+export const modelSyncSchema = z.object({
+  providerId: z.string().min(1),
+  items: z
+    .array(
+      z.object({
+        modelId: z.string().min(1).max(255),
+        capability: modelCapabilitySchema
+      })
+    )
+    .min(1)
+});

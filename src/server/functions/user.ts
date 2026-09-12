@@ -9,33 +9,24 @@ import {
   userSearchSchema
 } from '@/types/user';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
-import {
-  countUsers,
-  deleteUser as deleteUserRow,
-  listUsers as listUserRows,
-  requireCurrentUser,
-  requireUserDetail,
-  setUserPlan,
-  setUserRole,
-  updateOwnProfile
-} from '@/server/services/user';
+import * as users from '@/server/services/user';
 
 export const getMe = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .handler(async ({ context }) => ({
-    ...(await requireCurrentUser(context.user.id)),
+    ...(await users.getMe(context.user.id)),
     admin: context.user.admin
   }));
 
 export const updateProfile = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(profileUpdateSchema)
-  .handler(({ data, context }) => updateOwnProfile(context.user.id, data));
+  .handler(({ data, context }) => users.updateProfile(context.user.id, data));
 
 export const listUsers = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(userSearchSchema)
-  .handler(({ data }) => listUserRows(data.search));
+  .handler(({ data }) => users.listUsers(data.search));
 
 /**
  * Admin: change a user's plan. Pass planId=null to clear (fall back to default).
@@ -43,26 +34,26 @@ export const listUsers = createServerFn({ method: 'GET' })
 export const updateUserPlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(userPlanSchema)
-  .handler(({ data }) => setUserPlan(data.id, data.planId));
+  .handler(({ data }) => users.updateUserPlan(data.id, data.planId));
 
 export const getUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(userIdSchema)
-  .handler(({ data }) => requireUserDetail(data.id));
+  .handler(({ data }) => users.getUser(data.id));
 
 export const updateUserRole = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(userRoleSchema)
-  .handler(({ data, context }) => setUserRole(context.user.id, data));
+  .handler(({ data, context }) => users.updateUserRole(context.user.id, data));
 
 export const deleteUser = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(userIdSchema)
-  .handler(({ data, context }) => deleteUserRow(context.user.id, data.id));
+  .handler(({ data, context }) => users.deleteUser(context.user.id, data.id));
 
 export const getUserStats = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => countUsers());
+  .handler(() => users.getUserStats());
 
 export const userQueries = {
   all: () => ['user'] as const,

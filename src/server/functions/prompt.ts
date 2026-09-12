@@ -8,69 +8,63 @@ import {
   promptUpdateSchema
 } from '@/types/prompt';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
-import {
-  countPromptsByVisibility,
-  deleteAnyPrompt,
-  deleteOwnPrompt,
-  insertPrompt,
-  listAllPrompts,
-  listOwnedPrompts,
-  listPromptsUsableBy,
-  updateAnyPrompt,
-  updateOwnPrompt
-} from '@/server/services/prompt';
+import * as prompts from '@/server/services/prompt';
 
 export const getPromptStats = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => countPromptsByVisibility());
+  .handler(() => prompts.getPromptStats());
 
 export const adminListPrompts = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => listAllPrompts());
+  .handler(() => prompts.adminListPrompts());
 
 export const listPrompts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .handler(({ context }) => listOwnedPrompts(context.user.id));
+  .handler(({ context }) => prompts.listPrompts(context.user.id));
 
 export const listUsablePrompts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(promptPageSchema)
-  .handler(({ data, context }) => listPromptsUsableBy(context.user.id, data));
+  .handler(({ data, context }) =>
+    prompts.listUsablePrompts(context.user.id, data)
+  );
 
 export const createPrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(promptCreateSchema)
   .handler(({ data, context }) =>
-    insertPrompt(context.user.id, data, 'private')
+    prompts.createPrompt(context.user.id, data, 'private')
   );
 
 export const updatePrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(promptUpdateSchema)
-  .handler(({ data, context }) => updateOwnPrompt(context.user.id, data));
+  .handler(({ data, context }) => prompts.updatePrompt(context.user.id, data));
 
 export const deletePrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(promptIdSchema)
-  .handler(({ data, context }) => deleteOwnPrompt(context.user.id, data.id));
+  .handler(({ data, context }) =>
+    prompts.deletePrompt(context.user.id, data.id)
+  );
 
 /** Admin console: a public prompt available to everyone. */
 export const adminCreatePrompt = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(promptCreateSchema)
   .handler(({ data, context }) =>
-    insertPrompt(context.user.id, data, 'public')
+    prompts.createPrompt(context.user.id, data, 'public')
   );
 
 export const adminUpdatePrompt = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(promptUpdateSchema)
-  .handler(({ data }) => updateAnyPrompt(data));
+  .handler(({ data }) => prompts.adminUpdatePrompt(data));
 
 export const adminDeletePrompt = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(promptIdSchema)
-  .handler(({ data }) => deleteAnyPrompt(data.id));
+  .handler(({ data }) => prompts.adminDeletePrompt(data.id));
 
 export const promptQueries = {
   all: () => ['prompt'] as const,

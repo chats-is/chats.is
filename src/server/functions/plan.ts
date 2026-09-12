@@ -3,38 +3,32 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { planCreateSchema, planIdSchema, planUpdateSchema } from '@/types/plan';
 import { adminMiddleware } from '@/server/middleware';
-import {
-  deletePlan as deletePlanRow,
-  insertPlan,
-  listPlansForUsers,
-  listPlansWithUserCounts,
-  updatePlan as updatePlanRow
-} from '@/server/services/plan';
+import * as plans from '@/server/services/plan';
 
 /** Public list — no quota amounts. */
 export const listPublicPlans = createServerFn({ method: 'GET' }).handler(() =>
-  listPlansForUsers()
+  plans.listPublicPlans()
 );
 
 /** Admin list — also returns user count per plan. */
 export const listPlans = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => listPlansWithUserCounts());
+  .handler(() => plans.listPlans());
 
 export const createPlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planCreateSchema)
-  .handler(({ data }) => insertPlan(data));
+  .handler(({ data }) => plans.createPlan(data));
 
 export const updatePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planUpdateSchema)
-  .handler(({ data }) => updatePlanRow(data));
+  .handler(({ data }) => plans.updatePlan(data));
 
 export const deletePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planIdSchema)
-  .handler(({ data }) => deletePlanRow(data.id));
+  .handler(({ data }) => plans.deletePlan(data.id));
 
 export const planQueries = {
   all: () => ['plan'] as const,

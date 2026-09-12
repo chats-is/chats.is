@@ -384,7 +384,7 @@ const roundCost = (n: number) =>
 // ============================================================================
 
 /** Every model with its pricing row — the admin pricing table. */
-export async function listModelsWithPricing(
+export async function listPricingWithModels(
   filter: z.infer<typeof pricingListSchema>
 ) {
   const result = await db.query.models.findMany({
@@ -411,9 +411,7 @@ export async function listModelsWithPricing(
  * combination the cost engine could not resolve — an image model priced both
  * per-image and per-token has no defined cost.
  */
-export async function upsertModelPricing(
-  data: z.infer<typeof pricingUpsertSchema>
-) {
+export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
   const model = await db.query.models.findFirst({
     where: eq(models.id, data.modelDbId)
   });

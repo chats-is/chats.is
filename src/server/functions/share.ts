@@ -7,39 +7,33 @@ import {
   sharePageSchema
 } from '@/types/shared-link';
 import { authedMiddleware } from '@/server/middleware';
-import {
-  deleteAllOwnShares,
-  deleteOwnShare,
-  findChatBehindShare,
-  findOrCreateShare,
-  listOwnedShares
-} from '@/server/services/share';
+import * as shares from '@/server/services/share';
 
 export const createShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(shareChatSchema)
   .handler(({ data, context }) =>
-    findOrCreateShare(context.user.id, data.chatId)
+    shares.createShare(context.user.id, data.chatId)
   );
 
 export const listShares = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(sharePageSchema)
-  .handler(({ data, context }) => listOwnedShares(context.user.id, data));
+  .handler(({ data, context }) => shares.listShares(context.user.id, data));
 
 /** Public by design: a share link is readable by whoever holds it. */
 export const getSharedChat = createServerFn({ method: 'GET' })
   .validator(shareIdSchema)
-  .handler(({ data }) => findChatBehindShare(data.id));
+  .handler(({ data }) => shares.getSharedChat(data.id));
 
 export const deleteShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(shareIdSchema)
-  .handler(({ data, context }) => deleteOwnShare(context.user.id, data.id));
+  .handler(({ data, context }) => shares.deleteShare(context.user.id, data.id));
 
 export const deleteAllShares = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .handler(({ context }) => deleteAllOwnShares(context.user.id));
+  .handler(({ context }) => shares.deleteAllShares(context.user.id));
 
 export const shareQueries = {
   all: () => ['share'] as const,

@@ -1,11 +1,9 @@
 import { type JSONValue } from 'ai';
 import { z } from 'zod';
 
-import { modelCapabilitySchema } from './model';
-
 /** The providers this app knows how to talk to. Declared as a schema so the
  *  admin form and the server validate against the same list. */
-export const providerTypeSchema = z.enum([
+const providerTypeSchema = z.enum([
   'openai',
   'azure',
   'google',
@@ -70,17 +68,4 @@ export const providerRefSchema = z.object({ providerId: z.string().min(1) });
 export const providerToggleSchema = z.object({
   id: z.string().min(1),
   isEnabled: z.boolean()
-});
-
-/** Which of a provider's models to bring into this install. */
-export const providerModelImportSchema = z.object({
-  providerId: z.string().min(1),
-  items: z
-    .array(
-      z.object({
-        modelId: z.string().min(1).max(255),
-        capability: modelCapabilitySchema
-      })
-    )
-    .min(1)
 });

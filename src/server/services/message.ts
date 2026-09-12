@@ -23,7 +23,7 @@ const clientColumns = {
   updatedAt: messages.updatedAt
 };
 
-export async function listOwnedMessagesInChat(userId: string, chatId: string) {
+export async function listMessages(userId: string, chatId: string) {
   return await db.query.messages.findMany({
     where: and(eq(messages.chatId, chatId), eq(messages.userId, userId)),
     orderBy: (messages, { asc }) => [asc(messages.createdAt)],
@@ -41,7 +41,7 @@ export async function listOwnedMessagesInChat(userId: string, chatId: string) {
  * wants the user message back to render at once, which is why a bulk insert
  * returns a single row.
  */
-export async function insertMessagesReturningFirst(
+export async function createMessages(
   userId: string,
   input: z.infer<typeof messageCreateSchema>
 ) {
@@ -71,7 +71,7 @@ export async function insertMessagesReturningFirst(
  * Assistant messages are not editable, so the role is part of the where clause
  * rather than a check: a request naming one simply matches no row.
  */
-export async function updateOwnUserMessage(
+export async function updateMessage(
   userId: string,
   input: z.infer<typeof messageUpdateSchema>
 ) {
@@ -98,7 +98,7 @@ export async function updateOwnUserMessage(
  * `parentId`), taking the artifacts those messages produced with them. One
  * transaction, so a half-deleted branch is never left behind.
  */
-export async function deleteOwnMessagesAndArtifacts(
+export async function deleteMessages(
   userId: string,
   target: z.infer<typeof messageDeleteSchema>
 ) {

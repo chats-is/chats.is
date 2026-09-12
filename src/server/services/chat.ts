@@ -18,7 +18,7 @@ import { artifacts, chats, messages } from '@/db/schema';
  * The two writes belong to one act: a chat with no messages is never a state
  * the app wants to read back.
  */
-export async function insertChatWithMessages(
+export async function createChat(
   userId: string,
   input: z.infer<typeof chatCreateSchema>
 ) {
@@ -43,7 +43,7 @@ export async function insertChatWithMessages(
 
 /** Rename a chat or move it to another model. Absent fields are left alone,
  *  and a request naming none writes nothing. */
-export async function updateOwnChat(
+export async function updateChat(
   userId: string,
   input: z.infer<typeof chatUpdateSchema>
 ) {
@@ -59,7 +59,7 @@ export async function updateOwnChat(
     .where(and(eq(chats.id, input.id), eq(chats.userId, userId)));
 }
 
-export async function listOwnedChats(
+export async function listChats(
   userId: string,
   input: z.infer<typeof chatListSchema>
 ) {
@@ -87,7 +87,7 @@ export async function listOwnedChats(
  * disabled, so the caller cannot offer to continue a conversation on a model
  * that can no longer answer.
  */
-export async function findOwnedChat(
+export async function getChat(
   userId: string,
   input: z.infer<typeof chatDetailSchema>
 ) {
@@ -142,10 +142,10 @@ export async function findOwnedChat(
   };
 }
 
-export async function deleteOwnChat(userId: string, id: string) {
+export async function deleteChat(userId: string, id: string) {
   await db.delete(chats).where(and(eq(chats.id, id), eq(chats.userId, userId)));
 }
 
-export async function deleteAllOwnChats(userId: string) {
+export async function deleteAllChats(userId: string) {
   await db.delete(chats).where(eq(chats.userId, userId));
 }

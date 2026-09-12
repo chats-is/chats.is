@@ -11,45 +11,36 @@ import {
   chatUpdateSchema
 } from '@/types/chat';
 import { authedMiddleware } from '@/server/middleware';
-import {
-  deleteAllOwnChats,
-  deleteOwnChat,
-  findOwnedChat,
-  insertChatWithMessages,
-  listOwnedChats,
-  updateOwnChat
-} from '@/server/services/chat';
+import * as chats from '@/server/services/chat';
 
 export const createChat = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(chatCreateSchema)
-  .handler(({ data, context }) =>
-    insertChatWithMessages(context.user.id, data)
-  );
+  .handler(({ data, context }) => chats.createChat(context.user.id, data));
 
 export const updateChat = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(chatUpdateSchema)
-  .handler(({ data, context }) => updateOwnChat(context.user.id, data));
+  .handler(({ data, context }) => chats.updateChat(context.user.id, data));
 
 export const listChats = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(chatListSchema)
-  .handler(({ data, context }) => listOwnedChats(context.user.id, data));
+  .handler(({ data, context }) => chats.listChats(context.user.id, data));
 
 export const getChat = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(chatDetailSchema)
-  .handler(({ data, context }) => findOwnedChat(context.user.id, data));
+  .handler(({ data, context }) => chats.getChat(context.user.id, data));
 
 export const deleteChat = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(chatIdSchema)
-  .handler(({ data, context }) => deleteOwnChat(context.user.id, data.id));
+  .handler(({ data, context }) => chats.deleteChat(context.user.id, data.id));
 
 export const deleteAllChats = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .handler(({ context }) => deleteAllOwnChats(context.user.id));
+  .handler(({ context }) => chats.deleteAllChats(context.user.id));
 
 type ListInput = { type?: z.infer<typeof chatTypeSchema>; limit?: number };
 

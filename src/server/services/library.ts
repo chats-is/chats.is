@@ -46,7 +46,7 @@ const MEDIA_PARTS_JSONPATH = `$[*] ? (@.type == "file" || @.type like_regex "^to
  * the boundary timestamp — a strict `lt` cursor would skip whatever remained
  * of it — so a page can come back slightly longer than `limit`.
  */
-export async function readLibraryPage(
+export async function listLibrary(
   userId: string,
   { cursor, limit }: z.infer<typeof libraryPageSchema>
 ): Promise<{ items: LibraryItem[]; nextCursor: string | undefined }> {

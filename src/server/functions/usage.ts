@@ -9,41 +9,35 @@ import {
   usageUserSchema
 } from '@/types/usage';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
-import {
-  listModelsUsedBy,
-  readGlobalUsage,
-  readOwnUsage,
-  readUsageForUser,
-  readUsageLog
-} from '@/server/services/usage';
+import * as usage from '@/server/services/usage';
 
 /** /settings/usage — the calling user's own usage. */
 export const getMyUsage = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(usageRangeSchema)
-  .handler(({ data, context }) => readOwnUsage(context.user.id, data.from));
+  .handler(({ data, context }) => usage.getMyUsage(context.user.id, data.from));
 
 /** /console/users/[id] — admin view of one user. */
 export const adminUsageByUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageByUserRangeSchema)
-  .handler(({ data }) => readUsageForUser(data.userId, data.from));
+  .handler(({ data }) => usage.adminUsageByUser(data.userId, data.from));
 
 /** /console/usage — admin view across everyone. */
 export const adminListUsage = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageRangeSchema)
-  .handler(({ data }) => readGlobalUsage(data.from));
+  .handler(({ data }) => usage.adminListUsage(data.from));
 
 export const adminUserModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageUserSchema)
-  .handler(({ data }) => listModelsUsedBy(data.userId));
+  .handler(({ data }) => usage.adminUserModels(data.userId));
 
 export const adminUsageLog = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageLogFilterSchema)
-  .handler(({ data }) => readUsageLog(data));
+  .handler(({ data }) => usage.adminUsageLog(data));
 
 /** What a caller may narrow the log by; all optional here because the query
  *  key is built before the schema's defaults apply. */

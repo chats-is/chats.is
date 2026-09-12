@@ -16,7 +16,7 @@ import { PublicError } from '@/server/public-error';
  * surface as a 500 and give the client no reason to sign out, so this answers
  * 401 instead.
  */
-export async function requireCurrentUser(userId: string) {
+export async function getMe(userId: string) {
   const user = await db.select().from(users).where(eq(users.id, userId));
 
   if (!user[0]) {
@@ -26,7 +26,7 @@ export async function requireCurrentUser(userId: string) {
   return user[0];
 }
 
-export async function updateOwnProfile(
+export async function updateProfile(
   userId: string,
   input: z.infer<typeof profileUpdateSchema>
 ) {
@@ -73,7 +73,7 @@ export async function listUsers(search?: string) {
 }
 
 /** Pass planId=null to clear it; the user falls back to the default. */
-export async function setUserPlan(id: string, planId: string | null) {
+export async function updateUserPlan(id: string, planId: string | null) {
   await db
     .update(users)
     .set({ planId, updatedAt: new Date() })
@@ -84,7 +84,7 @@ export async function setUserPlan(id: string, planId: string | null) {
  * One user with what the console's detail page shows: linked accounts, and
  * how much they have written. Throws when the id names nobody.
  */
-export async function requireUserDetail(id: string) {
+export async function getUser(id: string) {
   const user = await db.select().from(users).where(eq(users.id, id));
 
   if (!user[0]) {
@@ -119,7 +119,7 @@ export async function requireUserDetail(id: string) {
 
 /** `actingUserId` is required, not optional: an admin must not be able to
  *  strip their own admin role and lock themselves out of the console. */
-export async function setUserRole(
+export async function updateUserRole(
   actingUserId: string,
   input: z.infer<typeof userRoleSchema>
 ) {
@@ -155,7 +155,7 @@ export async function deleteUser(actingUserId: string, id: string) {
   return { success: true };
 }
 
-export async function countUsers() {
+export async function getUserStats() {
   const totalUsers = await db
     .select({ count: sql<number>`count(*)` })
     .from(users);

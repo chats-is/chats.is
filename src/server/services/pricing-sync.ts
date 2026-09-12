@@ -126,7 +126,7 @@ function findRemoteCost(
  * Preview what would change for a given list of model.id values if synced.
  * Does not write to the database.
  */
-export async function previewSync(args: {
+export async function previewPricingSync(args: {
   source: PricingSource;
   modelDbIds?: string[]; // models.id (PK), not modelId
 }): Promise<
@@ -183,7 +183,7 @@ export async function previewSync(args: {
  *
  * Returns counts of matched/updated/created/unchanged + list of unmatched ids.
  */
-export async function syncPricing(args: {
+export async function runPricingSync(args: {
   source: PricingSource;
   modelDbIds?: string[]; // models.id (PK)
   onlyMissing?: boolean; // skip models that already have pricing

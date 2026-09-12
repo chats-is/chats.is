@@ -44,7 +44,7 @@ async function getPromptByIdOrThrow(id: string) {
   return prompt;
 }
 
-export async function countPromptsByVisibility() {
+export async function getPromptStats() {
   const [totalRows, groupedRows] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(prompts),
     db
@@ -67,7 +67,7 @@ export async function countPromptsByVisibility() {
 }
 
 /** Every prompt in the system, regardless of owner or visibility. */
-export async function listAllPrompts() {
+export async function adminListPrompts() {
   return await db.query.prompts.findMany({
     orderBy: () => promptOrderBy,
     with: promptOwner
@@ -75,7 +75,7 @@ export async function listAllPrompts() {
 }
 
 /** The user's own prompts, for managing their personal library. */
-export async function listOwnedPrompts(userId: string) {
+export async function listPrompts(userId: string) {
   return await db.query.prompts.findMany({
     where: eq(prompts.userId, userId),
     orderBy: () => promptOrderBy
@@ -86,7 +86,7 @@ export async function listOwnedPrompts(userId: string) {
  * Prompts the user may insert: their own at any visibility, plus every public
  * one. Paged for the gallery, whole for the composer's suggestions.
  */
-export async function listPromptsUsableBy(
+export async function listUsablePrompts(
   userId: string,
   page?: z.infer<typeof promptPageSchema>
 ) {
@@ -112,7 +112,7 @@ export async function listPromptsUsableBy(
  * falls back to when the input names none: private for a user's own prompt,
  * public for one an admin adds to the shared gallery.
  */
-export async function insertPrompt(
+export async function createPrompt(
   userId: string,
   input: z.infer<typeof promptCreateSchema>,
   defaultVisibility: 'private' | 'public'
@@ -150,7 +150,7 @@ async function writePromptFields(input: z.infer<typeof promptUpdateSchema>) {
  * with an optional owner would let a caller drop the check by leaving an
  * argument out.
  */
-export async function updateOwnPrompt(
+export async function updatePrompt(
   userId: string,
   input: z.infer<typeof promptUpdateSchema>
 ) {
@@ -161,14 +161,14 @@ export async function updateOwnPrompt(
   await writePromptFields(input);
 }
 
-export async function updateAnyPrompt(
+export async function adminUpdatePrompt(
   input: z.infer<typeof promptUpdateSchema>
 ) {
   await getPromptByIdOrThrow(input.id);
   await writePromptFields(input);
 }
 
-export async function deleteOwnPrompt(userId: string, id: string) {
+export async function deletePrompt(userId: string, id: string) {
   const prompt = await getPromptByIdOrThrow(id);
   if (prompt.userId !== userId) {
     throw new Response('You can only delete your own prompts', {
@@ -178,7 +178,7 @@ export async function deleteOwnPrompt(userId: string, id: string) {
   await db.delete(prompts).where(eq(prompts.id, id));
 }
 
-export async function deleteAnyPrompt(id: string) {
+export async function adminDeletePrompt(id: string) {
   await getPromptByIdOrThrow(id);
   await db.delete(prompts).where(eq(prompts.id, id));
 }

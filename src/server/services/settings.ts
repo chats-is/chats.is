@@ -206,7 +206,7 @@ export async function getSystemSettings() {
 // Admin writes
 // ============================================================================
 
-export async function listAllSettings() {
+export async function listSettings() {
   return await db.query.settings.findMany();
 }
 
@@ -217,7 +217,7 @@ export async function listAllSettings() {
  * row that key names or creates it — there is no separate create for an admin
  * to reach for.
  */
-export async function upsertSetting(input: z.infer<typeof settingSchema>) {
+export async function updateSetting(input: z.infer<typeof settingSchema>) {
   const existing = await db.query.settings.findFirst({
     where: eq(settings.key, input.key)
   });
@@ -243,9 +243,11 @@ export async function upsertSetting(input: z.infer<typeof settingSchema>) {
 
 /** One after another rather than in a transaction, as it was: the console
  *  saves a form's worth of independent keys, not one atomic change. */
-export async function upsertSettings(input: z.infer<typeof settingSchema>[]) {
+export async function bulkUpdateSettings(
+  input: z.infer<typeof settingSchema>[]
+) {
   for (const item of input) {
-    await upsertSetting(item);
+    await updateSetting(item);
   }
 }
 

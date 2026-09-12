@@ -3,14 +3,14 @@ import { infiniteQueryOptions } from '@tanstack/react-query';
 
 import { libraryPageSchema } from '@/types/library';
 import { authedMiddleware } from '@/server/middleware';
-import { readLibraryPage, type LibraryItem } from '@/server/services/library';
+import * as library from '@/server/services/library';
 
-export type { LibraryItem };
+export type { LibraryItem } from '@/server/services/library';
 
 export const listLibrary = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(libraryPageSchema)
-  .handler(({ data, context }) => readLibraryPage(context.user.id, data));
+  .handler(({ data, context }) => library.listLibrary(context.user.id, data));
 
 export const libraryQueries = {
   all: () => ['library'] as const,

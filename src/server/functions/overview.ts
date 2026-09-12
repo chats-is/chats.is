@@ -2,12 +2,12 @@ import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 
 import { adminMiddleware } from '@/server/middleware';
-import { countConsoleEntities } from '@/server/services/overview';
+import * as overview from '@/server/services/overview';
 
 /** The counts behind the console's home page. */
 export const getConsoleOverview = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => countConsoleEntities());
+  .handler(() => overview.getConsoleOverview());
 
 export const overviewQueries = {
   /** Key prefixes, shared by the readers and by anything that invalidates

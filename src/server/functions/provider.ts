@@ -1,70 +1,61 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 
-import { modelRefSchema } from '@/types/model';
+import { modelRefSchema, modelSyncSchema } from '@/types/model';
 import {
   providerCreateSchema,
   providerIdSchema,
-  providerModelImportSchema,
   providerRefSchema,
   providerToggleSchema,
   providerUpdateSchema
 } from '@/types/provider';
 import { adminMiddleware } from '@/server/middleware';
-import {
-  deleteProvider as deleteProviderRow,
-  importMissingProviderModels,
-  insertProvider,
-  listEnabledProviders as listEnabledProviderRows,
-  listProvidersOfferingModel,
-  listProvidersWithMaskedKeys,
-  listRemoteProviderModels,
-  setProviderEnabled,
-  updateProvider as updateProviderRow
-} from '@/server/services/provider';
+import * as providers from '@/server/services/provider';
 
 export const listProviders = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => listProvidersWithMaskedKeys());
+  .handler(() => providers.listProviders());
 
 export const listEnabledProviders = createServerFn({ method: 'GET' }).handler(
-  () => listEnabledProviderRows()
+  () => providers.listEnabledProviders()
 );
 
 export const createProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(providerCreateSchema)
-  .handler(({ data }) => insertProvider(data));
+  .handler(({ data }) => providers.createProvider(data));
 
 export const updateProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(providerUpdateSchema)
-  .handler(({ data }) => updateProviderRow(data));
+  .handler(({ data }) => providers.updateProvider(data));
 
 export const deleteProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(providerIdSchema)
-  .handler(({ data }) => deleteProviderRow(data.id));
+  .handler(({ data }) => providers.deleteProvider(data.id));
 
 export const toggleEnabledProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(providerToggleSchema)
-  .handler(({ data }) => setProviderEnabled(data.id, data.isEnabled));
+  .handler(({ data }) =>
+    providers.toggleEnabledProvider(data.id, data.isEnabled)
+  );
 
 export const fetchProviderModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(providerRefSchema)
-  .handler(({ data }) => listRemoteProviderModels(data.providerId));
+  .handler(({ data }) => providers.fetchProviderModels(data.providerId));
 
 export const compatibleProviders = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(modelRefSchema)
-  .handler(({ data }) => listProvidersOfferingModel(data.modelId));
+  .handler(({ data }) => providers.compatibleProviders(data.modelId));
 
 export const syncProviderModels = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(providerModelImportSchema)
-  .handler(({ data }) => importMissingProviderModels(data));
+  .validator(modelSyncSchema)
+  .handler(({ data }) => providers.syncProviderModels(data));
 
 export const providerQueries = {
   all: () => ['provider'] as const,

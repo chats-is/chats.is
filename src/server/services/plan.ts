@@ -15,7 +15,7 @@ import { PublicError } from '@/server/public-error';
  * Deliberately omits the linked quota row — the dollar amounts in it are not
  * for the user end.
  */
-export async function listPlansForUsers() {
+export async function listPublicPlans() {
   return await db.query.plans.findMany({
     columns: {
       id: true,
@@ -30,7 +30,7 @@ export async function listPlansForUsers() {
 }
 
 /** Plans with their quota and how many users are on each. */
-export async function listPlansWithUserCounts() {
+export async function listPlans() {
   const all = await db.query.plans.findMany({
     orderBy: (p, { asc }) => [asc(p.displayOrder), asc(p.name)],
     with: { quota: true }
@@ -60,7 +60,7 @@ async function requireQuotaExists(quotaId: string) {
   if (!quota) throw new PublicError('Quota not found');
 }
 
-export async function insertPlan(input: z.infer<typeof planCreateSchema>) {
+export async function createPlan(input: z.infer<typeof planCreateSchema>) {
   const id = generateUUID();
   await requireQuotaExists(input.quotaId);
 

@@ -261,7 +261,7 @@ const asNumber = (v: number | null | ''): number | null =>
   v === '' || v === null ? null : v;
 
 /** All quotas, with the system default marked. */
-export async function listQuotasWithDefault() {
+export async function listQuotas() {
   const all = await db.query.quotas.findMany({
     orderBy: (q, { asc }) => [asc(q.name)]
   });
@@ -273,14 +273,14 @@ export async function listQuotasWithDefault() {
 }
 
 /** The id/name/unlimited triple the console's selectors need. */
-export async function listQuotaSummaries() {
+export async function listQuotasForSelect() {
   return await db.query.quotas.findMany({
     orderBy: (q, { asc }) => [asc(q.name)],
     columns: { id: true, name: true, isUnlimited: true }
   });
 }
 
-export async function insertQuota(input: z.infer<typeof quotaCreateSchema>) {
+export async function createQuota(input: z.infer<typeof quotaCreateSchema>) {
   if (!input.isUnlimited) {
     const w = asNumber(input.sevenDay);
     if (w === null || w <= 0) {
@@ -379,7 +379,7 @@ export async function deleteQuota(id: string) {
 }
 
 /** Admin: pin a user to a specific quota, overriding their plan. */
-export async function setUserQuotaOverride(userId: string, quotaId: string) {
+export async function setUserQuota(userId: string, quotaId: string) {
   const exists = await db.query.quotas.findFirst({
     where: eq(quotas.id, quotaId)
   });
@@ -391,7 +391,7 @@ export async function setUserQuotaOverride(userId: string, quotaId: string) {
 }
 
 /** Admin: clear the override; the user falls back to their plan or default. */
-export async function clearUserQuotaOverride(userId: string) {
+export async function removeUserQuota(userId: string) {
   await db
     .update(users)
     .set({ quotaId: null, updatedAt: new Date() })

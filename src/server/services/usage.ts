@@ -381,7 +381,7 @@ async function queryUsageRows(args: {
 
 /** A KPI tile and the rows behind it — what every usage screen asks for. The
  *  user-end variant drops cost: user-facing procedures never expose dollars. */
-export async function readOwnUsage(userId: string, since: Date) {
+export async function getMyUsage(userId: string, since: Date) {
   const [kpi, rows] = await Promise.all([
     queryKpiUser({ since, userId }),
     queryUsageRowsUser({ since, userId })
@@ -389,7 +389,7 @@ export async function readOwnUsage(userId: string, since: Date) {
   return { kpi, rows };
 }
 
-export async function readUsageForUser(userId: string, since: Date) {
+export async function adminUsageByUser(userId: string, since: Date) {
   const [kpi, rows] = await Promise.all([
     queryKpi({ since, userId }),
     queryUsageRows({ since, userId })
@@ -397,7 +397,7 @@ export async function readUsageForUser(userId: string, since: Date) {
   return { kpi, rows };
 }
 
-export async function readGlobalUsage(since: Date) {
+export async function adminListUsage(since: Date) {
   const [kpi, rows] = await Promise.all([
     queryKpi({ since }),
     queryUsageRows({ since })
@@ -407,7 +407,7 @@ export async function readGlobalUsage(since: Date) {
 
 /** Distinct models one user has spent on — the filter list on their detail
  *  page in the console. */
-export async function listModelsUsedBy(userId: string) {
+export async function adminUserModels(userId: string) {
   const rows = await db
     .select({ modelId: usage.modelId })
     .from(usage)
@@ -418,7 +418,9 @@ export async function listModelsUsedBy(userId: string) {
 }
 
 /** The admin usage log: one page of rows, plus the total behind it. */
-export async function readUsageLog(data: z.infer<typeof usageLogFilterSchema>) {
+export async function adminUsageLog(
+  data: z.infer<typeof usageLogFilterSchema>
+) {
   const whereParts = [
     data.from ? gte(usage.createdAt, data.from) : undefined,
     data.to ? lte(usage.createdAt, data.to) : undefined,

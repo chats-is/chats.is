@@ -104,9 +104,7 @@ export const findModelByModelId = perRequest(
 // ============================================================================
 
 /** Models with their provider bindings, for the console's model table. */
-export async function listModelsWithProviders(
-  filter: z.infer<typeof modelListSchema>
-) {
+export async function listModels(filter: z.infer<typeof modelListSchema>) {
   return await db.query.models.findMany({
     where: and(
       filter.capability ? eq(models.capability, filter.capability) : undefined,
@@ -126,7 +124,7 @@ export async function listModelsWithProviders(
   });
 }
 
-export async function insertModel(input: z.infer<typeof modelCreateSchema>) {
+export async function createModel(input: z.infer<typeof modelCreateSchema>) {
   const normalizedModelId = input.modelId.trim();
 
   const bindings =
@@ -261,7 +259,7 @@ export async function deleteModel(id: string) {
   await db.delete(models).where(eq(models.id, id));
 }
 
-export async function setModelEnabled(id: string, isEnabled: boolean) {
+export async function toggleEnabledModel(id: string, isEnabled: boolean) {
   await db
     .update(models)
     .set({ isEnabled: isEnabled, updatedAt: new Date() })

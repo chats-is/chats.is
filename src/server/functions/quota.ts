@@ -9,60 +9,51 @@ import {
   quotaUserSchema
 } from '@/types/quota';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
-import {
-  clearUserQuotaOverride,
-  deleteQuota as deleteQuotaRow,
-  getUserQuota,
-  insertQuota,
-  listQuotaSummaries,
-  listQuotasWithDefault,
-  setUserQuotaOverride,
-  updateQuota as updateQuotaRow
-} from '@/server/services/quota';
+import * as quotas from '@/server/services/quota';
 
 export const listQuotas = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => listQuotasWithDefault());
+  .handler(() => quotas.listQuotas());
 
 export const listQuotasForSelect = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => listQuotaSummaries());
+  .handler(() => quotas.listQuotasForSelect());
 
 export const createQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(quotaCreateSchema)
-  .handler(({ data }) => insertQuota(data));
+  .handler(({ data }) => quotas.createQuota(data));
 
 export const updateQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(quotaUpdateSchema)
-  .handler(({ data }) => updateQuotaRow(data));
+  .handler(({ data }) => quotas.updateQuota(data));
 
 export const deleteQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(quotaIdSchema)
-  .handler(({ data }) => deleteQuotaRow(data.id));
+  .handler(({ data }) => quotas.deleteQuota(data.id));
 
 /** Current user's quota — percentages and reset times, never dollars. */
 export const getMyQuota = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .handler(({ context }) => getUserQuota(context.user.id));
+  .handler(({ context }) => quotas.getUserQuota(context.user.id));
 
 /** Admin: any user's quota, same shape. */
 export const getQuotaForUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(quotaUserSchema)
-  .handler(({ data }) => getUserQuota(data.userId));
+  .handler(({ data }) => quotas.getUserQuota(data.userId));
 
 export const setUserQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(quotaAssignSchema)
-  .handler(({ data }) => setUserQuotaOverride(data.userId, data.quotaId));
+  .handler(({ data }) => quotas.setUserQuota(data.userId, data.quotaId));
 
 export const removeUserQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(quotaUserSchema)
-  .handler(({ data }) => clearUserQuotaOverride(data.userId));
+  .handler(({ data }) => quotas.removeUserQuota(data.userId));
 
 export const quotaQueries = {
   all: () => ['quota'] as const,

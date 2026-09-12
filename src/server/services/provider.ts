@@ -4,9 +4,9 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { type VertexServiceAccountKey } from '@/types';
+import { type modelSyncSchema } from '@/types/model';
 import {
   type providerCreateSchema,
-  type providerModelImportSchema,
   type providerUpdateSchema
 } from '@/types/provider';
 import { decrypt, encrypt, maskedKey } from '@/lib/crypto';
@@ -17,7 +17,7 @@ import { models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 /** Providers with their models, API keys masked. */
-export async function listProvidersWithMaskedKeys() {
+export async function listProviders() {
   const result = await db.query.providers.findMany({
     orderBy: (providers, { asc, desc }) => [
       asc(providers.displayOrder),
@@ -47,7 +47,7 @@ export async function listEnabledProviders() {
   });
 }
 
-export async function insertProvider(
+export async function createProvider(
   input: z.infer<typeof providerCreateSchema>
 ) {
   const id = generateUUID();
@@ -131,7 +131,7 @@ export async function deleteProvider(id: string) {
   await db.delete(providers).where(eq(providers.id, id));
 }
 
-export async function setProviderEnabled(id: string, isEnabled: boolean) {
+export async function toggleEnabledProvider(id: string, isEnabled: boolean) {
   await db
     .update(providers)
     .set({ isEnabled: isEnabled, updatedAt: new Date() })
@@ -140,7 +140,7 @@ export async function setProviderEnabled(id: string, isEnabled: boolean) {
 
 /** What the provider's own API offers, marked with what this install
  *  already has. Reaches the provider over the network. */
-export async function listRemoteProviderModels(providerId: string) {
+export async function fetchProviderModels(providerId: string) {
   const provider = await db.query.providers.findFirst({
     where: eq(providers.id, providerId),
     with: {
@@ -164,7 +164,7 @@ export async function listRemoteProviderModels(providerId: string) {
 
 /** Enabled providers whose API actually offers this model — the same-kind
  *  providers it can fail over between. One whose listing errors is omitted. */
-export async function listProvidersOfferingModel(modelId: string) {
+export async function compatibleProviders(modelId: string) {
   const enabledProviders = await db.query.providers.findMany({
     where: eq(providers.isEnabled, true),
     orderBy: (providers, { asc, desc }) => [
@@ -194,8 +194,8 @@ export async function listProvidersOfferingModel(modelId: string) {
 
 /** Create the selected models this install does not have yet, and report
  *  how many were skipped for already existing. */
-export async function importMissingProviderModels(
-  input: z.infer<typeof providerModelImportSchema>
+export async function syncProviderModels(
+  input: z.infer<typeof modelSyncSchema>
 ) {
   const provider = await db.query.providers.findFirst({
     where: eq(providers.id, input.providerId)

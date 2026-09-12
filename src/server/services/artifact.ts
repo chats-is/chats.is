@@ -10,7 +10,7 @@ import { artifacts } from '@/db/schema';
  * user owns. Library downloads read through here; the list feed carries only
  * a truncated preview.
  */
-export async function findOwnedArtifact(userId: string, id: string) {
+export async function getArtifact(userId: string, id: string) {
   const artifact = await db.query.artifacts.findFirst({
     where: and(eq(artifacts.id, id), eq(artifacts.userId, userId)),
     columns: {
@@ -25,7 +25,7 @@ export async function findOwnedArtifact(userId: string, id: string) {
  * independent product of the message that created it; the canvas switches
  * between them.
  */
-export async function listOwnedArtifactsInChat(userId: string, chatId: string) {
+export async function listArtifacts(userId: string, chatId: string) {
   return await db.query.artifacts.findMany({
     where: and(eq(artifacts.chatId, chatId), eq(artifacts.userId, userId)),
     orderBy: (artifacts, { asc }) => [asc(artifacts.createdAt)],

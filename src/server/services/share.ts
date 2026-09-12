@@ -16,7 +16,7 @@ import { PublicError } from '@/server/public-error';
  * earlier has to keep working — so this returns the existing row rather than
  * minting a second id for the same chat.
  */
-export async function findOrCreateShare(userId: string, chatId: string) {
+export async function createShare(userId: string, chatId: string) {
   const chat = await db.query.chats.findFirst({
     where: and(eq(chats.id, chatId), eq(chats.userId, userId)),
     columns: { id: true }
@@ -51,7 +51,7 @@ export async function findOrCreateShare(userId: string, chatId: string) {
   return result[0];
 }
 
-export async function listOwnedShares(
+export async function listShares(
   userId: string,
   input: z.infer<typeof sharePageSchema>
 ) {
@@ -83,7 +83,7 @@ export async function listOwnedShares(
  * Deliberately not scoped to a user: a share link is readable by whoever
  * holds it.
  */
-export async function findChatBehindShare(id: string) {
+export async function getSharedChat(id: string) {
   const share = await db.query.shares.findFirst({
     where: eq(shares.id, id),
     with: {
@@ -113,12 +113,12 @@ export async function findChatBehindShare(id: string) {
   return share?.chat;
 }
 
-export async function deleteOwnShare(userId: string, id: string) {
+export async function deleteShare(userId: string, id: string) {
   await db
     .delete(shares)
     .where(and(eq(shares.id, id), eq(shares.userId, userId)));
 }
 
-export async function deleteAllOwnShares(userId: string) {
+export async function deleteAllShares(userId: string) {
   await db.delete(shares).where(eq(shares.userId, userId));
 }

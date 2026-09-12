@@ -3,21 +3,20 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { artifactChatSchema, artifactIdSchema } from '@/types/artifact';
 import { authedMiddleware } from '@/server/middleware';
-import {
-  findOwnedArtifact,
-  listOwnedArtifactsInChat
-} from '@/server/services/artifact';
+import * as artifacts from '@/server/services/artifact';
 
 export const getArtifact = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(artifactIdSchema)
-  .handler(({ data, context }) => findOwnedArtifact(context.user.id, data.id));
+  .handler(({ data, context }) =>
+    artifacts.getArtifact(context.user.id, data.id)
+  );
 
 export const listArtifacts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(artifactChatSchema)
   .handler(({ data, context }) =>
-    listOwnedArtifactsInChat(context.user.id, data.chatId)
+    artifacts.listArtifacts(context.user.id, data.chatId)
   );
 
 /**

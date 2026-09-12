@@ -8,37 +8,34 @@ import {
   messageUpdateSchema
 } from '@/types/message';
 import { authedMiddleware } from '@/server/middleware';
-import {
-  deleteOwnMessagesAndArtifacts,
-  insertMessagesReturningFirst,
-  listOwnedMessagesInChat,
-  updateOwnUserMessage
-} from '@/server/services/message';
+import * as messages from '@/server/services/message';
 
 export const listMessages = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(messageChatSchema)
   .handler(({ data, context }) =>
-    listOwnedMessagesInChat(context.user.id, data.chatId)
+    messages.listMessages(context.user.id, data.chatId)
   );
 
 export const createMessages = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(messageCreateSchema)
   .handler(({ data, context }) =>
-    insertMessagesReturningFirst(context.user.id, data)
+    messages.createMessages(context.user.id, data)
   );
 
 export const updateMessage = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(messageUpdateSchema)
-  .handler(({ data, context }) => updateOwnUserMessage(context.user.id, data));
+  .handler(({ data, context }) =>
+    messages.updateMessage(context.user.id, data)
+  );
 
 export const deleteMessages = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(messageDeleteSchema)
   .handler(({ data, context }) =>
-    deleteOwnMessagesAndArtifacts(context.user.id, data)
+    messages.deleteMessages(context.user.id, data)
   );
 
 export const messageQueries = {
