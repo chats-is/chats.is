@@ -1,47 +1,24 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
-import { and, eq } from 'drizzle-orm';
 
 import { artifactChatSchema, artifactIdSchema } from '@/types/artifact';
-import { db } from '@/db';
-import { artifacts } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
+import {
+  findOwnedArtifact,
+  listOwnedArtifactsInChat
+} from '@/server/services/artifact';
 
-/** Single artifact with full content — used by Library downloads (the list
- *  feed only carries a truncated preview). */
 export const getArtifact = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(artifactIdSchema)
-  .handler(async ({ data, context }) => {
-    const artifact = await db.query.artifacts.findFirst({
-      where: and(
-        eq(artifacts.id, data.id),
-        eq(artifacts.userId, context.user.id)
-      ),
-      columns: {
-        userId: false
-      }
-    });
-    return artifact ?? null;
-  });
+  .handler(({ data, context }) => findOwnedArtifact(context.user.id, data.id));
 
-// All artifacts in a chat. Each artifact is an independent product of the
-// message that created it; the canvas switches between them.
 export const listArtifacts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(artifactChatSchema)
-  .handler(async ({ data, context }) => {
-    return await db.query.artifacts.findMany({
-      where: and(
-        eq(artifacts.chatId, data.chatId),
-        eq(artifacts.userId, context.user.id)
-      ),
-      orderBy: (artifacts, { asc }) => [asc(artifacts.createdAt)],
-      columns: {
-        userId: false
-      }
-    });
-  });
+  .handler(({ data, context }) =>
+    listOwnedArtifactsInChat(context.user.id, data.chatId)
+  );
 
 /**
  * Query keys live beside the functions they call, so a cache invalidation

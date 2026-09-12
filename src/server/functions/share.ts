@@ -1,134 +1,45 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
-import { and, eq } from 'drizzle-orm';
 
 import {
   shareChatSchema,
   shareIdSchema,
   sharePageSchema
 } from '@/types/shared-link';
-import { generateUUID } from '@/lib/utils';
-import { db } from '@/db';
-import { chats, shares } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
-import { PublicError } from '@/server/public-error';
+import {
+  deleteAllOwnShares,
+  deleteOwnShare,
+  findChatBehindShare,
+  findOrCreateShare,
+  listOwnedShares
+} from '@/server/services/share';
 
 export const createShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(shareChatSchema)
-  .handler(async ({ data, context }) => {
-    // Verify the chat belongs to the current user
-    const chat = await db.query.chats.findFirst({
-      where: and(eq(chats.id, data.chatId), eq(chats.userId, context.user.id)),
-      columns: { id: true }
-    });
-
-    if (!chat) {
-      throw new PublicError('Chat not found');
-    }
-
-    // Check if a share already exists for this chat
-    const existingShare = await db.query.shares.findFirst({
-      where: and(
-        eq(shares.chatId, data.chatId),
-        eq(shares.userId, context.user.id)
-      ),
-      columns: { chatId: false, userId: false }
-    });
-
-    if (existingShare) {
-      return existingShare;
-    }
-
-    const shareId = generateUUID();
-    const result = await db
-      .insert(shares)
-      .values({
-        id: shareId,
-        chatId: data.chatId,
-        userId: context.user.id
-      })
-      .returning({
-        id: shares.id,
-        createdAt: shares.createdAt
-      });
-
-    return result[0];
-  });
+  .handler(({ data, context }) =>
+    findOrCreateShare(context.user.id, data.chatId)
+  );
 
 export const listShares = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(sharePageSchema)
-  .handler(async ({ data, context }) => {
-    const limit = data.limit ?? 50;
-    const offset = data.offset ?? 0;
-
-    return await db.query.shares.findMany({
-      orderBy: (shares, { desc }) => [desc(shares.createdAt)],
-      limit: limit,
-      offset: offset,
-      where: eq(shares.userId, context.user.id),
-      with: {
-        chat: {
-          columns: {
-            userId: false
-          }
-        }
-      },
-      columns: {
-        chatId: false,
-        userId: false
-      }
-    });
-  });
+  .handler(({ data, context }) => listOwnedShares(context.user.id, data));
 
 /** Public by design: a share link is readable by whoever holds it. */
 export const getSharedChat = createServerFn({ method: 'GET' })
   .validator(shareIdSchema)
-  .handler(async ({ data }) => {
-    const share = await db.query.shares.findFirst({
-      where: eq(shares.id, data.id),
-      with: {
-        chat: {
-          with: {
-            messages: {
-              orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-              columns: {
-                chatId: false,
-                userId: false
-              }
-            },
-            artifacts: {
-              orderBy: (artifacts, { asc }) => [asc(artifacts.createdAt)],
-              columns: {
-                userId: false
-              }
-            }
-          },
-          columns: {
-            userId: false
-          }
-        }
-      }
-    });
-
-    return share?.chat;
-  });
+  .handler(({ data }) => findChatBehindShare(data.id));
 
 export const deleteShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(shareIdSchema)
-  .handler(async ({ data, context }) => {
-    await db
-      .delete(shares)
-      .where(and(eq(shares.id, data.id), eq(shares.userId, context.user.id)));
-  });
+  .handler(({ data, context }) => deleteOwnShare(context.user.id, data.id));
 
 export const deleteAllShares = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .handler(async ({ context }) => {
-    await db.delete(shares).where(eq(shares.userId, context.user.id));
-  });
+  .handler(({ context }) => deleteAllOwnShares(context.user.id));
 
 export const shareQueries = {
   all: () => ['share'] as const,

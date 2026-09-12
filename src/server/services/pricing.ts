@@ -1,16 +1,22 @@
 import '@tanstack/react-start/server-only';
 
 import { cache } from 'react';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { type z } from 'zod';
 
 import {
   type ChatUsage,
   type PriceSnapshot,
   type PricingRecord
 } from '@/types';
-import { parseNumber } from '@/lib/utils';
+import {
+  type pricingListSchema,
+  type pricingUpsertSchema
+} from '@/types/pricing';
+import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, models } from '@/db/schema';
+import { PublicError } from '@/server/public-error';
 
 const EMPTY_SNAPSHOT: PriceSnapshot = {
   inputPrice: null,
@@ -372,3 +378,139 @@ export function calculateTranscriptionCost(
 
 const roundCost = (n: number) =>
   Math.round(n * 10_000_000_000) / 10_000_000_000;
+
+// ============================================================================
+// Admin CRUD
+// ============================================================================
+
+/** Every model with its pricing row — the admin pricing table. */
+export async function listModelsWithPricing(
+  filter: z.infer<typeof pricingListSchema>
+) {
+  const result = await db.query.models.findMany({
+    where: and(
+      filter.capability ? eq(models.capability, filter.capability) : undefined,
+      filter.providerId ? eq(models.providerId, filter.providerId) : undefined
+    ),
+    with: {
+      provider: true,
+      pricings: { limit: 1 }
+    },
+    orderBy: (m, { asc, desc }) => [asc(m.displayOrder), desc(m.createdAt)]
+  });
+  return result.map(m => ({
+    ...m,
+    pricing: m.pricings[0] ?? null
+  }));
+}
+
+/**
+ * Create or replace a model's pricing. One row per model.
+ *
+ * Each capability bills in exactly one style, and the checks below reject a
+ * combination the cost engine could not resolve — an image model priced both
+ * per-image and per-token has no defined cost.
+ */
+export async function upsertModelPricing(
+  data: z.infer<typeof pricingUpsertSchema>
+) {
+  const model = await db.query.models.findFirst({
+    where: eq(models.id, data.modelDbId)
+  });
+  if (!model) throw new PublicError('Model not found');
+
+  // Capability-aware required-field check. Cache R/W are auto-defaulted
+  // to 0 below, so they don't need to be in the required list. Reuses
+  // `pricingMissingFields` from lib/pricing so admin-side and runtime
+  // gate share the same rule.
+  const cap = model.capability;
+
+  // Image models bill EITHER per-image OR per-token, never both — the two
+  // styles are mutually exclusive (see calculateImageCost).
+  if (
+    cap === 'image' &&
+    data.image != null &&
+    (data.input != null || data.output != null)
+  ) {
+    throw new PublicError(
+      'Image pricing must be either Per image OR token-based (Input + Output), not both.'
+    );
+  }
+
+  // Audio is one-of-three: per-character (classic TTS), per-token, or
+  // per-second (STT).
+  const audioStyles = [
+    data.audioCharacters != null,
+    data.audioInput != null || data.audioOutput != null,
+    data.audioSeconds != null
+  ].filter(Boolean).length;
+  if (cap === 'audio' && audioStyles > 1) {
+    throw new PublicError(
+      'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per second.'
+    );
+  }
+
+  // Video is the same either/or: per-video (flat) OR per-second.
+  if (cap === 'video' && data.video != null && data.videoSeconds != null) {
+    throw new PublicError(
+      'Video pricing must be either Per video OR Per second, not both.'
+    );
+  }
+
+  const missing = pricingMissingFields(
+    cap,
+    data as unknown as PricingRecord,
+    cap === 'audio'
+      ? { transcription: !!model.supportsTranscription }
+      : undefined
+  );
+  if (missing.length > 0) {
+    throw new PublicError(
+      `Missing required price${missing.length > 1 ? 's' : ''} for ${cap} model: ${missing.join(', ')}.`
+    );
+  }
+
+  const now = new Date();
+  // Cache R/W default to "0" (free) when not set, so the cost engine
+  // never falls back to data rate. All other fields stay null when unset.
+  const cacheDefault = (v: string | null | undefined): string =>
+    v === null || v === undefined || v === '' ? '0' : v;
+  const values = {
+    modelId: model.modelId,
+    input: data.input,
+    output: data.output,
+    cacheRead: cacheDefault(data.cacheRead),
+    cacheWrite: cacheDefault(data.cacheWrite),
+    // Reasoning stays null when not set — cost engine falls back to output.
+    reasoning: data.reasoning,
+    image: data.image,
+    video: data.video,
+    videoSeconds: data.videoSeconds,
+    audioInput: data.audioInput,
+    audioOutput: data.audioOutput,
+    audioCharacters: data.audioCharacters,
+    audioSeconds: data.audioSeconds,
+    source: data.source,
+    updatedAt: now
+  };
+
+  const existing = await db.query.modelPricings.findFirst({
+    where: eq(modelPricings.modelId, model.modelId)
+  });
+  if (existing) {
+    await db
+      .update(modelPricings)
+      .set(values)
+      .where(eq(modelPricings.id, existing.id));
+  } else {
+    await db.insert(modelPricings).values({
+      id: generateUUID(),
+      ...values,
+      createdAt: now
+    });
+  }
+}
+
+export async function deletePricing(id: string) {
+  await db.delete(modelPricings).where(eq(modelPricings.id, id));
+}

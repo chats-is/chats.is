@@ -1,110 +1,56 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
-import { eq } from 'drizzle-orm';
 
 import {
   settingKeySchema,
   settingsBulkSchema,
   settingSchema
 } from '@/types/settings';
-import { generateUUID } from '@/lib/utils';
-import { db } from '@/db';
-import { settings } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
+import {
+  deleteSetting as deleteSettingRow,
+  listAllSettings,
+  getAppSettings as readAppSettings,
+  getSystemSettings as readSystemSettings,
+  upsertSetting,
+  upsertSettings
+} from '@/server/services/settings';
 
 export const listSettings = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(async () => {
-    return await db.query.settings.findMany();
-  });
+  .handler(() => listAllSettings());
 
 /**
  * What the document itself needs: the name the installation gives itself,
  * which the title and description follow from, and the two ids that decide
  * whether an analytics script is written into the page.
  */
-export const getAppSettings = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const { getAppSettings: readAppSettings } =
-      await import('@/server/services/settings');
-    return readAppSettings();
-  }
+export const getAppSettings = createServerFn({ method: 'GET' }).handler(() =>
+  readAppSettings()
 );
 
 /**
  * Get complete system settings for client initialization
  * Includes all enabled models and default settings
  */
-export const getSystemSettings = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const { getSystemSettings: readSystemSettings } =
-      await import('@/server/services/settings');
-    return readSystemSettings();
-  }
+export const getSystemSettings = createServerFn({ method: 'GET' }).handler(() =>
+  readSystemSettings()
 );
 
 export const updateSetting = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(settingSchema)
-  .handler(async ({ data }) => {
-    const existing = await db.query.settings.findFirst({
-      where: eq(settings.key, data.key)
-    });
-
-    if (existing) {
-      await db
-        .update(settings)
-        .set({
-          value: data.value,
-          description: data.description ?? existing.description,
-          updatedAt: new Date()
-        })
-        .where(eq(settings.key, data.key));
-    } else {
-      await db.insert(settings).values({
-        id: generateUUID(),
-        key: data.key,
-        value: data.value,
-        description: data.description
-      });
-    }
-  });
+  .handler(({ data }) => upsertSetting(data));
 
 export const bulkUpdateSettings = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(settingsBulkSchema)
-  .handler(async ({ data }) => {
-    for (const item of data) {
-      const existing = await db.query.settings.findFirst({
-        where: eq(settings.key, item.key)
-      });
-
-      if (existing) {
-        await db
-          .update(settings)
-          .set({
-            value: item.value,
-            description: item.description ?? existing.description,
-            updatedAt: new Date()
-          })
-          .where(eq(settings.key, item.key));
-      } else {
-        await db.insert(settings).values({
-          id: generateUUID(),
-          key: item.key,
-          value: item.value,
-          description: item.description
-        });
-      }
-    }
-  });
+  .handler(({ data }) => upsertSettings(data));
 
 export const deleteSetting = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(settingKeySchema)
-  .handler(async ({ data }) => {
-    await db.delete(settings).where(eq(settings.key, data.key));
-  });
+  .handler(({ data }) => deleteSettingRow(data.key));
 
 export const settingsQueries = {
   all: () => ['settings'] as const,

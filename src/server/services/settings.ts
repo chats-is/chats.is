@@ -1,13 +1,16 @@
 import '@tanstack/react-start/server-only';
 
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
+import { type z } from 'zod';
 
+import { type settingSchema } from '@/types/settings';
 import {
   DEFAULT_APP_DESCRIPTION,
   DEFAULT_APP_NAME,
   DEFAULT_APP_SUBTITLE
 } from '@/lib/constant';
 import { perRequest } from '@/lib/request-cache';
+import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
 import { findModelByModelId, getAllModels } from '@/server/services/model';
@@ -197,4 +200,55 @@ export async function getSystemSettings() {
       sttModelId: values['default.stt.modelId']
     }
   };
+}
+
+// ============================================================================
+// Admin writes
+// ============================================================================
+
+export async function listAllSettings() {
+  return await db.query.settings.findMany();
+}
+
+/**
+ * Write one setting.
+ *
+ * Settings are addressed by key rather than id, so a write either updates the
+ * row that key names or creates it — there is no separate create for an admin
+ * to reach for.
+ */
+export async function upsertSetting(input: z.infer<typeof settingSchema>) {
+  const existing = await db.query.settings.findFirst({
+    where: eq(settings.key, input.key)
+  });
+
+  if (existing) {
+    await db
+      .update(settings)
+      .set({
+        value: input.value,
+        description: input.description ?? existing.description,
+        updatedAt: new Date()
+      })
+      .where(eq(settings.key, input.key));
+  } else {
+    await db.insert(settings).values({
+      id: generateUUID(),
+      key: input.key,
+      value: input.value,
+      description: input.description
+    });
+  }
+}
+
+/** One after another rather than in a transaction, as it was: the console
+ *  saves a form's worth of independent keys, not one atomic change. */
+export async function upsertSettings(input: z.infer<typeof settingSchema>[]) {
+  for (const item of input) {
+    await upsertSetting(item);
+  }
+}
+
+export async function deleteSetting(key: string) {
+  await db.delete(settings).where(eq(settings.key, key));
 }

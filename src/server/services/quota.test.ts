@@ -5,10 +5,13 @@ import {
   assertQuota,
   getUserQuota,
   ModelAccessDeniedError,
-  QuotaExceededError,
-  validateQuotaLimits
+  QuotaExceededError
 } from './quota';
 import { getUserResolvedQuota, getUserUsageWindows } from './quota-queries';
+
+// The CRUD half of quota.ts opens a Neon pool at module load; the logic under
+// test never reaches it.
+vi.mock('@/db', () => ({ db: {} }));
 
 // quota.ts is the business layer over the reads in quota-queries.ts. Mock the
 // reads so this tests the resolve/percent/threshold logic in isolation.
@@ -38,29 +41,6 @@ function windows(fiveUsed: number, sevenUsed: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-});
-
-describe('validateQuotaLimits (pure)', () => {
-  it('passes when 5-hour ≤ 25% of weekly', () => {
-    expect(() =>
-      validateQuotaLimits({ fiveHour: 25, sevenDay: 100 })
-    ).not.toThrow();
-  });
-
-  it('throws when 5-hour exceeds 25% of weekly', () => {
-    expect(() => validateQuotaLimits({ fiveHour: 26, sevenDay: 100 })).toThrow(
-      /25% of weekly/
-    );
-  });
-
-  it('ignores the check when either side is null', () => {
-    expect(() =>
-      validateQuotaLimits({ fiveHour: 999, sevenDay: null })
-    ).not.toThrow();
-    expect(() =>
-      validateQuotaLimits({ fiveHour: null, sevenDay: 100 })
-    ).not.toThrow();
-  });
 });
 
 describe('getUserQuota', () => {

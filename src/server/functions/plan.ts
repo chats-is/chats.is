@@ -1,114 +1,40 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
-import { eq, sql } from 'drizzle-orm';
 
 import { planCreateSchema, planIdSchema, planUpdateSchema } from '@/types/plan';
-import { generateUUID } from '@/lib/utils';
-import { db } from '@/db';
-import { plans, quotas, users } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
-import { PublicError } from '@/server/public-error';
+import {
+  deletePlan as deletePlanRow,
+  insertPlan,
+  listPlansForUsers,
+  listPlansWithUserCounts,
+  updatePlan as updatePlanRow
+} from '@/server/services/plan';
 
-/**
- * Public list (used by clients to display tier info in /settings/usage).
- */
-/**
- * Public list of plans — id / name / description / displayOrder only.
- * Deliberately omits the linked quota row to avoid leaking quota dollar
- * amounts to the user end.
- */
-export const listPublicPlans = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    return await db.query.plans.findMany({
-      columns: {
-        id: true,
-        name: true,
-        description: true,
-        displayOrder: true,
-        createdAt: true,
-        updatedAt: true
-      },
-      orderBy: (p, { asc }) => [asc(p.displayOrder), asc(p.name)]
-    });
-  }
+/** Public list — no quota amounts. */
+export const listPublicPlans = createServerFn({ method: 'GET' }).handler(() =>
+  listPlansForUsers()
 );
 
-/**
- * Admin list — also returns user count per plan.
- */
+/** Admin list — also returns user count per plan. */
 export const listPlans = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(async () => {
-    const all = await db.query.plans.findMany({
-      orderBy: (p, { asc }) => [asc(p.displayOrder), asc(p.name)],
-      with: { quota: true }
-    });
-
-    const counts = await db
-      .select({
-        planId: users.planId,
-        count: sql<number>`count(*)`
-      })
-      .from(users)
-      .groupBy(users.planId);
-
-    const countMap = new Map(counts.map(c => [c.planId, Number(c.count)]));
-    return all.map(p => ({
-      ...p,
-      userCount: countMap.get(p.id) ?? 0
-    }));
-  });
+  .handler(() => listPlansWithUserCounts());
 
 export const createPlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planCreateSchema)
-  .handler(async ({ data }) => {
-    const id = generateUUID();
-    // Verify quota exists
-    const quota = await db.query.quotas.findFirst({
-      where: eq(quotas.id, data.quotaId)
-    });
-    if (!quota) throw new PublicError('Quota not found');
-
-    await db.insert(plans).values({
-      id,
-      name: data.name,
-      description: data.description ?? null,
-      quotaId: data.quotaId,
-      displayOrder: data.displayOrder
-    });
-
-    return { id };
-  });
+  .handler(({ data }) => insertPlan(data));
 
 export const updatePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planUpdateSchema)
-  .handler(async ({ data }) => {
-    const { id, ...updates } = data;
-    const patch: Record<string, unknown> = { updatedAt: new Date() };
-    if (updates.name !== undefined) patch.name = updates.name;
-    if (updates.description !== undefined)
-      patch.description = updates.description ?? null;
-    if (updates.quotaId !== undefined) {
-      const quota = await db.query.quotas.findFirst({
-        where: eq(quotas.id, updates.quotaId)
-      });
-      if (!quota) throw new PublicError('Quota not found');
-      patch.quotaId = updates.quotaId;
-    }
-    if (updates.displayOrder !== undefined)
-      patch.displayOrder = updates.displayOrder;
-
-    await db.update(plans).set(patch).where(eq(plans.id, id));
-  });
+  .handler(({ data }) => updatePlanRow(data));
 
 export const deletePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planIdSchema)
-  .handler(async ({ data }) => {
-    await db.delete(plans).where(eq(plans.id, data.id));
-  });
+  .handler(({ data }) => deletePlanRow(data.id));
 
 export const planQueries = {
   all: () => ['plan'] as const,

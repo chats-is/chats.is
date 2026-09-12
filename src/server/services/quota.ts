@@ -1,11 +1,23 @@
 import '@tanstack/react-start/server-only';
 
+import { eq } from 'drizzle-orm';
+import { type z } from 'zod';
+
 import { type ResolvedSource, type UserQuota } from '@/types';
-import { parseNumber } from '@/lib/utils';
+import {
+  validateQuotaLimits,
+  type quotaCreateSchema,
+  type quotaUpdateSchema
+} from '@/types/quota';
+import { generateUUID, parseNumber } from '@/lib/utils';
+import { db } from '@/db';
+import { quotas, users } from '@/db/schema';
+import { PublicError } from '@/server/public-error';
 import {
   getUserResolvedQuota,
   getUserUsageWindows
 } from '@/server/services/quota-queries';
+import { getDefaultQuotaId } from '@/server/services/settings';
 
 /**
  * Shape the raw resolved-quota row into the structured form business logic
@@ -114,30 +126,6 @@ export async function assertQuota(userId: string): Promise<void> {
   }
 }
 
-/**
- * Validate that an admin-supplied set of quota limits is internally consistent.
- *
- *   Upper-bound ratio: `fiveHour ≤ sevenDay × 0.25`. When `sevenDay ≥ 0` this
- *   also implies ordering (`fiveHour ≤ sevenDay`).
- *
- * Note: throws a plain Error — the tRPC layer surfaces `.message` directly
- * via `toast.error(e.message)` in the client.
- */
-export function validateQuotaLimits(input: {
-  fiveHour: number | null;
-  sevenDay: number | null;
-}): void {
-  const { fiveHour: h, sevenDay: w } = input;
-  const fmt = (n: number) => `$${n.toFixed(2)}`;
-
-  if (h != null && w != null && h > w * 0.25) {
-    throw new Error(
-      `5-hour limit (${fmt(h)}) is too large relative to weekly (${fmt(w)}). ` +
-        `Maximum allowed is ${fmt(w * 0.25)} (25% of weekly).`
-    );
-  }
-}
-
 export class ModelAccessDeniedError extends Error {
   constructor(modelLabel: string) {
     super(`${modelLabel} is not available.`);
@@ -159,4 +147,155 @@ export async function assertModelAccess(
   if (!resolved.allowedModelIds.includes(modelKey)) {
     throw new ModelAccessDeniedError(modelLabelForError);
   }
+}
+
+// ============================================================================
+// Quota CRUD — a quota is an independent entity that users and plans point at
+// ============================================================================
+
+/** The admin form sends '' for "no limit"; the column stores null. */
+const limitToString = (v: number | null | ''): string | null => {
+  if (v === '' || v === null) return null;
+  return v.toString();
+};
+
+const asNumber = (v: number | null | ''): number | null =>
+  v === '' || v === null ? null : v;
+
+/** All quotas, with the system default marked. */
+export async function listQuotasWithDefault() {
+  const all = await db.query.quotas.findMany({
+    orderBy: (q, { asc }) => [asc(q.name)]
+  });
+  const defaultQuotaId = await getDefaultQuotaId();
+  return all.map(q => ({
+    ...q,
+    isDefault: q.id === defaultQuotaId
+  }));
+}
+
+/** The id/name/unlimited triple the console's selectors need. */
+export async function listQuotaSummaries() {
+  return await db.query.quotas.findMany({
+    orderBy: (q, { asc }) => [asc(q.name)],
+    columns: { id: true, name: true, isUnlimited: true }
+  });
+}
+
+export async function insertQuota(input: z.infer<typeof quotaCreateSchema>) {
+  if (!input.isUnlimited) {
+    const w = asNumber(input.sevenDay);
+    if (w === null || w <= 0) {
+      throw new PublicError(
+        'Weekly limit is required and must be positive (or toggle Unlimited).'
+      );
+    }
+    validateQuotaLimits({
+      fiveHour: asNumber(input.fiveHour),
+      sevenDay: w
+    });
+  }
+  const id = generateUUID();
+  await db.insert(quotas).values({
+    id,
+    name: input.name,
+    description: input.description ?? null,
+    fiveHour: input.isUnlimited ? null : limitToString(input.fiveHour),
+    sevenDay: input.isUnlimited ? null : limitToString(input.sevenDay),
+    isUnlimited: input.isUnlimited,
+    allowedModelIds: input.allowedModelIds
+  });
+  return { id };
+}
+
+export async function updateQuota(input: z.infer<typeof quotaUpdateSchema>) {
+  const { id, ...updates } = input;
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (updates.name !== undefined) patch.name = updates.name;
+  if (updates.description !== undefined)
+    patch.description = updates.description ?? null;
+  if (updates.fiveHour !== undefined)
+    patch.fiveHour = limitToString(updates.fiveHour);
+  if (updates.sevenDay !== undefined)
+    patch.sevenDay = limitToString(updates.sevenDay);
+  if (updates.isUnlimited !== undefined)
+    patch.isUnlimited = updates.isUnlimited;
+  if (updates.allowedModelIds !== undefined)
+    patch.allowedModelIds = updates.allowedModelIds;
+
+  // Validate the resulting limits state (existing values merged with patch).
+  const existing = await db.query.quotas.findFirst({
+    where: eq(quotas.id, id)
+  });
+  if (!existing) throw new PublicError('Quota not found');
+
+  /** The value a field will end up with: the patch when it names one, the
+   *  stored value otherwise. */
+  const merged = (
+    v: number | null | '' | undefined,
+    fallback: string | null
+  ): number | null => {
+    if (v === undefined) {
+      if (fallback === null || fallback === '') return null;
+      const n = Number(fallback);
+      return Number.isFinite(n) ? n : null;
+    }
+    return asNumber(v);
+  };
+
+  const willBeUnlimited =
+    updates.isUnlimited !== undefined
+      ? updates.isUnlimited
+      : existing.isUnlimited;
+  if (!willBeUnlimited) {
+    const w = merged(updates.sevenDay, existing.sevenDay);
+    if (w === null || w <= 0) {
+      throw new PublicError(
+        'Weekly limit is required and must be positive (or toggle Unlimited).'
+      );
+    }
+    validateQuotaLimits({
+      fiveHour: merged(updates.fiveHour, existing.fiveHour),
+      sevenDay: w
+    });
+  } else {
+    // Force null the limits whenever Unlimited is on, so stale values
+    // don't linger from a previous non-unlimited state.
+    patch.fiveHour = null;
+    patch.sevenDay = null;
+  }
+
+  await db.update(quotas).set(patch).where(eq(quotas.id, id));
+}
+
+export async function deleteQuota(id: string) {
+  // FK ON DELETE restrict will block deletion if any plan references it.
+  // Also block deleting the system default quota.
+  const defaultId = await getDefaultQuotaId();
+  if (defaultId === id) {
+    throw new PublicError(
+      'Cannot delete the default quota. Set a different default first.'
+    );
+  }
+  await db.delete(quotas).where(eq(quotas.id, id));
+}
+
+/** Admin: pin a user to a specific quota, overriding their plan. */
+export async function setUserQuotaOverride(userId: string, quotaId: string) {
+  const exists = await db.query.quotas.findFirst({
+    where: eq(quotas.id, quotaId)
+  });
+  if (!exists) throw new PublicError('Quota not found');
+  await db
+    .update(users)
+    .set({ quotaId: quotaId, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+/** Admin: clear the override; the user falls back to their plan or default. */
+export async function clearUserQuotaOverride(userId: string) {
+  await db
+    .update(users)
+    .set({ quotaId: null, updatedAt: new Date() })
+    .where(eq(users.id, userId));
 }

@@ -1,8 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
-import { and, eq } from 'drizzle-orm';
 
-import { type PricingRecord } from '@/types';
 import {
   pricingIdSchema,
   pricingListSchema,
@@ -11,196 +9,53 @@ import {
   syncRunSchema,
   syncTargetSchema
 } from '@/types/pricing';
-import { generateUUID } from '@/lib/utils';
-import { db } from '@/db';
-import { modelPricings, models } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
-import { PublicError } from '@/server/public-error';
-import { pricingMissingFields } from '@/server/services/pricing';
+import {
+  deletePricing as deletePricingRow,
+  listModelsWithPricing,
+  upsertModelPricing
+} from '@/server/services/pricing';
 import {
   previewSync,
   searchRemotePricing as searchPricingCatalog,
   syncPricing
 } from '@/server/services/pricing-sync';
 
-/**
- * List all models together with their pricing (one row per model).
- * Convenient for the admin pricing table.
- */
 export const listPricingWithModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(pricingListSchema)
-  .handler(async ({ data }) => {
-    const result = await db.query.models.findMany({
-      where: and(
-        data.capability ? eq(models.capability, data.capability) : undefined,
-        data.providerId ? eq(models.providerId, data.providerId) : undefined
-      ),
-      with: {
-        provider: true,
-        pricings: { limit: 1 }
-      },
-      orderBy: (m, { asc, desc }) => [asc(m.displayOrder), desc(m.createdAt)]
-    });
-    return result.map(m => ({
-      ...m,
-      pricing: m.pricings[0] ?? null
-    }));
-  });
+  .handler(({ data }) => listModelsWithPricing(data));
 
-/**
- * Create or update the pricing for a model. One row per model.
- */
 export const upsertPricing = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(pricingUpsertSchema)
-  .handler(async ({ data }) => {
-    const model = await db.query.models.findFirst({
-      where: eq(models.id, data.modelDbId)
-    });
-    if (!model) throw new PublicError('Model not found');
-
-    // Capability-aware required-field check. Cache R/W are auto-defaulted
-    // to 0 below, so they don't need to be in the required list. Reuses
-    // `pricingMissingFields` from lib/pricing so admin-side and runtime
-    // gate share the same rule.
-    const cap = model.capability;
-
-    // Image models bill EITHER per-image OR per-token, never both — the two
-    // styles are mutually exclusive (see calculateImageCost).
-    if (
-      cap === 'image' &&
-      data.image != null &&
-      (data.input != null || data.output != null)
-    ) {
-      throw new PublicError(
-        'Image pricing must be either Per image OR token-based (Input + Output), not both.'
-      );
-    }
-
-    // Audio is one-of-three: per-character (classic TTS), per-token, or
-    // per-second (STT).
-    const audioStyles = [
-      data.audioCharacters != null,
-      data.audioInput != null || data.audioOutput != null,
-      data.audioSeconds != null
-    ].filter(Boolean).length;
-    if (cap === 'audio' && audioStyles > 1) {
-      throw new PublicError(
-        'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per second.'
-      );
-    }
-
-    // Video is the same either/or: per-video (flat) OR per-second.
-    if (cap === 'video' && data.video != null && data.videoSeconds != null) {
-      throw new PublicError(
-        'Video pricing must be either Per video OR Per second, not both.'
-      );
-    }
-
-    const missing = pricingMissingFields(
-      cap,
-      data as unknown as PricingRecord,
-      cap === 'audio'
-        ? { transcription: !!model.supportsTranscription }
-        : undefined
-    );
-    if (missing.length > 0) {
-      throw new PublicError(
-        `Missing required price${missing.length > 1 ? 's' : ''} for ${cap} model: ${missing.join(', ')}.`
-      );
-    }
-
-    const now = new Date();
-    // Cache R/W default to "0" (free) when not set, so the cost engine
-    // never falls back to data rate. All other fields stay null when unset.
-    const cacheDefault = (v: string | null | undefined): string =>
-      v === null || v === undefined || v === '' ? '0' : v;
-    const values = {
-      modelId: model.modelId,
-      input: data.input,
-      output: data.output,
-      cacheRead: cacheDefault(data.cacheRead),
-      cacheWrite: cacheDefault(data.cacheWrite),
-      // Reasoning stays null when not set — cost engine falls back to output.
-      reasoning: data.reasoning,
-      image: data.image,
-      video: data.video,
-      videoSeconds: data.videoSeconds,
-      audioInput: data.audioInput,
-      audioOutput: data.audioOutput,
-      audioCharacters: data.audioCharacters,
-      audioSeconds: data.audioSeconds,
-      source: data.source,
-      updatedAt: now
-    };
-
-    const existing = await db.query.modelPricings.findFirst({
-      where: eq(modelPricings.modelId, model.modelId)
-    });
-    if (existing) {
-      await db
-        .update(modelPricings)
-        .set(values)
-        .where(eq(modelPricings.id, existing.id));
-    } else {
-      await db.insert(modelPricings).values({
-        id: generateUUID(),
-        ...values,
-        createdAt: now
-      });
-    }
-  });
+  .handler(({ data }) => upsertModelPricing(data));
 
 export const deletePricing = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(pricingIdSchema)
-  .handler(async ({ data }) => {
-    await db.delete(modelPricings).where(eq(modelPricings.id, data.id));
-  });
+  .handler(({ data }) => deletePricingRow(data.id));
 
-/**
- * Preview what would change if we synced pricing from a remote source.
- */
+/** What would change if we synced pricing from a remote source. */
 export const previewPricingSync = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(syncTargetSchema)
-  .handler(async ({ data }) => {
-    return await previewSync({
-      source: data.source,
-      modelDbIds: data.modelDbIds
-    });
-  });
+  .handler(({ data }) => previewSync(data));
 
 /**
- * Sync pricing from a remote source. If modelDbIds is omitted, syncs all
- * models. onlyMissing=true skips models that already have active pricing.
+ * Sync pricing from a remote source. Omitting modelDbIds syncs every model;
+ * onlyMissing skips the ones that already have pricing.
  */
 export const runPricingSync = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(syncRunSchema)
-  .handler(async ({ data }) => {
-    return await syncPricing({
-      source: data.source,
-      modelDbIds: data.modelDbIds,
-      onlyMissing: data.onlyMissing
-    });
-  });
+  .handler(({ data }) => syncPricing(data));
 
-/**
- * Search remote pricing catalog by free-text query.
- * Useful for admin UI autocomplete.
- */
+/** Free-text search of the remote catalogue, for the admin autocomplete. */
 export const searchRemotePricing = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(remoteSearchSchema)
-  .handler(async ({ data }) => {
-    return await searchPricingCatalog({
-      source: data.source,
-      query: data.query,
-      limit: data.limit
-    });
-  });
+  .handler(({ data }) => searchPricingCatalog(data));
 
 export const pricingQueries = {
   all: () => ['pricing'] as const,
