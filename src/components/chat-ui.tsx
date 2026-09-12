@@ -24,7 +24,7 @@ import { resolveAutoOption } from '@/lib/media-options';
 import { takePendingPrompt } from '@/lib/pending-prompt';
 import { modelMatchesId } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
-import { artifactQueries } from '@/server/fn/artifact';
+import { artifactQueries } from '@/server/functions/artifact';
 import {
   ResizableHandle,
   ResizablePanel,

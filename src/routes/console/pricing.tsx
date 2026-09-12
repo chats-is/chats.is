@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
-import { pricingQueries } from '@/server/fn/pricing';
+import { pricingQueries } from '@/server/functions/pricing';
 import Pricing from '@/components/console/pricing';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 

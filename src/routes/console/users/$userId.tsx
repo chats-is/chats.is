@@ -2,8 +2,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
-import { quotaQueries } from '@/server/fn/quota';
-import { usageQueries } from '@/server/fn/usage';
+import { quotaQueries } from '@/server/functions/quota';
+import { usageQueries } from '@/server/functions/usage';
 import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
 import UserDetail from '@/components/console/user-detail';
 

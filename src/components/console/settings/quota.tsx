@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { quotaQueries } from '@/server/fn/quota';
+import { quotaQueries } from '@/server/functions/quota';
 
 import { SettingsForm, SettingsLoading, useSettingsForm } from './shared';
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
-import { libraryQueries } from '@/server/fn/library';
+import { libraryQueries } from '@/server/functions/library';
 import { GalleryPending } from '@/components/gallery-skeleton';
 import { LibraryView } from '@/components/library-view';
 

@@ -21,7 +21,7 @@ import { createSpeech } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { deleteMessages, updateMessage } from '@/server/fn/message';
+import { deleteMessages, updateMessage } from '@/server/functions/message';
 import {
   AlertDialog,
   AlertDialogAction,

@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { env } from '@/lib/env';
 import { pageTitle } from '@/lib/head';
-import { sessionQueries } from '@/server/fn/auth';
+import { sessionQueries } from '@/server/functions/auth';
 import { LoginForm } from '@/components/login-form';
 import { RoutePending } from '@/components/route-pending';
 

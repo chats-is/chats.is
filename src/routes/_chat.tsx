@@ -3,9 +3,9 @@ import { ArtifactProvider } from '@/contexts/artifact-context';
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
-import { sessionQueries } from '@/server/fn/auth';
-import { settingsQueries } from '@/server/fn/settings';
-import { userQueries } from '@/server/fn/user';
+import { sessionQueries } from '@/server/functions/auth';
+import { settingsQueries } from '@/server/functions/settings';
+import { userQueries } from '@/server/functions/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { SettingsDialogProvider } from '@/components/settings-dialog';
 import { Sidebar } from '@/components/sidebar';

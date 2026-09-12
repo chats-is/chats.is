@@ -21,8 +21,8 @@ import { getArtifactLanguageLabel } from '@/lib/code-language';
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
 import { formatMediaTime } from '@/lib/utils';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
-import { artifactQueries } from '@/server/fn/artifact';
-import { libraryQueries, type LibraryItem } from '@/server/fn/library';
+import { artifactQueries } from '@/server/functions/artifact';
+import { libraryQueries, type LibraryItem } from '@/server/functions/library';
 import {
   Dialog,
   DialogClose,

@@ -26,8 +26,8 @@ import {
   toggleEnabledModel,
   updateModel,
   type listModels
-} from '@/server/fn/model';
-import { providerQueries } from '@/server/fn/provider';
+} from '@/server/functions/model';
+import { providerQueries } from '@/server/functions/provider';
 import {
   AlertDialog,
   AlertDialogAction,

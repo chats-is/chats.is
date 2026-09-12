@@ -13,7 +13,7 @@ import {
   runPricingSync,
   upsertPricing,
   type listPricingWithModels
-} from '@/server/fn/pricing';
+} from '@/server/functions/pricing';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {

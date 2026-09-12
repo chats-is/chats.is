@@ -61,12 +61,12 @@ import {
   chats as chatsTable,
   messages as messagesTable
 } from '@/db/schema';
-import { createChat, getChat, updateChat } from '@/server/fn/chat';
+import { createChat, getChat, updateChat } from '@/server/functions/chat';
 import {
   createMessages,
   deleteMessages,
   listMessages
-} from '@/server/fn/message';
+} from '@/server/functions/message';
 import { getUser } from '@/server/session';
 
 export const Route = createFileRoute('/api/chat')({

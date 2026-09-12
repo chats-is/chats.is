@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
-import { planQueries } from '@/server/fn/plan';
-import { quotaQueries } from '@/server/fn/quota';
+import { planQueries } from '@/server/functions/plan';
+import { quotaQueries } from '@/server/functions/quota';
 import Plans from '@/components/console/plans';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 

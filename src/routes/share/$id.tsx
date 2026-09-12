@@ -5,8 +5,8 @@ import { format } from 'date-fns';
 
 import { pageTitle } from '@/lib/head';
 import { convertToChatMessages } from '@/lib/utils';
-import { settingsQueries } from '@/server/fn/settings';
-import { getSharedChat } from '@/server/fn/share';
+import { settingsQueries } from '@/server/functions/settings';
+import { getSharedChat } from '@/server/functions/share';
 import { RoutePending } from '@/components/route-pending';
 import { SharedChatView } from '@/components/shared-chat-view';
 

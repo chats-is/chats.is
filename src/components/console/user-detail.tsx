@@ -6,9 +6,9 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { CAPABILITIES } from '@/lib/constant';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
-import { quotaQueries } from '@/server/fn/quota';
-import { usageQueries, type adminUsageLog } from '@/server/fn/usage';
-import { userQueries } from '@/server/fn/user';
+import { quotaQueries } from '@/server/functions/quota';
+import { usageQueries, type adminUsageLog } from '@/server/functions/usage';
+import { userQueries } from '@/server/functions/user';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {

@@ -5,14 +5,14 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { mutating } from '@/lib/mutation';
-import { modelQueries } from '@/server/fn/model';
+import { modelQueries } from '@/server/functions/model';
 import {
   createQuota,
   deleteQuota,
   quotaQueries,
   updateQuota,
   type listQuotas
-} from '@/server/fn/quota';
+} from '@/server/functions/quota';
 import {
   AlertDialog,
   AlertDialogAction,

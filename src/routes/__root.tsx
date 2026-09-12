@@ -7,7 +7,7 @@ import { type QueryClient } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 
 import { DEFAULT_APP_NAME } from '@/lib/constant';
-import { settingsQueries } from '@/server/fn/settings';
+import { settingsQueries } from '@/server/functions/settings';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
 import { RouteError } from '@/components/route-error';

@@ -7,14 +7,14 @@ import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { modelQueries } from '@/server/fn/model';
+import { modelQueries } from '@/server/functions/model';
 import {
   createPrompt,
   deletePrompt as deletePromptFn,
   promptQueries,
   updatePrompt,
   type listPrompts
-} from '@/server/fn/prompt';
+} from '@/server/functions/prompt';
 import {
   AlertDialog,
   AlertDialogAction,

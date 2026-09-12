@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
-import { promptQueries } from '@/server/fn/prompt';
+import { promptQueries } from '@/server/functions/prompt';
 import { GalleryPending } from '@/components/gallery-skeleton';
 import { PromptsView } from '@/components/prompts-view';
 

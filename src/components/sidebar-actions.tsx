@@ -14,7 +14,7 @@ import { type Chat } from '@/types';
 import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { createShare } from '@/server/fn/share';
+import { createShare } from '@/server/functions/share';
 import {
   DropdownMenu,
   DropdownMenuContent,

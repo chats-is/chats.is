@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
 
 import { pageTitle } from '@/lib/head';
-import { getConsoleOverview } from '@/server/fn/overview';
+import { getConsoleOverview } from '@/server/functions/overview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConsoleCardsSkeleton } from '@/components/console/skeletons';
 

@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
-import { settingsQueries } from '@/server/fn/settings';
+import { settingsQueries } from '@/server/functions/settings';
 import { ConsoleSettingsNav } from '@/components/console/settings-nav';
 import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
 

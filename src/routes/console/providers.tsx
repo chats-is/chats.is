@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
-import { providerQueries } from '@/server/fn/provider';
+import { providerQueries } from '@/server/functions/provider';
 import Providers from '@/components/console/providers';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 

@@ -3,8 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
 import { reportWindowStart } from '@/lib/utils';
-import { quotaQueries } from '@/server/fn/quota';
-import { usageQueries } from '@/server/fn/usage';
+import { quotaQueries } from '@/server/functions/quota';
+import { usageQueries } from '@/server/functions/usage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {

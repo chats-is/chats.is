@@ -11,9 +11,9 @@ import {
   planQueries,
   updatePlan,
   type listPlans
-} from '@/server/fn/plan';
-import { quotaQueries } from '@/server/fn/quota';
-import { userQueries } from '@/server/fn/user';
+} from '@/server/functions/plan';
+import { quotaQueries } from '@/server/functions/quota';
+import { userQueries } from '@/server/functions/user';
 import {
   AlertDialog,
   AlertDialogAction,

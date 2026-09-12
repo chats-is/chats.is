@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { promptQueries } from '@/server/fn/prompt';
+import { promptQueries } from '@/server/functions/prompt';
 
 /** One row's worth. Suggestions, not a browsable list — /prompts has the rest. */
 const SUGGESTION_COUNT = 4;

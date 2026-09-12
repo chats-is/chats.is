@@ -13,8 +13,16 @@ import {
 import { toast } from 'sonner';
 
 import { mutating } from '@/lib/mutation';
-import { quotaQueries, removeUserQuota, setUserQuota } from '@/server/fn/quota';
-import { updateUserRole, userQueries, type listUsers } from '@/server/fn/user';
+import {
+  quotaQueries,
+  removeUserQuota,
+  setUserQuota
+} from '@/server/functions/quota';
+import {
+  updateUserRole,
+  userQueries,
+  type listUsers
+} from '@/server/functions/user';
 import { Input } from '@/components/ui/input';
 import {
   Select,

@@ -5,7 +5,10 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { mutating } from '@/lib/mutation';
-import { bulkUpdateSettings, settingsQueries } from '@/server/fn/settings';
+import {
+  bulkUpdateSettings,
+  settingsQueries
+} from '@/server/functions/settings';
 import { Button } from '@/components/ui/button';
 import { useAppForm } from '@/components/app-form';
 import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';

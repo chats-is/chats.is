@@ -26,7 +26,7 @@ import {
   toggleEnabledProvider,
   updateProvider,
   type listProviders
-} from '@/server/fn/provider';
+} from '@/server/functions/provider';
 import {
   AlertDialog,
   AlertDialogAction,

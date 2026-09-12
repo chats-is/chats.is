@@ -8,14 +8,14 @@ import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useSearchFilter } from '@/hooks/use-search-filter';
-import { modelQueries } from '@/server/fn/model';
+import { modelQueries } from '@/server/functions/model';
 import {
   adminCreatePrompt,
   adminDeletePrompt,
   adminUpdatePrompt,
   promptQueries,
   type adminListPrompts
-} from '@/server/fn/prompt';
+} from '@/server/functions/prompt';
 import {
   AlertDialog,
   AlertDialogAction,

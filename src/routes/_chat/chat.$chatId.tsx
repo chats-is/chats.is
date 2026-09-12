@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { peekChatSession } from '@/lib/chat-session';
 import { formatTitle, pageTitle, useAppName } from '@/lib/head';
 import { convertToChatMessages } from '@/lib/utils';
-import { chatQueries } from '@/server/fn/chat';
+import { chatQueries } from '@/server/functions/chat';
 import { ChatNotFound } from '@/components/chat-notfound';
 import { ChatSkeleton } from '@/components/chat-skeleton';
 import { ChatUI } from '@/components/chat-ui';

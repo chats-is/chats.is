@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { updateProfile } from '@/server/fn/user';
+import { updateProfile } from '@/server/functions/user';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 

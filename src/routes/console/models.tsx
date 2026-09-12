@@ -2,8 +2,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
-import { modelQueries } from '@/server/fn/model';
-import { providerQueries } from '@/server/fn/provider';
+import { modelQueries } from '@/server/functions/model';
+import { providerQueries } from '@/server/functions/provider';
 import Models from '@/components/console/models';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 

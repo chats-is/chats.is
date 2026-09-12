@@ -5,7 +5,10 @@ import { Sparkles } from 'lucide-react';
 
 import { setPendingPrompt } from '@/lib/pending-prompt';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
-import { promptQueries, type listUsablePrompts } from '@/server/fn/prompt';
+import {
+  promptQueries,
+  type listUsablePrompts
+} from '@/server/functions/prompt';
 import { ChatHeader } from '@/components/chat-header';
 import {
   GalleryCardSkeletons,

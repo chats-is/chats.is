@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
-import { modelQueries } from '@/server/fn/model';
+import { modelQueries } from '@/server/functions/model';
 import { ModelsSettings } from '@/components/console/settings/models';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 

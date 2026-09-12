@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { mutating } from '@/lib/mutation';
-import { deleteAllShares, deleteShare, shareQueries } from '@/server/fn/share';
+import {
+  deleteAllShares,
+  deleteShare,
+  shareQueries
+} from '@/server/functions/share';
 
 export function useSharedLinks(page: number = 0, limit: number = 5) {
   const offset = page * limit;

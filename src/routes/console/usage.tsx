@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
-import { modelQueries } from '@/server/fn/model';
+import { modelQueries } from '@/server/functions/model';
 import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
 import Usage from '@/components/console/usage';
 

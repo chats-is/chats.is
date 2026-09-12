@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Ban } from 'lucide-react';
 
-import { quotaQueries } from '@/server/fn/quota';
+import { quotaQueries } from '@/server/functions/quota';
 
 /**
  * Inline alert shown above a generation input. Warns the user as their usage

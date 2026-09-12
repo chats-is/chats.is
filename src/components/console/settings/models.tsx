@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { modelQueries } from '@/server/fn/model';
+import { modelQueries } from '@/server/functions/model';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 

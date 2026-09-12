@@ -6,12 +6,12 @@ import { toast } from 'sonner';
 import { type ModelCapability } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating, type Output } from '@/lib/mutation';
-import { modelQueries } from '@/server/fn/model';
+import { modelQueries } from '@/server/functions/model';
 import {
   providerQueries,
   syncProviderModels,
   type fetchProviderModels
-} from '@/server/fn/provider';
+} from '@/server/functions/provider';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {

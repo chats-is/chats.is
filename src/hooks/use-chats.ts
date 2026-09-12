@@ -13,7 +13,7 @@ import {
   deleteChat,
   updateChat,
   type listChats
-} from '@/server/fn/chat';
+} from '@/server/functions/chat';
 
 const LIMIT = 25;
 
