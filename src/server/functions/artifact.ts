@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { and, eq } from 'drizzle-orm';
-import { z } from 'zod';
 
+import { artifactChatSchema, artifactIdSchema } from '@/types/artifact';
 import { db } from '@/db';
 import { artifacts } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
@@ -11,7 +11,7 @@ import { authedMiddleware } from '@/server/middleware';
  *  feed only carries a truncated preview). */
 export const getArtifact = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(artifactIdSchema)
   .handler(async ({ data, context }) => {
     const artifact = await db.query.artifacts.findFirst({
       where: and(
@@ -29,7 +29,7 @@ export const getArtifact = createServerFn({ method: 'GET' })
 // message that created it; the canvas switches between them.
 export const listArtifacts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(z.object({ chatId: z.string().min(1) }))
+  .validator(artifactChatSchema)
   .handler(async ({ data, context }) => {
     return await db.query.artifacts.findMany({
       where: and(

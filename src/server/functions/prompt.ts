@@ -1,38 +1,17 @@
 import { createServerFn } from '@tanstack/react-start';
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { asc, desc, eq, or, sql } from 'drizzle-orm';
-import { z } from 'zod';
 
+import {
+  promptCreateSchema,
+  promptIdSchema,
+  promptPageSchema,
+  promptUpdateSchema
+} from '@/types/prompt';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { prompts } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
-
-const labelArraySchema = z.array(z.string()).nullable().optional();
-const visibilitySchema = z.enum(['private', 'public']);
-
-const promptCreateSchema = z.object({
-  name: z.string().min(1).max(100),
-  content: z.string().min(1),
-  image: z.string().max(500).nullable().optional(),
-  tags: labelArraySchema,
-  providers: labelArraySchema,
-  models: labelArraySchema,
-  visibility: visibilitySchema.optional(),
-  displayOrder: z.number().int().default(0)
-});
-
-const promptUpdateSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1).max(100).optional(),
-  content: z.string().min(1).optional(),
-  image: z.string().max(500).nullable().optional(),
-  tags: labelArraySchema,
-  providers: labelArraySchema,
-  models: labelArraySchema,
-  visibility: visibilitySchema.optional(),
-  displayOrder: z.number().int().optional()
-});
 
 // `id` last so the order is total: prompts seeded together share a display
 // order and a creation time, and paging by row offset over an order that
@@ -118,14 +97,7 @@ export const listUsablePrompts = createServerFn({ method: 'GET' })
   // Paged for the gallery, whole for the composer's suggestions: without a
   // limit this returns everything, which is what a handful of suggestions is
   // picked from.
-  .validator(
-    z
-      .object({
-        limit: z.number().min(1).max(100).optional(),
-        cursor: z.number().min(0).nullish()
-      })
-      .optional()
-  )
+  .validator(promptPageSchema)
   .handler(async ({ data, context }) => {
     return await db.query.prompts.findMany({
       limit: data?.limit,
@@ -188,7 +160,7 @@ export const updatePrompt = createServerFn({ method: 'POST' })
 
 export const deletePrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(promptIdSchema)
   .handler(async ({ data, context }) => {
     const prompt = await getPromptByIdOrThrow(data.id);
     if (prompt.userId !== context.user.id) {
@@ -240,7 +212,7 @@ export const adminUpdatePrompt = createServerFn({ method: 'POST' })
 // Admin console: delete any prompt in the system.
 export const adminDeletePrompt = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(promptIdSchema)
   .handler(async ({ data }) => {
     await getPromptByIdOrThrow(data.id);
     await db.delete(prompts).where(eq(prompts.id, data.id));

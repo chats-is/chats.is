@@ -1,8 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { and, eq } from 'drizzle-orm';
-import { z } from 'zod';
 
+import {
+  shareChatSchema,
+  shareIdSchema,
+  sharePageSchema
+} from '@/types/shared-link';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { chats, shares } from '@/db/schema';
@@ -11,11 +15,7 @@ import { PublicError } from '@/server/public-error';
 
 export const createShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      chatId: z.string().min(1)
-    })
-  )
+  .validator(shareChatSchema)
   .handler(async ({ data, context }) => {
     // Verify the chat belongs to the current user
     const chat = await db.query.chats.findFirst({
@@ -58,12 +58,7 @@ export const createShare = createServerFn({ method: 'POST' })
 
 export const listShares = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      limit: z.number().min(1).default(50).optional(),
-      offset: z.number().min(0).default(0).optional()
-    })
-  )
+  .validator(sharePageSchema)
   .handler(async ({ data, context }) => {
     const limit = data.limit ?? 50;
     const offset = data.offset ?? 0;
@@ -89,11 +84,7 @@ export const listShares = createServerFn({ method: 'GET' })
 
 /** Public by design: a share link is readable by whoever holds it. */
 export const getSharedChat = createServerFn({ method: 'GET' })
-  .validator(
-    z.object({
-      id: z.string().min(1)
-    })
-  )
+  .validator(shareIdSchema)
   .handler(async ({ data }) => {
     const share = await db.query.shares.findFirst({
       where: eq(shares.id, data.id),
@@ -126,7 +117,7 @@ export const getSharedChat = createServerFn({ method: 'GET' })
 
 export const deleteShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(shareIdSchema)
   .handler(async ({ data, context }) => {
     await db
       .delete(shares)

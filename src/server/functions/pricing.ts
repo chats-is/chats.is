@@ -1,9 +1,16 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { and, eq } from 'drizzle-orm';
-import { z } from 'zod';
 
 import { type PricingRecord } from '@/types';
+import {
+  pricingIdSchema,
+  pricingListSchema,
+  pricingUpsertSchema,
+  remoteSearchSchema,
+  syncRunSchema,
+  syncTargetSchema
+} from '@/types/pricing';
 import { pricingMissingFields } from '@/lib/pricing';
 import {
   previewSync,
@@ -16,32 +23,13 @@ import { modelPricings, models } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 
-const sourceSchema = z.enum(['manual', 'models.dev', 'llm-metadata']);
-const syncSourceSchema = z.enum(['models.dev', 'llm-metadata']);
-
-const priceNumberSchema = z
-  .union([z.number(), z.string()])
-  .optional()
-  .nullable()
-  .transform(v => {
-    if (v === null || v === undefined || v === '') return null;
-    const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n) || n < 0) return null;
-    return n.toString();
-  });
-
 /**
  * List all models together with their pricing (one row per model).
  * Convenient for the admin pricing table.
  */
 export const listPricingWithModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      capability: z.enum(['chat', 'image', 'video', 'audio']).optional(),
-      providerId: z.string().optional()
-    })
-  )
+  .validator(pricingListSchema)
   .handler(async ({ data }) => {
     const result = await db.query.models.findMany({
       where: and(
@@ -65,24 +53,7 @@ export const listPricingWithModels = createServerFn({ method: 'GET' })
  */
 export const upsertPricing = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      modelDbId: z.string().min(1),
-      input: priceNumberSchema,
-      output: priceNumberSchema,
-      cacheRead: priceNumberSchema,
-      cacheWrite: priceNumberSchema,
-      reasoning: priceNumberSchema,
-      image: priceNumberSchema,
-      video: priceNumberSchema,
-      videoSeconds: priceNumberSchema,
-      audioInput: priceNumberSchema,
-      audioOutput: priceNumberSchema,
-      audioCharacters: priceNumberSchema,
-      audioSeconds: priceNumberSchema,
-      source: sourceSchema.default('manual')
-    })
-  )
+  .validator(pricingUpsertSchema)
   .handler(async ({ data }) => {
     const model = await db.query.models.findFirst({
       where: eq(models.id, data.modelDbId)
@@ -183,7 +154,7 @@ export const upsertPricing = createServerFn({ method: 'POST' })
 
 export const deletePricing = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(pricingIdSchema)
   .handler(async ({ data }) => {
     await db.delete(modelPricings).where(eq(modelPricings.id, data.id));
   });
@@ -193,12 +164,7 @@ export const deletePricing = createServerFn({ method: 'POST' })
  */
 export const previewPricingSync = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      source: syncSourceSchema,
-      modelDbIds: z.array(z.string()).optional()
-    })
-  )
+  .validator(syncTargetSchema)
   .handler(async ({ data }) => {
     return await previewSync({
       source: data.source,
@@ -212,13 +178,7 @@ export const previewPricingSync = createServerFn({ method: 'POST' })
  */
 export const runPricingSync = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      source: syncSourceSchema,
-      modelDbIds: z.array(z.string()).optional(),
-      onlyMissing: z.boolean().default(false)
-    })
-  )
+  .validator(syncRunSchema)
   .handler(async ({ data }) => {
     return await syncPricing({
       source: data.source,
@@ -233,13 +193,7 @@ export const runPricingSync = createServerFn({ method: 'POST' })
  */
 export const searchRemotePricing = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      source: syncSourceSchema,
-      query: z.string().optional(),
-      limit: z.number().int().min(1).max(200).default(50)
-    })
-  )
+  .validator(remoteSearchSchema)
   .handler(async ({ data }) => {
     return await searchPricingCatalog({
       source: data.source,

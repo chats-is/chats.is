@@ -1,25 +1,23 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { and, eq } from 'drizzle-orm';
-import { z } from 'zod';
 
-import { EFFORTS } from '@/lib/provider-vocab';
+import {
+  modelCreateSchema,
+  modelIdSchema,
+  modelListSchema,
+  modelToggleSchema,
+  modelUpdateSchema
+} from '@/types/model';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { modelProviders, models } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 
-const capabilitySchema = z.enum(['chat', 'image', 'video', 'audio']);
-
 export const listModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      capability: capabilitySchema.optional(),
-      providerId: z.string().optional()
-    })
-  )
+  .validator(modelListSchema)
   .handler(async ({ data }) => {
     return await db.query.models.findMany({
       where: and(
@@ -42,66 +40,7 @@ export const listModels = createServerFn({ method: 'GET' })
 
 export const createModel = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      name: z.string().min(1).max(100),
-      modelId: z.string().min(1).max(255),
-      // Legacy single provider (still accepted); prefer `providers`.
-      providerId: z.string().min(1).optional(),
-      providers: z
-        .array(
-          z.object({
-            providerId: z.string().min(1),
-            priority: z.number().int().optional(),
-            isEnabled: z.boolean().optional()
-          })
-        )
-        .optional(),
-      capability: capabilitySchema,
-      image: z.string().optional(),
-      aliases: z.array(z.string()).optional(),
-      supportsVision: z.boolean().default(false),
-      supportsReasoning: z.boolean().default(false),
-      supportsImageEdit: z.boolean().default(false),
-      supportsImageToVideo: z.boolean().default(false),
-      supportsVideoEdit: z.boolean().default(false),
-      supportsTranscription: z.boolean().default(false),
-      isEnabled: z.boolean().default(true),
-      uiOptions: z
-        .object({
-          size: z.string().optional(),
-          sizes: z.array(z.string()).optional(),
-          aspectRatio: z.string().optional(),
-          aspectRatios: z.array(z.string()).optional(),
-          duration: z.number().optional(),
-          durations: z.array(z.number()).optional(),
-          resolution: z.string().optional(),
-          resolutions: z.array(z.string()).optional(),
-          voice: z.string().optional(),
-          voices: z.array(z.string()).optional(),
-          // Effort is the one option every provider spells the same way, so
-          // unlike its neighbours it can be checked against the list itself.
-          effort: z.enum(EFFORTS).optional(),
-          efforts: z.array(z.enum(EFFORTS)).optional(),
-          reasoning: z.boolean().optional()
-        })
-        .strict()
-        .optional(),
-      apiParams: z
-        .object({
-          temperature: z.number().optional(),
-          topP: z.number().optional(),
-          topK: z.number().optional(),
-          maxOutputTokens: z.number().optional(),
-          frequencyPenalty: z.number().optional(),
-          presencePenalty: z.number().optional()
-        })
-        .strict()
-        .optional(),
-      systemPrompt: z.string().nullable().optional(),
-      displayOrder: z.number().int().default(0)
-    })
-  )
+  .validator(modelCreateSchema)
   .handler(async ({ data }) => {
     const normalizedModelId = data.modelId.trim();
 
@@ -173,68 +112,7 @@ export const createModel = createServerFn({ method: 'POST' })
 
 export const updateModel = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1).max(100).optional(),
-      modelId: z.string().min(1).max(255).optional(),
-      providerId: z.string().min(1).optional(),
-      providers: z
-        .array(
-          z.object({
-            providerId: z.string().min(1),
-            priority: z.number().int().optional(),
-            isEnabled: z.boolean().optional()
-          })
-        )
-        .optional(),
-      capability: capabilitySchema.optional(),
-      image: z.string().optional(),
-      aliases: z.array(z.string()).optional(),
-      supportsVision: z.boolean().optional(),
-      supportsReasoning: z.boolean().optional(),
-      supportsImageEdit: z.boolean().optional(),
-      supportsImageToVideo: z.boolean().optional(),
-      supportsVideoEdit: z.boolean().optional(),
-      supportsTranscription: z.boolean().optional(),
-      isEnabled: z.boolean().optional(),
-      uiOptions: z
-        .object({
-          size: z.string().optional(),
-          sizes: z.array(z.string()).optional(),
-          aspectRatio: z.string().optional(),
-          aspectRatios: z.array(z.string()).optional(),
-          duration: z.number().optional(),
-          durations: z.array(z.number()).optional(),
-          resolution: z.string().optional(),
-          resolutions: z.array(z.string()).optional(),
-          voice: z.string().optional(),
-          voices: z.array(z.string()).optional(),
-          // Effort is the one option every provider spells the same way, so
-          // unlike its neighbours it can be checked against the list itself.
-          effort: z.enum(EFFORTS).optional(),
-          efforts: z.array(z.enum(EFFORTS)).optional(),
-          reasoning: z.boolean().optional()
-        })
-        .strict()
-        .nullable()
-        .optional(),
-      apiParams: z
-        .object({
-          temperature: z.number().optional(),
-          topP: z.number().optional(),
-          topK: z.number().optional(),
-          maxOutputTokens: z.number().optional(),
-          frequencyPenalty: z.number().optional(),
-          presencePenalty: z.number().optional()
-        })
-        .strict()
-        .nullable()
-        .optional(),
-      systemPrompt: z.string().nullable().optional(),
-      displayOrder: z.number().int().optional()
-    })
-  )
+  .validator(modelUpdateSchema)
   .handler(async ({ data }) => {
     const { id, providers: inputProviders, ...updates } = data;
     const sanitizedUpdates = { ...updates };
@@ -299,19 +177,14 @@ export const updateModel = createServerFn({ method: 'POST' })
 
 export const deleteModel = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(modelIdSchema)
   .handler(async ({ data }) => {
     await db.delete(models).where(eq(models.id, data.id));
   });
 
 export const toggleEnabledModel = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      isEnabled: z.boolean()
-    })
-  )
+  .validator(modelToggleSchema)
   .handler(async ({ data }) => {
     await db
       .update(models)

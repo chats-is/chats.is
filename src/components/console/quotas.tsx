@@ -86,8 +86,8 @@ const amount = (value: string): number | null => {
 
 const quotaSchema = z
   .object({
-    name: z.string().trim().min(1, 'Name is required'),
-    description: z.string(),
+    name: z.string().trim().min(1, 'Name is required').max(100),
+    description: z.string().max(500),
     role: z.enum(['strict', 'standard', 'flexible', 'custom']),
     sevenDay: z.string(),
     // Editable only when role === 'custom'; derived from sevenDay otherwise.

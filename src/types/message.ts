@@ -56,3 +56,27 @@ export const messageSchema = z.object({
   ),
   metadata: messageMetadataSchema.optional()
 });
+
+/** What the message server functions accept. */
+export const messageChatSchema = z.object({ chatId: z.string().min(1) });
+
+export const messageCreateSchema = z.object({
+  chatId: z.string().min(1),
+  messages: z.array(messageSchema)
+});
+
+export const messageUpdateSchema = z.object({
+  id: z.string().min(1),
+  message: messageSchema
+});
+
+/** Either a single message and its replies, or a whole branch — never both
+ *  and never neither. */
+export const messageDeleteSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    parentId: z.string().trim().min(1).optional()
+  })
+  .refine(data => !!data.id !== !!data.parentId, {
+    message: 'Provide either id or parentId, but not both or neither'
+  });

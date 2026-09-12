@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { type ModelCapability, type ProviderType } from '@/types';
+import { modelCapabilitySchema } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { useSearchFilter } from '@/hooks/use-search-filter';
@@ -97,9 +98,9 @@ const jsonObject = z.string().refine(value => {
 
 const modelSchema = z
   .object({
-    name: z.string().trim().min(1, 'Display name is required'),
-    modelId: z.string().trim().min(1, 'Model ID is required'),
-    capability: z.enum(['chat', 'image', 'video', 'audio']),
+    name: z.string().trim().min(1, 'Display name is required').max(100),
+    modelId: z.string().trim().min(1, 'Model ID is required').max(255),
+    capability: modelCapabilitySchema,
     image: z.string(),
     aliases: z.string(),
     supportsVision: z.boolean(),

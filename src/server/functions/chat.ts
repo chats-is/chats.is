@@ -1,24 +1,23 @@
 import { createServerFn } from '@tanstack/react-start';
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { and, eq, isNotNull } from 'drizzle-orm';
-import { z } from 'zod';
+import { type z } from 'zod';
 
-import { chatTypeSchema, messageSchema } from '@/types';
+import { type chatTypeSchema } from '@/types';
+import {
+  chatCreateSchema,
+  chatDetailSchema,
+  chatIdSchema,
+  chatListSchema,
+  chatUpdateSchema
+} from '@/types/chat';
 import { db } from '@/db';
 import { artifacts, chats, messages } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
 
 export const createChat = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      title: z.string().trim().min(1).max(255),
-      type: chatTypeSchema.default('chat'),
-      modelId: z.string().trim().min(1).max(255),
-      messages: z.array(messageSchema)
-    })
-  )
+  .validator(chatCreateSchema)
   .handler(async ({ data, context }) => {
     await db.insert(chats).values({
       id: data.id,
@@ -41,13 +40,7 @@ export const createChat = createServerFn({ method: 'POST' })
 
 export const updateChat = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      title: z.string().trim().min(1).max(255).optional(),
-      modelId: z.string().trim().min(1).max(255).optional()
-    })
-  )
+  .validator(chatUpdateSchema)
   .handler(async ({ data, context }) => {
     const updates: Record<string, any> = {};
     if (data.title) updates.title = data.title;
@@ -63,14 +56,7 @@ export const updateChat = createServerFn({ method: 'POST' })
 
 export const listChats = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      type: chatTypeSchema.optional(),
-      limit: z.number().min(1).default(50).optional(),
-      offset: z.number().min(0).default(0).optional(),
-      cursor: z.number().nullish()
-    })
-  )
+  .validator(chatListSchema)
   .handler(async ({ data, context }) => {
     const type = data.type;
     const limit = data.limit ?? 50;
@@ -92,14 +78,7 @@ export const listChats = createServerFn({ method: 'GET' })
 
 export const getChat = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      type: chatTypeSchema.optional(),
-      includeMessages: z.boolean().default(true),
-      includeArtifacts: z.boolean().default(false)
-    })
-  )
+  .validator(chatDetailSchema)
   .handler(async ({ data, context }) => {
     const chat = await db.query.chats.findFirst({
       where: and(
@@ -154,7 +133,7 @@ export const getChat = createServerFn({ method: 'GET' })
 
 export const deleteChat = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(chatIdSchema)
   .handler(async ({ data, context }) => {
     await db
       .delete(chats)

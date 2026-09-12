@@ -28,3 +28,7 @@ export type Artifact = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+/** What the artifact server functions accept. */
+export const artifactIdSchema = z.object({ id: z.string().min(1) });
+export const artifactChatSchema = z.object({ chatId: z.string().min(1) });

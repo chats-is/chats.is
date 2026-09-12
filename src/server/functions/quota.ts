@@ -1,8 +1,14 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
 
+import {
+  quotaAssignSchema,
+  quotaCreateSchema,
+  quotaIdSchema,
+  quotaUpdateSchema,
+  quotaUserSchema
+} from '@/types/quota';
 import { getDefaultQuotaId } from '@/lib/queries';
 import { getUserQuota, validateQuotaLimits } from '@/lib/quota';
 import { generateUUID } from '@/lib/utils';
@@ -11,7 +17,6 @@ import { quotas, users } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 
-const limitSchema = z.union([z.number().positive(), z.literal('')]).nullable();
 const limitToString = (v: number | null | ''): string | null => {
   if (v === '' || v === null) return null;
   return v.toString();
@@ -51,16 +56,7 @@ export const listQuotasForSelect = createServerFn({ method: 'GET' })
 
 export const createQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      name: z.string().min(1).max(100),
-      description: z.string().max(500).optional().nullable(),
-      fiveHour: limitSchema.default(null),
-      sevenDay: limitSchema.default(null),
-      isUnlimited: z.boolean().default(false),
-      allowedModelIds: z.array(z.string()).default([])
-    })
-  )
+  .validator(quotaCreateSchema)
   .handler(async ({ data }) => {
     const num = (v: number | null | ''): number | null =>
       v === '' || v === null ? null : v;
@@ -91,17 +87,7 @@ export const createQuota = createServerFn({ method: 'POST' })
 
 export const updateQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1).max(100).optional(),
-      description: z.string().max(500).optional().nullable(),
-      fiveHour: limitSchema.optional(),
-      sevenDay: limitSchema.optional(),
-      isUnlimited: z.boolean().optional(),
-      allowedModelIds: z.array(z.string()).optional()
-    })
-  )
+  .validator(quotaUpdateSchema)
   .handler(async ({ data }) => {
     const { id, ...updates } = data;
     const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -161,7 +147,7 @@ export const updateQuota = createServerFn({ method: 'POST' })
 
 export const deleteQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(quotaIdSchema)
   .handler(async ({ data }) => {
     // FK ON DELETE restrict will block deletion if any plan references it.
     // Also block deleting the system default quota.
@@ -188,7 +174,7 @@ export const getMyQuota = createServerFn({ method: 'GET' })
 /** Admin: any user's quota (same shape as `me`). */
 export const getQuotaForUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(z.object({ userId: z.string().min(1) }))
+  .validator(quotaUserSchema)
   .handler(async ({ data }) => {
     return await getUserQuota(data.userId);
   });
@@ -198,12 +184,7 @@ export const getQuotaForUser = createServerFn({ method: 'GET' })
  */
 export const setUserQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      userId: z.string().min(1),
-      quotaId: z.string().min(1)
-    })
-  )
+  .validator(quotaAssignSchema)
   .handler(async ({ data }) => {
     const exists = await db.query.quotas.findFirst({
       where: eq(quotas.id, data.quotaId)
@@ -220,7 +201,7 @@ export const setUserQuota = createServerFn({ method: 'POST' })
  */
 export const removeUserQuota = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ userId: z.string().min(1) }))
+  .validator(quotaUserSchema)
   .handler(async ({ data }) => {
     await db
       .update(users)

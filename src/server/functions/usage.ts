@@ -1,9 +1,15 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
-import { z } from 'zod';
 
-import { type UsageRow, type UserUsageRow } from '@/types';
+import {
+  usageByUserRangeSchema,
+  usageLogFilterSchema,
+  usageRangeSchema,
+  usageUserSchema,
+  type UsageRow,
+  type UserUsageRow
+} from '@/types/usage';
 import { db } from '@/db';
 import { models, providers, usage, users } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
@@ -118,7 +124,7 @@ async function queryUsageRows(args: {
 // =========================================================================
 export const getMyUsage = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(z.object({ from: z.date() }))
+  .validator(usageRangeSchema)
   .handler(async ({ data, context }) => {
     const since = data.from;
     const [kpi, rows] = await Promise.all([
@@ -133,12 +139,7 @@ export const getMyUsage = createServerFn({ method: 'GET' })
 // =========================================================================
 export const adminUsageByUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      userId: z.string().min(1),
-      from: z.date()
-    })
-  )
+  .validator(usageByUserRangeSchema)
   .handler(async ({ data }) => {
     const since = data.from;
     const [kpi, rows] = await Promise.all([
@@ -153,7 +154,7 @@ export const adminUsageByUser = createServerFn({ method: 'GET' })
 // =========================================================================
 export const adminListUsage = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(z.object({ from: z.date() }))
+  .validator(usageRangeSchema)
   .handler(async ({ data }) => {
     const since = data.from;
     const [kpi, rows] = await Promise.all([
@@ -168,7 +169,7 @@ export const adminListUsage = createServerFn({ method: 'GET' })
 // =========================================================================
 export const adminUserModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(z.object({ userId: z.string().min(1) }))
+  .validator(usageUserSchema)
   .handler(async ({ data }) => {
     const rows = await db
       .select({ modelId: usage.modelId })
@@ -184,18 +185,7 @@ export const adminUserModels = createServerFn({ method: 'GET' })
 // =========================================================================
 export const adminUsageLog = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      from: z.date().optional(),
-      to: z.date().optional(),
-      userId: z.string().optional(),
-      userQuery: z.string().optional(),
-      modelId: z.string().optional(),
-      capability: z.enum(['chat', 'image', 'video', 'audio']).optional(),
-      page: z.number().int().min(1).default(1),
-      pageSize: z.number().int().min(1).max(200).default(50)
-    })
-  )
+  .validator(usageLogFilterSchema)
   .handler(async ({ data }) => {
     const whereParts = [
       data.from ? gte(usage.createdAt, data.from) : undefined,

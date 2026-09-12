@@ -1,9 +1,9 @@
 import { createServerFn } from '@tanstack/react-start';
 import { infiniteQueryOptions } from '@tanstack/react-query';
 import { and, desc, eq, isNotNull, lt, sql } from 'drizzle-orm';
-import { z } from 'zod';
 
 import { mediaToolNames } from '@/types';
+import { libraryPageSchema } from '@/types/library';
 import { extractLibraryMedia, type LibraryMediaItem } from '@/lib/library';
 import { db } from '@/db';
 import { artifacts, messages } from '@/db/schema';
@@ -38,12 +38,7 @@ const MEDIA_PARTS_JSONPATH = `$[*] ? (@.type == "file" || @.type like_regex "^to
  */
 export const listLibrary = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      cursor: z.string().nullish(),
-      limit: z.number().min(1).max(60).default(24)
-    })
-  )
+  .validator(libraryPageSchema)
   .handler(async ({ data, context }) => {
     const userId = context.user.id;
     const before = data.cursor ? new Date(data.cursor) : null;

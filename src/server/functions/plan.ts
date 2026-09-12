@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { eq, sql } from 'drizzle-orm';
-import { z } from 'zod';
 
+import { planCreateSchema, planIdSchema, planUpdateSchema } from '@/types/plan';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { plans, quotas, users } from '@/db/schema';
@@ -61,14 +61,7 @@ export const listPlans = createServerFn({ method: 'GET' })
 
 export const createPlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      name: z.string().min(1).max(100),
-      description: z.string().max(500).optional().nullable(),
-      quotaId: z.string().min(1),
-      displayOrder: z.number().int().default(0)
-    })
-  )
+  .validator(planCreateSchema)
   .handler(async ({ data }) => {
     const id = generateUUID();
     // Verify quota exists
@@ -90,15 +83,7 @@ export const createPlan = createServerFn({ method: 'POST' })
 
 export const updatePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1).max(100).optional(),
-      description: z.string().max(500).optional().nullable(),
-      quotaId: z.string().min(1).optional(),
-      displayOrder: z.number().int().optional()
-    })
-  )
+  .validator(planUpdateSchema)
   .handler(async ({ data }) => {
     const { id, ...updates } = data;
     const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -120,7 +105,7 @@ export const updatePlan = createServerFn({ method: 'POST' })
 
 export const deletePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(planIdSchema)
   .handler(async ({ data }) => {
     await db.delete(plans).where(eq(plans.id, data.id));
   });

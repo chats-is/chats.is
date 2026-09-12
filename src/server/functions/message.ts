@@ -1,16 +1,20 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { and, eq, inArray, or } from 'drizzle-orm';
-import { z } from 'zod';
 
-import { messageSchema } from '@/types';
+import {
+  messageChatSchema,
+  messageCreateSchema,
+  messageDeleteSchema,
+  messageUpdateSchema
+} from '@/types/message';
 import { db } from '@/db';
 import { artifacts, messages } from '@/db/schema';
 import { authedMiddleware } from '@/server/middleware';
 
 export const listMessages = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .validator(z.object({ chatId: z.string().min(1) }))
+  .validator(messageChatSchema)
   .handler(async ({ data, context }) => {
     return await db.query.messages.findMany({
       where: and(
@@ -27,12 +31,7 @@ export const listMessages = createServerFn({ method: 'GET' })
 
 export const createMessages = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      chatId: z.string().min(1),
-      messages: z.array(messageSchema)
-    })
-  )
+  .validator(messageCreateSchema)
   .handler(async ({ data, context }) => {
     const result = await db
       .insert(messages)
@@ -64,12 +63,7 @@ export const createMessages = createServerFn({ method: 'POST' })
 
 export const updateMessage = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      message: messageSchema
-    })
-  )
+  .validator(messageUpdateSchema)
   .handler(async ({ data, context }) => {
     const result = await db
       .update(messages)
@@ -99,16 +93,7 @@ export const updateMessage = createServerFn({ method: 'POST' })
 
 export const deleteMessages = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(
-    z
-      .object({
-        id: z.string().trim().min(1).optional(),
-        parentId: z.string().trim().min(1).optional()
-      })
-      .refine(data => !!data.id !== !!data.parentId, {
-        message: 'Provide either id or parentId, but not both or neither'
-      })
-  )
+  .validator(messageDeleteSchema)
   .handler(async ({ data, context }) => {
     const conditions = data.id
       ? or(eq(messages.id, data.id), eq(messages.parentId, data.id))

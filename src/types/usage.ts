@@ -1,3 +1,6 @@
+import { z } from 'zod';
+
+import { modelCapabilitySchema } from './model';
 import { type ChatUsage } from './pricing';
 
 /** Shared input fields for `recordXxxUsage` writers. */
@@ -144,3 +147,32 @@ export type DailyDay = {
   day: string;
   groups: DailyGroup[];
 };
+
+/**
+ * What the usage server functions accept.
+ *
+ * `from` is an absolute instant the browser computed from its own local
+ * calendar-day boundary. Nothing on the server does timezone maths — it
+ * filters on a timestamptz column — which keeps the KPI window and the
+ * browser's local-day chart buckets aligned.
+ */
+export const usageRangeSchema = z.object({ from: z.date() });
+
+export const usageByUserRangeSchema = z.object({
+  userId: z.string().min(1),
+  from: z.date()
+});
+
+export const usageUserSchema = z.object({ userId: z.string().min(1) });
+
+/** What the admin log may be narrowed by. */
+export const usageLogFilterSchema = z.object({
+  from: z.date().optional(),
+  to: z.date().optional(),
+  userId: z.string().optional(),
+  userQuery: z.string().optional(),
+  modelId: z.string().optional(),
+  capability: modelCapabilitySchema.optional(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(200).default(50)
+});

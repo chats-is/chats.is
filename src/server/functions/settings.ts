@@ -1,8 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
 
+import {
+  settingKeySchema,
+  settingsBulkSchema,
+  settingSchema
+} from '@/types/settings';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
@@ -40,13 +44,7 @@ export const getSystemSettings = createServerFn({ method: 'GET' }).handler(
 
 export const updateSetting = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      key: z.string().min(1).max(100),
-      value: z.string().nullable(),
-      description: z.string().max(500).optional()
-    })
-  )
+  .validator(settingSchema)
   .handler(async ({ data }) => {
     const existing = await db.query.settings.findFirst({
       where: eq(settings.key, data.key)
@@ -73,15 +71,7 @@ export const updateSetting = createServerFn({ method: 'POST' })
 
 export const bulkUpdateSettings = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.array(
-      z.object({
-        key: z.string().min(1).max(100),
-        value: z.string().nullable(),
-        description: z.string().max(500).optional()
-      })
-    )
-  )
+  .validator(settingsBulkSchema)
   .handler(async ({ data }) => {
     for (const item of data) {
       const existing = await db.query.settings.findFirst({
@@ -110,7 +100,7 @@ export const bulkUpdateSettings = createServerFn({ method: 'POST' })
 
 export const deleteSetting = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ key: z.string().min(1) }))
+  .validator(settingKeySchema)
   .handler(async ({ data }) => {
     await db.delete(settings).where(eq(settings.key, data.key));
   });

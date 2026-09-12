@@ -1,9 +1,17 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { and, eq, inArray } from 'drizzle-orm';
-import { z } from 'zod';
 
-import { type VertexServiceAccountKey } from '@/types';
+import { modelRefSchema } from '@/types/model';
+import {
+  providerCreateSchema,
+  providerIdSchema,
+  providerModelImportSchema,
+  providerRefSchema,
+  providerToggleSchema,
+  providerUpdateSchema,
+  type VertexServiceAccountKey
+} from '@/types/provider';
 import { decrypt, encrypt, maskedKey } from '@/lib/crypto';
 import { getProviderModels, toProviderModelId } from '@/lib/provider';
 import { generateUUID } from '@/lib/utils';
@@ -47,27 +55,7 @@ export const listEnabledProviders = createServerFn({ method: 'GET' }).handler(
 
 export const createProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      name: z.string().min(1).max(100),
-      type: z.enum([
-        'openai',
-        'azure',
-        'google',
-        'vertex',
-        'anthropic',
-        'bedrock',
-        'xai',
-        'deepseek'
-      ]),
-      apiKey: z.string().min(1),
-      image: z.string().optional(),
-      baseUrl: z.url().optional().or(z.literal('')),
-      isEnabled: z.boolean().default(false),
-      apiOptions: z.record(z.string(), z.any()).optional(),
-      displayOrder: z.number().int().default(0)
-    })
-  )
+  .validator(providerCreateSchema)
   .handler(async ({ data }) => {
     const id = generateUUID();
 
@@ -87,28 +75,7 @@ export const createProvider = createServerFn({ method: 'POST' })
 
 export const updateProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1).max(100).optional(),
-      type: z.enum([
-        'openai',
-        'azure',
-        'google',
-        'vertex',
-        'anthropic',
-        'bedrock',
-        'xai',
-        'deepseek'
-      ]),
-      apiKey: z.string().optional(),
-      image: z.string().optional(),
-      baseUrl: z.url().optional().or(z.literal('')),
-      isEnabled: z.boolean().optional(),
-      apiOptions: z.record(z.string(), z.any()).nullable().optional(),
-      displayOrder: z.number().int().optional()
-    })
-  )
+  .validator(providerUpdateSchema)
   .handler(async ({ data }) => {
     const existingProvider = await db.query.providers.findFirst({
       where: eq(providers.id, data.id)
@@ -171,7 +138,7 @@ export const updateProvider = createServerFn({ method: 'POST' })
 
 export const deleteProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string().min(1) }))
+  .validator(providerIdSchema)
   .handler(async ({ data }) => {
     // This will fail if provider has models due to FK constraint
     await db.delete(providers).where(eq(providers.id, data.id));
@@ -179,12 +146,7 @@ export const deleteProvider = createServerFn({ method: 'POST' })
 
 export const toggleEnabledProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      isEnabled: z.boolean()
-    })
-  )
+  .validator(providerToggleSchema)
   .handler(async ({ data }) => {
     await db
       .update(providers)
@@ -194,7 +156,7 @@ export const toggleEnabledProvider = createServerFn({ method: 'POST' })
 
 export const fetchProviderModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(z.object({ providerId: z.string().min(1) }))
+  .validator(providerRefSchema)
   .handler(async ({ data }) => {
     const provider = await db.query.providers.findFirst({
       where: eq(providers.id, data.providerId),
@@ -222,7 +184,7 @@ export const fetchProviderModels = createServerFn({ method: 'GET' })
 // listing errors are omitted.
 export const compatibleProviders = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(z.object({ modelId: z.string().min(1) }))
+  .validator(modelRefSchema)
   .handler(async ({ data }) => {
     const enabledProviders = await db.query.providers.findMany({
       where: eq(providers.isEnabled, true),
@@ -253,19 +215,7 @@ export const compatibleProviders = createServerFn({ method: 'GET' })
 
 export const syncProviderModels = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      providerId: z.string().min(1),
-      items: z
-        .array(
-          z.object({
-            modelId: z.string().min(1).max(255),
-            capability: z.enum(['chat', 'image', 'video', 'audio'])
-          })
-        )
-        .min(1)
-    })
-  )
+  .validator(providerModelImportSchema)
   .handler(async ({ data }) => {
     const provider = await db.query.providers.findFirst({
       where: eq(providers.id, data.providerId)

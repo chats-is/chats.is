@@ -49,8 +49,8 @@ import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
 const planSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required'),
-  description: z.string(),
+  name: z.string().trim().min(1, 'Name is required').max(100),
+  description: z.string().max(500),
   quotaId: z.string().min(1, 'Select a quota'),
   displayOrder: z.string()
 });

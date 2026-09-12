@@ -52,9 +52,9 @@ import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 type AdminPrompt = Awaited<ReturnType<typeof adminListPrompts>>[number];
 
 const promptSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required'),
+  name: z.string().trim().min(1, 'Name is required').max(100),
   content: z.string().trim().min(1, 'Content is required'),
-  image: z.string(),
+  image: z.string().max(500),
   tags: z.string(),
   providers: z.string(),
   models: z.array(z.string()),

@@ -1,8 +1,14 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 import { eq, like, or, sql } from 'drizzle-orm';
-import { z } from 'zod';
 
+import {
+  profileUpdateSchema,
+  userIdSchema,
+  userPlanSchema,
+  userRoleSchema,
+  userSearchSchema
+} from '@/types/user';
 import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
@@ -31,12 +37,7 @@ export const getMe = createServerFn({ method: 'GET' })
 
 export const updateProfile = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
-  .validator(
-    z.object({
-      name: z.string().min(1).max(100).optional(),
-      image: z.url().optional()
-    })
-  )
+  .validator(profileUpdateSchema)
   .handler(async ({ data, context }) => {
     const updates: { name?: string; image?: string; updatedAt?: Date } = {};
     if (data.name !== undefined) updates.name = data.name;
@@ -52,11 +53,7 @@ export const updateProfile = createServerFn({ method: 'POST' })
 
 export const listUsers = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      search: z.string().optional()
-    })
-  )
+  .validator(userSearchSchema)
   .handler(async ({ data }) => {
     const search = data.search;
 
@@ -93,12 +90,7 @@ export const listUsers = createServerFn({ method: 'GET' })
  */
 export const updateUserPlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string().min(1),
-      planId: z.string().nullable()
-    })
-  )
+  .validator(userPlanSchema)
   .handler(async ({ data }) => {
     await db
       .update(users)
@@ -108,7 +100,7 @@ export const updateUserPlan = createServerFn({ method: 'POST' })
 
 export const getUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .validator(userIdSchema)
   .handler(async ({ data }) => {
     const user = await db.select().from(users).where(eq(users.id, data.id));
 
@@ -147,12 +139,7 @@ export const getUser = createServerFn({ method: 'GET' })
 
 export const updateUserRole = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
-    z.object({
-      id: z.string(),
-      role: z.enum(['user', 'admin'])
-    })
-  )
+  .validator(userRoleSchema)
   .handler(async ({ data, context }) => {
     // Prevent admin from removing their own admin role
     if (context.user.id === data.id && data.role !== 'admin') {
@@ -170,7 +157,7 @@ export const updateUserRole = createServerFn({ method: 'POST' })
 
 export const deleteUser = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ id: z.string() }))
+  .validator(userIdSchema)
   .handler(async ({ data, context }) => {
     // Prevent admin from deleting themselves
     if (context.user.id === data.id) {
