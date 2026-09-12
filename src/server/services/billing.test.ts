@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { makeTestDb } from '@/test/pg';
 import { eq } from 'drizzle-orm';
 import {
   afterAll,
@@ -14,17 +15,15 @@ import * as schema from '@/db/schema';
 import {
   assertQuota,
   getUserQuota,
+  getUserUsageWindows,
   QuotaExceededError
 } from '@/server/services/quota';
-import { getUserUsageWindows } from '@/server/services/quota-queries';
 import {
   recordAudioUsage,
   recordChatUsage,
   recordImageUsage,
   recordVideoUsage
 } from '@/server/services/usage';
-
-import { makeTestDb } from '../test/pg';
 
 // Point the app's db at an in-process Postgres (PGlite) with real migrations.
 // getUserUsageWindows / getUserResolvedQuota / assertQuota all import this.
