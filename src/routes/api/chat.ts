@@ -13,7 +13,6 @@ import {
   tool,
   UI_MESSAGE_STREAM_HEADERS
 } from 'ai';
-import { eq } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -47,22 +46,12 @@ import {
   formatString,
   generateUUID
 } from '@/lib/utils';
-import { db } from '@/db';
-import {
-  artifacts as artifactsTable,
-  chats as chatsTable,
-  messages as messagesTable
-} from '@/db/schema';
-import { createChat, getChat, updateChat } from '@/server/functions/chat';
-import {
-  createMessages,
-  deleteMessages,
-  listMessages
-} from '@/server/functions/message';
+import * as chats from '@/server/services/chat';
 import {
   buildMediaTools,
   type MediaToolsOptions
 } from '@/server/services/chat-tools';
+import * as messages from '@/server/services/message';
 import { findModelByModelId } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
 import { getSystemPrompt, getTitleSettings } from '@/server/services/settings';
@@ -199,11 +188,10 @@ async function POST({ request: req }: { request: Request }) {
 
   let title = 'Untitled';
   // No type filter: continuing a legacy media chat reuses its row.
-  const chat = await getChat({
-    data: {
-      id,
-      includeMessages: false
-    }
+  const chat = await chats.getChat(user.id, {
+    id,
+    includeMessages: false,
+    includeArtifacts: false
   });
   const UNTITLED = 'Untitled';
 
@@ -245,13 +233,12 @@ async function POST({ request: req }: { request: Request }) {
   if (!chat) {
     title = await generateTitle();
 
-    await createChat({
-      data: {
-        id,
-        title,
-        modelId,
-        messages: [userMessage]
-      }
+    await chats.createChat(user.id, {
+      id,
+      title,
+      type: 'chat',
+      modelId,
+      messages: [userMessage]
     });
   } else {
     title = chat.title;
@@ -263,18 +250,16 @@ async function POST({ request: req }: { request: Request }) {
       const generated = await generateTitle();
       if (generated !== UNTITLED) {
         title = generated;
-        await updateChat({ data: { id, title } });
+        await chats.updateChat(user.id, { id, title });
       }
     }
 
     if (parentMessageId && parentMessageId === userMessage.id) {
-      await deleteMessages({ data: { parentId: parentMessageId } });
+      await messages.deleteMessages(user.id, { parentId: parentMessageId });
     } else {
-      await createMessages({
-        data: {
-          chatId: id,
-          messages: [userMessage]
-        }
+      await messages.createMessages(user.id, {
+        chatId: id,
+        messages: [userMessage]
       });
     }
   }
@@ -330,19 +315,11 @@ async function POST({ request: req }: { request: Request }) {
       onEnd: async ({ responseMessage }) => {
         if (!responseMessage) return;
         try {
-          // createdAt is left to the database. The user's message was stored
-          // with the database's clock, and a refusal lands milliseconds later —
-          // close enough that any skew between that clock and this process's
-          // puts the refusal *before* the message it answers, and the thread
-          // renders in that order on reload. The normal path passes its own
-          // timestamp and gets away with it only because a model takes seconds.
-          await db.insert(messagesTable).values({
+          await messages.createRefusal(user.id, {
             id: responseMessage.id || errorMessageId,
             parentId: responseMessage.metadata?.parentId ?? userMessage.id,
-            role: 'assistant',
-            parts: responseMessage.parts,
             chatId: id,
-            userId: user.id
+            parts: responseMessage.parts
           });
         } catch (err) {
           // The client has already rendered the refusal; throwing here would
@@ -356,7 +333,7 @@ async function POST({ request: req }: { request: Request }) {
   }
 
   try {
-    const historyMessages = await listMessages({ data: { chatId: id } });
+    const historyMessages = await messages.listMessages(user.id, id);
     const chatMessages = convertToChatMessages(historyMessages);
 
     let reasonStartedAt: Date | null = null;
@@ -991,52 +968,24 @@ async function POST({ request: req }: { request: Request }) {
           .map(artifactId => completedArtifacts.get(artifactId))
           .filter((artifact): artifact is Artifact => Boolean(artifact));
 
-        await db.transaction(async tx => {
-          await tx.insert(messagesTable).values({
+        await messages.createTurn(user.id, {
+          chatId: id,
+          message: {
             id: responseMessage.id,
             parentId: responseMessage.metadata?.parentId ?? userMessage.id,
-            role: responseMessage.role,
+            role: 'assistant',
             parts: responseMessage.parts,
-            chatId: id,
-            userId: user.id,
             reasonDuration: responseMessage.metadata?.reasonDuration,
             createdAt: responseMessage.metadata?.createdAt ?? finishedAt,
             updatedAt: responseMessage.metadata?.updatedAt ?? finishedAt
-          });
-
-          // Each artifact created this turn is its own independent row, pinned
-          // to this turn's message.
-          if (persistedArtifacts.length > 0) {
-            await tx.insert(artifactsTable).values(
-              persistedArtifacts.map(artifact => ({
-                id: artifact.id,
-                chatId: id,
-                messageId: responseMessage.id,
-                userId: user.id,
-                title: artifact.title,
-                type: artifact.type,
-                language: artifact.language ?? null,
-                content: artifact.content ?? null,
-                fileUrl: artifact.fileUrl ?? null,
-                fileName: artifact.fileName ?? null,
-                mimeType: artifact.mimeType ?? null,
-                size: artifact.size ?? null,
-                createdAt: artifact.createdAt,
-                updatedAt: artifact.updatedAt
-              }))
-            );
-          }
+          },
+          artifacts: persistedArtifacts
         });
 
         // Update chat model if changed
         if (chat && chat.modelId !== modelId) {
           try {
-            await updateChat({
-              data: {
-                id,
-                modelId
-              }
-            });
+            await chats.updateChat(user.id, { id, modelId });
           } catch (err) {
             console.warn('Unable to update chat', id, err);
           }
@@ -1053,12 +1002,7 @@ async function POST({ request: req }: { request: Request }) {
     const streamContext = await getResumableStreamContext();
     if (streamContext) {
       try {
-        // Record this generation's stream id on the chat so the GET handler
-        // can resume it after a refresh (overwrites any prior, finished one).
-        await db
-          .update(chatsTable)
-          .set({ activeStreamId: streamId })
-          .where(eq(chatsTable.id, id));
+        await chats.setStreamId(id, streamId);
         const resumable = await streamContext.resumableStream(streamId, () =>
           stream.pipeThrough(new JsonToSseTransformStream())
         );
@@ -1120,10 +1064,8 @@ async function GET({ request: req }: { request: Request }) {
   }
 
   // Only the chat owner may resume, and only if it has an active stream.
-  const chat = await db.query.chats.findFirst({
-    where: (c, { and, eq }) => and(eq(c.id, chatId), eq(c.userId, user.id))
-  });
-  if (!chat?.activeStreamId) {
+  const streamId = await chats.getStreamId(user.id, chatId);
+  if (!streamId) {
     return new Response(null, { status: 204 });
   }
 
@@ -1133,7 +1075,7 @@ async function GET({ request: req }: { request: Request }) {
   // resume fires on every chat mount, swallow errors and fall back to the DB.
   let resumed: ReadableStream<string> | null | undefined;
   try {
-    resumed = await streamContext.resumeExistingStream(chat.activeStreamId);
+    resumed = await streamContext.resumeExistingStream(streamId);
   } catch (err) {
     console.warn(
       '[chat] resume failed, falling back to persisted message —',

@@ -1,0 +1,1 @@
+ALTER TABLE "chat" RENAME COLUMN "active_stream_id" TO "stream_id";

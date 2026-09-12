@@ -3,6 +3,7 @@ import '@tanstack/react-start/server-only';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import { type z } from 'zod';
 
+import { type Artifact } from '@/types';
 import {
   type messageCreateSchema,
   type messageDeleteSchema,
@@ -10,6 +11,9 @@ import {
 } from '@/types/message';
 import { db } from '@/db';
 import { artifacts, messages } from '@/db/schema';
+
+/** The parts array a message carries, as the column stores it. */
+type MessageParts = typeof messages.$inferInsert.parts;
 
 /** The columns a message goes back to the client with: the row minus the two
  *  ownership keys the caller already knows. */
@@ -128,5 +132,95 @@ export async function deleteMessages(
     await tx
       .delete(messages)
       .where(and(conditions, eq(messages.userId, userId)));
+  });
+}
+
+/**
+ * Persist an assistant turn that was refused before the model ran.
+ *
+ * `createdAt` is left to the database. The user's message was stored with the
+ * database's clock, and a refusal lands milliseconds later — close enough that
+ * any skew between that clock and this process's puts the refusal *before* the
+ * message it answers, and the thread renders in that order on reload. The
+ * normal path passes its own timestamp and gets away with it only because a
+ * model takes seconds.
+ */
+export async function createRefusal(
+  userId: string,
+  input: {
+    id: string;
+    parentId: string;
+    chatId: string;
+    parts: MessageParts;
+  }
+) {
+  await db.insert(messages).values({
+    id: input.id,
+    parentId: input.parentId,
+    role: 'assistant',
+    parts: input.parts,
+    chatId: input.chatId,
+    userId
+  });
+}
+
+/**
+ * Persist a finished assistant turn together with the artifacts it produced.
+ *
+ * One transaction: an artifact pinned to a message that was never written
+ * would be unreachable, and a turn that claims artifacts it does not have
+ * renders as a gap.
+ */
+export async function createTurn(
+  userId: string,
+  input: {
+    message: {
+      id: string;
+      parentId: string;
+      role: 'assistant';
+      parts: MessageParts;
+      reasonDuration?: number;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    chatId: string;
+    artifacts: Artifact[];
+  }
+) {
+  await db.transaction(async tx => {
+    await tx.insert(messages).values({
+      id: input.message.id,
+      parentId: input.message.parentId,
+      role: input.message.role,
+      parts: input.message.parts,
+      chatId: input.chatId,
+      userId,
+      reasonDuration: input.message.reasonDuration,
+      createdAt: input.message.createdAt,
+      updatedAt: input.message.updatedAt
+    });
+
+    // Each artifact created this turn is its own independent row, pinned to
+    // this turn's message.
+    if (input.artifacts.length > 0) {
+      await tx.insert(artifacts).values(
+        input.artifacts.map(artifact => ({
+          id: artifact.id,
+          chatId: input.chatId,
+          messageId: input.message.id,
+          userId,
+          title: artifact.title,
+          type: artifact.type,
+          language: artifact.language ?? null,
+          content: artifact.content ?? null,
+          fileUrl: artifact.fileUrl ?? null,
+          fileName: artifact.fileName ?? null,
+          mimeType: artifact.mimeType ?? null,
+          size: artifact.size ?? null,
+          createdAt: artifact.createdAt,
+          updatedAt: artifact.updatedAt
+        }))
+      );
+    }
   });
 }

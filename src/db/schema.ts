@@ -39,11 +39,13 @@ export const chats = createTable(
       .default('chat')
       .$type<ChatType>(),
     modelId: varchar('model_id', { length: 255 }).notNull(),
-    // Resumable-stream id of an in-progress generation (a Redis key, not a FK).
-    // Null when nothing is streaming. The chat route's GET handler reads this
-    // to re-attach to the stream after a page refresh. Only set when REDIS_URL
-    // is configured.
-    activeStreamId: varchar('active_stream_id', { length: 255 }),
+    // Resumable-stream id of the most recent generation (a Redis key, not a
+    // FK). Written when a generation starts and never cleared: whether the
+    // stream is still live is Redis's answer, not this column's — the GET
+    // handler asks for it and falls back to the persisted message when it has
+    // expired. Null only until the chat's first generation, and only written
+    // at all when REDIS_URL is configured.
+    streamId: varchar('stream_id', { length: 255 }),
     userId: varchar('user_id', { length: 255 })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),

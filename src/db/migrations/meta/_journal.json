@@ -148,6 +148,13 @@
       "when": 1788312758556,
       "tag": "0020_better_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788312758557,
+      "tag": "0021_rename_stream_id",
+      "breakpoints": true
     }
   ]
 }

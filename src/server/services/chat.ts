@@ -149,3 +149,31 @@ export async function deleteChat(userId: string, id: string) {
 export async function deleteAllChats(userId: string) {
   await db.delete(chats).where(eq(chats.userId, userId));
 }
+
+/**
+ * The id of the chat's most recent generation stream, or null.
+ *
+ * Scoped to the owner: only they may reconnect to a stream of theirs. Answers
+ * null both when the chat is not theirs and when it has never generated, since
+ * the caller treats the two the same — there is nothing to resume. A returned
+ * id says a stream once existed, not that it is still live; whether it can be
+ * resumed is Redis's answer, and the caller falls back when it cannot.
+ */
+export async function getStreamId(userId: string, chatId: string) {
+  const chat = await db.query.chats.findFirst({
+    where: and(eq(chats.id, chatId), eq(chats.userId, userId)),
+    columns: { streamId: true }
+  });
+  return chat?.streamId ?? null;
+}
+
+/**
+ * Record the stream a generation is writing to, so a refresh can re-attach.
+ *
+ * Not scoped to the owner: the caller has already established the chat is
+ * theirs by getting this far, and the id was minted in this request. Never
+ * cleared — the next generation overwrites it.
+ */
+export async function setStreamId(chatId: string, streamId: string) {
+  await db.update(chats).set({ streamId }).where(eq(chats.id, chatId));
+}

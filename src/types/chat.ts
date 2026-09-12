@@ -11,7 +11,7 @@ export type Chat = {
   title: string;
   type: ChatType;
   modelId: string;
-  activeStreamId?: string | null;
+  streamId?: string | null;
   messages: ChatMessage[];
   artifacts?: Artifact[];
   createdAt: Date;
