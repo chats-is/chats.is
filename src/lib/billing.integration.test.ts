@@ -10,15 +10,19 @@ import {
   vi
 } from 'vitest';
 
-import { getUserUsageWindows } from '@/lib/queries';
-import { assertQuota, getUserQuota, QuotaExceededError } from '@/lib/quota';
+import * as schema from '@/db/schema';
+import {
+  assertQuota,
+  getUserQuota,
+  QuotaExceededError
+} from '@/server/services/quota';
+import { getUserUsageWindows } from '@/server/services/quota-queries';
 import {
   recordAudioUsage,
   recordChatUsage,
   recordImageUsage,
   recordVideoUsage
-} from '@/lib/usage';
-import * as schema from '@/db/schema';
+} from '@/server/services/usage';
 
 import { makeTestDb } from '../test/pg';
 

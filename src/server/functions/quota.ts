@@ -9,13 +9,13 @@ import {
   quotaUpdateSchema,
   quotaUserSchema
 } from '@/types/quota';
-import { getDefaultQuotaId } from '@/lib/queries';
-import { getUserQuota, validateQuotaLimits } from '@/lib/quota';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { quotas, users } from '@/db/schema';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
+import { getUserQuota, validateQuotaLimits } from '@/server/services/quota';
+import { getDefaultQuotaId } from '@/server/services/settings';
 
 const limitToString = (v: number | null | ''): string | null => {
   if (v === '' || v === null) return null;

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PricingMissingError, requirePricing } from '@/lib/pricing';
+import { PricingMissingError, requirePricing } from '@/server/services/pricing';
 import {
   assertModelAccess,
   assertQuota,
   ModelAccessDeniedError,
   QuotaExceededError
-} from '@/lib/quota';
+} from '@/server/services/quota';
 
 import { preflightCheck } from './preflight';
 
@@ -14,7 +14,7 @@ import { preflightCheck } from './preflight';
 // (importing the real ones pulls in the DB/env chain). The error classes are
 // replicated inside the factories so `instanceof` in preflight.ts matches the
 // instances the tests construct.
-vi.mock('@/lib/pricing', () => {
+vi.mock('@/server/services/pricing', () => {
   class PricingMissingError extends Error {
     public userMessage: string;
     constructor(modelLabel: string) {
@@ -25,7 +25,7 @@ vi.mock('@/lib/pricing', () => {
   }
   return { PricingMissingError, requirePricing: vi.fn() };
 });
-vi.mock('@/lib/quota', () => {
+vi.mock('@/server/services/quota', () => {
   class ModelAccessDeniedError extends Error {
     constructor(modelLabel: string) {
       super(`${modelLabel} is not available.`);

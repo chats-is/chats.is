@@ -7,6 +7,9 @@ import {
   type RecordTranscriptionUsageInput,
   type RecordVideoUsageInput
 } from '@/types';
+import { generateUUID, parseNumber } from '@/lib/utils';
+import { db } from '@/db';
+import { usage } from '@/db/schema';
 import {
   calculateAudioCost,
   calculateChatCost,
@@ -14,10 +17,7 @@ import {
   calculateTranscriptionCost,
   calculateVideoCost,
   resolveModelByKey
-} from '@/lib/pricing';
-import { generateUUID, parseNumber } from '@/lib/utils';
-import { db } from '@/db';
-import { usage } from '@/db/schema';
+} from '@/server/services/pricing';
 
 /**
  * Compute cost and insert a usage row for a chat completion.

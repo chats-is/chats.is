@@ -1,8 +1,11 @@
 import '@tanstack/react-start/server-only';
 
 import { type ResolvedSource, type UserQuota } from '@/types';
-import { getUserResolvedQuota, getUserUsageWindows } from '@/lib/queries';
 import { parseNumber } from '@/lib/utils';
+import {
+  getUserResolvedQuota,
+  getUserUsageWindows
+} from '@/server/services/quota-queries';
 
 /**
  * Shape the raw resolved-quota row into the structured form business logic

@@ -1,14 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { generateSpeech, NoSpeechGeneratedError } from 'ai';
 
-import { preflightGate } from '@/lib/preflight';
 import {
   bindingsToFailoverProviders,
   getSpeechModel,
   runWithProviderFailover
 } from '@/lib/provider';
-import { findModelByModelId, getSpeechSettings } from '@/lib/queries';
-import { recordAudioUsage } from '@/lib/usage';
+import { findModelByModelId } from '@/server/services/model';
+import { preflightGate } from '@/server/services/preflight';
+import { getSpeechSettings } from '@/server/services/settings';
+import { recordAudioUsage } from '@/server/services/usage';
 import { getUser } from '@/server/session';
 
 export const Route = createFileRoute('/api/speech')({

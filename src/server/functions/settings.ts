@@ -25,7 +25,8 @@ export const listSettings = createServerFn({ method: 'GET' })
  */
 export const getAppSettings = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const { getAppSettings: readAppSettings } = await import('@/lib/queries');
+    const { getAppSettings: readAppSettings } =
+      await import('@/server/services/settings');
     return readAppSettings();
   }
 );
@@ -37,7 +38,7 @@ export const getAppSettings = createServerFn({ method: 'GET' }).handler(
 export const getSystemSettings = createServerFn({ method: 'GET' }).handler(
   async () => {
     const { getSystemSettings: readSystemSettings } =
-      await import('@/lib/queries');
+      await import('@/server/services/settings');
     return readSystemSettings();
   }
 );

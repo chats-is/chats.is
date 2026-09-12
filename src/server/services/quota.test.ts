@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getUserResolvedQuota, getUserUsageWindows } from '@/lib/queries';
-
 import {
   assertModelAccess,
   assertQuota,
@@ -10,10 +8,11 @@ import {
   QuotaExceededError,
   validateQuotaLimits
 } from './quota';
+import { getUserResolvedQuota, getUserUsageWindows } from './quota-queries';
 
-// quota.ts is the business layer over the DB-access layer (`@/lib/queries`).
-// Mock queries so we test the resolve/percent/threshold logic in isolation.
-vi.mock('@/lib/queries', () => ({
+// quota.ts is the business layer over the reads in quota-queries.ts. Mock the
+// reads so this tests the resolve/percent/threshold logic in isolation.
+vi.mock('./quota-queries', () => ({
   getUserResolvedQuota: vi.fn(),
   getUserUsageWindows: vi.fn()
 }));

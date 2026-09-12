@@ -31,25 +31,26 @@ import {
   pickSize,
   pickVoice
 } from '@/lib/media-options';
-import { preflightCheck } from '@/lib/preflight';
 import {
   bindingsToFailoverProviders,
   type FailoverProvider
 } from '@/lib/provider';
-import { findModelByModelId, getMediaDefaultModelIds } from '@/lib/queries';
 import { generateAndStoreSpeech } from '@/lib/speech-generation';
 import { transcribeAudio } from '@/lib/transcription';
-import {
-  recordAudioUsage,
-  recordImageUsage,
-  recordTranscriptionUsage,
-  recordVideoUsage
-} from '@/lib/usage';
 import { isSttModel, isTtsModel } from '@/lib/utils';
 import {
   generateAndStoreVideo,
   VideoTimeoutError
 } from '@/lib/video-generation';
+import { findModelByModelId } from '@/server/services/model';
+import { preflightCheck } from '@/server/services/preflight';
+import { getMediaDefaultModelIds } from '@/server/services/settings';
+import {
+  recordAudioUsage,
+  recordImageUsage,
+  recordTranscriptionUsage,
+  recordVideoUsage
+} from '@/server/services/usage';
 
 export type MediaToolsOptions = {
   image?: {

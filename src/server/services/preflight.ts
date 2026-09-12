@@ -1,13 +1,13 @@
 import '@tanstack/react-start/server-only';
 
 import { type ChatErrorKind } from '@/types';
-import { PricingMissingError, requirePricing } from '@/lib/pricing';
+import { PricingMissingError, requirePricing } from '@/server/services/pricing';
 import {
   assertModelAccess,
   assertQuota,
   ModelAccessDeniedError,
   QuotaExceededError
-} from '@/lib/quota';
+} from '@/server/services/quota';
 
 export type PreflightResult =
   | { ok: true }

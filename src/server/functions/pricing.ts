@@ -11,17 +11,17 @@ import {
   syncRunSchema,
   syncTargetSchema
 } from '@/types/pricing';
-import { pricingMissingFields } from '@/lib/pricing';
-import {
-  previewSync,
-  searchRemotePricing as searchPricingCatalog,
-  syncPricing
-} from '@/lib/pricing-sync';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, models } from '@/db/schema';
 import { adminMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
+import { pricingMissingFields } from '@/server/services/pricing';
+import {
+  previewSync,
+  searchRemotePricing as searchPricingCatalog,
+  syncPricing
+} from '@/server/services/pricing-sync';
 
 /**
  * List all models together with their pricing (one row per model).

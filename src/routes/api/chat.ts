@@ -30,25 +30,17 @@ import {
 } from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
-import { buildMediaTools, type MediaToolsOptions } from '@/lib/chat-tools';
 import { normalizeChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
 import { pickEffort } from '@/lib/media-options';
-import { preflightCheck } from '@/lib/preflight';
 import {
   AllProvidersFailedError,
   bindingsToFailoverProviders,
   getLanguageModel,
   type FailoverProvider
 } from '@/lib/provider';
-import {
-  findModelByModelId,
-  getSystemPrompt,
-  getTitleSettings
-} from '@/lib/queries';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
 import { BASE_SYSTEM_PROMPT } from '@/lib/system-prompt';
-import { recordChatUsage } from '@/lib/usage';
 import {
   convertToChatMessages,
   formatLocalTime,
@@ -67,6 +59,14 @@ import {
   deleteMessages,
   listMessages
 } from '@/server/functions/message';
+import {
+  buildMediaTools,
+  type MediaToolsOptions
+} from '@/server/services/chat-tools';
+import { findModelByModelId } from '@/server/services/model';
+import { preflightCheck } from '@/server/services/preflight';
+import { getSystemPrompt, getTitleSettings } from '@/server/services/settings';
+import { recordChatUsage } from '@/server/services/usage';
 import { getUser } from '@/server/session';
 
 export const Route = createFileRoute('/api/chat')({
