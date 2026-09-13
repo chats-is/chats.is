@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { makeTestDb } from '@/test/pg';
+import { makeTestDb } from '@/test-utils/pg';
 import { eq } from 'drizzle-orm';
 import {
   afterAll,

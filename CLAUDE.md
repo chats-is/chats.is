@@ -105,7 +105,7 @@ src/
 ├── hooks/, contexts/
 ├── components/       flat, with only artifacts/, console/ and ui/ grouped
 │   └── ui/           shadcn/ui components
-└── test/             pg.ts, the PGlite helper
+└── test-utils/       pg.ts, the PGlite helper
 ```
 
 ## How the project is built
