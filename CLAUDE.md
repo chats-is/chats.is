@@ -54,22 +54,30 @@ A single test file is `pnpm vitest run src/types/quota.test.ts`, and `-t 'name'`
 Configuration is a local `.env`, and `.env.example` lists every variable. Four are required:
 `DATABASE_URL`, `AUTH_SECRET`, `APP_SECRET` (it encrypts provider keys at rest) and
 `BLOB_READ_WRITE_TOKEN`. The rest are optional — `REDIS_URL` turns on resumable streams, and each login
-method stays off until enabled. A fresh install has no providers or models, so the first account, which
+method stays off until enabled. Variables the browser reads are prefixed `VITE_` and declared
+separately in `src/lib/env.public.ts`, apart from the server schema in `src/lib/env.ts`; today that is
+`VITE_UPLOAD_PATH`, the blob prefix uploads are written under, which defaults to `uploads`. A fresh install has no providers or models, so the first account, which
 becomes an admin, has to add them in `/console` before anything can answer.
 
 ## Stack
 
 - **UI** — React 19, with shadcn/ui components over Radix UI.
 - **TanStack Start** — the full-stack React framework the app is built on.
-- **TanStack Router** — type-safe routing, and **TanStack Query** for data fetching and caching.
+- **TanStack Router** — type-safe routing, with `router-core` underneath it.
+- **TanStack Query** — data fetching and caching, joined to the router by
+  `@tanstack/react-router-ssr-query` so loader results reach the client cache.
+- **TanStack Form** — form state and validation.
+- **TanStack Table** — headless tables, used by the console.
+- **TanStack Devtools** — the router and devtools panels in development, with `@tanstack/devtools-vite`.
 - **Postgres** — the database, reached with the `@neondatabase/serverless` driver.
 - **Drizzle ORM** — the TypeScript ORM, with **drizzle-kit** for migrations.
-- **better-auth** — the authentication library.
-- **Vercel AI SDK** — the AI toolkit for streaming, tool calls and provider adapters.
+- **Better Auth** — the authentication library.
+- **AI SDK** — the AI toolkit for streaming, tool calls, multi-model support and provider adapters.
 - **Redis** — used with **resumable-stream** for streams that survive a reconnect.
 - **Vercel Blob** — object storage for uploaded and generated media.
 - **zod** — schema validation.
-- **Vitest** — the test runner; **ESLint** and **Prettier** for linting and formatting.
+- **Vitest** — the test runner; **ESLint** (with `@tanstack/eslint-config`) and **Prettier** for
+  linting and formatting.
 
 ## Structure
 
