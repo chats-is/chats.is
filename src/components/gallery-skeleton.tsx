@@ -22,7 +22,7 @@ export function GalleryGridSkeleton() {
  */
 export function GalleryCardSkeletons({ count }: { count: number }) {
   return Array.from({ length: count }, (_, index) => (
-    <Skeleton key={index} className="aspect-square rounded-lg" aria-hidden />
+    <Skeleton key={index} className="aspect-square rounded-2xl" aria-hidden />
   ));
 }
 

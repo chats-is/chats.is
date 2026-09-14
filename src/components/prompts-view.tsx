@@ -52,7 +52,7 @@ export function PromptsView() {
       <div className="flex-1 overflow-y-auto" ref={scrollRef}>
         <div className="mx-auto w-full max-w-5xl space-y-4 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex h-9 shrink-0 items-center rounded-md border bg-muted/50 p-1">
+            <div className="inline-flex h-9 shrink-0 items-center rounded-full border bg-muted/50 p-1">
               {VIEW_TABS.map(tab => (
                 <button
                   key={tab.value}
@@ -60,7 +60,7 @@ export function PromptsView() {
                   onClick={() => setView(tab.value)}
                   aria-current={view === tab.value ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-7 items-center rounded-sm px-3 text-sm font-medium whitespace-nowrap transition-colors',
+                    'inline-flex h-7 items-center rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors',
                     view === tab.value
                       ? 'bg-background text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
@@ -77,13 +77,13 @@ export function PromptsView() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by name or content"
-                className="pl-9"
+                className="rounded-full pl-9"
               />
             </div>
 
             {view === 'my' && (
               <Button
-                className="gap-2"
+                className="gap-2 rounded-full"
                 onClick={() => setCreateRequestId(id => id + 1)}
               >
                 <Plus className="size-4" />

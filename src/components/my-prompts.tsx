@@ -150,7 +150,7 @@ function MyPromptsSkeletonRows({ count }: { count: number }) {
 
 function MyPromptsSkeleton() {
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-2xl border">
       <table className="w-full min-w-[640px]">
         <thead>
           <tr className="border-b bg-muted/50">
@@ -384,7 +384,7 @@ export function MyPrompts({
   return (
     <div className="flex flex-col">
       <div className="space-y-4">
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-x-auto rounded-2xl border">
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b bg-muted/50">

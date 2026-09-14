@@ -34,7 +34,7 @@ function PromptCard({ prompt }: { prompt: UsablePrompt }) {
       type="button"
       onClick={handleUse}
       title={prompt.name}
-      className="group relative flex aspect-square flex-col overflow-hidden rounded-lg border bg-background text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
+      className="group relative flex aspect-square flex-col overflow-hidden rounded-2xl border bg-background text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
     >
       {prompt.image ? (
         <>

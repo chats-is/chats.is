@@ -326,7 +326,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
         <div
           role="button"
           tabIndex={0}
-          className="flex h-full w-full flex-col rounded-lg border bg-background px-3 py-2.5 text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
+          className="flex h-full w-full flex-col rounded-2xl border bg-background px-3 py-2.5 text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
           onClick={() =>
             item.chatId &&
             router.navigate({
@@ -370,7 +370,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
 
   if (item.kind === 'image') {
     return (
-      <div className="group relative overflow-hidden rounded-lg border">
+      <div className="group relative overflow-hidden rounded-2xl border">
         <LibraryLightbox
           type="image"
           src={item.url}
@@ -396,7 +396,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
 
   if (item.kind === 'video') {
     return (
-      <div className="group relative overflow-hidden rounded-lg border">
+      <div className="group relative overflow-hidden rounded-2xl border">
         <LibraryLightbox
           type="video"
           src={item.url}
@@ -430,7 +430,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
 
   // Audio — card-sized large player.
   return (
-    <div className="group relative flex aspect-square flex-col rounded-lg border bg-muted/30 p-3">
+    <div className="group relative flex aspect-square flex-col rounded-2xl border bg-muted/30 p-3">
       <LibraryAudioPlayer src={item.url} title={item.title} />
       <CardActions
         chatId={item.chatId}

@@ -75,7 +75,7 @@ export function PromptSuggestions({
             onClick={() =>
               onInsert(prependPrompt(prompt.content, currentValue))
             }
-            className="flex min-h-20 flex-col gap-1 overflow-hidden rounded-lg border bg-background p-2.5 text-left shadow-xs transition-[border-color,background-color,box-shadow] hover:border-accent-foreground/15 hover:bg-accent/30 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+            className="flex min-h-20 flex-col gap-1 overflow-hidden rounded-2xl border bg-background p-2.5 text-left shadow-xs transition-[border-color,background-color,box-shadow] hover:border-accent-foreground/15 hover:bg-accent/30 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
           >
             <span className="truncate text-xs font-medium text-foreground/90">
               {prompt.name}
