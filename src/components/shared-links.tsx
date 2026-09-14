@@ -16,7 +16,7 @@ const LIMIT = 5;
 function SharedLinksSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-2xl border">
         <table className="w-full min-w-[640px] table-fixed">
           <thead>
             <tr className="border-b bg-muted/50">
@@ -45,8 +45,8 @@ function SharedLinksSkeleton() {
         </table>
       </div>
       <div className="flex justify-between">
-        <Skeleton className="h-9 w-20" />
-        <Skeleton className="h-9 w-16" />
+        <Skeleton className="h-9 w-20 rounded-full" />
+        <Skeleton className="h-9 w-16 rounded-full" />
       </div>
     </div>
   );
@@ -108,7 +108,7 @@ export function SharedLinks() {
         <SharedLinksSkeleton />
       ) : (
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto rounded-2xl border">
             <table className="w-full min-w-[640px] table-fixed">
               <thead>
                 <tr className="border-b bg-muted/50">
@@ -185,6 +185,7 @@ export function SharedLinks() {
               {showPrevious && (
                 <Button
                   variant="outline"
+                  className="rounded-full"
                   onClick={handlePrevious}
                   disabled={isDeleting.size > 0}
                 >
@@ -194,6 +195,7 @@ export function SharedLinks() {
               {showNext && (
                 <Button
                   variant="outline"
+                  className="rounded-full"
                   onClick={handleNext}
                   disabled={isDeleting.size > 0}
                 >

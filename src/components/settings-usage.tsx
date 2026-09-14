@@ -53,8 +53,9 @@ export function SettingsUsage() {
           </p>
         </div>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
+          className="rounded-full"
           onClick={handleRefresh}
           disabled={refreshing}
           aria-label="Refresh"
@@ -94,7 +95,7 @@ export function SettingsUsage() {
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium">Stats</h2>
           <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 rounded-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
