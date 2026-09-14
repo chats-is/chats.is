@@ -59,7 +59,7 @@ export const SettingsSpeech = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between space-y-0">
+      <div className="flex items-center justify-between gap-4">
         <UiLabel>Model</UiLabel>
         <Select onValueChange={handleModelChange} value={speechModel}>
           <SelectTrigger className="w-auto rounded-full">
@@ -97,7 +97,7 @@ export const SettingsSpeech = () => {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex items-center justify-between space-y-0">
+      <div className="flex items-center justify-between gap-4">
         <UiLabel>Voice</UiLabel>
         <Select
           onValueChange={handleVoiceChange}

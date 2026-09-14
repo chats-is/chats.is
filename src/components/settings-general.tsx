@@ -35,7 +35,7 @@ export const SettingsGeneral = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between space-y-0">
+      <div className="flex items-center justify-between gap-4">
         <UiLabel>Theme</UiLabel>
         <Select
           onValueChange={value => setTheme(value)}
@@ -75,7 +75,7 @@ export const SettingsGeneral = () => {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex items-center justify-between space-y-0">
+      <div className="flex items-center justify-between gap-4">
         <UiLabel>Delete all chats</UiLabel>
         <Button
           className="rounded-full"

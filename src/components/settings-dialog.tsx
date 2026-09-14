@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { BarChart3, Link2, Settings, Volume2 } from 'lucide-react';
+import { BarChart3, Link2, Settings, User, Volume2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -33,6 +33,7 @@ import { SharedLinks } from '@/components/shared-links';
 const PANELS = [
   { value: 'general', label: 'General', icon: Settings },
   { value: 'speech', label: 'Speech', icon: Volume2 },
+  { value: 'profile', label: 'Profile', icon: User },
   { value: 'usage', label: 'Usage', icon: BarChart3 },
   { value: 'shared-links', label: 'Shared Links', icon: Link2 }
 ] as const;
@@ -41,13 +42,10 @@ type Panel = (typeof PANELS)[number]['value'];
 
 function PanelBody({ panel }: { panel: Panel }) {
   switch (panel) {
+    case 'profile':
+      return <SettingsProfile />;
     case 'general':
-      return (
-        <section className="space-y-6">
-          <SettingsProfile />
-          <SettingsGeneral />
-        </section>
-      );
+      return <SettingsGeneral />;
     case 'speech':
       return <SettingsSpeech />;
     case 'usage':

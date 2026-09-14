@@ -113,92 +113,91 @@ export const SettingsProfile = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <label className="text-sm leading-none font-medium">Avatar</label>
-          <div className="flex items-center justify-end">
-            <div
-              className="group relative flex size-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-input bg-background shadow-sm transition-colors hover:border-muted-foreground/50"
-              onClick={handleAvatarClick}
-            >
-              <div className="relative size-full overflow-hidden rounded-full">
-                {previewUrl || user.image ? (
-                  <img
-                    className="size-full object-cover"
-                    src={previewUrl || user.image || ''}
-                    alt={user.name ?? ''}
-                    height={56}
-                    width={56}
-                  />
-                ) : (
-                  <div className="flex size-full items-center justify-center bg-primary/10 text-sm font-medium text-primary">
-                    {user.name
-                      ? user.name
-                          .split(' ')
-                          .map(word => word[0])
-                          .join('')
-                          .toUpperCase()
-                          .slice(0, 2)
-                      : (user.email?.[0] || '?').toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <div
-                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 data-[uploading=true]:opacity-100"
-                data-uploading={isUploading}
-              >
-                {isUploading ? (
-                  <Loader2 className="size-4 animate-spin text-white" />
-                ) : (
-                  <Camera className="size-4 text-white" />
-                )}
-              </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <label className="text-sm leading-none font-medium">Avatar</label>
+        <div className="flex items-center justify-end">
+          <div
+            className="group relative flex size-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-input bg-background shadow-sm transition-colors hover:border-muted-foreground/50"
+            onClick={handleAvatarClick}
+          >
+            <div className="relative size-full overflow-hidden rounded-full">
+              {previewUrl || user.image ? (
+                <img
+                  className="size-full object-cover"
+                  src={previewUrl || user.image || ''}
+                  alt={user.name ?? ''}
+                  height={56}
+                  width={56}
+                />
+              ) : (
+                <div className="flex size-full items-center justify-center bg-primary/10 text-sm font-medium text-primary">
+                  {user.name
+                    ? user.name
+                        .split(' ')
+                        .map(word => word[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)
+                    : (user.email?.[0] || '?').toUpperCase()}
+                </div>
+              )}
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={isUploading || updateProfileMutation.isPending}
-            />
+            <div
+              className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 data-[uploading=true]:opacity-100"
+              data-uploading={isUploading}
+            >
+              {isUploading ? (
+                <Loader2 className="size-4 animate-spin text-white" />
+              ) : (
+                <Camera className="size-4 text-white" />
+              )}
+            </div>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            className="hidden"
+            onChange={handleFileChange}
+            disabled={isUploading || updateProfileMutation.isPending}
+          />
         </div>
+      </div>
 
-        <div className="flex items-center justify-between gap-4">
-          <label htmlFor="name" className="text-sm leading-none font-medium">
-            Full Name
-          </label>
-          <div className="flex w-full max-w-64 items-center justify-end gap-2">
-            <Input
-              id="name"
-              type="text"
-              placeholder="Enter your name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              disabled={updateProfileMutation.isPending || isUploading}
-              maxLength={100}
-            />
-            {(name.trim() !== user.name || updateProfileMutation.isPending) && (
-              <Button
-                type="submit"
-                disabled={
-                  updateProfileMutation.isPending ||
-                  !name.trim() ||
-                  name.trim() === user.name
-                }
-                className="shrink-0 gap-2"
-              >
-                {updateProfileMutation.isPending && (
-                  <Loader2 className="size-4 animate-spin" />
-                )}
-                {updateProfileMutation.isPending ? 'Saving...' : 'Save'}
-              </Button>
-            )}
-          </div>
+      <div className="flex items-center justify-between gap-4">
+        <label htmlFor="name" className="text-sm leading-none font-medium">
+          Full Name
+        </label>
+        <div className="flex w-full max-w-64 items-center justify-end gap-2">
+          <Input
+            id="name"
+            type="text"
+            placeholder="Enter your name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            disabled={updateProfileMutation.isPending || isUploading}
+            maxLength={100}
+            className="rounded-full"
+          />
+          {(name.trim() !== user.name || updateProfileMutation.isPending) && (
+            <Button
+              type="submit"
+              disabled={
+                updateProfileMutation.isPending ||
+                !name.trim() ||
+                name.trim() === user.name
+              }
+              className="shrink-0 gap-2"
+            >
+              {updateProfileMutation.isPending && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
+              {updateProfileMutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          )}
         </div>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 };
