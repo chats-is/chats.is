@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { BarChart3, Link2, Settings, Sparkles, Volume2 } from 'lucide-react';
+import { BarChart3, Link2, Settings, Volume2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -15,7 +15,6 @@ import { SettingsProfile } from '@/components/settings-profile';
 import { SettingsSpeech } from '@/components/settings-speech';
 import { SettingsUsage } from '@/components/settings-usage';
 import { SharedLinks } from '@/components/shared-links';
-import { UserPrompt } from '@/components/user-prompt';
 
 /**
  * The user's settings.
@@ -35,8 +34,7 @@ const PANELS = [
   { value: 'general', label: 'General', icon: Settings },
   { value: 'speech', label: 'Speech', icon: Volume2 },
   { value: 'usage', label: 'Usage', icon: BarChart3 },
-  { value: 'shared-links', label: 'Shared Links', icon: Link2 },
-  { value: 'prompts', label: 'Prompts', icon: Sparkles }
+  { value: 'shared-links', label: 'Shared Links', icon: Link2 }
 ] as const;
 
 type Panel = (typeof PANELS)[number]['value'];
@@ -56,8 +54,6 @@ function PanelBody({ panel }: { panel: Panel }) {
       return <SettingsUsage />;
     case 'shared-links':
       return <SharedLinks />;
-    case 'prompts':
-      return <UserPrompt />;
   }
 }
 
@@ -83,10 +79,10 @@ function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Wide enough that the Prompts panel's table clears its own
-          min-w-[720px] beside the nav column rather than scrolling sideways,
-          and tall enough to show a run of rows — both capped to the viewport
-          so a short window still gets a dialog that fits inside it. */}
+      {/* Wide enough for panels like Usage to clear their tables beside the
+          nav column rather than scrolling sideways, and tall enough to show
+          a run of rows — both capped to the viewport so a short window still
+          gets a dialog that fits inside it. */}
       <DialogContent className="flex h-[min(46rem,calc(100dvh-4rem))] flex-col gap-0 p-0 sm:max-w-5xl">
         <DialogHeader className="border-b px-5 py-4">
           <DialogTitle>Settings</DialogTitle>

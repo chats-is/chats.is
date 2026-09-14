@@ -1,13 +1,17 @@
-import { useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient
+} from '@tanstack/react-query';
+import { Copy, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { modelQueries } from '@/server/functions/model';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import {
   createPrompt,
   deletePrompt as deletePromptFn,
@@ -26,7 +30,6 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +40,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
@@ -46,28 +49,20 @@ import {
 } from '@/components/ui/tooltip';
 
 type MyPrompt = Awaited<ReturnType<typeof listPrompts>>[number];
-type Visibility = 'private' | 'public';
 
 type PromptFormData = {
   name: string;
   content: string;
   image: string;
-  // tags & providers are free-text labels entered as a comma-separated string.
+  // A comma-separated string of free-text labels.
   tags: string;
-  providers: string;
-  // models references real model ids.
-  models: string[];
-  visibility: Visibility;
 };
 
 const EMPTY_FORM: PromptFormData = {
   name: '',
   content: '',
   image: '',
-  tags: '',
-  providers: '',
-  models: [],
-  visibility: 'private'
+  tags: ''
 };
 
 const parseList = (value: string) =>
@@ -125,7 +120,72 @@ const PromptThumbnail = ({
   );
 };
 
-export const UserPrompt = () => {
+/** Rows in the table's own shape — the initial load, and the page being
+ *  fetched as it joins the rows already on screen. */
+const MY_PROMPTS_SKELETON_ROWS = 5;
+const NEXT_PAGE_PLACEHOLDER_ROWS = 3;
+
+function MyPromptsSkeletonRows({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <tr key={i} className="border-b last:border-b-0">
+          <td className="p-3">
+            <Skeleton className="size-8 rounded" />
+          </td>
+          <td className="p-3">
+            <Skeleton className="h-4 w-32" />
+          </td>
+          <td className="p-3">
+            <Skeleton className="h-4 w-20" />
+          </td>
+          <td className="p-3">
+            <Skeleton className="ml-auto h-4 w-16" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function MyPromptsSkeleton() {
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <table className="w-full min-w-[640px]">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="w-20 p-3 text-left text-sm font-medium">Image</th>
+            <th className="p-3 text-left text-sm font-medium">Name</th>
+            <th className="p-3 text-left text-sm font-medium">Tags</th>
+            <th className="w-28 p-3 text-right text-sm font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <MyPromptsSkeletonRows count={MY_PROMPTS_SKELETON_ROWS} />
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Your own prompt library — add, edit and delete. Everything you save here
+ *  is private to you; sharing a prompt with everyone else is an admin action
+ *  done from the console. `search` and `createRequestId` come from the
+ *  shared toolbar above: a request id (rather than a callback) because it
+ *  changes only when the Add Prompt button is actually clicked, so this can
+ *  open the dialog from a plain effect instead of exposing an imperative API.
+ *  `scrollRef` is the page's own scroll container — this tab is only ever
+ *  mounted while it is the active one, so unlike Trending it doesn't need an
+ *  `active` flag to gate the scroll listener. */
+export function MyPrompts({
+  search,
+  createRequestId,
+  scrollRef
+}: {
+  search: string;
+  createRequestId: number;
+  scrollRef: RefObject<HTMLDivElement | null>;
+}) {
   const { copyToClipboard } = useCopyToClipboard();
   const queryClient = useQueryClient();
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -134,15 +194,29 @@ export const UserPrompt = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [formData, setFormData] = useState<PromptFormData>(EMPTY_FORM);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data: myPrompts, isLoading } = useQuery(promptQueries.list());
-  const { data: models } = useQuery(modelQueries.list());
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const modelName = (modelId: string) =>
-    models?.find(m => m.modelId === modelId)?.name ?? modelId;
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery(
+      promptQueries.listInfinite({
+        limit: 24,
+        search: debouncedSearch || undefined
+      })
+    );
+
+  useInfiniteScroll(scrollRef, {
+    enabled: !!hasNextPage && !isFetchingNextPage && !isLoading,
+    onLoadMore: fetchNextPage
+  });
+
+  const myPrompts = data?.pages.flat() ?? [];
 
   const resetForm = () => {
     setEditingId(null);
@@ -160,9 +234,12 @@ export const UserPrompt = () => {
 
   const invalidatePrompts = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: promptQueries.key.list() }),
       queryClient.invalidateQueries({
-        queryKey: promptQueries.key.usable()
+        queryKey: promptQueries.key.listInfinite()
+      }),
+      queryClient.invalidateQueries({ queryKey: promptQueries.key.usable() }),
+      queryClient.invalidateQueries({
+        queryKey: promptQueries.key.usableInfinite()
       })
     ]);
   };
@@ -200,24 +277,27 @@ export const UserPrompt = () => {
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isFormBusy = isSubmitting || isUploadingImage;
 
-  const filteredPrompts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    if (!keyword) return myPrompts ?? [];
+  const deletePrompt = myPrompts.find(prompt => prompt.id === deleteId) ?? null;
 
-    return (myPrompts ?? []).filter(
-      prompt =>
-        prompt.name.toLowerCase().includes(keyword) ||
-        prompt.content.toLowerCase().includes(keyword)
-    );
-  }, [myPrompts, search]);
-
-  const deletePrompt =
-    myPrompts?.find(prompt => prompt.id === deleteId) ?? null;
-
-  const handleCreate = () => {
-    resetForm();
+  // The Add Prompt button lives in the shared toolbar above, so it opens
+  // this dialog by bumping a request id rather than calling a handler here
+  // directly. Compared against the id this instance last saw — initialized
+  // to the id it mounted with — rather than a fixed "0 means unset": leaving
+  // the tab unmounts this component, so a plain "id changed since last
+  // render" would misfire on every remount, reopening the dialog for a click
+  // from a previous visit to this tab.
+  const lastCreateRequestId = useRef(createRequestId);
+  useEffect(() => {
+    if (createRequestId === lastCreateRequestId.current) return;
+    lastCreateRequestId.current = createRequestId;
+    setEditingId(null);
+    setFormData(EMPTY_FORM);
+    setIsUploadingImage(false);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
     setIsOpen(true);
-  };
+  }, [createRequestId]);
 
   const handleEdit = (prompt: MyPrompt) => {
     setEditingId(prompt.id);
@@ -225,10 +305,7 @@ export const UserPrompt = () => {
       name: prompt.name,
       content: prompt.content,
       image: prompt.image || '',
-      tags: joinList(prompt.tags),
-      providers: joinList(prompt.providers),
-      models: prompt.models || [],
-      visibility: prompt.visibility
+      tags: joinList(prompt.tags)
     });
     setIsOpen(true);
   };
@@ -245,15 +322,16 @@ export const UserPrompt = () => {
     }
 
     const tags = parseList(formData.tags);
-    const providers = parseList(formData.providers);
+    // No visibility field: prompts added here are always private to you. The
+    // server enforces this too, so this is only ever a UI-level shortcut.
+    // Providers/models aren't offered here either — nothing in the app
+    // filters or targets by them, so asking for a choice with no effect
+    // would only slow down adding a prompt.
     const payload = {
       name,
       content,
       image: formData.image || null,
-      tags: tags.length > 0 ? tags : null,
-      providers: providers.length > 0 ? providers : null,
-      models: formData.models.length > 0 ? formData.models : null,
-      visibility: formData.visibility
+      tags: tags.length > 0 ? tags : null
     };
 
     if (editingId) {
@@ -262,15 +340,6 @@ export const UserPrompt = () => {
     }
 
     createMutation.mutate(payload);
-  };
-
-  const toggleModel = (modelId: string) => {
-    setFormData(current => ({
-      ...current,
-      models: current.models.includes(modelId)
-        ? current.models.filter(item => item !== modelId)
-        : [...current.models, modelId]
-    }));
   };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -309,34 +378,14 @@ export const UserPrompt = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <MyPromptsSkeleton />;
   }
 
   return (
     <div className="flex flex-col">
       <div className="space-y-4">
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="relative flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name or content"
-              className="pl-9"
-            />
-          </div>
-          <Button className="gap-2" onClick={handleCreate}>
-            <Plus className="size-4" />
-            Add Prompt
-          </Button>
-        </div>
-
         <div className="overflow-x-auto rounded-md border">
-          <table className="w-full min-w-[720px]">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="w-20 p-3 text-left text-sm font-medium">
@@ -344,17 +393,13 @@ export const UserPrompt = () => {
                 </th>
                 <th className="p-3 text-left text-sm font-medium">Name</th>
                 <th className="p-3 text-left text-sm font-medium">Tags</th>
-                <th className="p-3 text-left text-sm font-medium">Models</th>
-                <th className="w-24 p-3 text-left text-sm font-medium">
-                  Visibility
-                </th>
                 <th className="w-28 p-3 text-right text-sm font-medium">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {filteredPrompts.map(prompt => (
+              {myPrompts.map(prompt => (
                 <tr
                   key={prompt.id}
                   className="border-b transition-colors hover:bg-muted/30"
@@ -376,17 +421,6 @@ export const UserPrompt = () => {
                       values={prompt.tags}
                       className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                     />
-                  </td>
-                  <td className="p-3">
-                    <LabelBadges
-                      values={prompt.models?.map(modelName)}
-                      className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                    />
-                  </td>
-                  <td className="p-3">
-                    <span className="rounded bg-muted px-2 py-1 text-xs">
-                      {prompt.visibility}
-                    </span>
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
                     <Tooltip>
@@ -432,15 +466,20 @@ export const UserPrompt = () => {
                 </tr>
               ))}
 
-              {filteredPrompts.length === 0 && (
+              {/* The page being fetched, in the table it is joining. */}
+              {isFetchingNextPage && (
+                <MyPromptsSkeletonRows count={NEXT_PAGE_PLACEHOLDER_ROWS} />
+              )}
+
+              {!isFetchingNextPage && myPrompts.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={4}
                     className="p-6 text-center text-muted-foreground"
                   >
-                    {myPrompts?.length
-                      ? 'No prompts match the current filter.'
-                      : 'No prompts configured. Add your first prompt to get started.'}
+                    {debouncedSearch
+                      ? 'No prompts match your search.'
+                      : 'No prompts yet. Add your first prompt to get started.'}
                   </td>
                 </tr>
               )}
@@ -465,7 +504,9 @@ export const UserPrompt = () => {
             <DialogTitle>
               {editingId ? 'Edit Prompt' : 'Add Prompt'}
             </DialogTitle>
-            <DialogDescription>Manage your prompt.</DialogDescription>
+            <DialogDescription>
+              Manage your prompt. It stays private to you.
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -505,68 +546,22 @@ export const UserPrompt = () => {
                 />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="prompt-tags">Tags</Label>
-                  <Input
-                    id="prompt-tags"
-                    value={formData.tags}
-                    onChange={e =>
-                      setFormData(current => ({
-                        ...current,
-                        tags: e.target.value
-                      }))
-                    }
-                    placeholder="writing, english"
-                    disabled={isFormBusy}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Comma-separated. Used for filtering.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prompt-providers">Providers</Label>
-                  <Input
-                    id="prompt-providers"
-                    value={formData.providers}
-                    onChange={e =>
-                      setFormData(current => ({
-                        ...current,
-                        providers: e.target.value
-                      }))
-                    }
-                    placeholder="openai, anthropic"
-                    disabled={isFormBusy}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Comma-separated labels (display only).
-                  </p>
-                </div>
-              </div>
-
               <div className="space-y-2">
-                <Label>Models</Label>
-                <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2.5">
-                  {models?.length ? (
-                    models.map(model => (
-                      <label
-                        key={model.id}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <Checkbox
-                          checked={formData.models.includes(model.modelId)}
-                          onCheckedChange={() => toggleModel(model.modelId)}
-                          disabled={isFormBusy}
-                        />
-                        <span>{model.name}</span>
-                      </label>
-                    ))
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No models.</p>
-                  )}
-                </div>
+                <Label htmlFor="prompt-tags">Tags</Label>
+                <Input
+                  id="prompt-tags"
+                  value={formData.tags}
+                  onChange={e =>
+                    setFormData(current => ({
+                      ...current,
+                      tags: e.target.value
+                    }))
+                  }
+                  placeholder="writing, english"
+                  disabled={isFormBusy}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Target models — used for filtering.
+                  Comma-separated, shown as labels in your prompt list.
                 </p>
               </div>
 
@@ -578,70 +573,48 @@ export const UserPrompt = () => {
                     image={formData.image}
                     content={formData.content || 'Preview'}
                   />
-                  <div className="space-y-2">
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/gif,image/webp"
-                      className="hidden"
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    disabled={isFormBusy}
+                    onChange={handleImageChange}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => imageInputRef.current?.click()}
                       disabled={isFormBusy}
-                      onChange={handleImageChange}
-                    />
-                    <div className="flex flex-wrap gap-2">
+                    >
+                      {isUploadingImage && (
+                        <Loader2 className="size-4 animate-spin" />
+                      )}
+                      {formData.image ? 'Replace image' : 'Upload image'}
+                    </Button>
+                    {formData.image && (
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => imageInputRef.current?.click()}
+                        onClick={() =>
+                          setFormData(current => ({
+                            ...current,
+                            image: ''
+                          }))
+                        }
                         disabled={isFormBusy}
                       >
-                        {isUploadingImage && (
-                          <Loader2 className="size-4 animate-spin" />
-                        )}
-                        {formData.image ? 'Replace image' : 'Upload image'}
+                        Remove
                       </Button>
-                      {formData.image && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setFormData(current => ({
-                              ...current,
-                              image: ''
-                            }))
-                          }
-                          disabled={isFormBusy}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Max 5MB.</p>
+                    )}
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border p-2.5">
-                <div className="space-y-1">
-                  <Label htmlFor="prompt-public">Public</Label>
-                  <p className="text-xs text-muted-foreground">
-                    {formData.visibility === 'public'
-                      ? 'Visible to everyone in the prompt picker.'
-                      : 'Only visible to you.'}
-                  </p>
-                </div>
-                <Switch
-                  id="prompt-public"
-                  checked={formData.visibility === 'public'}
-                  onCheckedChange={checked =>
-                    setFormData(current => ({
-                      ...current,
-                      visibility: checked ? 'public' : 'private'
-                    }))
-                  }
-                  disabled={isFormBusy}
-                />
+                <p className="text-xs text-muted-foreground">
+                  JPEG, PNG, GIF or WebP, up to 5MB.
+                </p>
               </div>
             </div>
 
@@ -704,4 +677,4 @@ export const UserPrompt = () => {
       </AlertDialog>
     </div>
   );
-};
+}

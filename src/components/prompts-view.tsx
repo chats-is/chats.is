@@ -1,111 +1,112 @@
-import { useRef } from 'react';
-import { useRouter } from '@tanstack/react-router';
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { Sparkles } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { Plus, Search } from 'lucide-react';
 
-import { setPendingPrompt } from '@/lib/pending-prompt';
-import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
-import {
-  promptQueries,
-  type listUsablePrompts
-} from '@/server/functions/prompt';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ChatHeader } from '@/components/chat-header';
-import {
-  GalleryCardSkeletons,
-  GalleryGridSkeleton
-} from '@/components/gallery-skeleton';
+import { MyPrompts } from '@/components/my-prompts';
+import { TrendingPrompts } from '@/components/trending-prompts';
 
-type UsablePrompt = Awaited<ReturnType<typeof listUsablePrompts>>[number];
+const VIEW_TABS = [
+  { value: 'trending', label: 'Trending' },
+  { value: 'my', label: 'My Prompts' }
+] as const;
 
-/** Card for a single prompt — clicking seeds it into a fresh chat composer. */
-function PromptCard({ prompt }: { prompt: UsablePrompt }) {
-  const router = useRouter();
-
-  const handleUse = () => {
-    setPendingPrompt(prompt.content);
-    // refresh() forces a fresh `/` render (new chat id → remount) so the
-    // seeding effect re-runs even when `/` is served from the router cache,
-    // matching how NewContent navigates.
-    router.navigate({ to: '/' });
-    router.invalidate();
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleUse}
-      title={prompt.name}
-      className="group relative flex aspect-square flex-col overflow-hidden rounded-lg border bg-background text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
-    >
-      {prompt.image ? (
-        <>
-          <img
-            src={prompt.image}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-2">
-            <span className="line-clamp-2 text-xs text-white">
-              {prompt.name}
-            </span>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="line-clamp-[10] min-h-0 flex-1 overflow-hidden p-3 text-xs whitespace-pre-wrap text-muted-foreground">
-            {prompt.content}
-          </p>
-          <div className="px-3 pb-2.5">
-            <span className="line-clamp-2 text-xs font-medium">
-              {prompt.name}
-            </span>
-          </div>
-        </>
-      )}
-    </button>
-  );
-}
-
-/** One row of the widest grid, so a page on its way reads as a row of cards. */
-const NEXT_PAGE_PLACEHOLDER_CARDS = 4;
+type View = (typeof VIEW_TABS)[number]['value'];
 
 export function PromptsView() {
+  const navigate = useNavigate();
+  // Reading the loose union of every route's search — rather than this
+  // route's own `Route.useSearch` — avoids a circular import between the
+  // route file and this component, which the route file already imports.
+  const view = useSearch({ strict: false }).tab ?? 'trending';
+
+  const setView = (next: View) => {
+    void navigate({
+      to: '.',
+      search: (previous: Record<string, unknown>) => {
+        const rest = { ...previous };
+        delete rest.tab;
+        return next === 'trending' ? rest : { ...rest, tab: next };
+      },
+      replace: false
+    });
+  };
+
+  // Each tab keeps its own typed search, so switching tabs and back doesn't
+  // clear what you'd typed in the other one.
+  const [trendingSearch, setTrendingSearch] = useState('');
+  const [mineSearch, setMineSearch] = useState('');
+  // Bumped by the Add Prompt button; MyPrompts opens its dialog in response.
+  const [createRequestId, setCreateRequestId] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteQuery(promptQueries.usableInfinite({ limit: 24 }));
 
-  useInfiniteScroll(scrollRef, {
-    enabled: !!hasNextPage && !isFetchingNextPage && !isLoading,
-    onLoadMore: fetchNextPage
-  });
-
-  const prompts = data?.pages.flat() ?? [];
+  const search = view === 'trending' ? trendingSearch : mineSearch;
+  const setSearch = view === 'trending' ? setTrendingSearch : setMineSearch;
 
   return (
     <div className="flex size-full flex-col">
       <ChatHeader title="Prompts" />
       <div className="flex-1 overflow-y-auto" ref={scrollRef}>
-        <div className="mx-auto w-full max-w-5xl p-4">
-          {isLoading ? (
-            <GalleryGridSkeleton />
-          ) : prompts.length ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {prompts.map(prompt => (
-                <PromptCard key={prompt.id} prompt={prompt} />
+        <div className="mx-auto w-full max-w-5xl space-y-4 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex h-9 shrink-0 items-center rounded-md border bg-muted/50 p-1">
+              {VIEW_TABS.map(tab => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setView(tab.value)}
+                  aria-current={view === tab.value ? 'page' : undefined}
+                  className={cn(
+                    'inline-flex h-7 items-center rounded-sm px-3 text-sm font-medium whitespace-nowrap transition-colors',
+                    view === tab.value
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {tab.label}
+                </button>
               ))}
-              {/* The page being fetched, in the grid it is joining. */}
-              {isFetchingNextPage && (
-                <GalleryCardSkeletons count={NEXT_PAGE_PLACEHOLDER_CARDS} />
-              )}
             </div>
-          ) : (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
-              <Sparkles className="size-12 opacity-50" />
-              <p className="text-sm">
-                Prompts you and your team create will appear here.
-              </p>
+
+            <div className="relative min-w-40 flex-1">
+              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by name or content"
+                className="pl-9"
+              />
             </div>
+
+            {view === 'my' && (
+              <Button
+                className="gap-2"
+                onClick={() => setCreateRequestId(id => id + 1)}
+              >
+                <Plus className="size-4" />
+                Add Prompt
+              </Button>
+            )}
+          </div>
+
+          {/* Keep Trending mounted so its infinite-scroll position and loaded
+              pages survive a trip to My Prompts and back. */}
+          <div className={view === 'trending' ? undefined : 'hidden'}>
+            <TrendingPrompts
+              active={view === 'trending'}
+              scrollRef={scrollRef}
+              search={trendingSearch}
+            />
+          </div>
+          {view === 'my' && (
+            <MyPrompts
+              search={mineSearch}
+              createRequestId={createRequestId}
+              scrollRef={scrollRef}
+            />
           )}
         </div>
       </div>

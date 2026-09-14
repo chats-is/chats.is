@@ -20,7 +20,8 @@ export const adminListPrompts = createServerFn({ method: 'GET' })
 
 export const listPrompts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
-  .handler(({ context }) => prompts.listPrompts(context.user.id));
+  .validator(promptPageSchema)
+  .handler(({ data, context }) => prompts.listPrompts(context.user.id, data));
 
 export const listUsablePrompts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
@@ -29,17 +30,24 @@ export const listUsablePrompts = createServerFn({ method: 'GET' })
     prompts.listUsablePrompts(context.user.id, data)
   );
 
+/** A regular user's own prompt. Always private — `visibility` is stripped
+ *  before it reaches the service, so a client can never request `public`
+ *  here; only the admin console (below) may create a shared prompt. */
 export const createPrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(promptCreateSchema)
-  .handler(({ data, context }) =>
-    prompts.createPrompt(context.user.id, data, 'private')
-  );
+  .handler(({ data, context }) => {
+    const { visibility: _visibility, ...input } = data;
+    return prompts.createPrompt(context.user.id, input, 'private');
+  });
 
 export const updatePrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(promptUpdateSchema)
-  .handler(({ data, context }) => prompts.updatePrompt(context.user.id, data));
+  .handler(({ data, context }) => {
+    const { visibility: _visibility, ...input } = data;
+    return prompts.updatePrompt(context.user.id, input);
+  });
 
 export const deletePrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
@@ -73,7 +81,7 @@ export const promptQueries = {
   key: {
     stats: () => ['prompt', 'stats'] as const,
     adminList: () => ['prompt', 'adminList'] as const,
-    list: () => ['prompt', 'list'] as const,
+    listInfinite: () => ['prompt', 'listInfinite'] as const,
     usable: () => ['prompt', 'usable'] as const,
     usableInfinite: () => ['prompt', 'usableInfinite'] as const
   },
@@ -87,22 +95,44 @@ export const promptQueries = {
       queryKey: [...promptQueries.key.adminList()] as const,
       queryFn: () => adminListPrompts()
     }),
-  list: () =>
-    queryOptions({
-      queryKey: [...promptQueries.key.list()] as const,
-      queryFn: () => listPrompts()
-    }),
   usable: () =>
     queryOptions({
       queryKey: [...promptQueries.key.usable()] as const,
       queryFn: () => listUsablePrompts()
     }),
-  /** The gallery scrolls; the cursor is the row offset, as the sidebar's is. */
-  usableInfinite: ({ limit = 24 }: { limit?: number } = {}) =>
+  /** The gallery scrolls; the cursor is the row offset, as the sidebar's is.
+   *  `search` is part of the key so a new term starts paging over. */
+  usableInfinite: ({
+    limit = 24,
+    search
+  }: { limit?: number; search?: string } = {}) =>
     infiniteQueryOptions({
-      queryKey: [...promptQueries.key.usableInfinite(), limit] as const,
+      queryKey: [
+        ...promptQueries.key.usableInfinite(),
+        limit,
+        search ?? ''
+      ] as const,
       queryFn: ({ pageParam }) =>
-        listUsablePrompts({ data: { limit, cursor: pageParam } }),
+        listUsablePrompts({ data: { limit, cursor: pageParam, search } }),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length < limit
+          ? undefined
+          : allPages.reduce((count, page) => count + page.length, 0)
+    }),
+  /** My Prompts scrolls the same way the gallery does. */
+  listInfinite: ({
+    limit = 24,
+    search
+  }: { limit?: number; search?: string } = {}) =>
+    infiniteQueryOptions({
+      queryKey: [
+        ...promptQueries.key.listInfinite(),
+        limit,
+        search ?? ''
+      ] as const,
+      queryFn: ({ pageParam }) =>
+        listPrompts({ data: { limit, cursor: pageParam, search } }),
       initialPageParam: 0,
       getNextPageParam: (lastPage, allPages) =>
         lastPage.length < limit

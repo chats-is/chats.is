@@ -41,6 +41,7 @@ export const promptIdSchema = z.object({ id: z.string().min(1) });
 export const promptPageSchema = z
   .object({
     limit: z.number().min(1).max(100).optional(),
-    cursor: z.number().min(0).nullish()
+    cursor: z.number().min(0).nullish(),
+    search: z.string().max(200).optional()
   })
   .optional();

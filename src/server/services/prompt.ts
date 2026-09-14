@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { asc, desc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -74,10 +74,28 @@ export async function adminListPrompts() {
   });
 }
 
-/** The user's own prompts, for managing their personal library. */
-export async function listPrompts(userId: string) {
+/** The user's own prompts, for managing their personal library. Paged, like
+ *  `listUsablePrompts`. */
+export async function listPrompts(
+  userId: string,
+  page?: z.infer<typeof promptPageSchema>
+) {
+  const owner = eq(prompts.userId, userId);
+  const search = page?.search?.trim();
+  const where = search
+    ? and(
+        owner,
+        or(
+          ilike(prompts.name, `%${search}%`),
+          ilike(prompts.content, `%${search}%`)
+        )
+      )
+    : owner;
+
   return await db.query.prompts.findMany({
-    where: eq(prompts.userId, userId),
+    limit: page?.limit,
+    offset: page?.cursor ?? 0,
+    where,
     orderBy: () => promptOrderBy
   });
 }
@@ -90,6 +108,21 @@ export async function listUsablePrompts(
   userId: string,
   page?: z.infer<typeof promptPageSchema>
 ) {
+  const usable = or(
+    eq(prompts.userId, userId),
+    eq(prompts.visibility, 'public')
+  );
+  const search = page?.search?.trim();
+  const where = search
+    ? and(
+        usable,
+        or(
+          ilike(prompts.name, `%${search}%`),
+          ilike(prompts.content, `%${search}%`)
+        )
+      )
+    : usable;
+
   return await db.query.prompts.findMany({
     limit: page?.limit,
     offset: page?.cursor ?? 0,
@@ -102,7 +135,7 @@ export async function listUsablePrompts(
       image: true,
       content: true
     },
-    where: or(eq(prompts.userId, userId), eq(prompts.visibility, 'public')),
+    where,
     orderBy: () => promptOrderBy
   });
 }
