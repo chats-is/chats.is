@@ -56,11 +56,15 @@ export function getRouter() {
     // the thing being preloaded is the conversation a click is about to ask
     // for, and half a hover is the difference between it being ready and not.
     defaultPreloadDelay: 0,
-    // A route's pending state is held back for a moment so a fast load does
-    // not flash a placeholder, but a whole second of nothing reads as a click
-    // that did not register. Long enough to skip the flash, short enough that
-    // a slower load says something is happening.
-    defaultPendingMs: 150,
+    // How long a load may take before it is worth saying so. Under this, the
+    // placeholder never appears and the page changes once; over it, the
+    // placeholder stands in until the data lands.
+    //
+    // Long enough for a menu or popover to finish closing first: a placeholder
+    // that arrives mid-animation takes the whole shell with it, and the menu
+    // reappears for a frame on its way out. Short enough that a slow load still
+    // answers the click — the framework's own second of nothing does not.
+    defaultPendingMs: 300,
     // The root route names this too, which is enough on the client, where an
     // error climbs to the nearest boundary. On the server it does not climb:
     // a match that errored renders its own route's error component or this
