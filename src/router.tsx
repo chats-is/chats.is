@@ -39,6 +39,18 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // The galleries start at the top every time they are opened.
+    //
+    // Restoration is per history entry, so arriving by a link — a new entry —
+    // has nothing to restore and would instead inherit the scroll of the page
+    // left behind: the router carries each element's position forward, and two
+    // pages whose scrollers sit at the same place in the DOM read as the same
+    // element. Naming them here says the position is not kept, rather than kept
+    // and handed to the wrong page.
+    scrollToTopSelectors: [
+      '[data-scroll-restoration-id="library"]',
+      '[data-scroll-restoration-id="prompts"]'
+    ],
     defaultPreload: 'intent',
     // Start the moment the pointer lands, rather than after the usual pause:
     // the thing being preloaded is the conversation a click is about to ask

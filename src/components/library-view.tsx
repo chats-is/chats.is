@@ -461,7 +461,15 @@ export function LibraryView() {
   return (
     <div className="flex size-full flex-col">
       <ChatHeader title="Library" />
-      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+      {/* Named so the router can be told, in `scrollToTopSelectors`, that this
+          gallery opens at the top. Without an id it identifies a scroller by
+          its position in the DOM, and the other gallery's sits in exactly the
+          same place — the two would read as one element. */}
+      <div
+        ref={scrollRef}
+        data-scroll-restoration-id="library"
+        className="flex-1 overflow-y-auto"
+      >
         <div className="mx-auto w-full max-w-5xl p-4">
           {isLoading ? (
             <GalleryGridSkeleton />

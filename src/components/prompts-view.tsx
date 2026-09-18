@@ -49,7 +49,15 @@ export function PromptsView() {
   return (
     <div className="flex size-full flex-col">
       <ChatHeader title="Prompts" />
-      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+      {/* Named so the router can be told, in `scrollToTopSelectors`, that this
+          gallery opens at the top. Without an id it identifies a scroller by
+          its position in the DOM, and the other gallery's sits in exactly the
+          same place — the two would read as one element. */}
+      <div
+        ref={scrollRef}
+        data-scroll-restoration-id="prompts"
+        className="flex-1 overflow-y-auto"
+      >
         <div className="mx-auto w-full max-w-5xl space-y-4 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex h-9 shrink-0 items-center rounded-full border bg-muted/50 p-1">
