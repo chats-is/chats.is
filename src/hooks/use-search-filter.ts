@@ -22,6 +22,30 @@ const TYPED: ReadonlySet<keyof Filters> = new Set(['q', 'user']);
 type Update<TValue> = TValue | ((previous: TValue) => TValue);
 
 /**
+ * The address a filter set to `value` names.
+ *
+ * A filter left at its default is dropped rather than spelled out, so an
+ * unfiltered page has a clean URL and no two links mean the same view. Shared
+ * with anything that needs the address without navigating to it — the pager
+ * builds its links from this, so a page link and a page click agree.
+ */
+export function filterSearch<TKey extends keyof Filters>(
+  key: TKey,
+  value: Filters[TKey],
+  fallback: Filters[TKey]
+) {
+  return (previous: Record<string, unknown>) => {
+    const rest = { ...previous };
+    delete rest[key];
+    // Narrowing a table renumbers its pages, so page 4 of the old filter means
+    // nothing under the new one — every filter but the page itself starts over
+    // at the first page.
+    if (key !== 'page') delete rest.page;
+    return value === fallback ? rest : { ...rest, [key]: value };
+  };
+}
+
+/**
  * A filter that lives in the address rather than in the component.
  *
  * Reads like `useState` at the call site, so the components that had these as
@@ -46,10 +70,7 @@ export function useSearchFilter<TKey extends keyof Filters>(
         search: (previous: Record<string, unknown>) => {
           const current = (previous[key] ?? fallback) as Filters[TKey];
           const value = typeof next === 'function' ? next(current) : next;
-
-          const rest = { ...previous };
-          delete rest[key];
-          return value === fallback ? rest : { ...rest, [key]: value };
+          return filterSearch(key, value, fallback)(previous);
         },
         replace: TYPED.has(key)
       });

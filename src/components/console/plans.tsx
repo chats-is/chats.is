@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { mutating } from '@/lib/mutation';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   createPlan,
   deletePlan,
@@ -44,9 +45,10 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { planTableInput } from '@/components/console/table-filters';
+import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 
-type Plan = Awaited<ReturnType<typeof listPlans>>[number];
+type Plan = Awaited<ReturnType<typeof listPlans>>['rows'][number];
 
 const planSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
@@ -142,8 +144,12 @@ const planColumns = (actions: {
   ]);
 
 export default function PlansPage() {
+  const [page, setPage] = useSearchFilter('page', 1);
+
   const queryClient = useQueryClient();
-  const { data: plans, isLoading } = useQuery(planQueries.list());
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    planQueries.list(planTableInput({ page }))
+  );
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -231,13 +237,10 @@ export default function PlansPage() {
     [quotaOptions]
   );
 
-  if (isLoading) {
-    return <ConsoleTableSkeleton columns={4} />;
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end gap-4">
+      <ConsoleToolbar>
+        <ConsoleFilters />
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button
@@ -317,12 +320,21 @@ export default function PlansPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </ConsoleToolbar>
 
       <DataTable
         columns={columns}
-        data={plans}
+        data={isLoading ? undefined : data?.rows}
         empty="No plans yet. Create a Quota first, then add a plan."
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
+          }
+        }
       />
 
       <AlertDialog

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { mutating } from '@/lib/mutation';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
 import {
   createQuota,
@@ -46,9 +47,10 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { quotaTableInput } from '@/components/console/table-filters';
+import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 
-type Quota = Awaited<ReturnType<typeof listQuotas>>[number];
+type Quota = Awaited<ReturnType<typeof listQuotas>>['rows'][number];
 type Role = 'strict' | 'standard' | 'flexible' | 'custom';
 
 // 5h limit as a fraction of the weekly limit. Weekly is the anchor — admin
@@ -266,9 +268,13 @@ const quotaColumns = (actions: {
   ]);
 
 export default function QuotasPage() {
+  const [page, setPage] = useSearchFilter('page', 1);
+
   const queryClient = useQueryClient();
-  const { data: quotas, isLoading } = useQuery(quotaQueries.list());
-  const { data: models } = useQuery(modelQueries.list());
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    quotaQueries.list(quotaTableInput({ page }))
+  );
+  const { data: models } = useQuery(modelQueries.forSelect());
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -368,13 +374,10 @@ export default function QuotasPage() {
     return groups;
   }, [models]);
 
-  if (isLoading) {
-    return <ConsoleTableSkeleton columns={5} />;
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end gap-4">
+      <ConsoleToolbar>
+        <ConsoleFilters />
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={() => openFor(null)}>
@@ -566,12 +569,21 @@ export default function QuotasPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </ConsoleToolbar>
 
       <DataTable
         columns={columns}
-        data={quotas}
+        data={isLoading ? undefined : data?.rows}
         empty="No quotas yet. Create one to start."
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
+          }
+        }
       />
 
       <AlertDialog

@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   shareChatSchema,
   shareIdSchema,
@@ -43,10 +44,18 @@ export const shareQueries = {
     list: () => ['share', 'list'] as const,
     detail: () => ['share', 'detail'] as const
   },
-  list: (input: { limit?: number; offset?: number } = {}) =>
+  /** One page of the user's share links. */
+  list: (input: { page?: number; pageSize?: number } = {}) =>
     queryOptions({
       queryKey: [...shareQueries.key.list(), input] as const,
-      queryFn: () => listShares({ data: input })
+      queryFn: () =>
+        listShares({
+          data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...input }
+        }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
     }),
   detail: (input: { id: string }) =>
     queryOptions({

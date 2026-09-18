@@ -1,12 +1,14 @@
 import '@tanstack/react-start/server-only';
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, or } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { type VertexServiceAccountKey } from '@/types';
 import { type modelSyncSchema } from '@/types/model';
+import { pageWindow } from '@/types/pagination';
 import {
   type providerCreateSchema,
+  type providerListSchema,
   type providerUpdateSchema
 } from '@/types/provider';
 import { decrypt, encrypt, maskedKey } from '@/lib/crypto';
@@ -16,21 +18,59 @@ import { db } from '@/db';
 import { models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
-/** Providers with their models, API keys masked. */
-export async function listProviders() {
-  const result = await db.query.providers.findMany({
+/** The console's provider table: one page of providers with their models,
+ *  API keys masked. */
+export async function listProviders(
+  filter: z.infer<typeof providerListSchema>
+) {
+  const search = filter.q?.trim();
+  const term = search ? `%${search}%` : null;
+  const where = term
+    ? or(ilike(providers.name, term), ilike(providers.type, term))
+    : undefined;
+
+  const [result, [totalRow]] = await Promise.all([
+    db.query.providers.findMany({
+      where,
+      ...pageWindow(filter),
+      // `id` last so the order is total — see the note on `listModels`.
+      orderBy: (providers, { asc, desc }) => [
+        asc(providers.displayOrder),
+        desc(providers.createdAt),
+        asc(providers.id)
+      ],
+      with: {
+        models: true
+      }
+    }),
+    db.select({ count: count() }).from(providers).where(where)
+  ]);
+
+  return {
+    rows: result.map(({ apiKey, ...provider }) => ({
+      ...provider,
+      maskedKey: maskedKey(provider.type, apiKey)
+    })),
+    total: Number(totalRow?.count ?? 0),
+    page: filter.page,
+    pageSize: filter.pageSize
+  };
+}
+
+/**
+ * Every provider, for the selectors that offer one.
+ *
+ * Unpaged, like the model selector's list, and without the key or the models
+ * relation — a provider picker reads only the identity it shows.
+ */
+export async function listProvidersForSelect() {
+  return await db.query.providers.findMany({
     orderBy: (providers, { asc, desc }) => [
       asc(providers.displayOrder),
       desc(providers.createdAt)
     ],
-    with: {
-      models: true
-    }
+    columns: { id: true, name: true, type: true, isEnabled: true, image: true }
   });
-  return result.map(({ apiKey, ...provider }) => ({
-    ...provider,
-    maskedKey: maskedKey(provider.type, apiKey)
-  }));
 }
 
 /** The enabled providers, without the key column at all. */

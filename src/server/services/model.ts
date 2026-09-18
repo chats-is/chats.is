@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, or } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -8,10 +8,11 @@ import {
   type modelListSchema,
   type modelUpdateSchema
 } from '@/types/model';
+import { pageWindow } from '@/types/pagination';
 import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { modelProviders, models, type providers } from '@/db/schema';
+import { modelProviders, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 type Provider = typeof providers.$inferSelect;
@@ -104,23 +105,74 @@ export const findModelByModelId = perRequest(
 // ============================================================================
 
 /** Models with their provider bindings, for the console's model table. */
+/** The console's model table: one page of models, with their provider bindings. */
 export async function listModels(filter: z.infer<typeof modelListSchema>) {
+  const search = filter.q?.trim();
+  const term = search ? `%${search}%` : null;
+  const where = and(
+    filter.capability ? eq(models.capability, filter.capability) : undefined,
+    filter.providerId ? eq(models.providerId, filter.providerId) : undefined,
+    term
+      ? or(
+          ilike(models.name, term),
+          ilike(models.modelId, term),
+          // Matching the provider by name needs its row, and a relational
+          // `where` cannot reach one — so name the matching providers instead.
+          inArray(
+            models.providerId,
+            db
+              .select({ id: providers.id })
+              .from(providers)
+              .where(ilike(providers.name, term))
+          )
+        )
+      : undefined
+  );
+
+  const [rows, [totalRow]] = await Promise.all([
+    db.query.models.findMany({
+      where,
+      ...pageWindow(filter),
+      // `id` last so the order is total: models seeded together share a display
+      // order and a creation time, and paging by row offset over an order that
+      // leaves ties unbroken can repeat a row on one page and skip it on the next.
+      orderBy: (models, { asc, desc }) => [
+        asc(models.displayOrder),
+        desc(models.createdAt),
+        asc(models.id)
+      ],
+      with: {
+        provider: true,
+        modelProviders: {
+          with: { provider: true },
+          orderBy: (mp, { asc }) => [asc(mp.priority)]
+        }
+      }
+    }),
+    db.select({ count: count() }).from(models).where(where)
+  ]);
+
+  return {
+    rows,
+    total: Number(totalRow?.count ?? 0),
+    page: filter.page,
+    pageSize: filter.pageSize
+  };
+}
+
+/**
+ * Every model, for the selectors that offer one.
+ *
+ * A dropdown has to hold the whole list — a page of it would hide the model
+ * the user is looking for — so this is deliberately unpaged. It carries no
+ * provider bindings either: nothing choosing a model reads them.
+ */
+export async function listModelsForSelect() {
   return await db.query.models.findMany({
-    where: and(
-      filter.capability ? eq(models.capability, filter.capability) : undefined,
-      filter.providerId ? eq(models.providerId, filter.providerId) : undefined
-    ),
     orderBy: (models, { asc, desc }) => [
       asc(models.displayOrder),
       desc(models.createdAt)
-    ],
-    with: {
-      provider: true,
-      modelProviders: {
-        with: { provider: true },
-        orderBy: (mp, { asc }) => [asc(mp.priority)]
-      }
-    }
+    ]
   });
 }
 

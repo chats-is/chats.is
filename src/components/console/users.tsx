@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,13 +6,13 @@ import {
   Github,
   Loader2,
   Mail,
-  Search,
   ShieldCheck,
   User as UserIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { mutating } from '@/lib/mutation';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   quotaQueries,
   removeUserQuota,
@@ -23,7 +23,6 @@ import {
   userQueries,
   type listUsers
 } from '@/server/functions/user';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -35,10 +34,15 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { userTableInput } from '@/components/console/table-filters';
+import {
+  ConsoleFilters,
+  ConsoleSearch,
+  ConsoleToolbar
+} from '@/components/console/toolbar';
 import { IconGoogle } from '@/components/icons';
 
-type User = Awaited<ReturnType<typeof listUsers>>[number];
+type User = Awaited<ReturnType<typeof listUsers>>['rows'][number];
 type QuotaOption = { id: string; name: string; isUnlimited: boolean };
 
 const ProviderIcon = ({ provider }: { provider: string }) => {
@@ -177,7 +181,7 @@ const userColumns = (ctx: {
                 ctx.setRole(user, value as 'user' | 'admin')
               }
             >
-              <SelectTrigger className="h-8 w-28">
+              <SelectTrigger className="w-28">
                 <div className="flex items-center gap-2">
                   {saving ? (
                     <Loader2 className="size-3 animate-spin" />
@@ -222,7 +226,7 @@ const userColumns = (ctx: {
               disabled={saving || !ctx.quotaOptions?.length}
               onValueChange={value => ctx.setQuota(user, value)}
             >
-              <SelectTrigger className="h-8 w-36">
+              <SelectTrigger className="w-36">
                 {saving ? (
                   <Loader2 className="size-3 animate-spin" />
                 ) : (
@@ -248,8 +252,8 @@ const userColumns = (ctx: {
   ]);
 
 export default function UsersPage() {
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useSearchFilter('q', '');
+  const [page, setPage] = useSearchFilter('page', 1);
   const [updatingRoleUserId, setUpdatingRoleUserId] = useState<string | null>(
     null
   );
@@ -258,10 +262,8 @@ export default function UsersPage() {
   );
 
   const queryClient = useQueryClient();
-  const { data: users, isLoading } = useQuery(
-    userQueries.list({
-      search: search || undefined
-    })
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    userQueries.list(userTableInput({ q: search, page }))
   );
   const { data: stats } = useQuery(userQueries.stats());
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
@@ -313,14 +315,6 @@ export default function UsersPage() {
     }
   });
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch(searchInput);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
   const columns = useMemo(
     () =>
       userColumns({
@@ -343,34 +337,35 @@ export default function UsersPage() {
     [quotaOptions, updatingRoleUserId, updatingQuotaUserId]
   );
 
-  if (isLoading) {
-    return <ConsoleTableSkeleton columns={8} />;
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex max-w-2xl flex-1 items-center gap-2">
-          <div className="relative max-w-xs flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or email..."
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
+      <ConsoleToolbar>
+        <ConsoleFilters>
+          <ConsoleSearch
+            placeholder="Search by name or email..."
+            value={search}
+            onChange={setSearch}
+          />
+        </ConsoleFilters>
         <div className="text-sm text-muted-foreground">
           {stats?.total || 0} total users, {stats?.admins || 0} admins.
         </div>
-      </div>
+      </ConsoleToolbar>
 
       <DataTable
         columns={columns}
-        data={users}
+        data={isLoading ? undefined : data?.rows}
         empty={
           search ? 'No users found matching your search.' : 'No users found.'
+        }
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
+          }
         }
       />
     </div>

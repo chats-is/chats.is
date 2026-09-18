@@ -1,7 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { type z } from 'zod';
 
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   usageByUserRangeSchema,
   usageLogFilterSchema,
@@ -85,6 +86,12 @@ export const usageQueries = {
     queryOptions({
       queryKey: [...usageQueries.key.log(), filters] as const,
       queryFn: () =>
-        adminUsageLog({ data: { page: 1, pageSize: 50, ...filters } })
+        adminUsageLog({
+          data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...filters }
+        }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
     })
 };

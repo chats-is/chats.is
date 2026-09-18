@@ -1,3 +1,4 @@
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -22,8 +23,20 @@ import { UsageModuleSkeleton } from '@/components/usage-module';
 /**
  * A run of cells of slightly varied width, so a row does not read as a grid.
  * Shared with `DataTable`, which stands in the same way once it is mounted.
+ *
+ * Ceilings rather than widths, and paired with `w-full`. A bar of a fixed width
+ * cannot shrink or wrap the way the text it stands in for does, so a wide table
+ * of them sets a minimum width the real rows never ask for — and the page
+ * scrolls sideways until the data lands and the cells start wrapping.
  */
-export const CELL_WIDTHS = ['w-32', 'w-24', 'w-40', 'w-20', 'w-28', 'w-16'];
+export const CELL_WIDTHS = [
+  'max-w-32',
+  'max-w-24',
+  'max-w-40',
+  'max-w-20',
+  'max-w-28',
+  'max-w-16'
+];
 
 /** The search-and-action row most console pages carry above their table. */
 function ToolbarSkeleton() {
@@ -36,13 +49,16 @@ function ToolbarSkeleton() {
 }
 
 /**
- * A console table, in outline. `columns` and `rows` are the shape to hold, not
- * a promise about the data — a page whose table is a different width simply
- * settles into place when it arrives.
+ * A console table, in outline.
+ *
+ * This one stands in before the component mounts, so it cannot read the real
+ * column defs the way `DataTable` does — `columns` is the count to hold, and it
+ * has to be kept in step with the page by hand. `rows` defaults to a full page
+ * so the outline is the height the table will actually be.
  */
 export function ConsoleTableSkeleton({
   columns = 5,
-  rows = 6,
+  rows = DEFAULT_PAGE_SIZE,
   toolbar = true
 }: {
   columns?: number;
@@ -58,7 +74,7 @@ export function ConsoleTableSkeleton({
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               {Array.from({ length: columns }).map((_, i) => (
                 <TableHead key={i} className="h-auto p-3">
-                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-full max-w-16" />
                 </TableHead>
               ))}
             </TableRow>
@@ -69,7 +85,7 @@ export function ConsoleTableSkeleton({
                 {Array.from({ length: columns }).map((_, col) => (
                   <TableCell key={col} className="p-3">
                     <Skeleton
-                      className={`h-4 ${CELL_WIDTHS[(row + col) % CELL_WIDTHS.length]}`}
+                      className={`h-4 w-full ${CELL_WIDTHS[(row + col) % CELL_WIDTHS.length]}`}
                     />
                   </TableCell>
                 ))}
@@ -142,8 +158,13 @@ export function ConsoleSettingsPanelSkeleton() {
   );
 }
 
-/** Usage: the stat cards and charts, then the log beneath them. */
-export function ConsoleUsageSkeleton() {
+/**
+ * Usage: the stat cards and charts, then the log beneath them.
+ *
+ * `columns` because the two pages that use this have logs of different widths —
+ * the platform-wide log carries a User column the single-user one does not.
+ */
+export function ConsoleUsageSkeleton({ columns = 6 }: { columns?: number }) {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -158,7 +179,7 @@ export function ConsoleUsageSkeleton() {
         <Card className="py-0">
           <CardContent className="space-y-3 p-4">
             <Skeleton className="h-5 w-16" />
-            <ConsoleTableSkeleton columns={6} rows={5} toolbar={false} />
+            <ConsoleTableSkeleton columns={columns} toolbar={false} />
           </CardContent>
         </Card>
       </section>

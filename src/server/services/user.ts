@@ -1,9 +1,14 @@
 import '@tanstack/react-start/server-only';
 
-import { eq, like, or, sql } from 'drizzle-orm';
+import { count, eq, like, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
-import { type profileUpdateSchema, type userRoleSchema } from '@/types/user';
+import { pageWindow } from '@/types/pagination';
+import {
+  type profileUpdateSchema,
+  type userRoleSchema,
+  type userSearchSchema
+} from '@/types/user';
 import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
@@ -43,33 +48,50 @@ export async function updateProfile(
 }
 
 /** Users with their sign-in methods, plan and quota override, newest first. */
-export async function listUsers(search?: string) {
-  return await db.query.users.findMany({
-    where: search
-      ? or(like(users.name, `%${search}%`), like(users.email, `%${search}%`))
-      : undefined,
-    orderBy: (users, { desc }) => [desc(users.createdAt)],
-    with: {
-      accounts: {
-        columns: {
-          providerId: true
-        }
-      },
-      plan: {
-        columns: {
-          id: true,
-          name: true
-        }
-      },
-      quota: {
-        columns: {
-          id: true,
-          name: true,
-          isUnlimited: true
+export async function listUsers(filter: z.infer<typeof userSearchSchema>) {
+  const search = filter.search?.trim();
+  const where = search
+    ? or(like(users.name, `%${search}%`), like(users.email, `%${search}%`))
+    : undefined;
+
+  const [rows, [totalRow]] = await Promise.all([
+    db.query.users.findMany({
+      where,
+      ...pageWindow(filter),
+      // `id` last so the order is total: accounts created in the same import
+      // share a timestamp, and offset paging over an order that leaves ties
+      // unbroken can repeat a row on one page and skip it on the next.
+      orderBy: (users, { asc, desc }) => [desc(users.createdAt), asc(users.id)],
+      with: {
+        accounts: {
+          columns: {
+            providerId: true
+          }
+        },
+        plan: {
+          columns: {
+            id: true,
+            name: true
+          }
+        },
+        quota: {
+          columns: {
+            id: true,
+            name: true,
+            isUnlimited: true
+          }
         }
       }
-    }
-  });
+    }),
+    db.select({ count: count() }).from(users).where(where)
+  ]);
+
+  return {
+    rows,
+    total: Number(totalRow?.count ?? 0),
+    page: filter.page,
+    pageSize: filter.pageSize
+  };
 }
 
 /** Pass planId=null to clear it; the user falls back to the default. */

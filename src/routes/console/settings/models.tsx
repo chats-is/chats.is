@@ -7,7 +7,7 @@ import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 
 export const Route = createFileRoute('/console/settings/models')({
   loader: ({ context }) =>
-    context.queryClient.ensureQueryData(modelQueries.list({})),
+    context.queryClient.ensureQueryData(modelQueries.forSelect()),
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Models Settings') }]
   }),

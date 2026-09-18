@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -499,7 +499,10 @@ export async function adminUsageLog(
     .from(usage)
     .leftJoin(users, eq(users.id, usage.userId))
     .where(where)
-    .orderBy(desc(usage.createdAt))
+    // `id` last so the order is total: rows recorded in the same instant would
+    // otherwise sort arbitrarily, and offset paging over an order that leaves
+    // ties unbroken can repeat a row on one page and skip it on the next.
+    .orderBy(desc(usage.createdAt), asc(usage.id))
     .limit(data.pageSize)
     .offset((data.page - 1) * data.pageSize);
 

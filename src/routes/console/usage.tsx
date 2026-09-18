@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
+import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/functions/model';
 import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
@@ -14,13 +15,13 @@ const searchSchema = z.object({
   user: z.string().optional(),
   model: z.string().optional(),
   capability: z.string().optional(),
-  page: z.coerce.number().int().positive().optional()
+  page: pageSearchSchema
 });
 
 export const Route = createFileRoute('/console/usage')({
   validateSearch: searchSchema,
   loader: ({ context }) =>
-    context.queryClient.ensureQueryData(modelQueries.list({})),
+    context.queryClient.ensureQueryData(modelQueries.forSelect()),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Usage') }] }),
   pendingComponent: () => <ConsoleUsageSkeleton />,
   component: Usage

@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import { paginationSchema } from './pagination';
+
+/** The console's plan table, cut to one page. */
+export const planListSchema = z.object({ ...paginationSchema.shape });
+
 /**
  * What the plan server functions accept. A plan is a name and the quota
  * behind it; both writes carry the same fields.

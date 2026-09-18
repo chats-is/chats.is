@@ -145,8 +145,8 @@ export function ProviderModelSyncDialog({
   const syncMutation = useMutation({
     mutationFn: mutating(syncProviderModels),
     onSuccess: (result: Output<typeof syncProviderModels>) => {
-      queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
-      queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
+      queryClient.invalidateQueries({ queryKey: providerQueries.all() });
+      queryClient.invalidateQueries({ queryKey: modelQueries.all() });
       reset();
       onOpenChange(false);
       toast.success(

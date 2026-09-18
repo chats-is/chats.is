@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -35,7 +35,6 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Tooltip,
@@ -47,9 +46,14 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { promptTableInput } from '@/components/console/table-filters';
+import {
+  ConsoleFilters,
+  ConsoleSearch,
+  ConsoleToolbar
+} from '@/components/console/toolbar';
 
-type AdminPrompt = Awaited<ReturnType<typeof adminListPrompts>>[number];
+type AdminPrompt = Awaited<ReturnType<typeof adminListPrompts>>['rows'][number];
 
 const promptSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
@@ -57,27 +61,19 @@ const promptSchema = z.object({
   image: z.string().max(500),
   tags: z.string(),
   providers: z.string(),
-  models: z.array(z.string()),
-  visibility: z.enum(['private', 'public'])
+  models: z.array(z.string())
 });
 
 type PromptForm = z.infer<typeof promptSchema>;
 
-// Admin-created prompts default to public (available to all users).
 const EMPTY_FORM: PromptForm = {
   name: '',
   content: '',
   image: '',
   tags: '',
   providers: '',
-  models: [],
-  visibility: 'public'
+  models: []
 };
-
-const VISIBILITY_OPTIONS = [
-  { value: 'public', label: 'Public — visible to all users' },
-  { value: 'private', label: 'Private — only the owner' }
-];
 
 const parseList = (value: string) =>
   value
@@ -212,10 +208,13 @@ export default function PromptsPage() {
   const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null);
   const [deletePrompt, setDeletePrompt] = useState<AdminPrompt | null>(null);
   const [search, setSearch] = useSearchFilter('q', '');
+  const [page, setPage] = useSearchFilter('page', 1);
 
   const queryClient = useQueryClient();
-  const { data: prompts, isLoading } = useQuery(promptQueries.adminList());
-  const { data: models } = useQuery(modelQueries.list());
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    promptQueries.adminList(promptTableInput({ q: search, page }))
+  );
+  const { data: models } = useQuery(modelQueries.forSelect());
 
   const modelName = (modelId: string) =>
     models?.find(m => m.modelId === modelId)?.name ?? modelId;
@@ -270,8 +269,7 @@ export default function PromptsPage() {
         image: value.image || null,
         tags: tags.length > 0 ? tags : null,
         providers: providers.length > 0 ? providers : null,
-        models: value.models.length > 0 ? value.models : null,
-        visibility: value.visibility
+        models: value.models.length > 0 ? value.models : null
       };
 
       try {
@@ -299,8 +297,7 @@ export default function PromptsPage() {
           image: prompt.image || '',
           tags: joinList(prompt.tags),
           providers: joinList(prompt.providers),
-          models: prompt.models || [],
-          visibility: prompt.visibility
+          models: prompt.models || []
         }
       : EMPTY_FORM;
     setDefaults(values);
@@ -308,37 +305,21 @@ export default function PromptsPage() {
     setIsOpen(true);
   };
 
-  const filteredPrompts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    if (!keyword) return prompts ?? [];
-    return (prompts ?? []).filter(
-      prompt =>
-        prompt.name.toLowerCase().includes(keyword) ||
-        prompt.content.toLowerCase().includes(keyword)
-    );
-  }, [prompts, search]);
-
   const columns = useMemo(
     () => promptColumns({ modelName, edit: openFor, remove: setDeletePrompt }),
     [models]
   );
 
-  if (isLoading) {
-    return <ConsoleTableSkeleton columns={7} />;
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+    <div className="space-y-6">
+      <ConsoleToolbar>
+        <ConsoleFilters>
+          <ConsoleSearch
             placeholder="Search by name or content"
-            className="pl-9"
+            value={search}
+            onChange={setSearch}
           />
-        </div>
+        </ConsoleFilters>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
@@ -501,15 +482,6 @@ export default function PromptsPage() {
                     </div>
                   )}
                 </form.Field>
-
-                <form.AppField name="visibility">
-                  {field => (
-                    <field.SelectField
-                      label="Visibility"
-                      options={VISIBILITY_OPTIONS}
-                    />
-                  )}
-                </form.AppField>
               </div>
 
               <div className="flex justify-end gap-2">
@@ -534,17 +506,26 @@ export default function PromptsPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </ConsoleToolbar>
 
       <DataTable
         columns={columns}
-        data={filteredPrompts}
+        data={isLoading ? undefined : data?.rows}
         className="overflow-x-auto"
         tableClassName="min-w-[820px]"
         empty={
-          prompts?.length
+          search
             ? 'No prompts match the current filter.'
             : 'No prompts yet. Add the first one.'
+        }
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
+          }
         }
       />
 

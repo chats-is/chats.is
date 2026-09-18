@@ -43,7 +43,12 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { pricingTableInput } from '@/components/console/table-filters';
+import {
+  ConsoleFilters,
+  ConsoleSearch,
+  ConsoleToolbar
+} from '@/components/console/toolbar';
 import { ModelIcon } from '@/components/model-icon';
 
 type PricingSource = 'models.dev' | 'llm-metadata';
@@ -203,7 +208,9 @@ function summarizePricing(
   return lines;
 }
 
-type PricingRow = Awaited<ReturnType<typeof listPricingWithModels>>[number];
+type PricingRow = Awaited<
+  ReturnType<typeof listPricingWithModels>
+>['rows'][number];
 
 const helper = createAppColumnHelper<PricingRow>();
 
@@ -301,7 +308,13 @@ export default function PricingPage() {
     'llm-metadata'
   ]);
 
-  const { data: rows, isLoading } = useQuery(pricingQueries.listWithModels());
+  const [page, setPage] = useSearchFilter('page', 1);
+
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    pricingQueries.listWithModels(
+      pricingTableInput({ capability: filterCapability, q: search, page })
+    )
+  );
 
   const upsertMutation = useMutation({
     mutationFn: mutating(upsertPricing),
@@ -338,21 +351,6 @@ export default function PricingPage() {
   // For 1-source mode: a Set of modelDbIds (checked rows).
   // For 2-source mode: per-row pick (modelDbId → source picked, or absent = skip).
   const [picks, setPicks] = useState<Map<string, PricingSource>>(new Map());
-
-  const filtered = useMemo(() => {
-    if (!rows) return [];
-    const q = search.toLowerCase().trim();
-    return rows.filter(r => {
-      if (filterCapability !== 'all' && r.capability !== filterCapability)
-        return false;
-      if (!q) return true;
-      return (
-        r.name.toLowerCase().includes(q) ||
-        r.modelId.toLowerCase().includes(q) ||
-        r.provider?.name.toLowerCase().includes(q)
-      );
-    });
-  }, [rows, search, filterCapability]);
 
   const [defaults, setDefaults] = useState(EMPTY_PRICING);
 
@@ -538,23 +536,15 @@ export default function PricingPage() {
     }
   };
 
-  if (isLoading) {
-    return <ConsoleTableSkeleton columns={7} />;
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex max-w-2xl flex-1 items-center gap-2">
-          <div className="relative max-w-xs flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search models..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+      <ConsoleToolbar>
+        <ConsoleFilters>
+          <ConsoleSearch
+            placeholder="Search models..."
+            value={search}
+            onChange={setSearch}
+          />
           <Select value={filterCapability} onValueChange={setFilterCapability}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -568,7 +558,7 @@ export default function PricingPage() {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </ConsoleFilters>
 
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>
@@ -624,9 +614,22 @@ export default function PricingPage() {
             </div>
           </PopoverContent>
         </Popover>
-      </div>
+      </ConsoleToolbar>
 
-      <DataTable columns={columns} data={filtered} empty="No models found." />
+      <DataTable
+        columns={columns}
+        data={isLoading ? undefined : data?.rows}
+        empty="No models found."
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
+          }
+        }
+      />
 
       <Dialog open={!!edit} onOpenChange={open => !open && setEdit(null)}>
         <DialogContent className="sm:max-w-2xl">

@@ -1,10 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   quotaAssignSchema,
   quotaCreateSchema,
   quotaIdSchema,
+  quotaListSchema,
   quotaUpdateSchema,
   quotaUserSchema
 } from '@/types/quota';
@@ -13,7 +15,8 @@ import * as quotas from '@/server/services/quota';
 
 export const listQuotas = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => quotas.listQuotas());
+  .validator(quotaListSchema)
+  .handler(({ data }) => quotas.listQuotas(data));
 
 export const listQuotasForSelect = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
@@ -65,10 +68,18 @@ export const quotaQueries = {
     me: () => ['quota', 'me'] as const,
     byUser: () => ['quota', 'byUser'] as const
   },
-  list: () =>
+  /** One page of the console's quota table. */
+  list: (input: { page?: number; pageSize?: number } = {}) =>
     queryOptions({
-      queryKey: [...quotaQueries.key.list()] as const,
-      queryFn: () => listQuotas()
+      queryKey: [...quotaQueries.key.list(), input] as const,
+      queryFn: () =>
+        listQuotas({
+          data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...input }
+        }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
     }),
   listForSelect: () =>
     queryOptions({

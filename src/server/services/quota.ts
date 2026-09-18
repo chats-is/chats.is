@@ -1,12 +1,14 @@
 import '@tanstack/react-start/server-only';
 
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, count, eq, gte, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { type ResolvedSource, type UserQuota } from '@/types';
+import { pageWindow } from '@/types/pagination';
 import {
   validateQuotaLimits,
   type quotaCreateSchema,
+  type quotaListSchema,
   type quotaUpdateSchema
 } from '@/types/quota';
 import { perRequest } from '@/lib/request-cache';
@@ -261,15 +263,24 @@ const asNumber = (v: number | null | ''): number | null =>
   v === '' || v === null ? null : v;
 
 /** All quotas, with the system default marked. */
-export async function listQuotas() {
-  const all = await db.query.quotas.findMany({
-    orderBy: (q, { asc }) => [asc(q.name)]
-  });
-  const defaultQuotaId = await getDefaultQuotaId();
-  return all.map(q => ({
-    ...q,
-    isDefault: q.id === defaultQuotaId
-  }));
+/** One page of quotas, each flagged if it is the one new users fall back to. */
+export async function listQuotas(page: z.infer<typeof quotaListSchema>) {
+  const [rows, [totalRow], defaultQuotaId] = await Promise.all([
+    db.query.quotas.findMany({
+      ...pageWindow(page),
+      // `id` last so the order is total, which offset paging depends on.
+      orderBy: (q, { asc }) => [asc(q.name), asc(q.id)]
+    }),
+    db.select({ count: count() }).from(quotas),
+    getDefaultQuotaId()
+  ]);
+
+  return {
+    rows: rows.map(q => ({ ...q, isDefault: q.id === defaultQuotaId })),
+    total: Number(totalRow?.count ?? 0),
+    page: page.page,
+    pageSize: page.pageSize
+  };
 }
 
 /** The id/name/unlimited triple the console's selectors need. */

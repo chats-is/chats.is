@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { EFFORTS } from '@/lib/provider-vocab';
 
+import { paginationSchema } from './pagination';
 import { type ProviderType } from './provider';
 
 /**
@@ -165,9 +166,13 @@ const modelAPIParamsSchema = z
   })
   .strict();
 
+/** The console's model table: narrowed, then cut to one page. */
 export const modelListSchema = z.object({
   capability: modelCapabilitySchema.optional(),
-  providerId: z.string().optional()
+  providerId: z.string().optional(),
+  /** Matches a model's name, its model id, or its primary provider's name. */
+  q: z.string().optional(),
+  ...paginationSchema.shape
 });
 
 export const modelCreateSchema = z.object({

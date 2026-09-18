@@ -65,7 +65,7 @@ function ModelSelect({
 
 export function ModelsSettings() {
   const { form, isLoading } = useSettingsForm(KEYS);
-  const { data: models } = useQuery(modelQueries.list());
+  const { data: models } = useQuery(modelQueries.forSelect());
 
   const chatModels = models?.filter(
     m => m.capability === 'chat' && m.isEnabled

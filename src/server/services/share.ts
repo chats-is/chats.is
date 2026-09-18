@@ -1,8 +1,9 @@
 import '@tanstack/react-start/server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import { type z } from 'zod';
 
+import { pageWindow } from '@/types/pagination';
 import { type sharePageSchema } from '@/types/shared-link';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
@@ -51,30 +52,45 @@ export async function createShare(userId: string, chatId: string) {
   return result[0];
 }
 
+/** One page of the user's own share links, and how many they have in all. */
 export async function listShares(
   userId: string,
   input: z.infer<typeof sharePageSchema>
 ) {
-  const limit = input.limit ?? 50;
-  const offset = input.offset ?? 0;
+  const owner = eq(shares.userId, userId);
 
-  return await db.query.shares.findMany({
-    orderBy: (shares, { desc }) => [desc(shares.createdAt)],
-    limit: limit,
-    offset: offset,
-    where: eq(shares.userId, userId),
-    with: {
-      chat: {
-        columns: {
-          userId: false
+  const [rows, [totalRow]] = await Promise.all([
+    db.query.shares.findMany({
+      // `id` last so the order is total: shares created together share a
+      // timestamp, and offset paging over an order that leaves ties unbroken
+      // can repeat a row on one page and skip it on the next.
+      orderBy: (shares, { asc, desc }) => [
+        desc(shares.createdAt),
+        asc(shares.id)
+      ],
+      ...pageWindow(input),
+      where: owner,
+      with: {
+        chat: {
+          columns: {
+            userId: false
+          }
         }
+      },
+      columns: {
+        chatId: false,
+        userId: false
       }
-    },
-    columns: {
-      chatId: false,
-      userId: false
-    }
-  });
+    }),
+    db.select({ count: count() }).from(shares).where(owner)
+  ]);
+
+  return {
+    rows,
+    total: Number(totalRow?.count ?? 0),
+    page: input.page,
+    pageSize: input.pageSize
+  };
 }
 
 /**

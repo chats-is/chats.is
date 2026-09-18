@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { CAPABILITIES } from '@/lib/constant';
 import { formatUsd, reportWindowStart } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
@@ -174,18 +175,12 @@ function UsageLog({ days }: { days: number }) {
   const [modelId, setModelId] = useSearchFilter('model', '');
   const [capability, setCapability] = useSearchFilter('capability', '');
   const [page, setPage] = useSearchFilter('page', 1);
-  const pageSize = 50;
-
-  // Reset to page 1 when the window changes.
-  useEffect(() => {
-    setPage(1);
-  }, [days]);
 
   const from = useMemo(() => reportWindowStart(days), [days]);
 
-  const { data: models } = useQuery(modelQueries.list());
+  const { data: models } = useQuery(modelQueries.forSelect());
 
-  const { data, isLoading } = useQuery(
+  const { data, isLoading, isPlaceholderData } = useQuery(
     usageQueries.log({
       from,
       userQuery: userQuery.trim() || undefined,
@@ -194,14 +189,9 @@ function UsageLog({ days }: { days: number }) {
         ? (capability as 'chat' | 'image' | 'video' | 'audio')
         : undefined,
       page,
-      pageSize
+      pageSize: DEFAULT_PAGE_SIZE
     })
   );
-
-  const totalPages = useMemo(() => {
-    if (!data) return 1;
-    return Math.max(1, Math.ceil(data.total / pageSize));
-  }, [data]);
 
   return (
     <Card className="py-0">
@@ -211,18 +201,12 @@ function UsageLog({ days }: { days: number }) {
           <Input
             placeholder="Search user (name or email)..."
             value={userQuery}
-            onChange={e => {
-              setUserQuery(e.target.value);
-              setPage(1);
-            }}
+            onChange={e => setUserQuery(e.target.value)}
             className="w-64"
           />
           <Select
             value={modelId || '__all__'}
-            onValueChange={v => {
-              setModelId(v === '__all__' ? '' : v);
-              setPage(1);
-            }}
+            onValueChange={v => setModelId(v === '__all__' ? '' : v)}
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All models" />
@@ -238,10 +222,7 @@ function UsageLog({ days }: { days: number }) {
           </Select>
           <Select
             value={capability || '__all__'}
-            onValueChange={v => {
-              setCapability(v === '__all__' ? '' : v);
-              setPage(1);
-            }}
+            onValueChange={v => setCapability(v === '__all__' ? '' : v)}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All capabilities" />
@@ -263,31 +244,16 @@ function UsageLog({ days }: { days: number }) {
           dense
           empty="No records."
           tableClassName="text-sm"
+          pending={isPlaceholderData}
+          pagination={
+            data && {
+              page: data.page,
+              pageSize: data.pageSize,
+              total: data.total,
+              onPageChange: setPage
+            }
+          }
         />
-
-        {data && data.total > pageSize && (
-          <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              Page {page} of {totalPages} · {data.total} records
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="rounded border px-2 py-1 disabled:opacity-40"
-              >
-                Prev
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="rounded border px-2 py-1 disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

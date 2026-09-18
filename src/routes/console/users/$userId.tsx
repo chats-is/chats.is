@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
+import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
 import { quotaQueries } from '@/server/functions/quota';
 import { usageQueries } from '@/server/functions/usage';
@@ -14,7 +15,7 @@ const searchSchema = z.object({
   days: z.coerce.number().int().positive().optional(),
   model: z.string().optional(),
   capability: z.string().optional(),
-  page: z.coerce.number().int().positive().optional()
+  page: pageSearchSchema
 });
 
 export const Route = createFileRoute('/console/users/$userId')({
@@ -33,7 +34,7 @@ export const Route = createFileRoute('/console/users/$userId')({
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'User usage limits') }]
   }),
-  pendingComponent: () => <ConsoleUsageSkeleton />,
+  pendingComponent: () => <ConsoleUsageSkeleton columns={5} />,
   component: UserDetailPage
 });
 

@@ -1,10 +1,12 @@
 import '@tanstack/react-start/server-only';
 
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
+import { pageWindow } from '@/types/pagination';
 import {
   type promptCreateSchema,
+  type promptListSchema,
   type promptPageSchema,
   type promptUpdateSchema
 } from '@/types/prompt';
@@ -66,12 +68,35 @@ export async function getPromptStats() {
   };
 }
 
-/** Every prompt in the system, regardless of owner or visibility. */
-export async function adminListPrompts() {
-  return await db.query.prompts.findMany({
-    orderBy: () => promptOrderBy,
-    with: promptOwner
-  });
+/** One page of every prompt in the system, regardless of owner or visibility,
+ *  each with its owner. */
+export async function adminListPrompts(
+  filter: z.infer<typeof promptListSchema>
+) {
+  const search = filter.search?.trim();
+  const where = search
+    ? or(
+        ilike(prompts.name, `%${search}%`),
+        ilike(prompts.content, `%${search}%`)
+      )
+    : undefined;
+
+  const [rows, [totalRow]] = await Promise.all([
+    db.query.prompts.findMany({
+      where,
+      ...pageWindow(filter),
+      orderBy: () => promptOrderBy,
+      with: promptOwner
+    }),
+    db.select({ count: count() }).from(prompts).where(where)
+  ]);
+
+  return {
+    rows,
+    total: Number(totalRow?.count ?? 0),
+    page: filter.page,
+    pageSize: filter.pageSize
+  };
 }
 
 /** The user's own prompts, for managing their personal library. Paged, like
@@ -141,14 +166,17 @@ export async function listUsablePrompts(
 }
 
 /**
- * Write a prompt owned by `userId`. `defaultVisibility` is what the caller
- * falls back to when the input names none: private for a user's own prompt,
- * public for one an admin adds to the shared gallery.
+ * Write a prompt owned by `userId`.
+ *
+ * `visibility` comes from which server function was called — private for a
+ * user's own prompt, public for one the console adds to the shared gallery —
+ * and not from the input, which no longer carries the field at all.
  */
 export async function createPrompt(
   userId: string,
   input: z.infer<typeof promptCreateSchema>,
-  defaultVisibility: 'private' | 'public'
+  /** Decided by which server function was called, never by the client. */
+  visibility: 'private' | 'public'
 ) {
   const id = generateUUID();
 
@@ -156,7 +184,7 @@ export async function createPrompt(
     id,
     name: input.name,
     userId,
-    visibility: input.visibility ?? defaultVisibility,
+    visibility,
     tags: input.tags,
     providers: input.providers,
     models: input.models,

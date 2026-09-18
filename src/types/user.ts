@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { paginationSchema } from './pagination';
+
 /**
  * What the user server functions accept. The profile edit comes from the user
  * themselves; the rest act on one user as an admin.
@@ -9,7 +11,11 @@ export const profileUpdateSchema = z.object({
   image: z.url().optional()
 });
 
-export const userSearchSchema = z.object({ search: z.string().optional() });
+/** The console's user table: narrowed by name or email, then cut to one page. */
+export const userSearchSchema = z.object({
+  search: z.string().optional(),
+  ...paginationSchema.shape
+});
 
 export const userIdSchema = z.object({ id: z.string() });
 

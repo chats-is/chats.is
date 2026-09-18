@@ -1,6 +1,8 @@
 import { type JSONValue } from 'ai';
 import { z } from 'zod';
 
+import { paginationSchema } from './pagination';
+
 /** The providers this app knows how to talk to. Declared as a schema so the
  *  admin form and the server validate against the same list. */
 const providerTypeSchema = z.enum([
@@ -61,6 +63,13 @@ export const providerUpdateSchema = z.object({
   isEnabled: z.boolean().optional(),
   apiOptions: apiOptionsSchema.nullable().optional(),
   displayOrder: z.number().int().optional()
+});
+
+/** The console's provider table: narrowed, then cut to one page. */
+export const providerListSchema = z.object({
+  /** Matches a provider's name or its type. */
+  q: z.string().optional(),
+  ...paginationSchema.shape
 });
 
 export const providerIdSchema = z.object({ id: z.string().min(1) });

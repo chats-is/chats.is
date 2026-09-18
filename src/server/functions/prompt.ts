@@ -1,9 +1,15 @@
 import { createServerFn } from '@tanstack/react-start';
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions
+} from '@tanstack/react-query';
 
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   promptCreateSchema,
   promptIdSchema,
+  promptListSchema,
   promptPageSchema,
   promptUpdateSchema
 } from '@/types/prompt';
@@ -16,7 +22,8 @@ export const getPromptStats = createServerFn({ method: 'GET' })
 
 export const adminListPrompts = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => prompts.adminListPrompts());
+  .validator(promptListSchema)
+  .handler(({ data }) => prompts.adminListPrompts(data));
 
 export const listPrompts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
@@ -30,24 +37,19 @@ export const listUsablePrompts = createServerFn({ method: 'GET' })
     prompts.listUsablePrompts(context.user.id, data)
   );
 
-/** A regular user's own prompt. Always private — `visibility` is stripped
- *  before it reaches the service, so a client can never request `public`
- *  here; only the admin console (below) may create a shared prompt. */
+/** A regular user's own prompt. Always private: only the admin console (below)
+ *  may create a shared one, and `visibility` is not a field either form sends. */
 export const createPrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(promptCreateSchema)
-  .handler(({ data, context }) => {
-    const { visibility: _visibility, ...input } = data;
-    return prompts.createPrompt(context.user.id, input, 'private');
-  });
+  .handler(({ data, context }) =>
+    prompts.createPrompt(context.user.id, data, 'private')
+  );
 
 export const updatePrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(promptUpdateSchema)
-  .handler(({ data, context }) => {
-    const { visibility: _visibility, ...input } = data;
-    return prompts.updatePrompt(context.user.id, input);
-  });
+  .handler(({ data, context }) => prompts.updatePrompt(context.user.id, data));
 
 export const deletePrompt = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
@@ -90,10 +92,20 @@ export const promptQueries = {
       queryKey: [...promptQueries.key.stats()] as const,
       queryFn: () => getPromptStats()
     }),
-  adminList: () =>
+  /** One page of the console's prompt table. */
+  adminList: (
+    input: { search?: string; page?: number; pageSize?: number } = {}
+  ) =>
     queryOptions({
-      queryKey: [...promptQueries.key.adminList()] as const,
-      queryFn: () => adminListPrompts()
+      queryKey: [...promptQueries.key.adminList(), input] as const,
+      queryFn: () =>
+        adminListPrompts({
+          data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...input }
+        }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
     }),
   usable: () =>
     queryOptions({

@@ -1,10 +1,13 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
+import { type z } from 'zod';
 
 import { modelRefSchema, modelSyncSchema } from '@/types/model';
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   providerCreateSchema,
   providerIdSchema,
+  providerListSchema,
   providerRefSchema,
   providerToggleSchema,
   providerUpdateSchema
@@ -12,9 +15,19 @@ import {
 import { adminMiddleware } from '@/server/middleware';
 import * as providers from '@/server/services/provider';
 
+/** How a caller may narrow the provider table; all optional here because the
+ *  query key is built before the schema's defaults apply. */
+type ProviderListInput = Partial<z.input<typeof providerListSchema>>;
+
 export const listProviders = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => providers.listProviders());
+  .validator(providerListSchema)
+  .handler(({ data }) => providers.listProviders(data));
+
+/** Unpaged, for the selectors that have to offer every provider. */
+export const listProvidersForSelect = createServerFn({ method: 'GET' })
+  .middleware([adminMiddleware])
+  .handler(() => providers.listProvidersForSelect());
 
 export const listEnabledProviders = createServerFn({ method: 'GET' }).handler(
   () => providers.listEnabledProviders()
@@ -63,14 +76,29 @@ export const providerQueries = {
    *  invalidates them, so the two can never drift apart. */
   key: {
     list: () => ['provider', 'list'] as const,
+    forSelect: () => ['provider', 'forSelect'] as const,
     enabled: () => ['provider', 'enabled'] as const,
     remoteModels: () => ['provider', 'remoteModels'] as const,
     compatible: () => ['provider', 'compatible'] as const
   },
-  list: () =>
+  /** One page of the console's provider table. */
+  list: (input: ProviderListInput = {}) =>
     queryOptions({
-      queryKey: [...providerQueries.key.list()] as const,
-      queryFn: () => listProviders()
+      queryKey: [...providerQueries.key.list(), input] as const,
+      queryFn: () =>
+        listProviders({
+          data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...input }
+        }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
+    }),
+  /** Every provider, for a selector that offers one. */
+  forSelect: () =>
+    queryOptions({
+      queryKey: [...providerQueries.key.forSelect()] as const,
+      queryFn: () => listProvidersForSelect()
     }),
   enabled: () =>
     queryOptions({

@@ -9,7 +9,6 @@ import {
   Loader2,
   Pencil,
   Plus,
-  Search,
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -74,11 +73,16 @@ import {
   DataTable
 } from '@/components/console/data-table';
 import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { modelTableInput } from '@/components/console/table-filters';
+import {
+  ConsoleFilters,
+  ConsoleSearch,
+  ConsoleToolbar
+} from '@/components/console/toolbar';
 import { UiOptionsField } from '@/components/console/ui-options-field';
 import { ModelIcon } from '@/components/model-icon';
 
-type Model = Awaited<ReturnType<typeof listModels>>[number];
+type Model = Awaited<ReturnType<typeof listModels>>['rows'][number];
 
 const CAPABILITY_OPTIONS = CAPABILITIES.map(c => ({
   value: c.value,
@@ -335,13 +339,18 @@ export default function ModelsPage() {
     'all'
   );
   const [search, setSearch] = useSearchFilter('q', '');
+  const [page, setPage] = useSearchFilter('page', 1);
 
   const queryClient = useQueryClient();
-  const { data: models, isLoading } = useQuery(modelQueries.list());
-  const { data: providers } = useQuery(providerQueries.list());
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    modelQueries.list(
+      modelTableInput({ capability: filterCapability, q: search, page })
+    )
+  );
+  const { data: providers } = useQuery(providerQueries.forSelect());
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
+    queryClient.invalidateQueries({ queryKey: modelQueries.all() });
 
   const createMutation = useMutation({
     mutationFn: mutating(createModel),
@@ -498,34 +507,15 @@ export default function ModelsPage() {
     enabled: isOpen && !!debouncedModelId
   });
 
-  const filteredModels = models?.filter(m => {
-    const matchesCapability =
-      filterCapability === 'all' || m.capability === filterCapability;
-    const matchesSearch =
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.modelId.toLowerCase().includes(search.toLowerCase()) ||
-      m.provider?.name.toLowerCase().includes(search.toLowerCase());
-
-    return matchesCapability && matchesSearch;
-  });
-
-  if (isLoading) {
-    return <ConsoleTableSkeleton columns={7} />;
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex max-w-2xl flex-1 items-center gap-2">
-          <div className="relative max-w-xs flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search models..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+      <ConsoleToolbar>
+        <ConsoleFilters>
+          <ConsoleSearch
+            placeholder="Search models..."
+            value={search}
+            onChange={setSearch}
+          />
           <Select value={filterCapability} onValueChange={setFilterCapability}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -539,7 +529,7 @@ export default function ModelsPage() {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </ConsoleFilters>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
@@ -938,12 +928,21 @@ export default function ModelsPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </ConsoleToolbar>
 
       <DataTable
         columns={columns}
-        data={filteredModels}
+        data={isLoading ? undefined : data?.rows}
         empty="No models configured. Add your first model to get started."
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
+          }
+        }
       />
 
       <AlertDialog

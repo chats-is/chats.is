@@ -7,7 +7,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,6 +18,7 @@ import {
 } from '@/types';
 import { ProviderTypes } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   createProvider,
   deleteProvider,
@@ -67,10 +67,15 @@ import {
 } from '@/components/console/data-table';
 import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
 import { ProviderModelSyncDialog } from '@/components/console/provider-model-sync-dialog';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { providerTableInput } from '@/components/console/table-filters';
+import {
+  ConsoleFilters,
+  ConsoleSearch,
+  ConsoleToolbar
+} from '@/components/console/toolbar';
 import { ModelIcon } from '@/components/model-icon';
 
-type Provider = Awaited<ReturnType<typeof listProviders>>[number];
+type Provider = Awaited<ReturnType<typeof listProviders>>['rows'][number];
 
 type ProviderForm = {
   name: string;
@@ -290,17 +295,20 @@ export default function ProvidersPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSearchFilter('q', '');
+  const [page, setPage] = useSearchFilter('page', 1);
   const [vertexMaskedApiKey, setVertexMaskedApiKey] = useState('');
   const [modelSyncProviderId, setModelSyncProviderId] = useState<string | null>(
     null
   );
 
   const queryClient = useQueryClient();
-  const { data: providers, isLoading } = useQuery(providerQueries.list());
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    providerQueries.list(providerTableInput({ q: search, page }))
+  );
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: providerQueries.key.list() });
+    queryClient.invalidateQueries({ queryKey: providerQueries.all() });
 
   const createMutation = useMutation({
     mutationFn: mutating(createProvider),
@@ -327,7 +335,7 @@ export default function ProvidersPage() {
     onError: error => toast.error(error.message)
   });
 
-  const editingProvider = providers?.find(p => p.id === editingId);
+  const editingProvider = data?.rows.find(p => p.id === editingId);
   const editingVertexKey = vertexKeyOf(editingProvider);
   const editingVertexAuthMode: VertexAuthMode | null =
     editingProvider?.type === 'vertex'
@@ -543,30 +551,16 @@ export default function ProvidersPage() {
       ? 'Bedrock: paste JSON containing region and AWS credentials.'
       : null;
 
-  const filteredProviders = providers?.filter(
-    p =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.type.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (isLoading) {
-    return <ConsoleTableSkeleton columns={6} />;
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex max-w-2xl flex-1 items-center gap-2">
-          <div className="relative max-w-xs flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search providers..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
+      <ConsoleToolbar>
+        <ConsoleFilters>
+          <ConsoleSearch
+            placeholder="Search providers..."
+            value={search}
+            onChange={setSearch}
+          />
+        </ConsoleFilters>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
@@ -834,15 +828,24 @@ export default function ProvidersPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </ConsoleToolbar>
 
       <DataTable
         columns={columns}
-        data={filteredProviders}
+        data={isLoading ? undefined : data?.rows}
         empty={
           search
             ? 'No providers found matching your search.'
             : 'No providers configured. Add your first provider to get started.'
+        }
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
+          }
         }
       />
 
@@ -884,7 +887,7 @@ export default function ProvidersPage() {
       <ProviderModelSyncDialog
         open={!!modelSyncProviderId}
         providerId={modelSyncProviderId}
-        providerName={providers?.find(p => p.id === modelSyncProviderId)?.name}
+        providerName={data?.rows.find(p => p.id === modelSyncProviderId)?.name}
         onOpenChange={open => {
           if (!open) setModelSyncProviderId(null);
         }}

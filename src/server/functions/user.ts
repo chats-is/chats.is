@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   profileUpdateSchema,
   userIdSchema,
@@ -26,7 +27,7 @@ export const updateProfile = createServerFn({ method: 'POST' })
 export const listUsers = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(userSearchSchema)
-  .handler(({ data }) => users.listUsers(data.search));
+  .handler(({ data }) => users.listUsers(data));
 
 /**
  * Admin: change a user's plan. Pass planId=null to clear (fall back to default).
@@ -70,10 +71,16 @@ export const userQueries = {
       queryKey: [...userQueries.key.me()] as const,
       queryFn: () => getMe()
     }),
-  list: (input: { limit?: number; offset?: number; search?: string } = {}) =>
+  /** One page of the console's user table. */
+  list: (input: { search?: string; page?: number; pageSize?: number } = {}) =>
     queryOptions({
       queryKey: [...userQueries.key.list(), input] as const,
-      queryFn: () => listUsers({ data: input })
+      queryFn: () =>
+        listUsers({ data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...input } }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
     }),
   detail: (input: { id: string }) =>
     queryOptions({

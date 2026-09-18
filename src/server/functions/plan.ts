@@ -1,7 +1,13 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { planCreateSchema, planIdSchema, planUpdateSchema } from '@/types/plan';
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import {
+  planCreateSchema,
+  planIdSchema,
+  planListSchema,
+  planUpdateSchema
+} from '@/types/plan';
 import { adminMiddleware } from '@/server/middleware';
 import * as plans from '@/server/services/plan';
 
@@ -10,10 +16,11 @@ export const listPublicPlans = createServerFn({ method: 'GET' }).handler(() =>
   plans.listPublicPlans()
 );
 
-/** Admin list — also returns user count per plan. */
+/** Admin list — one page, and the user count per plan. */
 export const listPlans = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => plans.listPlans());
+  .validator(planListSchema)
+  .handler(({ data }) => plans.listPlans(data));
 
 export const createPlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
@@ -43,9 +50,15 @@ export const planQueries = {
       queryKey: [...planQueries.key.listPublic()] as const,
       queryFn: () => listPublicPlans()
     }),
-  list: () =>
+  /** One page of the console's plan table. */
+  list: (input: { page?: number; pageSize?: number } = {}) =>
     queryOptions({
-      queryKey: [...planQueries.key.list()] as const,
-      queryFn: () => listPlans()
+      queryKey: [...planQueries.key.list(), input] as const,
+      queryFn: () =>
+        listPlans({ data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...input } }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
     })
 };

@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
+import { type z } from 'zod';
 
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   pricingIdSchema,
   pricingListSchema,
@@ -12,6 +14,10 @@ import {
 import { adminMiddleware } from '@/server/middleware';
 import * as pricing from '@/server/services/pricing';
 import * as pricingSync from '@/server/services/pricing-sync';
+
+/** How a caller may narrow the pricing table; all optional here because the
+ *  query key is built before the schema's defaults apply. */
+type PricingListInput = Partial<z.input<typeof pricingListSchema>>;
 
 export const listPricingWithModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
@@ -57,15 +63,18 @@ export const pricingQueries = {
     listWithModels: () => ['pricing', 'listWithModels'] as const,
     searchRemote: () => ['pricing', 'searchRemote'] as const
   },
-  listWithModels: (
-    input: {
-      capability?: 'chat' | 'image' | 'video' | 'audio';
-      providerId?: string;
-    } = {}
-  ) =>
+  /** One page of the console's pricing table. */
+  listWithModels: (input: PricingListInput = {}) =>
     queryOptions({
       queryKey: [...pricingQueries.key.listWithModels(), input] as const,
-      queryFn: () => listPricingWithModels({ data: input })
+      queryFn: () =>
+        listPricingWithModels({
+          data: { page: 1, pageSize: DEFAULT_PAGE_SIZE, ...input }
+        }),
+      // Paging changes the key, so without this every page turn would read as
+      // a first load and blank the table. The previous page stays on screen
+      // until the next one lands.
+      placeholderData: keepPreviousData
     }),
   /** Reads the upstream catalogue, so it is only fetched when asked for. */
   searchRemote: (input: {

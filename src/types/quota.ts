@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import { paginationSchema } from './pagination';
+
+/** The console's quota table, cut to one page. */
+export const quotaListSchema = z.object({ ...paginationSchema.shape });
+
 /** Which layer in the resolution chain produced the user's effective quota. */
 export type ResolvedSource = 'override' | 'plan' | 'default' | 'none';
 

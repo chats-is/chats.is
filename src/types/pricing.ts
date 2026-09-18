@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { type modelPricings } from '@/db/schema';
 
 import { modelCapabilitySchema } from './model';
+import { paginationSchema } from './pagination';
 
 /** A row in `model_pricing`. Inferred from the Drizzle schema. */
 export type PricingRecord = typeof modelPricings.$inferSelect;
@@ -81,10 +82,14 @@ const priceNumberSchema = z
     return n.toString();
   });
 
-/** What the pricing server functions accept. */
+/** What the pricing server functions accept. The console's pricing table is
+ *  narrowed, then cut to one page. */
 export const pricingListSchema = z.object({
   capability: modelCapabilitySchema.optional(),
-  providerId: z.string().optional()
+  providerId: z.string().optional(),
+  /** Matches a model's name, its model id, or its provider's name. */
+  q: z.string().optional(),
+  ...paginationSchema.shape
 });
 
 export const pricingUpsertSchema = z.object({

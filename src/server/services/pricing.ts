@@ -1,7 +1,7 @@
 import '@tanstack/react-start/server-only';
 
 import { cache } from 'react';
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, or } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -9,13 +9,14 @@ import {
   type PriceSnapshot,
   type PricingRecord
 } from '@/types';
+import { pageWindow } from '@/types/pagination';
 import {
   type pricingListSchema,
   type pricingUpsertSchema
 } from '@/types/pricing';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
-import { modelPricings, models } from '@/db/schema';
+import { modelPricings, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 const EMPTY_SNAPSHOT: PriceSnapshot = {
@@ -387,21 +388,52 @@ const roundCost = (n: number) =>
 export async function listPricingWithModels(
   filter: z.infer<typeof pricingListSchema>
 ) {
-  const result = await db.query.models.findMany({
-    where: and(
-      filter.capability ? eq(models.capability, filter.capability) : undefined,
-      filter.providerId ? eq(models.providerId, filter.providerId) : undefined
-    ),
-    with: {
-      provider: true,
-      pricings: { limit: 1 }
-    },
-    orderBy: (m, { asc, desc }) => [asc(m.displayOrder), desc(m.createdAt)]
-  });
-  return result.map(m => ({
-    ...m,
-    pricing: m.pricings[0] ?? null
-  }));
+  const search = filter.q?.trim();
+  const term = search ? `%${search}%` : null;
+  const where = and(
+    filter.capability ? eq(models.capability, filter.capability) : undefined,
+    filter.providerId ? eq(models.providerId, filter.providerId) : undefined,
+    term
+      ? or(
+          ilike(models.name, term),
+          ilike(models.modelId, term),
+          // A relational `where` cannot reach the joined provider row, so name
+          // the providers whose name matches instead.
+          inArray(
+            models.providerId,
+            db
+              .select({ id: providers.id })
+              .from(providers)
+              .where(ilike(providers.name, term))
+          )
+        )
+      : undefined
+  );
+
+  const [result, [totalRow]] = await Promise.all([
+    db.query.models.findMany({
+      where,
+      ...pageWindow(filter),
+      with: {
+        provider: true,
+        pricings: { limit: 1 }
+      },
+      // `id` last so the order is total, which offset paging depends on.
+      orderBy: (m, { asc, desc }) => [
+        asc(m.displayOrder),
+        desc(m.createdAt),
+        asc(m.id)
+      ]
+    }),
+    db.select({ count: count() }).from(models).where(where)
+  ]);
+
+  return {
+    rows: result.map(m => ({ ...m, pricing: m.pricings[0] ?? null })),
+    total: Number(totalRow?.count ?? 0),
+    page: filter.page,
+    pageSize: filter.pageSize
+  };
 }
 
 /**
