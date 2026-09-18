@@ -186,30 +186,3 @@ export function ConsoleUsageSkeleton({ columns = 6 }: { columns?: number }) {
     </div>
   );
 }
-
-/**
- * The stand-in for a console page named only by its address.
- *
- * The layout's own wait covers the whole content area, so the page's own
- * pending component has not been reached yet — the layout is what has to know
- * what is coming, and the address is all it has to go on. Each route still
- * declares its own, more exact, placeholder for its own wait; this is the
- * coarser guess made one level up, and a page not named here is a table,
- * because most of the console is.
- */
-export function ConsoleContentSkeleton({ pathname }: { pathname: string }) {
-  if (pathname === '/console' || pathname === '/console/') {
-    return <ConsoleCardsSkeleton />;
-  }
-  if (pathname.startsWith('/console/settings')) {
-    return <ConsoleSettingsSkeleton />;
-  }
-  // Usage, and a single user, are both a run of stats over a log.
-  if (
-    pathname.startsWith('/console/usage') ||
-    /^\/console\/users\/[^/]+$/.test(pathname)
-  ) {
-    return <ConsoleUsageSkeleton />;
-  }
-  return <ConsoleTableSkeleton />;
-}

@@ -7,6 +7,7 @@ import { sessionQueries } from '@/server/functions/auth';
 import { settingsQueries } from '@/server/functions/settings';
 import { userQueries } from '@/server/functions/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { RoutePending } from '@/components/route-pending';
 import { SettingsDialogProvider } from '@/components/settings-dialog';
 import { Sidebar } from '@/components/sidebar';
 
@@ -17,10 +18,9 @@ import { Sidebar } from '@/components/sidebar';
  * so a signed-out visitor is sent to sign in instead of watching a page render
  * whose every read would then be refused.
  */
-// No pending component on this layout either. It wraps the sidebar and
-// whichever page is open, so standing in for it while one chat's data loads
-// would take the whole shell down with it — and an invalidated match skips the
-// usual grace period, so it would not even be brief.
+// The wait for this subtree is the wait for the shell itself: until the guard
+// has answered and the settings are in, there is no sidebar to keep and no page
+// to put beside it. Once the shell is up the pages below wait on their own.
 export const Route = createFileRoute('/_chat')({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(sessionQueries.me());
@@ -39,6 +39,7 @@ export const Route = createFileRoute('/_chat')({
     ]);
     return settings;
   },
+  pendingComponent: RoutePending,
   component: ChatLayout
 });
 
