@@ -34,6 +34,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { userTableInput } from '@/components/console/table-filters';
 import {
   ConsoleFilters,
@@ -250,6 +251,35 @@ const userColumns = (ctx: {
       }
     })
   ]);
+
+/** Stands in for the row actions, which a placeholder row can never call. */
+const noop = () => {};
+
+/**
+ * The page while its first rows are on their way.
+ *
+ * Built from the same column defs the table uses, so the header is the real one
+ * and only the rows stand in. Exported as a component rather than as the column
+ * list itself: a module that exports anything but components loses Fast Refresh
+ * for everything in it.
+ *
+ * The actions are empty because they cannot fire — a placeholder row has no
+ * record to act on, and the cells that would call them are bars.
+ */
+export function UsersPending() {
+  return (
+    <ConsoleTableSkeleton
+      columns={userColumns({
+        quotaOptions: undefined,
+        updatingRoleUserId: null,
+        updatingQuotaUserId: null,
+        setRole: noop,
+        setQuota: noop
+      })}
+      action="text"
+    />
+  );
+}
 
 export default function UsersPage() {
   const [search, setSearch] = useSearchFilter('q', '');

@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/functions/model';
 import { ModelsSettings } from '@/components/console/settings/models';
-import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
 
 export const Route = createFileRoute('/console/settings/models')({
   loader: ({ context }) =>
@@ -11,6 +11,6 @@ export const Route = createFileRoute('/console/settings/models')({
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Models Settings') }]
   }),
-  pendingComponent: () => <ConsoleTableSkeleton columns={3} toolbar={false} />,
+  pendingComponent: ConsoleSettingsPanelSkeleton,
   component: ModelsSettings
 });

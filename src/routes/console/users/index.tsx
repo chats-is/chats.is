@@ -6,7 +6,7 @@ import { pageTitle } from '@/lib/head';
 import { quotaQueries } from '@/server/functions/quota';
 import { userQueries } from '@/server/functions/user';
 import { userTableInput } from '@/components/console/table-filters';
-import Users from '@/components/console/users';
+import Users, { UsersPending } from '@/components/console/users';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
  *  and come back to. Each is optional: a filter at its default is simply
@@ -19,25 +19,27 @@ const searchSchema = z.object({
 export const Route = createFileRoute('/console/users/')({
   validateSearch: searchSchema,
   /**
-   * Starts the page's queries without waiting for them.
+   * The unfiltered first page, awaited — and deliberately not a function of the
+   * address. Were the page and the filters read here, every page turn and every
+   * keystroke would re-run this loader and stand the placeholder in front of a
+   * table that is already on screen. They belong to the table's own query,
+   * which keeps the previous page visible while the next one loads.
    *
-   * An awaited loader makes the route pend, and a pending route shows a
-   * placeholder for the whole page — the console layout's, if this route
-   * declares none. That is the wrong shape for a table whose chrome (heading,
-   * search box, pager) is ready immediately and whose rows are the only thing
-   * still coming: the table stands in for its own rows, in its own outline.
+   * The key is the one the component asks for on a plain visit, so it mounts
+   * with data rather than skeletoning a second time.
    *
-   * So these are fired and not awaited. The request still leaves before the
-   * component mounts; the component simply renders its skeleton rows rather
-   * than the route withholding the page until the rows exist.
+   * The counts in the toolbar and the quota options are started alongside but
+   * not waited for: the toolbar stands in for the counts, and the options fill
+   * a select inside a row that does not exist yet.
    */
   loader: ({ context }) => {
-    void context.queryClient.prefetchQuery(
-      userQueries.list(userTableInput({}))
-    );
     void context.queryClient.prefetchQuery(userQueries.stats());
     void context.queryClient.prefetchQuery(quotaQueries.listForSelect());
+    return context.queryClient.ensureQueryData(
+      userQueries.list(userTableInput({}))
+    );
   },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Users') }] }),
+  pendingComponent: UsersPending,
   component: Users
 });

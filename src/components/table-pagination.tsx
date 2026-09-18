@@ -12,6 +12,7 @@ import {
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * The pager under a paged table.
@@ -73,6 +74,25 @@ export function LocalTablePagination({
       total={total}
       onPageChange={onPageChange}
     />
+  );
+}
+
+/**
+ * The pager's footprint, before there is a count to page through.
+ *
+ * The real pager hides itself at a single page, so this is a guess that the
+ * table has more than one — but a guess that reserves space is the right way
+ * round: the rows land in place instead of the page growing under the reader.
+ *
+ * One row height for both sides, so the count on the left sits on the same
+ * line as the buttons on the right rather than riding higher.
+ */
+export function TablePaginationSkeleton() {
+  return (
+    <div className="flex h-8 items-center justify-between gap-2">
+      <Skeleton className="h-4 w-40 max-w-[35%]" />
+      <Skeleton className="h-8 w-64 max-w-[60%] rounded-full" />
+    </div>
   );
 }
 

@@ -73,6 +73,7 @@ import {
   DataTable
 } from '@/components/console/data-table';
 import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { modelTableInput } from '@/components/console/table-filters';
 import {
   ConsoleFilters,
@@ -329,6 +330,29 @@ const modelColumns = (actions: {
       )
     })
   ]);
+
+/** Stands in for the row actions, which a placeholder row can never call. */
+const noop = () => {};
+
+/**
+ * The page while its first rows are on their way.
+ *
+ * Built from the same column defs the table uses, so the header is the real one
+ * and only the rows stand in. Exported as a component rather than as the column
+ * list itself: a module that exports anything but components loses Fast Refresh
+ * for everything in it.
+ *
+ * The actions are empty because they cannot fire — a placeholder row has no
+ * record to act on, and the cells that would call them are bars.
+ */
+export function ModelsPending() {
+  return (
+    <ConsoleTableSkeleton
+      columns={modelColumns({ toggle: noop, edit: noop, remove: noop })}
+      filters={1}
+    />
+  );
+}
 
 export default function ModelsPage() {
   const [isOpen, setIsOpen] = useState(false);
