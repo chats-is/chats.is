@@ -47,7 +47,13 @@ function ConsoleLayout() {
         <SettingsDialogProvider>
           <SidebarProvider>
             <Sidebar />
-            <SidebarInset className="h-svh">
+            {/* Exactly one viewport tall, and it says so: the header is meant to
+                sit still while the page under it scrolls, so nothing inside is
+                allowed to push this box taller than the screen. Without the
+                clip a tall page scrolls the whole console — header included —
+                and the reader gets a second scrollbar beside the one that is
+                supposed to be there. */}
+            <SidebarInset className="h-svh overflow-hidden">
               <ConsoleHeader />
               <div className="min-h-0 flex-1 overflow-y-auto p-6">
                 <Outlet />

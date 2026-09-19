@@ -6,8 +6,20 @@ import {
 
 import { SettingsForm, SettingsLoading, useSettingsForm } from './shared';
 
-const KEYS = ['app.name', 'app.subtitle', 'app.description'] as const;
+const KEYS = [
+  'app.name',
+  'app.subtitle',
+  'app.description',
+  'default.chat.systemPrompt'
+] as const;
 
+/**
+ * What this installation calls itself, and what it says to every model.
+ *
+ * Both are written rather than chosen, which is why they share a page and why
+ * neither is a row in a list: a name and a prompt are typed into, and a field
+ * wide enough to type into is the whole point.
+ */
 export function GeneralSettings() {
   const { form, isLoading } = useSettingsForm(KEYS);
 
@@ -15,9 +27,11 @@ export function GeneralSettings() {
 
   return (
     <SettingsForm form={form}>
-      <div className="rounded-lg border p-4">
-        <h2 className="mb-4 text-lg font-semibold">Application</h2>
-        <div className="grid gap-4 md:grid-cols-2">
+      <div className="overflow-hidden rounded-lg border">
+        <h2 className="border-b bg-muted px-4 py-3 font-semibold">
+          Application
+        </h2>
+        <div className="grid gap-4 p-4 md:grid-cols-2">
           <form.AppField name="app.name">
             {field => (
               <field.TextField
@@ -42,7 +56,29 @@ export function GeneralSettings() {
                 label="App Description"
                 placeholder={DEFAULT_APP_DESCRIPTION}
                 rows={3}
-                fieldClassName="col-span-2"
+                fieldClassName="md:col-span-2"
+              />
+            )}
+          </form.AppField>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border">
+        <h2
+          id="system-prompt-heading"
+          className="border-b bg-muted px-4 py-3 font-semibold"
+        >
+          Default Chat System Prompt
+        </h2>
+        <div className="p-4">
+          {/* The heading names this field, so it carries no label of its own
+              rather than saying the same thing twice. */}
+          <form.AppField name="default.chat.systemPrompt">
+            {field => (
+              <field.TextareaField
+                aria-labelledby="system-prompt-heading"
+                placeholder="Added to every chat, after the app's own system prompt and before the model's own."
+                rows={12}
               />
             )}
           </form.AppField>

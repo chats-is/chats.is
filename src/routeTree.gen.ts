@@ -35,10 +35,8 @@ import { Route as ApiArtifactsPreviewRouteImport } from './routes/api/artifacts/
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiFilesUploadRouteImport } from './routes/api/files/upload'
 import { Route as ConsoleSettingsIndexRouteImport } from './routes/console/settings/index'
+import { Route as ConsoleSettingsDefaultsRouteImport } from './routes/console/settings/defaults'
 import { Route as ConsoleSettingsGeneralRouteImport } from './routes/console/settings/general'
-import { Route as ConsoleSettingsModelsRouteImport } from './routes/console/settings/models'
-import { Route as ConsoleSettingsPromptsRouteImport } from './routes/console/settings/prompts'
-import { Route as ConsoleSettingsQuotaRouteImport } from './routes/console/settings/quota'
 import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users/index'
 import { Route as ConsoleUsersUserIdRouteImport } from './routes/console/users/$userId'
 
@@ -171,24 +169,14 @@ const ConsoleSettingsIndexRoute = ConsoleSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ConsoleSettingsRoute,
 } as any)
+const ConsoleSettingsDefaultsRoute = ConsoleSettingsDefaultsRouteImport.update({
+  id: '/defaults',
+  path: '/defaults',
+  getParentRoute: () => ConsoleSettingsRoute,
+} as any)
 const ConsoleSettingsGeneralRoute = ConsoleSettingsGeneralRouteImport.update({
   id: '/general',
   path: '/general',
-  getParentRoute: () => ConsoleSettingsRoute,
-} as any)
-const ConsoleSettingsModelsRoute = ConsoleSettingsModelsRouteImport.update({
-  id: '/models',
-  path: '/models',
-  getParentRoute: () => ConsoleSettingsRoute,
-} as any)
-const ConsoleSettingsPromptsRoute = ConsoleSettingsPromptsRouteImport.update({
-  id: '/prompts',
-  path: '/prompts',
-  getParentRoute: () => ConsoleSettingsRoute,
-} as any)
-const ConsoleSettingsQuotaRoute = ConsoleSettingsQuotaRouteImport.update({
-  id: '/quota',
-  path: '/quota',
   getParentRoute: () => ConsoleSettingsRoute,
 } as any)
 const ConsoleUsersIndexRoute = ConsoleUsersIndexRouteImport.update({
@@ -227,10 +215,8 @@ export interface FileRoutesByFullPath {
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
+  '/console/settings/defaults': typeof ConsoleSettingsDefaultsRoute
   '/console/settings/general': typeof ConsoleSettingsGeneralRoute
-  '/console/settings/models': typeof ConsoleSettingsModelsRoute
-  '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
-  '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/settings/': typeof ConsoleSettingsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
@@ -258,10 +244,8 @@ export interface FileRoutesByTo {
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
+  '/console/settings/defaults': typeof ConsoleSettingsDefaultsRoute
   '/console/settings/general': typeof ConsoleSettingsGeneralRoute
-  '/console/settings/models': typeof ConsoleSettingsModelsRoute
-  '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
-  '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/settings': typeof ConsoleSettingsIndexRoute
   '/console/users': typeof ConsoleUsersIndexRoute
@@ -293,10 +277,8 @@ export interface FileRoutesById {
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
+  '/console/settings/defaults': typeof ConsoleSettingsDefaultsRoute
   '/console/settings/general': typeof ConsoleSettingsGeneralRoute
-  '/console/settings/models': typeof ConsoleSettingsModelsRoute
-  '/console/settings/prompts': typeof ConsoleSettingsPromptsRoute
-  '/console/settings/quota': typeof ConsoleSettingsQuotaRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/settings/': typeof ConsoleSettingsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
@@ -328,10 +310,8 @@ export interface FileRouteTypes {
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
+    | '/console/settings/defaults'
     | '/console/settings/general'
-    | '/console/settings/models'
-    | '/console/settings/prompts'
-    | '/console/settings/quota'
     | '/console/users/$userId'
     | '/console/settings/'
     | '/console/users/'
@@ -359,10 +339,8 @@ export interface FileRouteTypes {
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
+    | '/console/settings/defaults'
     | '/console/settings/general'
-    | '/console/settings/models'
-    | '/console/settings/prompts'
-    | '/console/settings/quota'
     | '/console/users/$userId'
     | '/console/settings'
     | '/console/users'
@@ -393,10 +371,8 @@ export interface FileRouteTypes {
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
+    | '/console/settings/defaults'
     | '/console/settings/general'
-    | '/console/settings/models'
-    | '/console/settings/prompts'
-    | '/console/settings/quota'
     | '/console/users/$userId'
     | '/console/settings/'
     | '/console/users/'
@@ -600,32 +576,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleSettingsIndexRouteImport
       parentRoute: typeof ConsoleSettingsRoute
     }
+    '/console/settings/defaults': {
+      id: '/console/settings/defaults'
+      path: '/defaults'
+      fullPath: '/console/settings/defaults'
+      preLoaderRoute: typeof ConsoleSettingsDefaultsRouteImport
+      parentRoute: typeof ConsoleSettingsRoute
+    }
     '/console/settings/general': {
       id: '/console/settings/general'
       path: '/general'
       fullPath: '/console/settings/general'
       preLoaderRoute: typeof ConsoleSettingsGeneralRouteImport
-      parentRoute: typeof ConsoleSettingsRoute
-    }
-    '/console/settings/models': {
-      id: '/console/settings/models'
-      path: '/models'
-      fullPath: '/console/settings/models'
-      preLoaderRoute: typeof ConsoleSettingsModelsRouteImport
-      parentRoute: typeof ConsoleSettingsRoute
-    }
-    '/console/settings/prompts': {
-      id: '/console/settings/prompts'
-      path: '/prompts'
-      fullPath: '/console/settings/prompts'
-      preLoaderRoute: typeof ConsoleSettingsPromptsRouteImport
-      parentRoute: typeof ConsoleSettingsRoute
-    }
-    '/console/settings/quota': {
-      id: '/console/settings/quota'
-      path: '/quota'
-      fullPath: '/console/settings/quota'
-      preLoaderRoute: typeof ConsoleSettingsQuotaRouteImport
       parentRoute: typeof ConsoleSettingsRoute
     }
     '/console/users/': {
@@ -662,18 +624,14 @@ const ChatRouteChildren: ChatRouteChildren = {
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface ConsoleSettingsRouteChildren {
+  ConsoleSettingsDefaultsRoute: typeof ConsoleSettingsDefaultsRoute
   ConsoleSettingsGeneralRoute: typeof ConsoleSettingsGeneralRoute
-  ConsoleSettingsModelsRoute: typeof ConsoleSettingsModelsRoute
-  ConsoleSettingsPromptsRoute: typeof ConsoleSettingsPromptsRoute
-  ConsoleSettingsQuotaRoute: typeof ConsoleSettingsQuotaRoute
   ConsoleSettingsIndexRoute: typeof ConsoleSettingsIndexRoute
 }
 
 const ConsoleSettingsRouteChildren: ConsoleSettingsRouteChildren = {
+  ConsoleSettingsDefaultsRoute: ConsoleSettingsDefaultsRoute,
   ConsoleSettingsGeneralRoute: ConsoleSettingsGeneralRoute,
-  ConsoleSettingsModelsRoute: ConsoleSettingsModelsRoute,
-  ConsoleSettingsPromptsRoute: ConsoleSettingsPromptsRoute,
-  ConsoleSettingsQuotaRoute: ConsoleSettingsQuotaRoute,
   ConsoleSettingsIndexRoute: ConsoleSettingsIndexRoute,
 }
 

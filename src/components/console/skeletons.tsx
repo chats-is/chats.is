@@ -173,29 +173,9 @@ export function ConsoleCardsSkeleton({ count = 5 }: { count?: number }) {
 }
 
 /**
- * Settings as the layout above it sees them: nav and panel both still to come.
- * Once the settings route itself is loading, the nav is real and only
- * `ConsoleSettingsPanelSkeleton` is needed.
- */
-export function ConsoleSettingsSkeleton() {
-  return (
-    <div className="flex flex-col gap-0 lg:flex-row">
-      <nav className="flex w-full shrink-0 flex-col gap-1 lg:w-52">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-9 w-full" />
-        ))}
-      </nav>
-      <div className="min-w-0 flex-1 lg:pl-8">
-        <ConsoleSettingsPanelSkeleton />
-      </div>
-    </div>
-  );
-}
-
-/**
- * The settings panel the nav switches between — a run of labelled fields. The
- * nav itself is a static list, so the route shows the real one and only the
- * panel stands in.
+ * The settings panel the tabs switch between — a run of labelled fields. The
+ * tabs themselves are a static list, so the route shows the real ones and only
+ * the panel under them stands in.
  */
 export function ConsoleSettingsPanelSkeleton() {
   return (
