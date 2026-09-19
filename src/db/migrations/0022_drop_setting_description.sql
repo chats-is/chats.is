@@ -1,0 +1,1 @@
+ALTER TABLE "setting" DROP COLUMN "description";

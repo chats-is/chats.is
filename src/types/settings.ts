@@ -8,8 +8,7 @@ import { z } from 'zod';
  */
 export const settingSchema = z.object({
   key: z.string().min(1).max(100),
-  value: z.string().nullable(),
-  description: z.string().max(500).optional()
+  value: z.string().nullable()
 });
 
 /** A bulk write is the same row shape, several at a time. */

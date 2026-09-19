@@ -225,18 +225,13 @@ export async function updateSetting(input: z.infer<typeof settingSchema>) {
   if (existing) {
     await db
       .update(settings)
-      .set({
-        value: input.value,
-        description: input.description ?? existing.description,
-        updatedAt: new Date()
-      })
+      .set({ value: input.value, updatedAt: new Date() })
       .where(eq(settings.key, input.key));
   } else {
     await db.insert(settings).values({
       id: generateUUID(),
       key: input.key,
-      value: input.value,
-      description: input.description
+      value: input.value
     });
   }
 }

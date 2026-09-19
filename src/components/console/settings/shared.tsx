@@ -16,32 +16,6 @@ import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
 import { expand, readPath } from './values';
 
 /**
- * Descriptions persisted alongside each setting. Kept in one place because the
- * settings are split across pages but the descriptions are a property of the
- * key, not of the page that happens to edit it.
- */
-const SETTING_DESCRIPTIONS: Record<string, string> = {
-  'app.name': 'Product name displayed in the UI',
-  'app.subtitle': 'Product subtitle',
-  'app.description': 'Product description for SEO',
-  'default.chat.modelId': 'Default model for chat',
-  'default.image.modelId': 'Default model for image generation',
-  'default.image.editModelId': 'Default model for editing an existing image',
-  'default.video.modelId': 'Default model for video generation',
-  'default.video.imageModelId':
-    'Default model for turning an image into a video',
-  'default.video.editModelId': 'Default model for editing an existing video',
-  'default.tts.modelId':
-    'Default model for text-to-speech, including reading messages aloud',
-  'default.stt.modelId':
-    'Default model for speech-to-text (chat transcribe tool)',
-  'speech.enabled': 'Enable or disable reading messages aloud',
-  'default.chat.systemPrompt': 'Default system prompt for chat',
-  'title.modelId': 'Model used for generating chat titles',
-  'default.quotaId': 'Quota id used for users without an assigned plan'
-};
-
-/**
  * Load the settings a page owns, track edits, and save just those keys.
  *
  * Every settings page runs this hook with its own key list. They share one
@@ -78,11 +52,7 @@ export function useSettingsForm(keys: readonly string[]) {
     defaultValues: valuesOf(settings),
     onSubmit: async ({ value }) => {
       await mutation.mutateAsync(
-        keys.map(key => ({
-          key,
-          value: readPath(value, key) || null,
-          description: SETTING_DESCRIPTIONS[key]
-        }))
+        keys.map(key => ({ key, value: readPath(value, key) || null }))
       );
       // The values just saved become the ones "no changes" is measured from,
       // so the Save button settles rather than staying lit.

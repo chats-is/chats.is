@@ -556,7 +556,6 @@ export const settings = createTable('setting', {
   id: varchar('id', { length: 255 }).notNull().primaryKey(),
   key: varchar('key', { length: 100 }).notNull().unique(),
   value: text('value'),
-  description: varchar('description', { length: 500 }),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow()
