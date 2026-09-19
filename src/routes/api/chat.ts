@@ -20,7 +20,8 @@ import {
   type Artifact,
   type ChatErrorKind,
   type ChatMessage,
-  type MessageMetadata
+  type MessageMetadata,
+  type Provider
 } from '@/types';
 import {
   artifactKindFromType,
@@ -34,9 +35,8 @@ import { ArtifactSystemPrompt } from '@/lib/constant';
 import { pickEffort } from '@/lib/media-options';
 import {
   AllProvidersFailedError,
-  bindingsToFailoverProviders,
   getLanguageModel,
-  type FailoverProvider
+  PROVIDER_FAILURE_MESSAGE
 } from '@/lib/provider';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
 import { BASE_SYSTEM_PROMPT } from '@/lib/system-prompt';
@@ -156,7 +156,7 @@ async function POST({ request: req }: { request: Request }) {
 
   // Fetch model from database to validate
   const dbModel = await findModelByModelId(modelId, 'chat');
-  const candidates = bindingsToFailoverProviders(dbModel?.providers ?? []);
+  const candidates = dbModel?.providers.map(binding => binding.provider!) ?? [];
 
   // A refusal is not returned as an HTTP error: it is persisted as the
   // assistant turn, so the user still sees why when they come back to the
@@ -358,7 +358,7 @@ async function POST({ request: req }: { request: Request }) {
     // the model carries, follow it verbatim.
     const systemMessage = [
       formatString(BASE_SYSTEM_PROMPT, {
-        provider: dbModel.provider?.name || '',
+        provider: dbModel.providers[0]?.provider?.name || '',
         modelId,
         // The server's clock, told in the user's zone. Sending their own
         // timestamp would carry their clock's errors with it; sending UTC
@@ -756,7 +756,7 @@ async function POST({ request: req }: { request: Request }) {
           })
         );
 
-        const buildStream = (failoverProvider: FailoverProvider) =>
+        const buildStream = (failoverProvider: Provider) =>
           streamText({
             model: getLanguageModel(failoverProvider, modelId),
             instructions: [
@@ -854,8 +854,14 @@ async function POST({ request: req }: { request: Request }) {
           }
         }
         if (!res) {
+          console.error(
+            '[chat] every provider failed',
+            failoverAttempts.map(
+              attempt => `${attempt.provider}: ${describeError(attempt.error)}`
+            )
+          );
           throw new AllProvidersFailedError(
-            'All providers failed',
+            PROVIDER_FAILURE_MESSAGE,
             failoverAttempts
           );
         }

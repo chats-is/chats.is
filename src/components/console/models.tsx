@@ -265,13 +265,10 @@ const modelColumns = (actions: {
       header: 'Provider',
       meta: { cellClassName: 'text-sm' },
       cell: ({ row }) => {
-        const bound = row.original.modelProviders ?? [];
-        return bound.length > 0
-          ? bound
-              .map(mp => mp.provider?.name)
-              .filter(Boolean)
-              .join(', ')
-          : row.original.provider?.name;
+        return (row.original.providers ?? [])
+          .map(binding => binding.provider?.name)
+          .filter(Boolean)
+          .join(', ');
       }
     }),
     helper.accessor('capability', {
@@ -468,7 +465,7 @@ export default function ModelsPage() {
       return;
     }
 
-    const bindings = (model.modelProviders ?? [])
+    const bindings = (model.providers ?? [])
       .slice()
       .sort((a, b) => a.priority - b.priority)
       .map(b => ({ providerId: b.providerId, isEnabled: b.isEnabled }));
@@ -493,10 +490,10 @@ export default function ModelsPage() {
       apiParams: model.apiParams
         ? JSON.stringify(model.apiParams, null, 2)
         : '',
+      // A model always has at least one binding, but the form needs a row to
+      // draw even if one ever arrives without.
       providers:
-        bindings.length > 0
-          ? bindings
-          : [{ providerId: model.providerId || '', isEnabled: true }]
+        bindings.length > 0 ? bindings : [{ providerId: '', isEnabled: true }]
     };
     setDefaults(values);
     form.reset(values);

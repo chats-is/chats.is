@@ -15,10 +15,12 @@ import {
   type LucideIcon
 } from 'lucide-react';
 
+import { type ModelStatus } from '@/types/model';
 import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { ModelStatusBadge } from '@/components/console/model-status';
 
 import { SettingsList, SettingsRow, type RowState } from './list';
 import { DefaultsPending } from './pending';
@@ -41,15 +43,17 @@ type ModelLike = {
   modelId: string;
   name: string;
   capability: string;
-  isEnabled: boolean;
+  /** Worked out by the server from this model's switch and its providers'. */
+  status: ModelStatus;
   supportsImageEdit?: boolean | null;
   supportsImageToVideo?: boolean | null;
   supportsVideoEdit?: boolean | null;
   supportsTranscription?: boolean | null;
 };
 
-/** One "pick a model for this job" setting. `can` is what makes a model
- *  eligible; being enabled is required of all of them and is not restated. */
+/** One "pick a model for this job" setting. `can` is what the job asks of a
+ *  model — a capability, sometimes a flag beside it. Whether the model can
+ *  answer at all is its status, which is a separate question. */
 type ModelRow = {
   key: string;
   label: string;
@@ -162,8 +166,14 @@ function statusOf(
 
   const model = models.find(candidate => candidate.modelId === value);
   if (!model) return { state: 'stale', flag: 'That model is no longer listed' };
-  if (!model.isEnabled) {
+  if (model.status === 'disabled') {
     return { state: 'stale', flag: `${model.name} is disabled` };
+  }
+  if (model.status === 'no-enabled-provider') {
+    return {
+      state: 'stale',
+      flag: `Providers for ${model.name} are unavailable`
+    };
   }
   if (!row.can(model)) {
     return { state: 'stale', flag: `${model.name} can no longer do this` };
@@ -215,9 +225,22 @@ export function DefaultsSettings() {
       >
         {MODEL_ROWS.map((row, index) => {
           const status = statuses[index];
+          // Every model the job could use, the ones that cannot answer today
+          // included: a model that is switched off is a thing the admin can go
+          // and switch on, and leaving it out only raises the question of
+          // where it went. The badge says which; it does not bar the choice.
           const options = (models ?? [])
-            .filter(model => model.isEnabled && row.can(model))
-            .map(model => ({ value: model.modelId, label: model.name }));
+            .filter(model => row.can(model))
+            .map(model => ({
+              value: model.modelId,
+              label: model.name,
+              node: (
+                <span className="flex items-center gap-2">
+                  {model.name}
+                  <ModelStatusBadge status={model.status} />
+                </span>
+              )
+            }));
 
           return (
             <SettingsRow

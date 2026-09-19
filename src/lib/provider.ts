@@ -14,13 +14,13 @@ import { GoogleGenAI } from '@google/genai';
 import {
   APICallError,
   type ImageModel,
-  type JSONValue,
   type LanguageModel,
   type SpeechModel,
   type TranscriptionModel
 } from 'ai';
 
 import {
+  type Provider,
   type ProviderConfig,
   type ProviderType,
   type VertexServiceAccountKey
@@ -217,16 +217,6 @@ export function getTranscriptionModel(
 // ============================================================================
 
 /**
- * A provider candidate for a model, carrying both the SDK config and the
- * identity needed for usage attribution. All candidates serve the same
- * modelId — failover switches the provider, never the model.
- */
-export type FailoverProvider = ProviderConfig & {
-  id: string;
-  name: string;
-};
-
-/**
  * The upstream model id a provider type actually receives for a logical modelId.
  * Vertex/Bedrock rename Anthropic models; everyone else uses modelId as-is.
  * Used to match a model against a provider's listed models (compatibility check).
@@ -237,6 +227,17 @@ export function toProviderModelId(type: ProviderType, modelId: string): string {
   return modelId;
 }
 
+/**
+ * What a reader is told when none of a model's providers answered.
+ *
+ * Addressed to the person looking at a chat, not to whoever runs the install:
+ * which providers were tried and what each said goes to the log. Retrying is
+ * worth a try — unlike a model that does not resolve at all, this one failed
+ * in flight and may not next time.
+ */
+export const PROVIDER_FAILURE_MESSAGE =
+  'This model is currently unavailable. Please try again or choose a different model.';
+
 export class AllProvidersFailedError extends Error {
   constructor(
     message: string,
@@ -245,37 +246,6 @@ export class AllProvidersFailedError extends Error {
     super(message);
     this.name = 'AllProvidersFailedError';
   }
-}
-
-/**
- * Map priority-ordered model→provider bindings (as returned by `findModelByModelId`)
- * into failover candidates. Bindings without a loaded provider row are skipped.
- */
-export function bindingsToFailoverProviders(
-  bindings: Array<{
-    provider: {
-      id: string;
-      name: string;
-      type: ProviderType;
-      apiKey?: string | null;
-      baseUrl?: string | null;
-      apiOptions?: Record<string, JSONValue> | null;
-    } | null;
-  }>
-): FailoverProvider[] {
-  return bindings
-    .filter(
-      (b): b is typeof b & { provider: NonNullable<typeof b.provider> } =>
-        b.provider != null
-    )
-    .map(b => ({
-      id: b.provider.id,
-      name: b.provider.name,
-      type: b.provider.type,
-      apiKey: b.provider.apiKey,
-      baseUrl: b.provider.baseUrl,
-      apiOptions: b.provider.apiOptions
-    }));
 }
 
 /**
@@ -326,10 +296,10 @@ export function isRetryableProviderError(error: unknown): boolean {
  * swapped without duplicating output.
  */
 export async function runWithProviderFailover<T>(
-  providers: FailoverProvider[],
-  run: (provider: FailoverProvider) => Promise<T>,
+  providers: Provider[],
+  run: (provider: Provider) => Promise<T>,
   options?: { shouldRetry?: (error: unknown) => boolean }
-): Promise<{ result: T; provider: FailoverProvider }> {
+): Promise<{ result: T; provider: Provider }> {
   const shouldRetry = options?.shouldRetry ?? isRetryableProviderError;
   const attempts: { provider: string; error: unknown }[] = [];
 
@@ -347,7 +317,21 @@ export async function runWithProviderFailover<T>(
     }
   }
 
-  throw new AllProvidersFailedError('All providers failed', attempts);
+  // Collected all the way down and read exactly here: without it the log says
+  // only that everything failed, and the one thing worth knowing — which
+  // provider said what — is gone.
+  console.error(
+    '[provider] every provider failed',
+    attempts.map(
+      attempt =>
+        `${attempt.provider}: ${
+          attempt.error instanceof Error
+            ? attempt.error.message
+            : String(attempt.error)
+        }`
+    )
+  );
+  throw new AllProvidersFailedError(PROVIDER_FAILURE_MESSAGE, attempts);
 }
 
 export async function getProviderModels(

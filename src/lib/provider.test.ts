@@ -1,20 +1,20 @@
 import { APICallError } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 
+import { type Provider } from '@/types';
+
 import {
   AllProvidersFailedError,
-  bindingsToFailoverProviders,
   isRetryableProviderError,
   runWithProviderFailover,
-  toProviderModelId,
-  type FailoverProvider
+  toProviderModelId
 } from './provider';
 
 // provider.ts -> ./crypto -> @/lib/env validates APP_SECRET at module load.
 // The functions under test never decrypt, so stub crypto to avoid loading env.
 vi.mock('@/lib/crypto', () => ({ decrypt: (s: string) => s }));
 
-function fp(overrides: Partial<FailoverProvider> = {}): FailoverProvider {
+function fp(overrides: Partial<Provider> = {}): Provider {
   return {
     id: 'p1',
     name: 'P1',
@@ -97,34 +97,6 @@ describe('toProviderModelId', () => {
     expect(toProviderModelId('bedrock', 'some-unmapped-id')).toBe(
       'some-unmapped-id'
     );
-  });
-});
-
-describe('bindingsToFailoverProviders', () => {
-  it('drops bindings without a loaded provider and maps the rest', () => {
-    const out = bindingsToFailoverProviders([
-      { provider: null },
-      {
-        provider: {
-          id: 'a',
-          name: 'A',
-          type: 'openai',
-          apiKey: 'key',
-          baseUrl: 'https://b',
-          apiOptions: { x: 1 }
-        }
-      }
-    ]);
-
-    expect(out).toHaveLength(1);
-    expect(out[0]).toEqual({
-      id: 'a',
-      name: 'A',
-      type: 'openai',
-      apiKey: 'key',
-      baseUrl: 'https://b',
-      apiOptions: { x: 1 }
-    });
   });
 });
 

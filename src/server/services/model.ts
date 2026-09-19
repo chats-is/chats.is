@@ -1,11 +1,12 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq, ilike, inArray, or } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, or, type SQL } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
   type modelCreateSchema,
   type modelListSchema,
+  type ModelStatus,
   type modelUpdateSchema
 } from '@/types/model';
 import { pageWindow } from '@/types/pagination';
@@ -20,8 +21,6 @@ type ProviderBinding = typeof modelProviders.$inferSelect & {
   provider: Provider | null;
 };
 type Model = typeof models.$inferSelect & {
-  /** @deprecated highest-priority provider, kept for legacy callers. */
-  provider: Provider | null;
   /** Priority-ordered, enabled provider bindings for failover. */
   providers: ProviderBinding[];
 };
@@ -38,8 +37,7 @@ export const getAllModels = perRequest(
     const result = await db.query.models.findMany({
       where: eq(models.isEnabled, true),
       with: {
-        provider: true,
-        modelProviders: {
+        providers: {
           with: { provider: true }
         }
       },
@@ -48,37 +46,12 @@ export const getAllModels = perRequest(
 
     return result
       .map(m => {
-        const hasBindings = (m.modelProviders ?? []).length > 0;
-        // New path: enabled bindings ordered by priority (provider also enabled).
-        const bindings = (m.modelProviders ?? [])
+        // Enabled bindings ordered by priority, the provider enabled too.
+        const providersList: ProviderBinding[] = (m.providers ?? [])
           .filter(b => b.isEnabled && b.provider?.isEnabled)
           .sort((a, b) => a.priority - b.priority);
 
-        // Backward-compat fallback ONLY when the model has no binding rows yet
-        // (pre-migration). A model that HAS bindings but all are disabled stays
-        // unavailable — we must not resurrect a provider the admin disabled.
-        const providersList: ProviderBinding[] = hasBindings
-          ? bindings
-          : m.provider?.isEnabled
-            ? [
-                {
-                  id: `legacy:${m.id}`,
-                  modelId: m.modelId,
-                  providerId: m.providerId,
-                  priority: 0,
-                  isEnabled: true,
-                  createdAt: m.createdAt,
-                  updatedAt: m.updatedAt,
-                  provider: m.provider
-                }
-              ]
-            : [];
-
-        return {
-          ...m,
-          provider: providersList[0]?.provider ?? m.provider ?? null,
-          providers: providersList
-        };
+        return { ...m, providers: providersList };
       })
       .filter(m => m.providers.length > 0);
   }
@@ -104,27 +77,37 @@ export const findModelByModelId = perRequest(
 // Admin CRUD
 // ============================================================================
 
-/** Models with their provider bindings, for the console's model table. */
+/**
+ * Models bound to a provider the condition matches.
+ *
+ * A model reaches its providers through `model_provider`, and a relational
+ * `where` cannot see across that table — so the condition is answered as a
+ * subquery over the bindings and the model is matched on the ids it returns.
+ */
+function boundTo(condition: SQL | undefined) {
+  return inArray(
+    models.modelId,
+    db
+      .select({ modelId: modelProviders.modelId })
+      .from(modelProviders)
+      .innerJoin(providers, eq(providers.id, modelProviders.providerId))
+      .where(condition)
+  );
+}
+
 /** The console's model table: one page of models, with their provider bindings. */
 export async function listModels(filter: z.infer<typeof modelListSchema>) {
   const search = filter.q?.trim();
   const term = search ? `%${search}%` : null;
   const where = and(
     filter.capability ? eq(models.capability, filter.capability) : undefined,
-    filter.providerId ? eq(models.providerId, filter.providerId) : undefined,
     term
       ? or(
           ilike(models.name, term),
           ilike(models.modelId, term),
           // Matching the provider by name needs its row, and a relational
-          // `where` cannot reach one — so name the matching providers instead.
-          inArray(
-            models.providerId,
-            db
-              .select({ id: providers.id })
-              .from(providers)
-              .where(ilike(providers.name, term))
-          )
+          // `where` cannot reach one — so name the matching models instead.
+          boundTo(ilike(providers.name, term))
         )
       : undefined
   );
@@ -142,10 +125,9 @@ export async function listModels(filter: z.infer<typeof modelListSchema>) {
         asc(models.id)
       ],
       with: {
-        provider: true,
-        modelProviders: {
+        providers: {
           with: { provider: true },
-          orderBy: (mp, { asc }) => [asc(mp.priority)]
+          orderBy: (binding, { asc }) => [asc(binding.priority)]
         }
       }
     }),
@@ -161,30 +143,65 @@ export async function listModels(filter: z.infer<typeof modelListSchema>) {
 }
 
 /**
- * Every model, for the selectors that offer one.
+ * Every model, for the selectors that offer one, each saying how it stands.
  *
  * A dropdown has to hold the whole list — a page of it would hide the model
- * the user is looking for — so this is deliberately unpaged. It carries no
- * provider bindings either: nothing choosing a model reads them.
+ * the user is looking for — so this is deliberately unpaged, and it offers the
+ * ones that cannot answer too: a model is picked here before it is switched
+ * on, and a setting already pointing at one that has stopped answering has to
+ * keep showing it rather than quietly reading as unset. Saying which is which
+ * is `status`; the bindings it is read from do not travel, because nothing
+ * choosing a model reads them.
  */
 export async function listModelsForSelect() {
-  return await db.query.models.findMany({
+  const rows = await db.query.models.findMany({
     orderBy: (models, { asc, desc }) => [
       asc(models.displayOrder),
       desc(models.createdAt)
-    ]
+    ],
+    with: { providers: { with: { provider: true } } }
   });
+
+  return rows.map(({ providers, ...model }) => ({
+    ...model,
+    status: statusOf(model.isEnabled, providers)
+  }));
+}
+
+/**
+ * Which switch, if either, is stopping a model answering.
+ *
+ * Read from `model_providers` alone. The `provider_id` column beside it is a
+ * mirror of the first enabled binding, written by `createModel` and kept in
+ * step by `updateModel` — asking it would be asking a copy.
+ *
+ * This is the console's own reading. `getAllModels` answers a different
+ * question, for a different caller, and is none of this function's business.
+ */
+function statusOf(
+  isEnabled: boolean,
+  bindings: Array<{
+    isEnabled: boolean;
+    provider: { isEnabled: boolean } | null;
+  }>
+): ModelStatus {
+  if (!isEnabled) return 'disabled';
+
+  const served = bindings.some(
+    binding => binding.isEnabled && binding.provider?.isEnabled
+  );
+
+  return served ? 'available' : 'no-enabled-provider';
 }
 
 export async function createModel(input: z.infer<typeof modelCreateSchema>) {
   const normalizedModelId = input.modelId.trim();
 
-  const bindings =
-    input.providers && input.providers.length > 0
-      ? input.providers
-      : input.providerId
-        ? [{ providerId: input.providerId }]
-        : [];
+  // A model and a provider are separate things that get paired, and writing a
+  // model is a deliberate act about that model — so it arrives paired. What the
+  // database does not constrain, because a provider deleted out from under a
+  // model leaves it unpaired and there is nothing to refuse at that moment.
+  const bindings = input.providers ?? [];
   if (bindings.length === 0) {
     throw new PublicError('At least one provider is required');
   }
@@ -192,12 +209,6 @@ export async function createModel(input: z.infer<typeof modelCreateSchema>) {
   if (new Set(bindingProviderIds).size !== bindingProviderIds.length) {
     throw new PublicError('A provider can only be added once per model');
   }
-  // Mirror the first ENABLED binding (fall back to the first) so the legacy
-  // providerId never points at a disabled binding.
-  const primaryProviderId = (
-    bindings.find(b => b.isEnabled !== false) ?? bindings[0]
-  ).providerId;
-
   // modelId is globally unique (one logical model per row); the multiple
   // providers are attached via the model_providers table.
   const existingModel = await db.query.models.findFirst({
@@ -215,8 +226,6 @@ export async function createModel(input: z.infer<typeof modelCreateSchema>) {
       id,
       name: input.name,
       modelId: normalizedModelId,
-      // Legacy mirror of the primary provider, kept in sync for compat.
-      providerId: primaryProviderId,
       capability: input.capability,
       image: input.image,
       aliases: input.aliases,
@@ -262,47 +271,40 @@ export async function updateModel(input: z.infer<typeof modelUpdateSchema>) {
 
   const targetModelId = existingModel.modelId;
 
-  if (inputProviders && inputProviders.length > 0) {
+  if (inputProviders) {
+    // Leaving the list out means "don't touch the pairings". Sending an empty
+    // one asks for a model nothing can serve, which is refused here for the
+    // same reason `createModel` refuses it.
+    if (inputProviders.length === 0) {
+      throw new PublicError('At least one provider is required');
+    }
     const ids = inputProviders.map(b => b.providerId);
     if (new Set(ids).size !== ids.length) {
       throw new PublicError('A provider can only be added once per model');
     }
   }
 
-  // Keep the legacy providerId mirror aligned with the first ENABLED
-  // binding (never a disabled one).
-  const primaryProviderId =
-    inputProviders && inputProviders.length > 0
-      ? (inputProviders.find(b => b.isEnabled !== false) ?? inputProviders[0])
-          .providerId
-      : sanitizedUpdates.providerId;
-
   await db.transaction(async tx => {
     await tx
       .update(models)
-      .set({
-        ...sanitizedUpdates,
-        ...(primaryProviderId ? { providerId: primaryProviderId } : {}),
-        updatedAt: new Date()
-      })
+      .set({ ...sanitizedUpdates, updatedAt: new Date() })
       .where(eq(models.id, id));
 
-    // Replace provider bindings when an explicit list is supplied.
+    // Replace the pairings when an explicit list is supplied. Never empty by
+    // here, so the delete is always followed by an insert.
     if (inputProviders) {
       await tx
         .delete(modelProviders)
         .where(eq(modelProviders.modelId, targetModelId));
-      if (inputProviders.length > 0) {
-        await tx.insert(modelProviders).values(
-          inputProviders.map((b, index) => ({
-            id: generateUUID(),
-            modelId: targetModelId,
-            providerId: b.providerId,
-            priority: b.priority ?? index,
-            isEnabled: b.isEnabled ?? true
-          }))
-        );
-      }
+      await tx.insert(modelProviders).values(
+        inputProviders.map((b, index) => ({
+          id: generateUUID(),
+          modelId: targetModelId,
+          providerId: b.providerId,
+          priority: b.priority ?? index,
+          isEnabled: b.isEnabled ?? true
+        }))
+      );
     }
   });
 }

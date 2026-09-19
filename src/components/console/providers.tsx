@@ -226,11 +226,6 @@ const providerColumns = (actions: {
         </span>
       )
     }),
-    helper.accessor(row => row.models?.length || 0, {
-      id: 'models',
-      header: 'Models',
-      meta: { align: 'center', headClassName: 'w-20' }
-    }),
     helper.accessor('isEnabled', {
       header: 'Enabled',
       meta: { align: 'center', headClassName: 'w-20' },

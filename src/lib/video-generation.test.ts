@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type Model, type ProviderConfig } from '@/types';
-import { type FailoverProvider } from '@/lib/provider';
+import { type Model, type Provider, type ProviderConfig } from '@/types';
 
 import {
   generateAndStoreVideo,
@@ -90,7 +89,7 @@ function azureProvider(
   };
 }
 
-function failover(overrides: Partial<FailoverProvider> = {}): FailoverProvider {
+function failover(overrides: Partial<Provider> = {}): Provider {
   return {
     id: 'p1',
     name: 'P1',

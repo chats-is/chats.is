@@ -86,7 +86,6 @@ const priceNumberSchema = z
  *  narrowed, then cut to one page. */
 export const pricingListSchema = z.object({
   capability: modelCapabilitySchema.optional(),
-  providerId: z.string().optional(),
   /** Matches a model's name, its model id, or its provider's name. */
   q: z.string().optional(),
   ...paginationSchema.shape
@@ -118,7 +117,16 @@ export const syncTargetSchema = z.object({
 });
 
 export const syncRunSchema = syncTargetSchema.extend({
-  onlyMissing: z.boolean().default(false)
+  onlyMissing: z.boolean().default(false),
+  /**
+   * Which provider each model should be priced from. A model paired with two
+   * providers can be listed under both in the catalogue, at different rates —
+   * so the preview offers every match and the run is told which was taken.
+   * Left out, each model falls back to its highest-priority pairing.
+   */
+  from: z
+    .array(z.object({ modelDbId: z.string(), providerType: z.string() }))
+    .optional()
 });
 
 export const remoteSearchSchema = z.object({

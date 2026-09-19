@@ -161,11 +161,9 @@ function MediaKind({
   // model configured before it closed can still carry values its providers
   // have no parameter for, and a row for one of those would promise a setting
   // that never leaves the browser.
-  const providerTypes = (
-    selected?.providers?.length
-      ? selected.providers.map(binding => binding.provider?.type)
-      : [selected?.provider?.type]
-  ).filter((type): type is ProviderType => !!type);
+  const providerTypes = (selected?.providers ?? [])
+    .map(binding => binding.provider?.type)
+    .filter((type): type is ProviderType => !!type);
 
   // Undefined, not an empty vocabulary, when nothing is known about the
   // providers: `{}` reads as "this provider accepts nothing" and would empty
@@ -201,7 +199,7 @@ function MediaKind({
   // serves several of them is named once.
   const byProvider = models.reduce<Array<[string, Array<Model>]>>(
     (groups, model) => {
-      const name = model.provider?.name ?? 'Other';
+      const name = model.providers?.[0]?.provider?.name ?? 'Other';
       const group = groups.find(([key]) => key === name);
       if (group) group[1].push(model);
       else groups.push([name, [model]]);
@@ -233,7 +231,9 @@ function MediaKind({
               <span className="flex size-4 shrink-0 items-center justify-center">
                 <ModelIcon
                   className="size-3.5 opacity-45 grayscale"
-                  image={providerModels[0]?.provider?.image ?? null}
+                  image={
+                    providerModels[0]?.providers?.[0]?.provider?.image ?? null
+                  }
                 />
               </span>
               {provider}
@@ -244,7 +244,11 @@ function MediaKind({
                 icon={
                   <ModelIcon
                     className="size-4 shrink-0"
-                    image={model.image || model.provider?.image || null}
+                    image={
+                      model.image ||
+                      model.providers?.[0]?.provider?.image ||
+                      null
+                    }
                   />
                 }
                 checked={model.modelId === selected?.modelId}

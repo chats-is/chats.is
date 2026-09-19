@@ -9,7 +9,13 @@ type RecordUsageBase = {
   chatId?: string | null;
   messageId?: string;
   modelId: string; // external modelId, e.g. 'gpt-4o'
-  providerId?: string;
+  /**
+   * The provider that actually served the call — required, because it is the
+   * only record of it. A model's pairings say who could serve it today, which
+   * is not who did months ago, so a row written without this can never be
+   * told which provider it belongs to.
+   */
+  providerId: string;
 };
 
 export type RecordChatUsageInput = RecordUsageBase & {

@@ -75,7 +75,6 @@ async function seedModel(
     id: randomUUID(),
     name: modelId,
     modelId,
-    providerId: 'prov1',
     capability
   });
   await h.db
@@ -203,7 +202,13 @@ describe('quota enforcement end-to-end (real Postgres)', () => {
 });
 
 describe('usage recording write round-trip (real Postgres)', () => {
-  const base = { userId: 'u1', messageId: randomUUID() };
+  // The provider that served the call travels with every record, so the
+  // fixtures name one too.
+  const base = {
+    userId: 'u1',
+    messageId: randomUUID(),
+    providerId: 'prov1'
+  };
 
   it('chat: writes computed cost + token snapshot', async () => {
     await seedModel('chat', 'gpt-test', { input: '3', output: '15' });

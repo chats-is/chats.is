@@ -134,6 +134,9 @@ export async function previewPricingSync(args: {
     modelDbId: string;
     modelId: string;
     modelName: string;
+    /** The pairing this row was looked up under. Null for a model with none. */
+    providerType: string | null;
+    providerName: string | null;
     matched: boolean;
     remote: RemoteCost | null;
     current: {
@@ -150,28 +153,52 @@ export async function previewPricingSync(args: {
     where: args.modelDbIds?.length
       ? inArray(models.id, args.modelDbIds)
       : undefined,
-    with: { pricings: { limit: 1 }, provider: true }
+    with: {
+      pricings: { limit: 1 },
+      // Priority order, because the price source follows whichever provider
+      // would actually serve the model first.
+      providers: {
+        with: { provider: true },
+        orderBy: (binding, { asc }) => [asc(binding.priority)]
+      }
+    }
   });
 
-  return allModels.map(m => {
-    const type = m.provider?.type as ProviderType | undefined;
-    const remote = type ? findRemoteCost(data, type, m.modelId) : null;
-    const current = m.pricings[0];
-    return {
-      modelDbId: m.id,
-      modelId: m.modelId,
-      modelName: m.name,
-      matched: !!remote,
-      remote: remote?.cost ?? null,
-      current: current
-        ? {
-            input: numOrUndef(current.input),
-            output: numOrUndef(current.output),
-            cacheRead: numOrUndef(current.cacheRead),
-            cacheWrite: numOrUndef(current.cacheWrite)
-          }
-        : null
+  // One row per pairing: a model served by two providers is listed under both
+  // in the catalogue, and the two entries can carry different rates. Offering
+  // only the first pairing's would hide the other, and price the model from a
+  // provider it may not even be using.
+  return allModels.flatMap(m => {
+    const current = m.pricings[0]
+      ? {
+          input: numOrUndef(m.pricings[0].input),
+          output: numOrUndef(m.pricings[0].output),
+          cacheRead: numOrUndef(m.pricings[0].cacheRead),
+          cacheWrite: numOrUndef(m.pricings[0].cacheWrite)
+        }
+      : null;
+
+    const row = (type: ProviderType | null, providerName: string | null) => {
+      const remote = type ? findRemoteCost(data, type, m.modelId) : null;
+      return {
+        modelDbId: m.id,
+        modelId: m.modelId,
+        modelName: m.name,
+        providerType: type,
+        providerName,
+        matched: !!remote,
+        remote: remote?.cost ?? null,
+        current
+      };
     };
+
+    const pairings = m.providers.filter(binding => binding.provider);
+    // A model with no pairing still shows, as a row nothing can price.
+    if (pairings.length === 0) return [row(null, null)];
+
+    return pairings.map(binding =>
+      row(binding.provider.type, binding.provider.name)
+    );
   });
 }
 
@@ -187,6 +214,8 @@ export async function runPricingSync(args: {
   source: PricingSource;
   modelDbIds?: string[]; // models.id (PK)
   onlyMissing?: boolean; // skip models that already have pricing
+  /** Which pairing to price each model from, as the preview offered it. */
+  from?: Array<{ modelDbId: string; providerType: string }>;
 }): Promise<PricingSyncResult> {
   const data = await fetchRemote(args.source);
   const result: PricingSyncResult = {
@@ -201,11 +230,27 @@ export async function runPricingSync(args: {
     where: args.modelDbIds?.length
       ? inArray(models.id, args.modelDbIds)
       : undefined,
-    with: { pricings: { limit: 1 }, provider: true }
+    with: {
+      pricings: { limit: 1 },
+      // Priority order, because the price source follows whichever provider
+      // would actually serve the model first.
+      providers: {
+        with: { provider: true },
+        orderBy: (binding, { asc }) => [asc(binding.priority)]
+      }
+    }
   });
 
+  // What the admin picked in the preview, if anything. A model left out of it
+  // falls back to its highest-priority pairing, which is what an unattended
+  // "sync everything" run has to do anyway.
+  const chosen = new Map(
+    (args.from ?? []).map(pick => [pick.modelDbId, pick.providerType])
+  );
+
   for (const m of targets) {
-    const type = m.provider?.type as ProviderType | undefined;
+    const type = (chosen.get(m.id) ?? m.providers[0]?.provider?.type) as
+      ProviderType | undefined;
     const remote = type ? findRemoteCost(data, type, m.modelId) : null;
     if (!remote) {
       result.notFound.push(m.modelId);

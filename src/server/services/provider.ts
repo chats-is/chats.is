@@ -15,7 +15,7 @@ import { decrypt, encrypt, maskedKey } from '@/lib/crypto';
 import { getProviderModels, toProviderModelId } from '@/lib/provider';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { models, providers } from '@/db/schema';
+import { modelProviders, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 /** The console's provider table: one page of providers with their models,
@@ -38,10 +38,7 @@ export async function listProviders(
         asc(providers.displayOrder),
         desc(providers.createdAt),
         asc(providers.id)
-      ],
-      with: {
-        models: true
-      }
+      ]
     }),
     db.select({ count: count() }).from(providers).where(where)
   ]);
@@ -182,10 +179,7 @@ export async function toggleEnabledProvider(id: string, isEnabled: boolean) {
  *  already has. Reaches the provider over the network. */
 export async function fetchProviderModels(providerId: string) {
   const provider = await db.query.providers.findFirst({
-    where: eq(providers.id, providerId),
-    with: {
-      models: true
-    }
+    where: eq(providers.id, providerId)
   });
 
   if (!provider) {
@@ -193,7 +187,15 @@ export async function fetchProviderModels(providerId: string) {
   }
 
   const apiModelIds = await getProviderModels(provider);
-  const existingIds = new Set(provider.models.map(model => model.modelId));
+  // Every model this installation has, not only the ones already paired with
+  // this provider: `model_id` is unique across the table, so one that exists
+  // under another provider cannot be created again here either. Asking only
+  // about this provider's pairings offered it as new and failed on submit.
+  const existing = await db.query.models.findMany({
+    columns: { modelId: true },
+    where: inArray(models.modelId, apiModelIds)
+  });
+  const existingIds = new Set(existing.map(model => model.modelId));
 
   return apiModelIds.map(modelId => ({
     modelId,
@@ -249,34 +251,46 @@ export async function syncProviderModels(
     throw new PublicError('No models selected');
   }
 
-  const existingModels = await db.query.models.findMany({
+  const existingBindings = await db.query.modelProviders.findMany({
     where: and(
-      eq(models.providerId, input.providerId),
+      eq(modelProviders.providerId, input.providerId),
       inArray(
-        models.modelId,
+        modelProviders.modelId,
         input.items.map(model => model.modelId)
       )
     )
   });
-  const existingIds = new Set(existingModels.map(model => model.modelId));
+  const existingIds = new Set(existingBindings.map(binding => binding.modelId));
   const modelsToCreate = input.items.filter(
     model => !existingIds.has(model.modelId)
   );
 
   if (modelsToCreate.length > 0) {
-    await db.insert(models).values(
-      modelsToCreate.map(model => ({
-        id: generateUUID(),
-        name: model.modelId,
-        modelId: model.modelId,
-        providerId: input.providerId,
-        capability: model.capability,
-        supportsVision: false,
-        supportsReasoning: false,
-        isEnabled: true,
-        displayOrder: 0
-      }))
-    );
+    // The binding is the model's only link to a provider, so it is written in
+    // the same transaction: a model without one is a model nothing can serve.
+    await db.transaction(async tx => {
+      await tx.insert(models).values(
+        modelsToCreate.map(model => ({
+          id: generateUUID(),
+          name: model.modelId,
+          modelId: model.modelId,
+          capability: model.capability,
+          supportsVision: false,
+          supportsReasoning: false,
+          isEnabled: true,
+          displayOrder: 0
+        }))
+      );
+      await tx.insert(modelProviders).values(
+        modelsToCreate.map(model => ({
+          id: generateUUID(),
+          modelId: model.modelId,
+          providerId: input.providerId,
+          priority: 0,
+          isEnabled: true
+        }))
+      );
+    });
   }
 
   return {

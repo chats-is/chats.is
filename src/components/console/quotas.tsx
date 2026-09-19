@@ -47,6 +47,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ModelStatusBadge } from '@/components/console/model-status';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { quotaTableInput } from '@/components/console/table-filters';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
@@ -559,6 +560,7 @@ export default function QuotasPage() {
                                       <span className="truncate font-mono text-xs">
                                         {m.modelId}
                                       </span>
+                                      <ModelStatusBadge status={m.status} />
                                     </label>
                                   ))}
                                 </div>

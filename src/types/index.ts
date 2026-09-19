@@ -28,6 +28,7 @@ export type {
   SentEffort
 } from './model';
 export type {
+  Provider,
   ProviderConfig,
   ProviderType,
   VertexAuthMode,

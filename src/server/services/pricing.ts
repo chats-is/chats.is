@@ -1,7 +1,7 @@
 import '@tanstack/react-start/server-only';
 
 import { cache } from 'react';
-import { and, count, eq, ilike, inArray, or } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, or, type SQL } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -16,7 +16,7 @@ import {
 } from '@/types/pricing';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
-import { modelPricings, models, providers } from '@/db/schema';
+import { modelPricings, modelProviders, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 const EMPTY_SNAPSHOT: PriceSnapshot = {
@@ -384,6 +384,19 @@ const roundCost = (n: number) =>
 // Admin CRUD
 // ============================================================================
 
+/** Models bound to a provider the condition matches — see the note on the
+ *  twin of this in `services/model.ts`. */
+function boundTo(condition: SQL | undefined) {
+  return inArray(
+    models.modelId,
+    db
+      .select({ modelId: modelProviders.modelId })
+      .from(modelProviders)
+      .innerJoin(providers, eq(providers.id, modelProviders.providerId))
+      .where(condition)
+  );
+}
+
 /** Every model with its pricing row — the admin pricing table. */
 export async function listPricingWithModels(
   filter: z.infer<typeof pricingListSchema>
@@ -392,20 +405,13 @@ export async function listPricingWithModels(
   const term = search ? `%${search}%` : null;
   const where = and(
     filter.capability ? eq(models.capability, filter.capability) : undefined,
-    filter.providerId ? eq(models.providerId, filter.providerId) : undefined,
     term
       ? or(
           ilike(models.name, term),
           ilike(models.modelId, term),
-          // A relational `where` cannot reach the joined provider row, so name
-          // the providers whose name matches instead.
-          inArray(
-            models.providerId,
-            db
-              .select({ id: providers.id })
-              .from(providers)
-              .where(ilike(providers.name, term))
-          )
+          // A relational `where` cannot reach across `model_provider`, so the
+          // matching providers name the models instead.
+          boundTo(ilike(providers.name, term))
         )
       : undefined
   );
@@ -415,7 +421,10 @@ export async function listPricingWithModels(
       where,
       ...pageWindow(filter),
       with: {
-        provider: true,
+        providers: {
+          with: { provider: true },
+          orderBy: (b, { asc }) => [asc(b.priority)]
+        },
         pricings: { limit: 1 }
       },
       // `id` last so the order is total, which offset paging depends on.

@@ -86,12 +86,13 @@ export function ModelMenu({
     );
   }
 
-  // Grouped models by provider for display
+  // Grouped by the provider a call would reach first — the head of the
+  // priority-ordered list.
   const groupedModels = (models ?? [])
-    .filter(m => m.provider)
+    .filter(m => m.providers?.[0]?.provider)
     .reduce(
       (acc, m) => {
-        const providerKey = m.provider!.id;
+        const providerKey = m.providers![0].provider!.id;
         if (!acc[providerKey]) {
           acc[providerKey] = [];
         }
@@ -162,7 +163,9 @@ export function ModelMenu({
               <span className="flex items-center gap-2">
                 <ModelIcon
                   image={
-                    selectedModel.image || selectedModel.provider?.image || null
+                    selectedModel.image ||
+                    selectedModel.providers?.[0]?.provider?.image ||
+                    null
                   }
                   className="size-4"
                 />
@@ -182,10 +185,14 @@ export function ModelMenu({
                   <SelectLabel className="flex items-center gap-2">
                     <ModelIcon
                       className="size-4 opacity-45 grayscale"
-                      image={providerModels[0]?.provider?.image || null}
+                      image={
+                        providerModels[0]?.providers?.[0]?.provider?.image ||
+                        null
+                      }
                     />
                     <span className="font-normal">
-                      {providerModels[0]?.provider?.name || 'Unknown'}
+                      {providerModels[0]?.providers?.[0]?.provider?.name ||
+                        'Unknown'}
                     </span>
                   </SelectLabel>
                   {providerModels.map(m => (
@@ -203,7 +210,9 @@ export function ModelMenu({
                     >
                       <span className="flex w-full items-start">
                         <ModelIcon
-                          image={m.image || m.provider?.image || null}
+                          image={
+                            m.image || m.providers?.[0]?.provider?.image || null
+                          }
                           className="mt-0.5 mr-2 size-4"
                         />
                         <span className="flex min-w-0 flex-1 flex-col">

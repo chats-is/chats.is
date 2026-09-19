@@ -69,10 +69,21 @@ type LocalCost = {
   cacheWrite?: number;
 };
 
+/**
+ * One line of the preview: a model as one of its providers lists it.
+ *
+ * A model paired with two providers appears twice, because the catalogue can
+ * carry a different rate under each — so `key` identifies the line and
+ * `modelDbId` the model it would write to. Only one line per model can be
+ * taken, since a model has one pricing row.
+ */
 type PreviewRow = {
+  key: string;
   modelDbId: string;
   modelId: string;
   modelName: string;
+  providerType: string | null;
+  providerName: string | null;
   current: LocalCost | null;
   sources: Record<
     PricingSource,
@@ -239,11 +250,12 @@ const pricingColumns = (edit: (row: PricingRow) => void) =>
         </>
       )
     }),
-    helper.accessor(row => row.provider?.name, {
+    helper.accessor(row => row.providers[0]?.provider?.name, {
       id: 'provider',
       header: 'Provider',
       meta: { cellClassName: 'text-sm' },
-      cell: ({ row }) => row.original.provider?.name ?? '-'
+      // The highest-priority binding, which is the one a call would try first.
+      cell: ({ row }) => row.original.providers[0]?.provider?.name ?? '-'
     }),
     helper.accessor('capability', {
       header: 'Capability',
@@ -367,8 +379,8 @@ export default function PricingPage() {
   const [previewSources, setPreviewSources] = useState<PricingSource[]>([]);
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [previewSearch, setPreviewSearch] = useState('');
-  // For 1-source mode: a Set of modelDbIds (checked rows).
-  // For 2-source mode: per-row pick (modelDbId → source picked, or absent = skip).
+  // A pick is per preview line, not per model: `key` → the catalogue taken.
+  /** Which line of the preview to take, by its key. */
   const [picks, setPicks] = useState<Map<string, PricingSource>>(new Map());
 
   const [defaults, setDefaults] = useState(EMPTY_PRICING);
@@ -482,14 +494,19 @@ export default function PricingPage() {
             .then(rows => ({ source: src, rows }));
         })
       );
-      // Merge by modelDbId. All sources should return the same models.
+      // Merge by model *and* provider: the two catalogues return the same
+      // lines, and a model with two providers has two of them.
       const merged = new Map<string, PreviewRow>();
       for (const { source, rows } of results) {
         for (const r of rows) {
-          const entry = merged.get(r.modelDbId) ?? {
+          const key = `${r.modelDbId}:${r.providerType ?? ''}`;
+          const entry = merged.get(key) ?? {
+            key,
             modelDbId: r.modelDbId,
             modelId: r.modelId,
             modelName: r.modelName,
+            providerType: r.providerType,
+            providerName: r.providerName,
             current: r.current,
             sources: {
               'models.dev': { matched: false, remote: null },
@@ -499,7 +516,7 @@ export default function PricingPage() {
           entry.sources[source] = { matched: r.matched, remote: r.remote };
           // Keep latest current (they should be the same).
           entry.current = r.current;
-          merged.set(r.modelDbId, entry);
+          merged.set(key, entry);
         }
       }
       setPreviewSources(sources);
@@ -521,23 +538,32 @@ export default function PricingPage() {
 
   const apply = async () => {
     if (pickCount === 0) return;
-    const groups: Record<PricingSource, string[]> = {
+    const groups: Record<
+      PricingSource,
+      Array<{ modelDbId: string; providerType: string }>
+    > = {
       'models.dev': [],
       'llm-metadata': []
     };
-    for (const [modelDbId, src] of picks.entries()) {
-      groups[src].push(modelDbId);
+    for (const [key, src] of picks.entries()) {
+      const row = previewRows.find(r => r.key === key);
+      if (!row?.providerType) continue;
+      groups[src].push({
+        modelDbId: row.modelDbId,
+        providerType: row.providerType
+      });
     }
     try {
       let created = 0;
       let updated = 0;
       let unchanged = 0;
       for (const source of previewSources) {
-        const ids = groups[source];
-        if (ids.length === 0) continue;
+        const from = groups[source];
+        if (from.length === 0) continue;
         const result = await syncMutation.mutateAsync({
           source,
-          modelDbIds: ids
+          modelDbIds: from.map(pick => pick.modelDbId),
+          from
         });
         created += result.created;
         updated += result.updated;
@@ -870,11 +896,20 @@ function PreviewDialog({
 
   const isSingle = sources.length === 1;
 
-  const togglePick = (modelDbId: string, source: PricingSource | null) => {
+  /**
+   * Take one line, or none.
+   *
+   * A model has a single pricing row, so taking a line drops any other line of
+   * the same model — picking Azure's rate after OpenAI's replaces it rather
+   * than queueing both writes against the same row.
+   */
+  const togglePick = (row: PreviewRow, source: PricingSource | null) => {
     setPicks(prev => {
       const next = new Map(prev);
-      if (source === null) next.delete(modelDbId);
-      else next.set(modelDbId, source);
+      for (const other of rows) {
+        if (other.modelDbId === row.modelDbId) next.delete(other.key);
+      }
+      if (source !== null) next.set(row.key, source);
       return next;
     });
   };
@@ -889,17 +924,37 @@ function PreviewDialog({
       if (r.sources[src].matched) matchedVisibleBySource[src].push(r);
     }
   }
+  /** Ticked when every model with a match here has one of its lines taken —
+   *  per model, not per line, since only one line of a model can be. */
   const allMatchedFor = (src: PricingSource) => {
     const list = matchedVisibleBySource[src];
-    return list.length > 0 && list.every(r => picks.get(r.modelDbId) === src);
+    if (list.length === 0) return false;
+    const models = new Set(list.map(r => r.modelDbId));
+    const taken = new Set(
+      list.filter(r => picks.get(r.key) === src).map(r => r.modelDbId)
+    );
+    return models.size === taken.size;
   };
   const togglePickAllFor = (src: PricingSource, on: boolean) => {
-    const ids = matchedVisibleBySource[src].map(r => r.modelDbId);
+    const matched = matchedVisibleBySource[src];
     setPicks(prev => {
       const next = new Map(prev);
-      for (const id of ids) {
-        if (on) next.set(id, src);
-        else if (next.get(id) === src) next.delete(id);
+      // A model can only take one line, so where it has several here the
+      // first one wins and the rest are left alone.
+      const spokenFor = new Set(
+        [...next.keys()]
+          .map(key => rows.find(row => row.key === key)?.modelDbId)
+          .filter(Boolean)
+      );
+      for (const row of matched) {
+        if (on) {
+          if (spokenFor.has(row.modelDbId)) continue;
+          next.set(row.key, src);
+          spokenFor.add(row.modelDbId);
+        } else if (next.get(row.key) === src) {
+          next.delete(row.key);
+          spokenFor.delete(row.modelDbId);
+        }
       }
       return next;
     });
@@ -1013,14 +1068,19 @@ function PreviewDialog({
               <PreviewColgroup sources={sources} />
               <tbody>
                 {visibleRows.map(r => {
-                  const pick = picks.get(r.modelDbId);
+                  const pick = picks.get(r.key);
                   return (
                     <tr
-                      key={r.modelDbId}
+                      key={r.key}
                       className="border-b last:border-0 hover:bg-muted/30"
                     >
                       <td className="p-2 align-middle">
                         <div className="font-mono text-sm">{r.modelId}</div>
+                        {/* Which provider's listing this line came from — the
+                            only thing telling two lines of one model apart. */}
+                        <div className="text-xs text-muted-foreground">
+                          {r.providerName ?? 'No provider'}
+                        </div>
                       </td>
                       <td className="border-l px-2 py-2 align-middle">
                         <StackedPrice
@@ -1048,9 +1108,8 @@ function PreviewDialog({
                                 checked={isPicked}
                                 disabled={!s.matched}
                                 onCheckedChange={c => {
-                                  if (c) togglePick(r.modelDbId, src);
-                                  else if (isPicked)
-                                    togglePick(r.modelDbId, null);
+                                  if (c) togglePick(r, src);
+                                  else if (isPicked) togglePick(r, null);
                                 }}
                               />
                             </div>

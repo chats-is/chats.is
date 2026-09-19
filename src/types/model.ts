@@ -79,6 +79,17 @@ export type ModelProvider = {
 };
 
 /**
+ * How a model stands, as the console's selectors report it.
+ *
+ * Two switches stop a model answering and they are at different levels, so an
+ * admin has to be told which one to go and find: the model's own, or the ones
+ * on its providers. A model has several providers, each enabled for it or not,
+ * each belonging to a provider that is itself enabled or not — the last state
+ * is every one of those being off, whichever of the two switches did it.
+ */
+export type ModelStatus = 'available' | 'disabled' | 'no-enabled-provider';
+
+/**
  * A single model↔provider binding (row in `model_providers`). A model can have
  * several of these; the app tries them ordered by `priority` (ascending) and
  * fails over to the next enabled one on a retryable error.
@@ -101,7 +112,6 @@ export type Model = {
   id: string;
   name: string;
   modelId: string;
-  providerId: string;
   capability: ModelCapability;
   image?: string | null;
   aliases?: string[] | null;
@@ -119,9 +129,8 @@ export type Model = {
   /** Inline system prompt for chat models (replaces the old prompt-record FK). */
   systemPrompt?: string | null;
   displayOrder: number;
-  /** @deprecated single-provider link; prefer `providers` (priority-ordered). */
-  provider?: ModelProvider | null;
-  /** Provider bindings ordered by priority (ascending). */
+  /** Provider bindings ordered by priority (ascending). The first is the one
+   *  a call reaches for; the rest are what it falls over to. */
   providers?: ModelProviderBinding[] | null;
 };
 
@@ -169,8 +178,8 @@ const modelAPIParamsSchema = z
 /** The console's model table: narrowed, then cut to one page. */
 export const modelListSchema = z.object({
   capability: modelCapabilitySchema.optional(),
-  providerId: z.string().optional(),
-  /** Matches a model's name, its model id, or its primary provider's name. */
+  /** Matches a model's name, its model id, or the name of a provider it is
+   *  bound to. */
   q: z.string().optional(),
   ...paginationSchema.shape
 });
@@ -178,8 +187,6 @@ export const modelListSchema = z.object({
 export const modelCreateSchema = z.object({
   name: z.string().min(1).max(100),
   modelId: z.string().min(1).max(255),
-  // Legacy single provider (still accepted); prefer `providers`.
-  providerId: z.string().min(1).optional(),
   providers: z.array(providerBindingSchema).optional(),
   capability: modelCapabilitySchema,
   image: z.string().optional(),
@@ -201,7 +208,6 @@ export const modelUpdateSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(100).optional(),
   modelId: z.string().min(1).max(255).optional(),
-  providerId: z.string().min(1).optional(),
   providers: z.array(providerBindingSchema).optional(),
   capability: modelCapabilitySchema.optional(),
   image: z.string().optional(),

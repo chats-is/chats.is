@@ -69,7 +69,10 @@ export const SettingsSpeech = () => {
               {selectedModel && (
                 <div className="flex items-center">
                   <ModelIcon
-                    image={selectedModel.image || selectedModel.provider?.image}
+                    image={
+                      selectedModel.image ||
+                      selectedModel.providers?.[0]?.provider?.image
+                    }
                     className="mr-2 size-4"
                   />
                   <span>{selectedModel.name}</span>
@@ -82,7 +85,7 @@ export const SettingsSpeech = () => {
               <SelectItem key={model.id} value={model.modelId}>
                 <div className="flex items-center">
                   <ModelIcon
-                    image={model.image || model.provider?.image}
+                    image={model.image || model.providers?.[0]?.provider?.image}
                     className="mr-2 size-4"
                   />
                   <div>

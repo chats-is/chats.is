@@ -136,12 +136,18 @@ export function ChatUI({
   );
 
   const displayImage = useMemo(
-    () => displayDbModel?.image || displayDbModel?.provider?.image || null,
+    () =>
+      displayDbModel?.image ||
+      displayDbModel?.providers?.[0]?.provider?.image ||
+      null,
     [displayDbModel]
   );
 
   const currentImage = useMemo(
-    () => currentDbModel?.image || currentDbModel?.provider?.image || null,
+    () =>
+      currentDbModel?.image ||
+      currentDbModel?.providers?.[0]?.provider?.image ||
+      null,
     [currentDbModel]
   );
 

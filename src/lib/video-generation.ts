@@ -1,14 +1,13 @@
 import { experimental_generateVideo as generateVideo } from 'ai';
 import OpenAI, { AzureOpenAI } from 'openai';
 
-import { type Model, type ProviderConfig } from '@/types';
+import { type Model, type Provider, type ProviderConfig } from '@/types';
 import { decrypt } from '@/lib/crypto';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getVideoModel,
   isRetryableProviderError,
-  runWithProviderFailover,
-  type FailoverProvider
+  runWithProviderFailover
 } from '@/lib/provider';
 import { toRequestParts } from '@/lib/provider-vocab';
 import { resolveVideoSeconds } from '@/lib/video-usage';
@@ -182,7 +181,7 @@ async function pollSoraJob(
 
 export type VideoGenerationOutput = StoredMedia & {
   videoSeconds?: number;
-  provider: FailoverProvider;
+  provider: Provider;
 };
 
 /**
@@ -194,7 +193,7 @@ export async function generateAndStoreVideo(args: {
   userId: string;
   prompt: string;
   dbModel: Model;
-  candidates: FailoverProvider[];
+  candidates: Provider[];
   /** For a model that names its output by pixels — Sora takes this, not a ratio. */
   size?: string;
   aspectRatio?: `${number}:${number}`;

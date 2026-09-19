@@ -1,11 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { generateSpeech, NoSpeechGeneratedError } from 'ai';
 
-import {
-  bindingsToFailoverProviders,
-  getSpeechModel,
-  runWithProviderFailover
-} from '@/lib/provider';
+import { getSpeechModel, runWithProviderFailover } from '@/lib/provider';
 import { findModelByModelId } from '@/server/services/model';
 import { preflightGate } from '@/server/services/preflight';
 import { getSpeechSettings } from '@/server/services/settings';
@@ -59,7 +55,7 @@ async function POST({ request: req }: { request: Request }) {
 
   // Fetch model from database to validate
   const dbModel = await findModelByModelId(modelId, 'audio');
-  const candidates = bindingsToFailoverProviders(dbModel?.providers ?? []);
+  const candidates = dbModel?.providers.map(binding => binding.provider!) ?? [];
   if (!dbModel || candidates.length === 0) {
     console.error(`[speech] model unavailable: ${modelId}`);
     return Response.json(

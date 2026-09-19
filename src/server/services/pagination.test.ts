@@ -81,19 +81,52 @@ const seedProvider = async (id: string, name: string) => {
 };
 
 /** Every model shares a display order and a capability, so only the id breaks
- *  the tie — which is exactly the case offset paging can get wrong. */
+ *  the tie — which is exactly the case offset paging can get wrong.
+ *
+ *  A binding comes with each: it is a model's only link to a provider, so a
+ *  model without one is not a model the console can do anything with. */
 const seedModels = async (count: number, providerId: string) => {
-  await h.db.insert(schema.models).values(
-    Array.from({ length: count }, (_, i) => ({
-      id: `m-${String(i).padStart(3, '0')}`,
-      name: `Model ${i}`,
-      modelId: `model-${i}`,
+  const rows = Array.from({ length: count }, (_, i) => ({
+    id: `m-${String(i).padStart(3, '0')}`,
+    name: `Model ${i}`,
+    modelId: `model-${i}`,
+    capability: 'chat' as const,
+    isEnabled: true,
+    displayOrder: 0
+  }));
+
+  await h.db.insert(schema.models).values(rows);
+  await h.db.insert(schema.modelProviders).values(
+    rows.map(model => ({
+      id: `mp-${model.id}`,
+      modelId: model.modelId,
       providerId,
-      capability: 'chat' as const,
-      isEnabled: true,
-      displayOrder: 0
+      priority: 0,
+      isEnabled: true
     }))
   );
+};
+
+/** One model and the binding that gives it a provider. */
+const seedModel = async (
+  model: {
+    id: string;
+    name: string;
+    modelId: string;
+    capability: 'chat' | 'image' | 'video' | 'audio';
+  },
+  providerId: string
+) => {
+  await h.db
+    .insert(schema.models)
+    .values({ ...model, isEnabled: true, displayOrder: 0 });
+  await h.db.insert(schema.modelProviders).values({
+    id: `mp-${model.id}`,
+    modelId: model.modelId,
+    providerId,
+    priority: 0,
+    isEnabled: true
+  });
 };
 
 describe('listModels', () => {
@@ -143,15 +176,10 @@ describe('listModels', () => {
 
   it('searches the provider name through the join', async () => {
     await seedProvider('p-xai', 'xAI');
-    await h.db.insert(schema.models).values({
-      id: 'm-grok',
-      name: 'Grok',
-      modelId: 'grok-4',
-      providerId: 'p-xai',
-      capability: 'chat' as const,
-      isEnabled: true,
-      displayOrder: 0
-    });
+    await seedModel(
+      { id: 'm-grok', name: 'Grok', modelId: 'grok-4', capability: 'chat' },
+      'p-xai'
+    );
 
     const page = await listModels({ page: 1, pageSize: 50, q: 'xAI' });
 
@@ -167,15 +195,15 @@ describe('listModels', () => {
   });
 
   it('narrows by capability and by search together', async () => {
-    await h.db.insert(schema.models).values({
-      id: 'm-dalle',
-      name: 'Model image',
-      modelId: 'dall-e-3',
-      providerId: 'p-openai',
-      capability: 'image' as const,
-      isEnabled: true,
-      displayOrder: 0
-    });
+    await seedModel(
+      {
+        id: 'm-dalle',
+        name: 'Model image',
+        modelId: 'dall-e-3',
+        capability: 'image'
+      },
+      'p-openai'
+    );
 
     const page = await listModels({
       page: 1,

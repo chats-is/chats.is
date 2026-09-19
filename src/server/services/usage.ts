@@ -15,7 +15,7 @@ import {
 import { type usageLogFilterSchema } from '@/types/usage';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
-import { models, providers, usage, users } from '@/db/schema';
+import { providers, usage, users } from '@/db/schema';
 import {
   calculateAudioCost,
   calculateChatCost,
@@ -62,7 +62,7 @@ export async function recordChatUsage(
       chatId: input.chatId ?? null,
       messageId: input.messageId,
       modelId: lookup?.model.modelId ?? input.modelId,
-      providerId: input.providerId ?? lookup?.model.providerId,
+      providerId: input.providerId,
       capability: 'chat',
       inputTokens: input.usage.inputTokens ?? 0,
       outputTokens: input.usage.outputTokens ?? 0,
@@ -118,7 +118,7 @@ export async function recordImageUsage(
       chatId: input.chatId ?? null,
       messageId: input.messageId,
       modelId: lookup?.model.modelId ?? input.modelId,
-      providerId: input.providerId ?? lookup?.model.providerId,
+      providerId: input.providerId,
       capability: 'image',
       imageCount: input.imageCount,
       inputTokens: input.inputTokens ?? 0,
@@ -165,7 +165,7 @@ export async function recordVideoUsage(
       chatId: input.chatId ?? null,
       messageId: input.messageId,
       modelId: lookup?.model.modelId ?? input.modelId,
-      providerId: input.providerId ?? lookup?.model.providerId,
+      providerId: input.providerId,
       capability: 'video',
       videoCount: input.videoCount,
       videoSeconds: (input.videoSeconds ?? 0).toString(),
@@ -209,7 +209,7 @@ export async function recordAudioUsage(
       chatId: input.chatId ?? null,
       messageId: input.messageId,
       modelId: lookup?.model.modelId ?? input.modelId,
-      providerId: input.providerId ?? lookup?.model.providerId,
+      providerId: input.providerId,
       capability: 'audio',
       audioCharacters: input.audioCharacters ?? 0,
       audioInputTokens: input.audioInputTokens ?? 0,
@@ -253,7 +253,7 @@ export async function recordTranscriptionUsage(
       chatId: input.chatId ?? null,
       messageId: input.messageId,
       modelId: lookup?.model.modelId ?? input.modelId,
-      providerId: input.providerId ?? lookup?.model.providerId,
+      providerId: input.providerId,
       capability: 'audio',
       audioSeconds: (input.audioSeconds ?? 0).toString(),
       cost: cost.toString(),
@@ -359,8 +359,9 @@ async function queryUsageRows(args: {
       reasoningTokens: usage.reasoningTokens
     })
     .from(usage)
-    .leftJoin(models, eq(models.modelId, usage.modelId))
-    .leftJoin(providers, eq(providers.id, models.providerId))
+    // The provider that actually served the call, as the row recorded it —
+    // not whichever one the model is bound to today.
+    .leftJoin(providers, eq(providers.id, usage.providerId))
     .where(where)
     .orderBy(usage.createdAt);
   return rows.map(r => ({

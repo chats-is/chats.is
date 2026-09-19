@@ -2,13 +2,12 @@ import '@tanstack/react-start/server-only';
 
 import { generateImage, generateText, type ModelMessage } from 'ai';
 
-import { type Model } from '@/types';
+import { type Model, type Provider } from '@/types';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getImageModel,
   getLanguageModel,
-  runWithProviderFailover,
-  type FailoverProvider
+  runWithProviderFailover
 } from '@/lib/provider';
 import { toRequestParts } from '@/lib/provider-vocab';
 
@@ -20,7 +19,7 @@ export type InputImage = {
 export type ImageGenerationResult = StoredMedia & {
   inputTokens?: number;
   outputTokens?: number;
-  provider: FailoverProvider;
+  provider: Provider;
 };
 
 /**
@@ -32,7 +31,7 @@ export async function generateAndStoreImage(args: {
   userId: string;
   prompt: string;
   dbModel: Model;
-  candidates: FailoverProvider[];
+  candidates: Provider[];
   size?: `${number}x${number}` | string;
   aspectRatio?: `${number}:${number}`;
   resolution?: string;

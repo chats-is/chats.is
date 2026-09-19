@@ -46,6 +46,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ModelStatusBadge } from '@/components/console/model-status';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { promptTableInput } from '@/components/console/table-filters';
 import {
@@ -430,7 +431,8 @@ export default function PromptsPage() {
                                   )
                                 }
                               />
-                              <span>{model.name}</span>
+                              <span className="truncate">{model.name}</span>
+                              <ModelStatusBadge status={model.status} />
                             </label>
                           ))
                         ) : (

@@ -100,7 +100,7 @@ export async function getChat(
     with: {
       model: {
         with: {
-          provider: true
+          providers: { with: { provider: true } }
         }
       },
       messages: input.includeMessages
@@ -135,8 +135,13 @@ export async function getChat(
 
   return {
     ...chat,
+    // A chat keeps naming its model only while that model can still answer:
+    // switched on, and with a provider of its own switched on.
     modelId:
-      chat.model?.isEnabled && chat.model.provider?.isEnabled
+      chat.model?.isEnabled &&
+      chat.model.providers.some(
+        binding => binding.isEnabled && binding.provider?.isEnabled
+      )
         ? chat.model.modelId
         : null
   };

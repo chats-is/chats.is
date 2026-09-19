@@ -24,6 +24,19 @@ export type ProviderConfig = {
   apiOptions?: Record<string, JSONValue> | null;
 };
 
+/**
+ * A provider, as anything that calls one needs it: who it is, and what it
+ * takes to reach it.
+ *
+ * One definition, because there is one thing. The config alone is
+ * `ProviderConfig`, for the SDK builders that take no interest in which
+ * provider they were handed.
+ */
+export type Provider = ProviderConfig & {
+  id: string;
+  name: string;
+};
+
 export type VertexAuthMode = 'service_account' | 'api_key';
 
 export type VertexServiceAccountKey = {

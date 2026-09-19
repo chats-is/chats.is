@@ -120,7 +120,7 @@ export const getTitleSettings = perRequest('getTitleSettings', async () => {
   return {
     prompt: DEFAULT_TITLE_PROMPT,
     modelId,
-    provider: model?.provider ?? null
+    provider: model?.providers?.[0]?.provider ?? null
   };
 });
 

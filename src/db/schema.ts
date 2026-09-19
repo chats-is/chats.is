@@ -361,11 +361,6 @@ export const providers = createTable(
   ]
 );
 
-export const providersRelations = relations(providers, ({ many }) => ({
-  models: many(models),
-  modelProviders: many(modelProviders)
-}));
-
 /**
  * Prompt - System prompts and user templates
  * Types: system (for system workflows), user (for user-facing templates)
@@ -427,9 +422,6 @@ export const models = createTable(
     id: varchar('id', { length: 255 }).notNull().primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     modelId: varchar('model_id', { length: 255 }).notNull().unique(),
-    providerId: varchar('provider_id', { length: 255 })
-      .notNull()
-      .references(() => providers.id, { onDelete: 'restrict' }),
     capability: varchar('capability', { length: 32 })
       .notNull()
       .$type<'chat' | 'image' | 'video' | 'audio'>(),
@@ -480,22 +472,15 @@ export const models = createTable(
       .defaultNow()
   },
   model => [
-    index('model_provider_id_idx').on(model.providerId),
     index('model_capability_idx').on(model.capability),
     index('model_is_enabled_idx').on(model.isEnabled)
   ]
 );
 
-export const modelsRelations = relations(models, ({ one, many }) => ({
-  // Deprecated single-provider link, kept for backward compatibility while the
-  // app migrates to the many-to-many `modelProviders` table. New code should
-  // resolve providers through `modelProviders` (ordered by priority).
-  provider: one(providers, {
-    fields: [models.providerId],
-    references: [providers.id]
-  }),
+export const modelsRelations = relations(models, ({ many }) => ({
   pricings: many(modelPricings),
-  modelProviders: many(modelProviders)
+  /** The providers this model is paired with, one row per pairing. */
+  providers: many(modelProviders)
 }));
 
 /**

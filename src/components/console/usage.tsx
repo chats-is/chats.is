@@ -23,6 +23,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { ModelStatusBadge } from '@/components/console/model-status';
 import {
   DailyStackedChart,
   UsageModule,
@@ -215,7 +216,10 @@ function UsageLog({ days }: { days: number }) {
               <SelectItem value="__all__">All models</SelectItem>
               {models?.map(m => (
                 <SelectItem key={m.id} value={m.modelId}>
-                  {m.modelId}
+                  <span className="flex items-center gap-2">
+                    {m.modelId}
+                    <ModelStatusBadge status={m.status} />
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

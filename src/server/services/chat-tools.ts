@@ -12,6 +12,7 @@ import {
   type ChatMessage,
   type MediaToolOutput,
   type Model,
+  type Provider,
   type TranscribeToolOutput
 } from '@/types';
 import {
@@ -31,10 +32,6 @@ import {
   pickSize,
   pickVoice
 } from '@/lib/media-options';
-import {
-  bindingsToFailoverProviders,
-  type FailoverProvider
-} from '@/lib/provider';
 import { generateAndStoreSpeech } from '@/lib/speech-generation';
 import { transcribeAudio } from '@/lib/transcription';
 import { isSttModel, isTtsModel } from '@/lib/utils';
@@ -78,7 +75,7 @@ export type MediaToolsOptions = {
 
 type ResolvedMediaModel = {
   dbModel: Model;
-  candidates: FailoverProvider[];
+  candidates: Provider[];
 };
 
 async function resolveMediaModel(
@@ -88,7 +85,7 @@ async function resolveMediaModel(
 ): Promise<ResolvedMediaModel | null> {
   if (!modelId) return null;
   const dbModel = await findModelByModelId(modelId, capability);
-  const candidates = bindingsToFailoverProviders(dbModel?.providers ?? []);
+  const candidates = dbModel?.providers.map(binding => binding.provider!) ?? [];
   if (!dbModel || candidates.length === 0) return null;
   if (accepts && !accepts(dbModel)) return null;
   return { dbModel, candidates };
