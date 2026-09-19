@@ -173,24 +173,6 @@ export function ConsoleCardsSkeleton({ count = 5 }: { count?: number }) {
 }
 
 /**
- * The settings panel the tabs switch between — a run of labelled fields. The
- * tabs themselves are a static list, so the route shows the real ones and only
- * the panel under them stands in.
- */
-export function ConsoleSettingsPanelSkeleton() {
-  return (
-    <div className="space-y-6">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="space-y-2">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-9 w-full" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
  * Usage: the stat cards and charts, then the log beneath them.
  *
  * `columns` because the two pages that use this have logs of different widths —

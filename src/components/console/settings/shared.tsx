@@ -11,7 +11,6 @@ import {
 } from '@/server/functions/settings';
 import { Button } from '@/components/ui/button';
 import { useAppForm } from '@/components/app-form';
-import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
 
 import { expand, readPath } from './values';
 
@@ -97,10 +96,6 @@ function valuesOf(
   // A switch needs a side even before anyone has picked one.
   flat['speech.enabled'] ||= 'false';
   return expand(flat);
-}
-
-export function SettingsLoading() {
-  return <ConsoleSettingsPanelSkeleton />;
 }
 
 /**

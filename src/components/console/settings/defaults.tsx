@@ -21,7 +21,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
 import { SettingsList, SettingsRow, type RowState } from './list';
-import { SettingsForm, SettingsLoading, useSettingsForm } from './shared';
+import { DefaultsPending } from './pending';
+import { SettingsForm, useSettingsForm } from './shared';
 import { readPath } from './values';
 
 /**
@@ -179,7 +180,7 @@ export function DefaultsSettings() {
   // than waiting for a save.
   const values = useStore(form.store, state => state.values);
 
-  if (isLoading) return <SettingsLoading />;
+  if (isLoading) return <DefaultsPending />;
 
   const statuses = MODEL_ROWS.map(row =>
     statusOf(readPath(values, row.key), row, models)

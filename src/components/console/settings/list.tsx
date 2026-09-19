@@ -1,5 +1,3 @@
-import { type LucideIcon } from 'lucide-react';
-
 import { cn } from '@/lib/utils';
 
 /**
@@ -58,13 +56,14 @@ export function SettingsRow({
   flag,
   children
 }: {
-  icon: LucideIcon;
+  /** Widened from lucide's own type so the pending page can stand one in. */
+  icon: React.ComponentType<{ className?: string }>;
   label: React.ReactNode;
   /** Omitted for a row whose control labels itself, such as a switch. */
   htmlFor?: string;
   hint?: React.ReactNode;
   /** The key this row writes, for whoever is reading the database. */
-  settingKey: string;
+  settingKey: React.ReactNode;
   state?: RowState;
   /** A line under the control saying what the row's state means. */
   flag?: React.ReactNode;
@@ -88,13 +87,13 @@ export function SettingsRow({
             <div className="font-medium">{label}</div>
           )}
           {hint && (
-            <p className="mt-0.5 max-w-[60ch] text-sm text-muted-foreground">
+            <div className="mt-0.5 max-w-[60ch] text-sm text-muted-foreground">
               {hint}
-            </p>
+            </div>
           )}
-          <span className="mt-1 block font-mono text-[11px] text-muted-foreground/75">
+          <div className="mt-1 font-mono text-[11px] text-muted-foreground/75">
             {settingKey}
-          </span>
+          </div>
         </div>
       </div>
 

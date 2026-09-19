@@ -4,7 +4,8 @@ import {
   DEFAULT_APP_SUBTITLE
 } from '@/lib/constant';
 
-import { SettingsForm, SettingsLoading, useSettingsForm } from './shared';
+import { GeneralPending } from './pending';
+import { SettingsForm, useSettingsForm } from './shared';
 
 const KEYS = [
   'app.name',
@@ -23,7 +24,7 @@ const KEYS = [
 export function GeneralSettings() {
   const { form, isLoading } = useSettingsForm(KEYS);
 
-  if (isLoading) return <SettingsLoading />;
+  if (isLoading) return <GeneralPending />;
 
   return (
     <SettingsForm form={form}>

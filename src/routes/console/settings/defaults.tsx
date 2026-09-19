@@ -4,7 +4,7 @@ import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import { DefaultsSettings } from '@/components/console/settings/defaults';
-import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
+import { DefaultsPending } from '@/components/console/settings/pending';
 
 export const Route = createFileRoute('/console/settings/defaults')({
   /**
@@ -22,6 +22,6 @@ export const Route = createFileRoute('/console/settings/defaults')({
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Default Settings') }]
   }),
-  pendingComponent: ConsoleSettingsPanelSkeleton,
+  pendingComponent: DefaultsPending,
   component: DefaultsSettings
 });

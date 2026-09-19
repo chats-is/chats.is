@@ -7,7 +7,10 @@ import {
 
 import { settingsQueries } from '@/server/functions/settings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ConsoleSettingsPanelSkeleton } from '@/components/console/skeletons';
+import {
+  DefaultsPending,
+  GeneralPending
+} from '@/components/console/settings/pending';
 
 export const Route = createFileRoute('/console/settings')({
   loader: ({ context }) =>
@@ -73,12 +76,17 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The tabs are a static list, so they are the real ones either side of the
- *  wait — only the panel under them stands in. */
+/**
+ * The tabs are a static list, so they are the real ones either side of the
+ * wait — only the panel under them stands in, and which page it stands in for
+ * is something the address already answers.
+ */
 function SettingsPending() {
+  const section = useSection();
+
   return (
     <SettingsShell>
-      <ConsoleSettingsPanelSkeleton />
+      {section === 'defaults' ? <DefaultsPending /> : <GeneralPending />}
     </SettingsShell>
   );
 }
