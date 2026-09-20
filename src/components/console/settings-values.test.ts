@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { expand, readPath } from './values';
+import { expand, readPath } from './settings-values';
 
 /**
  * A setting key is a dotted path, and the form addresses nested fields by the

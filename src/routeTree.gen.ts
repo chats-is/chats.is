@@ -34,9 +34,6 @@ import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
 import { Route as ApiArtifactsPreviewRouteImport } from './routes/api/artifacts/preview'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiFilesUploadRouteImport } from './routes/api/files/upload'
-import { Route as ConsoleSettingsIndexRouteImport } from './routes/console/settings/index'
-import { Route as ConsoleSettingsDefaultsRouteImport } from './routes/console/settings/defaults'
-import { Route as ConsoleSettingsGeneralRouteImport } from './routes/console/settings/general'
 import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users/index'
 import { Route as ConsoleUsersUserIdRouteImport } from './routes/console/users/$userId'
 
@@ -164,21 +161,6 @@ const ApiFilesUploadRoute = ApiFilesUploadRouteImport.update({
   path: '/upload',
   getParentRoute: () => ApiFilesRouteRoute,
 } as any)
-const ConsoleSettingsIndexRoute = ConsoleSettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ConsoleSettingsRoute,
-} as any)
-const ConsoleSettingsDefaultsRoute = ConsoleSettingsDefaultsRouteImport.update({
-  id: '/defaults',
-  path: '/defaults',
-  getParentRoute: () => ConsoleSettingsRoute,
-} as any)
-const ConsoleSettingsGeneralRoute = ConsoleSettingsGeneralRouteImport.update({
-  id: '/general',
-  path: '/general',
-  getParentRoute: () => ConsoleSettingsRoute,
-} as any)
 const ConsoleUsersIndexRoute = ConsoleUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -207,7 +189,7 @@ export interface FileRoutesByFullPath {
   '/console/prompts': typeof ConsolePromptsRoute
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
-  '/console/settings': typeof ConsoleSettingsRouteWithChildren
+  '/console/settings': typeof ConsoleSettingsRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/share/$id': typeof ShareIdRoute
   '/console/': typeof ConsoleIndexRoute
@@ -215,10 +197,7 @@ export interface FileRoutesByFullPath {
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
-  '/console/settings/defaults': typeof ConsoleSettingsDefaultsRoute
-  '/console/settings/general': typeof ConsoleSettingsGeneralRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
-  '/console/settings/': typeof ConsoleSettingsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -236,6 +215,7 @@ export interface FileRoutesByTo {
   '/console/prompts': typeof ConsolePromptsRoute
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
+  '/console/settings': typeof ConsoleSettingsRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/share/$id': typeof ShareIdRoute
   '/': typeof ChatIndexRoute
@@ -244,10 +224,7 @@ export interface FileRoutesByTo {
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
-  '/console/settings/defaults': typeof ConsoleSettingsDefaultsRoute
-  '/console/settings/general': typeof ConsoleSettingsGeneralRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
-  '/console/settings': typeof ConsoleSettingsIndexRoute
   '/console/users': typeof ConsoleUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -268,7 +245,7 @@ export interface FileRoutesById {
   '/console/prompts': typeof ConsolePromptsRoute
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
-  '/console/settings': typeof ConsoleSettingsRouteWithChildren
+  '/console/settings': typeof ConsoleSettingsRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/share/$id': typeof ShareIdRoute
   '/_chat/': typeof ChatIndexRoute
@@ -277,10 +254,7 @@ export interface FileRoutesById {
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
-  '/console/settings/defaults': typeof ConsoleSettingsDefaultsRoute
-  '/console/settings/general': typeof ConsoleSettingsGeneralRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
-  '/console/settings/': typeof ConsoleSettingsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -310,10 +284,7 @@ export interface FileRouteTypes {
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
-    | '/console/settings/defaults'
-    | '/console/settings/general'
     | '/console/users/$userId'
-    | '/console/settings/'
     | '/console/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -331,6 +302,7 @@ export interface FileRouteTypes {
     | '/console/prompts'
     | '/console/providers'
     | '/console/quotas'
+    | '/console/settings'
     | '/console/usage'
     | '/share/$id'
     | '/'
@@ -339,10 +311,7 @@ export interface FileRouteTypes {
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
-    | '/console/settings/defaults'
-    | '/console/settings/general'
     | '/console/users/$userId'
-    | '/console/settings'
     | '/console/users'
   id:
     | '__root__'
@@ -371,10 +340,7 @@ export interface FileRouteTypes {
     | '/api/artifacts/preview'
     | '/api/auth/$'
     | '/api/files/upload'
-    | '/console/settings/defaults'
-    | '/console/settings/general'
     | '/console/users/$userId'
-    | '/console/settings/'
     | '/console/users/'
   fileRoutesById: FileRoutesById
 }
@@ -569,27 +535,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesUploadRouteImport
       parentRoute: typeof ApiFilesRouteRoute
     }
-    '/console/settings/': {
-      id: '/console/settings/'
-      path: '/'
-      fullPath: '/console/settings/'
-      preLoaderRoute: typeof ConsoleSettingsIndexRouteImport
-      parentRoute: typeof ConsoleSettingsRoute
-    }
-    '/console/settings/defaults': {
-      id: '/console/settings/defaults'
-      path: '/defaults'
-      fullPath: '/console/settings/defaults'
-      preLoaderRoute: typeof ConsoleSettingsDefaultsRouteImport
-      parentRoute: typeof ConsoleSettingsRoute
-    }
-    '/console/settings/general': {
-      id: '/console/settings/general'
-      path: '/general'
-      fullPath: '/console/settings/general'
-      preLoaderRoute: typeof ConsoleSettingsGeneralRouteImport
-      parentRoute: typeof ConsoleSettingsRoute
-    }
     '/console/users/': {
       id: '/console/users/'
       path: '/users'
@@ -623,22 +568,6 @@ const ChatRouteChildren: ChatRouteChildren = {
 
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
-interface ConsoleSettingsRouteChildren {
-  ConsoleSettingsDefaultsRoute: typeof ConsoleSettingsDefaultsRoute
-  ConsoleSettingsGeneralRoute: typeof ConsoleSettingsGeneralRoute
-  ConsoleSettingsIndexRoute: typeof ConsoleSettingsIndexRoute
-}
-
-const ConsoleSettingsRouteChildren: ConsoleSettingsRouteChildren = {
-  ConsoleSettingsDefaultsRoute: ConsoleSettingsDefaultsRoute,
-  ConsoleSettingsGeneralRoute: ConsoleSettingsGeneralRoute,
-  ConsoleSettingsIndexRoute: ConsoleSettingsIndexRoute,
-}
-
-const ConsoleSettingsRouteWithChildren = ConsoleSettingsRoute._addFileChildren(
-  ConsoleSettingsRouteChildren,
-)
-
 interface ConsoleRouteChildren {
   ConsoleModelsRoute: typeof ConsoleModelsRoute
   ConsolePlansRoute: typeof ConsolePlansRoute
@@ -646,7 +575,7 @@ interface ConsoleRouteChildren {
   ConsolePromptsRoute: typeof ConsolePromptsRoute
   ConsoleProvidersRoute: typeof ConsoleProvidersRoute
   ConsoleQuotasRoute: typeof ConsoleQuotasRoute
-  ConsoleSettingsRoute: typeof ConsoleSettingsRouteWithChildren
+  ConsoleSettingsRoute: typeof ConsoleSettingsRoute
   ConsoleUsageRoute: typeof ConsoleUsageRoute
   ConsoleIndexRoute: typeof ConsoleIndexRoute
   ConsoleUsersUserIdRoute: typeof ConsoleUsersUserIdRoute
@@ -660,7 +589,7 @@ const ConsoleRouteChildren: ConsoleRouteChildren = {
   ConsolePromptsRoute: ConsolePromptsRoute,
   ConsoleProvidersRoute: ConsoleProvidersRoute,
   ConsoleQuotasRoute: ConsoleQuotasRoute,
-  ConsoleSettingsRoute: ConsoleSettingsRouteWithChildren,
+  ConsoleSettingsRoute: ConsoleSettingsRoute,
   ConsoleUsageRoute: ConsoleUsageRoute,
   ConsoleIndexRoute: ConsoleIndexRoute,
   ConsoleUsersUserIdRoute: ConsoleUsersUserIdRoute,
