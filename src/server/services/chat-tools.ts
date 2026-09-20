@@ -393,9 +393,13 @@ export async function buildMediaTools(args: {
 
     tools.generate_video = tool({
       description:
+        // No adjective for the length: the durations this model actually
+        // offers follow in the next line, from what an admin configured, and a
+        // description that says "short" beside a list ending in 60 contradicts
+        // it.
         (videoImage || dbModel.supportsImageToVideo
-          ? 'Generate a short video from a text description, optionally animating an image from this conversation.'
-          : 'Generate a short video from a text description.') +
+          ? 'Generate a video from a text description, optionally animating an image from this conversation.'
+          : 'Generate a video from a text description.') +
         optionsHint('sizes', dbModel.uiOptions?.sizes) +
         optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
         optionsHint('resolutions', dbModel.uiOptions?.resolutions) +

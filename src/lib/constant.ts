@@ -149,7 +149,7 @@ const MediaToolDescriptions: Record<ChatMediaToolName, string> = {
   edit_image:
     "- edit_image: modify an existing image from this conversation (a user upload or a previously generated image). Pass that image's URL as `imageUrl` and describe the change in `prompt`.",
   generate_video:
-    '- generate_video: create a short video from a text description, or animate an image from this conversation by passing its URL as `imageUrl`.',
+    '- generate_video: create a video from a text description, or animate an image from this conversation by passing its URL as `imageUrl`.',
   edit_video:
     "- edit_video: modify an existing video from this conversation (a user upload or a previously generated one) — use this whenever the user asks to change a video that already exists, never generate_video. Pass that video's URL as `videoUrl` and describe the change in `prompt`. Length, aspect ratio and resolution are inherited from the source.",
   text_to_speech:

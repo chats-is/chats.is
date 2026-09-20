@@ -59,8 +59,6 @@ type ModelRow = {
   label: string;
   icon: LucideIcon;
   hint: string;
-  /** What goes undone while nothing is chosen. */
-  missing: string;
   can: (model: ModelLike) => boolean;
 };
 
@@ -69,72 +67,63 @@ const MODEL_ROWS: Array<ModelRow> = [
     key: 'default.chat.modelId',
     label: 'Default Chat Model',
     icon: MessageSquare,
-    hint: 'Answers when a conversation names no model of its own.',
-    missing: 'A conversation with no model of its own has nothing to answer it',
+    hint: 'The default model for chat.',
     can: model => model.capability === 'chat'
   },
   {
     key: 'title.modelId',
     label: 'Title Generation Model',
     icon: Type,
-    hint: 'Names a conversation from its first message.',
-    missing: 'Conversations keep the name they were given',
+    hint: "The model used to generate a conversation's title.",
     can: model => model.capability === 'chat'
   },
   {
     key: 'default.image.modelId',
     label: 'Default Image Model',
     icon: Image,
-    hint: 'Generates a picture when a conversation asks for one.',
-    missing: 'Nothing generates a picture',
+    hint: "The default model for the chat's image tool.",
     can: model => model.capability === 'image'
   },
   {
     key: 'default.image.editModelId',
     label: 'Default Image Edit Model',
     icon: PenLine,
-    hint: 'Edits a picture the user attached, or one the model just made.',
-    missing: 'Nothing edits a picture',
+    hint: "The default model for the chat's image editing tool.",
     can: model => model.capability === 'image' && !!model.supportsImageEdit
   },
   {
     key: 'default.video.modelId',
     label: 'Default Video Model',
     icon: Video,
-    hint: 'Generates a clip from a written prompt.',
-    missing: 'Nothing generates a clip',
+    hint: "The default model for the chat's video tool.",
     can: model => model.capability === 'video'
   },
   {
     key: 'default.video.imageModelId',
     label: 'Default Image-to-Video Model',
     icon: Film,
-    hint: 'Animates a still the user supplied.',
-    missing: 'Nothing animates a still',
+    hint: "The default model for the chat's image-to-video tool.",
     can: model => model.capability === 'video' && !!model.supportsImageToVideo
   },
   {
     key: 'default.video.editModelId',
     label: 'Default Video Edit Model',
     icon: Clapperboard,
-    hint: 'Edits an existing clip.',
-    missing: 'Nothing edits a clip',
+    hint: "The default model for the chat's video editing tool.",
     can: model => model.capability === 'video' && !!model.supportsVideoEdit
   },
   {
     key: 'default.tts.modelId',
     label: 'Default TTS Model',
     icon: AudioLines,
-    hint: 'Generates speech.',
-    missing: 'Nothing generates speech',
+    hint: "The default model for the chat's text-to-speech tool and for reading a message aloud.",
     can: model => model.capability === 'audio' && !model.supportsTranscription
   },
   {
     key: 'default.stt.modelId',
     label: 'Default Transcription Model',
     icon: Mic,
-    hint: 'Turns recorded audio into text.',
-    missing: 'Nothing transcribes recorded audio',
+    hint: "The default model for the chat's transcription tool.",
     can: model => model.capability === 'audio' && !!model.supportsTranscription
   }
 ];
@@ -157,28 +146,16 @@ function statusOf(
   value: unknown,
   row: ModelRow,
   models: Array<ModelLike> | undefined
-): { state: RowState; flag?: string } {
-  if (typeof value !== 'string' || !value) {
-    return { state: 'unset', flag: row.missing };
-  }
+): RowState {
+  if (typeof value !== 'string' || !value) return 'unset';
   // Nothing to check against until the list lands.
-  if (!models) return { state: 'set' };
+  if (!models) return 'set';
 
   const model = models.find(candidate => candidate.modelId === value);
-  if (!model) return { state: 'stale', flag: 'That model is no longer listed' };
-  if (model.status === 'disabled') {
-    return { state: 'stale', flag: `${model.name} is disabled` };
-  }
-  if (model.status === 'no-enabled-provider') {
-    return {
-      state: 'stale',
-      flag: `Providers for ${model.name} are unavailable`
-    };
-  }
-  if (!row.can(model)) {
-    return { state: 'stale', flag: `${model.name} can no longer do this` };
-  }
-  return { state: 'set' };
+  if (!model) return 'stale';
+  if (model.status !== 'available') return 'stale';
+  // Still here and still usable, but no longer up to this particular job.
+  return row.can(model) ? 'set' : 'stale';
 }
 
 export function DefaultsSettings() {
@@ -195,8 +172,8 @@ export function DefaultsSettings() {
   const statuses = MODEL_ROWS.map(row =>
     statusOf(readPath(values, row.key), row, models)
   );
-  const set = statuses.filter(status => status.state === 'set').length;
-  const stale = statuses.filter(status => status.state === 'stale').length;
+  const set = statuses.filter(state => state === 'set').length;
+  const stale = statuses.filter(state => state === 'stale').length;
 
   const quotas = (quotaOptions ?? []).map(quota => ({
     value: quota.id,
@@ -206,7 +183,7 @@ export function DefaultsSettings() {
   return (
     <SettingsForm form={form}>
       <SettingsList
-        title="Default Models"
+        title="Models"
         aside={
           <span className="text-sm font-normal text-muted-foreground">
             {set} of {MODEL_ROWS.length} set
@@ -214,9 +191,7 @@ export function DefaultsSettings() {
               <>
                 {' · '}
                 <b className="font-medium text-amber-700 dark:text-amber-400">
-                  {stale === 1
-                    ? '1 names a model that is unavailable'
-                    : `${stale} name models that are unavailable`}
+                  {stale} unavailable
                 </b>
               </>
             )}
@@ -224,7 +199,7 @@ export function DefaultsSettings() {
         }
       >
         {MODEL_ROWS.map((row, index) => {
-          const status = statuses[index];
+          const state = statuses[index];
           // Every model the job could use, the ones that cannot answer today
           // included: a model that is switched off is a thing the admin can go
           // and switch on, and leaving it out only raises the question of
@@ -250,8 +225,7 @@ export function DefaultsSettings() {
               htmlFor={row.key}
               hint={row.hint}
               settingKey={row.key}
-              state={status.state}
-              flag={status.flag}
+              state={state}
             >
               <form.AppField name={row.key}>
                 {field => (
@@ -275,7 +249,7 @@ export function DefaultsSettings() {
         <SettingsRow
           icon={Play}
           label="Enable Speech"
-          hint="Whether messages can be read aloud. Which model and voice does it is the Default TTS Model above — reading a message aloud and generating speech in a reply are the same job."
+          hint="Whether a message can be read aloud."
           settingKey="speech.enabled"
         >
           {/* Settings are stored as text, so this switch is over "true"/"false"
@@ -305,12 +279,12 @@ export function DefaultsSettings() {
         </SettingsRow>
       </SettingsList>
 
-      <SettingsList title="Default Quota">
+      <SettingsList title="Quota">
         <SettingsRow
           icon={Gauge}
           label="Default Quota"
           htmlFor="default.quotaId"
-          hint="Fallback quota for users without a plan."
+          hint="The default quota, used when a user has no other."
           settingKey="default.quotaId"
         >
           <form.AppField name="default.quotaId">

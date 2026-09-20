@@ -40,12 +40,6 @@ const ROW_TINT: Record<RowState, string> = {
   stale: 'bg-amber-50 dark:bg-amber-950/25'
 };
 
-const FLAG_TONE: Record<RowState, string> = {
-  set: '',
-  unset: 'text-muted-foreground',
-  stale: 'text-amber-700 dark:text-amber-400'
-};
-
 export function SettingsRow({
   icon: Icon,
   label,
@@ -53,7 +47,6 @@ export function SettingsRow({
   hint,
   settingKey,
   state = 'set',
-  flag,
   children
 }: {
   /** Widened from lucide's own type so the pending page can stand one in. */
@@ -65,14 +58,12 @@ export function SettingsRow({
   /** The key this row writes, for whoever is reading the database. */
   settingKey: React.ReactNode;
   state?: RowState;
-  /** A line under the control saying what the row's state means. */
-  flag?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        'grid grid-cols-1 items-center gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_17rem] sm:gap-x-6',
+        'grid grid-cols-1 items-center gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-6',
         ROW_TINT[state]
       )}
     >
@@ -97,22 +88,8 @@ export function SettingsRow({
         </div>
       </div>
 
-      <div className="flex w-full min-w-0 flex-col items-stretch gap-1.5 sm:items-end sm:justify-self-end">
+      <div className="flex min-w-0 justify-end sm:justify-self-end">
         {children}
-        {flag && (
-          // `flex`, not `inline-flex`: an inline box is as wide as its longest
-          // line wants to be, and a sentence longer than the column would push
-          // the page sideways rather than wrap inside it.
-          <span
-            className={cn(
-              'flex max-w-full items-start gap-1.5 text-xs font-medium sm:text-right',
-              FLAG_TONE[state]
-            )}
-          >
-            <span className="mt-1 size-1.5 shrink-0 rounded-full bg-current" />
-            <span className="min-w-0">{flag}</span>
-          </span>
-        )}
       </div>
     </div>
   );
