@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
 import { promptQueries } from '@/server/functions/prompt';
-import { GalleryPending } from '@/components/gallery-skeleton';
+import { PromptsPending } from '@/components/gallery-skeleton';
 import { PromptsView } from '@/components/prompts-view';
 
 /** Which tab is open lives in the address, so a link to My Prompts opens
@@ -20,6 +20,6 @@ export const Route = createFileRoute('/_chat/prompts')({
       promptQueries.usableInfinite({ limit: 24 })
     ),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Prompts') }] }),
-  pendingComponent: () => <GalleryPending title="Prompts" />,
+  pendingComponent: PromptsPending,
   component: PromptsView
 });

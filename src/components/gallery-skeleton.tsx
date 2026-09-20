@@ -1,3 +1,5 @@
+import { useSearch } from '@tanstack/react-router';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatHeader } from '@/components/chat-header';
 
@@ -34,16 +36,57 @@ export function GalleryCardSkeletons({ count }: { count: number }) {
  * appears to vanish and come back rather than to fill in. This renders the
  * same shell the loaded page does, down to the title, and only the cards are
  * placeholders. Nothing moves when the data lands.
+ *
+ * `toolbar` is for a gallery that keeps a row of controls above its grid.
+ * Library has none, and `space-y-4` over a single child costs it nothing.
  */
-export function GalleryPending({ title }: { title: string }) {
+export function GalleryPending({
+  title,
+  toolbar
+}: {
+  title: string;
+  toolbar?: React.ReactNode;
+}) {
   return (
     <div className="flex size-full flex-col">
       <ChatHeader title={title} />
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-5xl p-4">
+        <div className="mx-auto w-full max-w-5xl space-y-4 p-4">
+          {toolbar}
           <GalleryGridSkeleton />
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Prompts, which keeps a row above its grid: which tab is open, a search box,
+ * and — on My Prompts only — the button that opens the new-prompt dialog.
+ * Leaving it out dropped the grid a row higher than it lands, so the whole
+ * page shifted down the moment the prompts arrived.
+ *
+ * Which tab is open is the address's answer, and it is answered before the
+ * loader runs, so the Add Prompt button is there exactly when it will be.
+ * Read loosely rather than through the route, which imports this file.
+ */
+export function PromptsPending() {
+  const view = useSearch({ strict: false }).tab ?? 'trending';
+
+  return (
+    <GalleryPending
+      title="Prompts"
+      toolbar={
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The two tab pills, as one bar: they are a fixed pair, so this is
+              their width rather than a guess at it. */}
+          <Skeleton className="h-9 w-48 shrink-0 rounded-full" />
+          <Skeleton className="h-9 min-w-40 flex-1 rounded-full" />
+          {view === 'my' && (
+            <Skeleton className="h-9 w-32 shrink-0 rounded-full" />
+          )}
+        </div>
+      }
+    />
   );
 }
