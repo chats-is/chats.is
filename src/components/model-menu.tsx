@@ -184,7 +184,10 @@ export function ModelMenu({
                 <SelectGroup key={providerId}>
                   <SelectLabel className="flex items-center gap-2">
                     <ModelIcon
-                      className="size-4 opacity-45 grayscale"
+                      // Named rather than inherited: the icon now carries a
+                      // colour of its own, so the group label's muted tone has
+                      // to be asked for.
+                      className="size-4 text-muted-foreground opacity-45 grayscale"
                       image={
                         providerModels[0]?.providers?.[0]?.provider?.image ||
                         null

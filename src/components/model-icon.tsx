@@ -37,11 +37,23 @@ export const ModelIcon = ({ image, className }: ModelIconProps) => {
   }
 
   // 2. LobeHub Icon
+  //
+  // `text-foreground` is not a preference, it is a shield. The set's default
+  // export is the mono variant, which paints itself in `currentColor`, and
+  // shadcn's Select sets `[&_svg:not([class*='text-'])]:text-muted-foreground`
+  // on its trigger and its items — a rule meant for its own chevron and tick
+  // that reaches any svg placed inside one. Without a `text-` class of its
+  // own a brand mark comes out grey there and black everywhere else. Carrying
+  // one both fails that `:not()` and names the colour; a caller who wants
+  // another passes it, and tailwind-merge lets theirs win.
   if (image) {
     return (
       <ClientOnly fallback={<span className={cn('size-5', className)} />}>
         <Suspense fallback={<span className={cn('size-5', className)} />}>
-          <LobeIcon image={image} className={className} />
+          <LobeIcon
+            image={image}
+            className={cn('text-foreground', className)}
+          />
         </Suspense>
       </ClientOnly>
     );

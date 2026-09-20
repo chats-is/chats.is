@@ -230,7 +230,7 @@ function MediaKind({
                   other line. */}
               <span className="flex size-4 shrink-0 items-center justify-center">
                 <ModelIcon
-                  className="size-3.5 opacity-45 grayscale"
+                  className="size-3.5 text-muted-foreground opacity-45 grayscale"
                   image={
                     providerModels[0]?.providers?.[0]?.provider?.image ?? null
                   }
