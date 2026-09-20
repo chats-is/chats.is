@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, desc, eq, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, isNotNull, lt, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { mediaToolNames } from '@/types';
@@ -31,6 +31,30 @@ export type LibraryItem =
 const MEDIA_PARTS_JSONPATH = `$[*] ? (@.type == "file" || @.type like_regex "^tool-(${mediaToolNames.join('|')})$")`;
 
 /**
+ * Where a media card's title comes from: what the message said, and failing
+ * that the file's own name, under either shape a part can take. Search reads
+ * these three and not the parts blob as a whole — that would match URLs and
+ * tool names, so looking for "video" would return every video ever generated
+ * whatever the message called it.
+ */
+const MEDIA_TITLE_JSONPATHS = [
+  '$[*] ? (@.type == "text").text',
+  '$[*].filename',
+  '$[*].output.filename'
+];
+
+/** A message whose card title contains `term`. */
+function messageMatches(term: string) {
+  const pattern = `%${term}%`;
+  return or(
+    ...MEDIA_TITLE_JSONPATHS.map(
+      path =>
+        sql`jsonb_path_query_array(${messages.parts}, ${sql.raw(`'${path}'`)})::text ilike ${pattern}`
+    )
+  );
+}
+
+/**
  * Merged, time-descending feed of everything the user generated across all
  * chats: media (read straight out of persisted assistant messages) mixed
  * with artifacts. Cursor = ISO timestamp; pages never split a group of
@@ -48,9 +72,12 @@ const MEDIA_PARTS_JSONPATH = `$[*] ? (@.type == "file" || @.type like_regex "^to
  */
 export async function listLibrary(
   userId: string,
-  { cursor, limit }: z.infer<typeof libraryPageSchema>
+  { cursor, limit, search }: z.infer<typeof libraryPageSchema>
 ): Promise<{ items: LibraryItem[]; nextCursor: string | undefined }> {
   const before = cursor ? new Date(cursor) : null;
+  // Filtered in SQL, not after extraction: `limit` has to mean a page of
+  // matches, or a search would return a near-empty page and stop.
+  const term = search?.trim();
 
   // Only messages that actually contain media parts — skips the bulk of
   // plain-text messages before JSON extraction.
@@ -70,7 +97,8 @@ export async function listLibrary(
           eq(messages.userId, userId),
           eq(messages.role, 'assistant'),
           hasMediaPart,
-          before ? lt(messages.createdAt, before) : undefined
+          before ? lt(messages.createdAt, before) : undefined,
+          term ? messageMatches(term) : undefined
         )
       )
       .orderBy(desc(messages.createdAt))
@@ -100,7 +128,14 @@ export async function listLibrary(
         and(
           eq(artifacts.userId, userId),
           isNotNull(artifacts.messageId),
-          before ? lt(artifacts.createdAt, before) : undefined
+          before ? lt(artifacts.createdAt, before) : undefined,
+          term
+            ? or(
+                ilike(artifacts.title, `%${term}%`),
+                ilike(artifacts.fileName, `%${term}%`),
+                ilike(artifacts.content, `%${term}%`)
+              )
+            : undefined
         )
       )
       .orderBy(desc(artifacts.createdAt))

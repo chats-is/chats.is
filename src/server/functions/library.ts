@@ -19,12 +19,13 @@ export const libraryQueries = {
   key: {
     list: () => ['library', 'list'] as const
   },
-  /** The library scrolls; the cursor is the timestamp of the last item shown. */
-  list: ({ limit = 24 }: { limit?: number } = {}) =>
+  /** The library scrolls; the cursor is the timestamp of the last item shown.
+   *  `search` is part of the key, so a new term starts paging over. */
+  list: ({ limit = 24, search }: { limit?: number; search?: string } = {}) =>
     infiniteQueryOptions({
-      queryKey: [...libraryQueries.key.list(), limit] as const,
+      queryKey: [...libraryQueries.key.list(), limit, search ?? ''] as const,
       queryFn: ({ pageParam }) =>
-        listLibrary({ data: { cursor: pageParam, limit } }),
+        listLibrary({ data: { cursor: pageParam, limit, search } }),
       initialPageParam: null as string | null | undefined,
       getNextPageParam: lastPage => lastPage.nextCursor
     })

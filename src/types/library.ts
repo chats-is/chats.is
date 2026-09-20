@@ -8,5 +8,8 @@ import { z } from 'zod';
  */
 export const libraryPageSchema = z.object({
   cursor: z.string().nullish(),
-  limit: z.number().min(1).max(60).default(24)
+  limit: z.number().min(1).max(60).default(24),
+  /** Matched against what a card actually shows: an artifact's title, name
+   *  and body, and the words a message said beside its media. */
+  search: z.string().max(200).optional()
 });

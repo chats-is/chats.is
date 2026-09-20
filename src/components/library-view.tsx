@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useRouter } from '@tanstack/react-router';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Pause,
   Play,
+  Search,
   Table,
   X
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { ChatHeader } from '@/components/chat-header';
 import {
   GalleryCardSkeletons,
@@ -445,9 +447,22 @@ const NEXT_PAGE_PLACEHOLDER_CARDS = 4;
 
 export function LibraryView() {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [search, setSearch] = useState('');
+
+  // Debounced: a term is part of the query key, so every keystroke would
+  // otherwise start its own page-one request.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
-      ...libraryQueries.list({ limit: 24 }),
+      ...libraryQueries.list({
+        limit: 24,
+        search: debouncedSearch || undefined
+      }),
       getNextPageParam: page => page.nextCursor
     });
 
@@ -470,14 +485,26 @@ export function LibraryView() {
         data-scroll-restoration-id="library"
         className="flex-1 overflow-y-auto"
       >
-        <div className="mx-auto w-full max-w-5xl p-4">
+        <div className="mx-auto w-full max-w-5xl space-y-4 p-4">
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name or content"
+              className="rounded-full pl-9"
+            />
+          </div>
+
           {isLoading ? (
             <GalleryGridSkeleton />
           ) : items.length === 0 ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
               <LibraryBig className="size-12 opacity-50" />
               <p className="text-sm">
-                Media and artifacts you generate in chats will appear here.
+                {debouncedSearch
+                  ? 'No items match your search.'
+                  : 'Media and artifacts you generate in chats will appear here.'}
               </p>
             </div>
           ) : (
