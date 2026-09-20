@@ -61,32 +61,26 @@ export function GalleryPending({
 }
 
 /**
- * Prompts, which keeps a row above its grid: which tab is open, a search box,
- * and — on My Prompts only — the button that opens the new-prompt dialog.
- * Leaving it out dropped the grid a row higher than it lands, so the whole
- * page shifted down the moment the prompts arrived.
+ * The row Prompts keeps above its grid: which tab is open, a search box, and
+ * — on My Prompts only — the button that opens the new-prompt dialog. Leaving
+ * it out drew the grid a row and a gap too high, so the whole page dropped the
+ * moment the prompts arrived.
  *
  * Which tab is open is the address's answer, and it is answered before the
- * loader runs, so the Add Prompt button is there exactly when it will be.
- * Read loosely rather than through the route, which imports this file.
+ * loader runs, so the Add Prompt placeholder is there exactly when the button
+ * will be. Read loosely rather than through the route, which imports this
+ * file.
  */
-export function PromptsPending() {
+export function PromptsToolbarSkeleton() {
   const view = useSearch({ strict: false }).tab ?? 'trending';
 
   return (
-    <GalleryPending
-      title="Prompts"
-      toolbar={
-        <div className="flex flex-wrap items-center gap-2">
-          {/* The two tab pills, as one bar: they are a fixed pair, so this is
-              their width rather than a guess at it. */}
-          <Skeleton className="h-9 w-48 shrink-0 rounded-full" />
-          <Skeleton className="h-9 min-w-40 flex-1 rounded-full" />
-          {view === 'my' && (
-            <Skeleton className="h-9 w-32 shrink-0 rounded-full" />
-          )}
-        </div>
-      }
-    />
+    <div className="flex flex-wrap items-center gap-2">
+      {/* The two tab pills, as one bar: they are a fixed pair, so this is
+          their width rather than a guess at it. */}
+      <Skeleton className="h-9 w-48 shrink-0 rounded-full" />
+      <Skeleton className="h-9 min-w-40 flex-1 rounded-full" />
+      {view === 'my' && <Skeleton className="h-9 w-32 shrink-0 rounded-full" />}
+    </div>
   );
 }
