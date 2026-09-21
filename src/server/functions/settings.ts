@@ -59,10 +59,29 @@ export const settingsQueries = {
       queryKey: [...settingsQueries.key.list()] as const,
       queryFn: () => listSettings()
     }),
+  /**
+   * The models on offer, the defaults and the feature switches — what an
+   * operator configures and every page of the app is drawn from.
+   *
+   * It is read by the layout, which is mounted once and stays: nothing about
+   * moving between pages ever asks for it again. Left at that, a tab kept what
+   * it was given when it opened — a model switched on in the console was not
+   * on offer, and one switched off went on being offered, until the browser
+   * was reloaded. So this one keeps itself current: it is looked at again when
+   * the window is returned to, and every few minutes while it is in view.
+   *
+   * A minute's trust in between, so that flicking between windows is not a
+   * request each time. Being a minute behind is safe: a model that has since
+   * been switched off is refused by the server when it is asked for, and the
+   * refusal says why.
+   */
   system: () =>
     queryOptions({
       queryKey: [...settingsQueries.key.system()] as const,
-      queryFn: () => getSystemSettings()
+      queryFn: () => getSystemSettings(),
+      staleTime: 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchInterval: 5 * 60 * 1000
     }),
   /** The installation's own name and description, read by the root route. */
   app: () =>
