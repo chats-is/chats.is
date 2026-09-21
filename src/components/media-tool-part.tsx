@@ -1,4 +1,4 @@
-import { usePreferences } from '@/contexts/preferences-context';
+import { usePreferencesIfAny } from '@/contexts/preferences-context';
 import { Loader2 } from 'lucide-react';
 
 import { mediaToolNames, type ChatMessage, type MediaToolName } from '@/types';
@@ -67,7 +67,10 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
  * the output arrives, or an error chip.
  */
 export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
-  const { preferences } = usePreferences();
+  // Only a hint for the shape of the placeholder while a generation runs, so
+  // it is taken where it exists and done without where it does not: a shared
+  // chat has no reader whose preferences these would be.
+  const preferences = usePreferencesIfAny()?.preferences;
 
   const toolName = part.type.slice('tool-'.length) as MediaToolName;
   const placeholderType =
@@ -85,15 +88,17 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
     const aspectRatio =
       requestedAspectRatio ??
       (placeholderType === 'video'
-        ? preferences.videoAspectRatio
-        : preferences.imageAspectRatio);
+        ? preferences?.videoAspectRatio
+        : preferences?.imageAspectRatio);
 
     return (
       <div className="my-2">
         <MediaPlaceholder
           type={placeholderType}
           aspectRatio={aspectRatio}
-          size={placeholderType === 'image' ? preferences.imageSize : undefined}
+          size={
+            placeholderType === 'image' ? preferences?.imageSize : undefined
+          }
         />
       </div>
     );

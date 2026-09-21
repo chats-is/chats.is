@@ -195,6 +195,15 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
   );
 }
 
+/**
+ * The reader's preferences, or null where there are none to read — a shared
+ * chat, which anyone can open and which has no reader of its own. For the few
+ * things drawn on both kinds of page that only want a preference as a hint.
+ */
+export function usePreferencesIfAny() {
+  return useContext(PreferencesContext);
+}
+
 export function usePreferences() {
   const context = useContext(PreferencesContext);
   if (!context) {

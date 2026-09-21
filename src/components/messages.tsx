@@ -169,6 +169,7 @@ export function Messages({
               status={status}
               message={message}
               image={image}
+              isReadonly={isReadonly}
               isLastMessage={isLastMessage}
               supportsReasoning={supportsReasoning}
               hasVisibleArtifacts={hasVisibleArtifacts}

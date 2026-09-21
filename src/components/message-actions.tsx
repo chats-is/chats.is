@@ -1,6 +1,4 @@
 import * as React from 'react';
-import { usePreferences } from '@/contexts/preferences-context';
-import { useSystemSettings } from '@/contexts/system-settings-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -8,16 +6,13 @@ import {
   Copy,
   Download,
   Loader2,
-  PauseCircle,
   Pencil,
   RefreshCw,
-  Trash2,
-  Volume2
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type ChatMessage } from '@/types';
-import { createSpeech } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
@@ -47,6 +42,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { ReadAloudButton } from '@/components/read-aloud-button';
 
 interface MessageActionsProps extends Partial<
   Pick<UseChatHelpers<ChatMessage>, 'status' | 'setMessages'>
@@ -67,18 +63,10 @@ export function MessageActions({
   isReadonly,
   isLastMessage
 }: MessageActionsProps) {
-  const { ttsModels, speechEnabled } = useSystemSettings();
-  const isSpeechAvailable = (ttsModels?.length ?? 0) > 0 && speechEnabled;
-  const { preferences } = usePreferences();
-  // The same text-to-speech selection the chat tool uses: reading a message
-  // aloud and generating speech in a reply are one setting, not two.
-  const speechModel = preferences.audioModelId;
-  const speechVoice = preferences.audioVoice;
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const [draftContent, setDraftContent] = React.useState('');
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [isPlaying, setIsPlaying] = React.useState(false);
 
   const updateMutation = useMutation({
     mutationFn: mutating(updateMessage)
@@ -86,8 +74,6 @@ export function MessageActions({
   const deleteMutation = useMutation({
     mutationFn: mutating(deleteMessages)
   });
-  const [isLoadingAudio, setIsLoadingAudio] = React.useState(false);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   const textParts = message.parts
     ?.filter(part => part.type === 'text')
@@ -169,82 +155,22 @@ export function MessageActions({
     }
   };
 
-  const onRead = async () => {
-    // A voice is optional: unset means the user never picked one, and the
-    // model's own default speaks. Requiring one here made the button do
-    // nothing at all, silently, for anyone who had not been into the settings.
-    if (isSpeechAvailable && speechModel) {
-      setIsLoadingAudio(true);
-      const result = await createSpeech(
-        speechModel,
-        speechVoice || undefined,
-        textParts
-      );
-      setIsLoadingAudio(false);
-
-      if (result && 'error' in result) {
-        toast.error(result.error);
-        setIsPlaying(false);
-        return;
-      }
-
-      if (result.audio) {
-        const audio = new Audio(result.audio);
-        audioRef.current = audio;
-        audio.volume = 1;
-        audio.play();
-        setIsPlaying(true);
-
-        audio.onended = () => {
-          setIsPlaying(false);
-        };
-      }
-    }
-  };
-
-  const togglePlayPause = () => {
-    if (isPlaying) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      setIsPlaying(false);
-    } else {
-      if (audioRef.current) {
-        audioRef.current.play();
-      } else {
-        onRead();
-      }
-      setIsPlaying(true);
-    }
-  };
-
   return (
     <div
       className={cn(
         'mt-2 flex items-center gap-1 lg:group-focus-within:visible lg:group-hover:visible',
-        message.role === 'user' ? 'mr-12 justify-end' : 'ml-12',
+        message.role === 'user' && 'justify-end',
+        // Indented past the avatar so the row sits under the text. A shared
+        // chat has no avatars, so there is only the text's own padding to match.
+        isReadonly ? 'mx-1' : message.role === 'user' ? 'mr-12' : 'ml-12',
         isLastMessage ? 'lg:visible' : 'lg:invisible'
       )}
     >
-      {isSpeechAvailable && !hasFileContent && textParts && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 text-muted-foreground"
-          onClick={togglePlayPause}
-          disabled={isLoadingAudio}
-        >
-          {isLoadingAudio ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : isPlaying ? (
-            <PauseCircle className="size-4" />
-          ) : (
-            <Volume2 className="size-4" />
-          )}
-          <span className="sr-only">
-            {isLoadingAudio ? 'Loading...' : isPlaying ? 'Stop' : 'Play'}
-          </span>
-        </Button>
+      {/* Not on a shared chat. Reading aloud is a generation — it calls a
+          priced model and is charged to whoever asked — and a shared chat is
+          read by people with no account to charge. */}
+      {!isReadonly && !hasFileContent && textParts && (
+        <ReadAloudButton text={textParts} />
       )}
       <Button
         variant="ghost"

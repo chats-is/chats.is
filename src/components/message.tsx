@@ -25,6 +25,10 @@ export interface MessageProps extends Partial<
 > {
   message: ChatMessage;
   image?: string | null;
+  /** A shared chat: read by anyone, changed by no one. It is drawn without
+   *  avatars — it knows a model's name and not its icon, so the assistant's
+   *  was an empty circle, and which side a message sits on says whose it is. */
+  isReadonly?: boolean;
   isLastMessage?: boolean;
   supportsReasoning?: boolean | null;
   hasVisibleArtifacts?: boolean;
@@ -39,6 +43,7 @@ export function Message({
   status,
   message,
   image,
+  isReadonly,
   isLastMessage,
   supportsReasoning,
   hasVisibleArtifacts = false,
@@ -167,14 +172,18 @@ export function Message({
           'flex-row-reverse': message.role === 'user'
         })}
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted select-none">
-          {message.role === 'user' && <User className="size-5" />}
-          {message.role === 'assistant' && <ModelIcon image={image} />}
-        </div>
+        {!isReadonly && (
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted select-none">
+            {message.role === 'user' && <User className="size-5" />}
+            {message.role === 'assistant' && <ModelIcon image={image} />}
+          </div>
+        )}
         <div
           className={cn(
             'flex min-h-9 flex-1 flex-col justify-center overflow-hidden px-1',
-            message.role === 'user' ? 'mr-3 items-end' : 'ml-3 items-start'
+            message.role === 'user' ? 'items-end' : 'items-start',
+            // The gap is the avatar's, and goes with it.
+            !isReadonly && (message.role === 'user' ? 'mr-3' : 'ml-3')
           )}
         >
           <div
