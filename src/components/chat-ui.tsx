@@ -25,6 +25,7 @@ import { takePendingPrompt } from '@/lib/pending-prompt';
 import { modelMatchesId } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
 import { artifactQueries } from '@/server/functions/artifact';
+import { quotaQueries } from '@/server/functions/quota';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -37,7 +38,12 @@ import { type ModelOptions } from '@/components/model-menu';
 
 interface ChatUIProps {
   id: string;
-  initialChat?: { title: string; modelId?: string };
+  initialChat?: {
+    title: string;
+    modelId?: string;
+    /** A reply is being written for this chat right now, somewhere. */
+    isGenerating?: boolean;
+  };
   initialMessages?: ChatMessage[];
   initialArtifacts?: Artifact[];
 }
@@ -278,7 +284,13 @@ export function ChatUI({
     // Re-attach to an in-progress generation after a page refresh. Server
     // resume is a no-op when REDIS_URL is unset, so this stays safe — and it
     // is skipped for a session that is already carrying the turn.
-    resume: canResume
+    //
+    // And only when there is one to re-attach to. The chat says so itself: it
+    // names the generation writing in it for as long as one is, and the page
+    // has just read it. Asking regardless was a request on every chat opened —
+    // and on every visit to the home page, for a chat that did not exist yet —
+    // nearly all of them answered "nothing here".
+    resume: canResume && Boolean(initialChat?.isGenerating)
   });
 
   // Stopping is two things. The SDK's `stop` closes this page's connection,
@@ -369,8 +381,14 @@ export function ChatUI({
     streamStatusRef.current = status;
   }, [status]);
 
-  // When a turn finishes, the server has persisted new artifacts; refresh so the
-  // chat's artifact list reflects the latest state.
+  // When a turn finishes, the server has stored what it produced and charged
+  // for it: the chat's artifacts and the reader's quota are the two things on
+  // this page that a turn changes.
+  //
+  // Only then. The artifacts a chat opens with arrive with the chat, so a
+  // status of `ready` is not by itself a reason to ask — it is also the status
+  // a page mounts with, and asking on it meant two or three requests every
+  // time a chat was opened, and two for a new chat that did not exist yet.
   useEffect(() => {
     const prev = prevStatusRef.current;
     prevStatusRef.current = status;
@@ -378,6 +396,7 @@ export function ChatUI({
       void queryClient.invalidateQueries({
         queryKey: artifactQueries.list({ chatId: id }).queryKey
       });
+      void queryClient.invalidateQueries({ queryKey: quotaQueries.key.me() });
     }
   }, [status, id, queryClient]);
 
@@ -406,12 +425,6 @@ export function ChatUI({
     if (pending) setInput(pending);
     // Mount-only: consume the one-shot hand-off exactly once.
   }, []);
-
-  useEffect(() => {
-    if (status === 'ready') {
-      artifactsQuery.refetch();
-    }
-  }, [status, artifactsQuery.refetch]);
 
   useEffect(() => {
     const wasPanelOpen = previousPanelOpenRef.current;

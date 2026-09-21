@@ -110,7 +110,11 @@ export const promptQueries = {
   usable: () =>
     queryOptions({
       queryKey: [...promptQueries.key.usable()] as const,
-      queryFn: () => listUsablePrompts()
+      queryFn: () => listUsablePrompts(),
+      // The suggestions under an empty composer — the page opened more than
+      // any other. The prompts behind them change when someone edits one, and
+      // an edit made in this tab invalidates this itself.
+      staleTime: 5 * 60 * 1000
     }),
   /** The gallery scrolls; the cursor is the row offset, as the sidebar's is.
    *  `search` is part of the key so a new term starts paging over. */

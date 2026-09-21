@@ -104,7 +104,8 @@ function ChatPage() {
       id={chatId}
       initialChat={{
         title: chat?.title ?? live?.title ?? '',
-        modelId: chat?.modelId ?? undefined
+        modelId: chat?.modelId ?? undefined,
+        isGenerating: Boolean(chat?.streamId)
       }}
       initialMessages={chat ? convertToChatMessages(chat.messages) : []}
       initialArtifacts={chat?.artifacts ?? []}

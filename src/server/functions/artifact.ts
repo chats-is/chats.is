@@ -39,6 +39,13 @@ export const artifactQueries = {
   list: (input: { chatId: string }) =>
     queryOptions({
       queryKey: [...artifactQueries.key.list(), input] as const,
-      queryFn: () => listArtifacts({ data: input })
+      queryFn: () => listArtifacts({ data: input }),
+      // Not kept once the chat is left. A chat's artifacts arrive with the
+      // chat, freshly read on every visit, and are handed to this query as its
+      // starting data — but starting data is only taken when nothing is held.
+      // Held for the usual five minutes, last visit's list was what the page
+      // opened with, ahead of the newer one in its hands, and then had to be
+      // asked for again to be put right.
+      gcTime: 0
     })
 };
