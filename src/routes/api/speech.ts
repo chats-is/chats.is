@@ -1,38 +1,42 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { generateSpeech, NoSpeechGeneratedError } from 'ai';
 
+import { type User } from '@/types';
+import { speechRequestSchema } from '@/types/speech';
 import { getSpeechModel, runWithProviderFailover } from '@/lib/provider';
+import { authedRequest } from '@/server/middleware';
 import { findModelByModelId } from '@/server/services/model';
 import { preflightGate } from '@/server/services/preflight';
 import { getSpeechSettings } from '@/server/services/settings';
 import { recordAudioUsage } from '@/server/services/usage';
-import { getUser } from '@/server/session';
 
 export const Route = createFileRoute('/api/speech')({
   server: {
+    middleware: [authedRequest],
     handlers: { POST }
   }
 });
 
-type PostData = {
-  modelId?: string;
-  text: string;
-  voice?: string;
-};
+async function POST({
+  request: req,
+  context
+}: {
+  request: Request;
+  context: { user: User };
+}) {
+  const { user } = context;
 
-async function POST({ request: req }: { request: Request }) {
-  const user = await getUser();
-
-  if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const parsed = speechRequestSchema.safeParse(
+    await req.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return Response.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid request.' },
+      { status: 400 }
+    );
   }
 
-  const json: PostData = await req.json();
-  const { modelId: requestModelId, text, voice: requestVoice } = json;
-
-  if (!text) {
-    return Response.json({ error: 'Please enter some text.' }, { status: 400 });
-  }
+  const { modelId: requestModelId, text, voice: requestVoice } = parsed.data;
 
   // Get speech settings
   const { speechEnabled, defaultModel } = await getSpeechSettings();

@@ -1,4 +1,4 @@
-import { APICallError } from 'ai';
+import { APICallError, RetryError } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type Provider } from '@/types';
@@ -65,6 +65,32 @@ describe('isRetryableProviderError', () => {
 
   it('treats an APICallError without a status as a retryable network error', () => {
     expect(isRetryableProviderError(apiCallError(undefined))).toBe(true);
+  });
+
+  it('reads through the RetryError the SDK wraps its last failure in', () => {
+    const wrapped = (reason: RetryError['reason'], status: number) =>
+      new RetryError({
+        message: 'Failed after 3 attempts.',
+        reason,
+        errors: [apiCallError(status)]
+      });
+
+    expect(isRetryableProviderError(wrapped('maxRetriesExceeded', 429))).toBe(
+      true
+    );
+    expect(isRetryableProviderError(wrapped('errorNotRetryable', 400))).toBe(
+      false
+    );
+    // Someone stopped it; another provider is not what they asked for.
+    expect(isRetryableProviderError(wrapped('abort', 503))).toBe(false);
+  });
+
+  it('does not fail over a call that was stopped on purpose', () => {
+    const stopped = new DOMException(
+      'This operation was aborted',
+      'AbortError'
+    );
+    expect(isRetryableProviderError(stopped)).toBe(false);
   });
 
   it('retries network-ish error messages', () => {

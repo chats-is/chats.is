@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import { type Artifact } from './artifact';
-import { messageSchema, type ChatMessage } from './message';
+import { mediaToolsOptionsSchema } from './chat-tools';
+import { messageSchema, userMessageSchema, type ChatMessage } from './message';
 
 export const chatTypeSchema = z.enum(['chat', 'audio', 'image', 'video']);
 export type ChatType = z.infer<typeof chatTypeSchema>;
@@ -51,3 +52,27 @@ export const chatDetailSchema = z.object({
 });
 
 export const chatIdSchema = z.object({ id: z.string().min(1) });
+
+/**
+ * What `/api/chat` accepts for one turn. The route owns its request, so it is
+ * not a server function — but what it is sent is decided here, like the rest.
+ */
+export const chatRequestSchema = z.object({
+  id: z.string().min(1),
+  modelId: z.string().trim().min(1).max(255),
+  userMessage: userMessageSchema,
+  /** Names the user message itself when a reply is being regenerated. */
+  parentMessageId: z.string().min(1).optional(),
+  isReasoning: z.boolean().optional(),
+  effort: z.string().max(64).optional(),
+  /** IANA zone from the browser, so "now" can be told in the user's terms. */
+  timeZone: z.string().max(64).optional(),
+  /** The browser's preferred language, e.g. `zh-CN`. */
+  language: z.string().max(64).optional(),
+  // Preferences out of the browser's storage, which outlive the versions that
+  // wrote them. One that no longer parses is dropped — the server's defaults
+  // apply — rather than refusing every turn until the user clears their data.
+  mediaOptions: mediaToolsOptionsSchema.optional().catch(undefined)
+});
+
+export type ChatRequest = z.infer<typeof chatRequestSchema>;

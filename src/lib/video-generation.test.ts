@@ -34,7 +34,10 @@ vi.mock('openai', () => {
   const videos = {
     create: videosCreate,
     retrieve: videosRetrieve,
-    downloadContent: videosDownload
+    downloadContent: videosDownload,
+    // A job that is given up on is asked to go; whether it does is not ours
+    // to assert, only that asking never gets in the way of the real error.
+    delete: vi.fn(async () => ({}))
   };
   class OpenAI {
     videos = videos;
@@ -157,7 +160,8 @@ describe('generateWithSora — Azure', () => {
         model: 'sora-2',
         size: '720x1280',
         seconds: '8'
-      })
+      }),
+      expect.anything()
     );
 
     expect(result.mediaType).toBe('video/mp4');
@@ -188,7 +192,8 @@ describe('generateWithSora — Azure', () => {
 
     expect(azureCtorArgs).toHaveLength(1);
     expect(videosCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'my-video-deploy' })
+      expect.objectContaining({ model: 'my-video-deploy' }),
+      expect.anything()
     );
   });
 
@@ -227,7 +232,8 @@ describe('generateWithSora — direct OpenAI (unchanged)', () => {
       baseURL: undefined
     });
     expect(videosCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ size: '1280x720' })
+      expect.objectContaining({ size: '1280x720' }),
+      expect.anything()
     );
   });
 });
@@ -255,7 +261,8 @@ describe('generateWithSora — size', () => {
     });
 
     expect(videosCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ size: '1024x1792' })
+      expect.objectContaining({ size: '1024x1792' }),
+      expect.anything()
     );
   });
 });

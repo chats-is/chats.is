@@ -3,11 +3,12 @@ import { queryOptions } from '@tanstack/react-query';
 
 import {
   messageChatSchema,
-  messageCreateSchema,
   messageDeleteSchema,
   messageUpdateSchema
 } from '@/types/message';
 import { authedMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
+import { carriesOnlyOwnFiles } from '@/server/services/blob';
 import * as messages from '@/server/services/message';
 
 export const listMessages = createServerFn({ method: 'GET' })
@@ -17,19 +18,15 @@ export const listMessages = createServerFn({ method: 'GET' })
     messages.listMessages(context.user.id, data.chatId)
   );
 
-export const createMessages = createServerFn({ method: 'POST' })
-  .middleware([authedMiddleware])
-  .validator(messageCreateSchema)
-  .handler(({ data, context }) =>
-    messages.createMessages(context.user.id, data)
-  );
-
 export const updateMessage = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(messageUpdateSchema)
-  .handler(({ data, context }) =>
-    messages.updateMessage(context.user.id, data)
-  );
+  .handler(({ data, context }) => {
+    if (!carriesOnlyOwnFiles(data.message.parts)) {
+      throw new PublicError('Attachments must be uploaded through this app');
+    }
+    return messages.updateMessage(context.user.id, data);
+  });
 
 export const deleteMessages = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])

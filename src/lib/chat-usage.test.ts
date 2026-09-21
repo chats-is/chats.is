@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeChatUsage } from './chat-usage';
+import { normalizeChatUsage, sumChatUsage } from './chat-usage';
 
 describe('normalizeChatUsage', () => {
   it('reads disjoint buckets from inputTokenDetails / outputTokenDetails', () => {
@@ -99,6 +99,23 @@ describe('normalizeChatUsage', () => {
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
       reasoningTokens: 0
+    });
+  });
+});
+
+describe('sumChatUsage', () => {
+  it('adds the steps of a turn bucket by bucket', () => {
+    expect(
+      sumChatUsage([
+        { inputTokens: 100, outputTokens: 20, cacheReadTokens: 5 },
+        { inputTokens: 130, outputTokens: 40, reasoningTokens: 7 }
+      ])
+    ).toEqual({
+      inputTokens: 230,
+      outputTokens: 60,
+      cacheReadTokens: 5,
+      cacheWriteTokens: 0,
+      reasoningTokens: 7
     });
   });
 });

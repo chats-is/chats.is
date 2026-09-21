@@ -1,3 +1,5 @@
+import '@tanstack/react-start/server-only';
+
 import { experimental_generateVideo as generateVideo } from 'ai';
 import OpenAI, { AzureOpenAI } from 'openai';
 
@@ -19,6 +21,19 @@ import { resolveVideoSeconds } from '@/lib/video-usage';
  * remaining request budget, and the user's fix is a shorter or smaller video
  * rather than a different model.
  */
+/**
+ * This provider cannot do what was asked — edit a video, start from an image —
+ * though the model may well do it somewhere else. Nothing was sent and nothing
+ * was charged, so the next provider is tried: a model bound to several is
+ * bound to them for exactly this.
+ */
+export class ProviderCannotError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ProviderCannotError';
+  }
+}
+
 export class VideoTimeoutError extends Error {
   constructor(message: string) {
     super(message);
@@ -119,20 +134,44 @@ export async function generateWithSora(args: {
     duration <= 4 ? '4' : duration <= 8 ? '8' : '12';
 
   // Create video generation request
-  const created = await openai.videos.create({
-    model: model, // 'sora-2' | 'sora-2-pro'
-    prompt,
-    ...(size && { size: size as OpenAI.Videos.VideoSize }),
-    seconds
-  });
+  const created = await openai.videos.create(
+    {
+      model: model, // 'sora-2' | 'sora-2-pro'
+      prompt,
+      ...(size && { size: size as OpenAI.Videos.VideoSize }),
+      seconds
+    },
+    { signal: abortSignal }
+  );
 
   // Poll for completion if not already completed.
-  const video =
-    created.status === 'completed'
-      ? created
-      : await pollSoraJob(openai, created.id, MAX_POLL_ATTEMPTS, abortSignal);
+  let video: OpenAI.Videos.Video;
+  try {
+    video =
+      created.status === 'completed'
+        ? created
+        : await pollSoraJob(openai, created.id, MAX_POLL_ATTEMPTS, abortSignal);
+  } catch (err) {
+    // Given up on — timed out, or stopped — but still rendering at the other
+    // end, and a render that finishes is a render that is charged. Asked to
+    // go, for what that is worth; the failure reported is the one above.
+    try {
+      // Bounded: the SDK would otherwise retry for up to ten minutes, holding
+      // back the error this is on the way to reporting.
+      await openai.videos.delete(created.id, {
+        timeout: 10_000,
+        maxRetries: 0
+      });
+    } catch {
+      // Best effort. Nothing here may replace the error being reported.
+    }
+    throw err;
+  }
 
   // Download video content using the SDK
+  // Not given the signal. The render is finished by now and will be charged
+  // for whatever happens next; stopping here would throw it away and leave no
+  // usage row behind, which is the one outcome that costs and records nothing.
   const videoResponse = await openai.videos.downloadContent(video.id);
   const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
 
@@ -160,7 +199,7 @@ async function pollSoraJob(
     abortSignal?.throwIfAborted();
 
     // Retrieve video status
-    const video = await openai.videos.retrieve(jobId);
+    const video = await openai.videos.retrieve(jobId, { signal: abortSignal });
 
     if (video.status === 'completed') {
       return video;
@@ -171,7 +210,18 @@ async function pollSoraJob(
     }
 
     // Wait 5 seconds before next poll
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+    // A wait that a Stop can end, rather than one it has to sit out.
+    await new Promise<void>((resolve, reject) => {
+      const stopped = () => {
+        clearTimeout(timer);
+        reject(abortSignal?.reason ?? new Error('aborted'));
+      };
+      const timer = setTimeout(() => {
+        abortSignal?.removeEventListener('abort', stopped);
+        resolve();
+      }, POLL_INTERVAL_MS);
+      abortSignal?.addEventListener('abort', stopped, { once: true });
+    });
   }
 
   throw new VideoTimeoutError(
@@ -233,14 +283,14 @@ export async function generateAndStoreVideo(args: {
       // either), so it always takes this path regardless of deployment name.
       if (modelId.includes('sora') || provider.type === 'azure') {
         if (inputVideoUrl) {
-          throw new Error(
+          throw new ProviderCannotError(
             `${dbModel.name} cannot edit a video; it generates from text only.`
           );
         }
         if (inputImage) {
           // The custom Sora path sends a prompt and nothing else, so an image
           // here would be dropped without a word — say so instead.
-          throw new Error(
+          throw new ProviderCannotError(
             `${dbModel.name} cannot animate an image; it generates from text only.`
           );
         }
@@ -277,7 +327,7 @@ export async function generateAndStoreVideo(args: {
         // other providers beats sending the prompt alone and returning a new
         // video the user did not ask for.
         if (inputVideoUrl && provider.type !== 'xai') {
-          throw new Error(
+          throw new ProviderCannotError(
             `${dbModel.name} cannot edit a video through ${provider.type}.`
           );
         }
@@ -337,7 +387,15 @@ export async function generateAndStoreVideo(args: {
 
         videoBuffer = Buffer.from(video.uint8Array);
         videoMediaType = 'video/mp4';
-        videoSeconds = resolveVideoSeconds(providerMetadata, duration);
+        // What is charged is what was asked of the provider, not what was
+        // settled before the vocabulary had its say — a length the provider
+        // was never sent is not one it rendered.
+        videoSeconds = resolveVideoSeconds(
+          providerMetadata,
+          // Falls back to the settled length when none could be sent: an
+          // estimate, but a per-second model charged for no seconds is free.
+          parts.top.duration ?? duration
+        );
       }
 
       return { videoBuffer, videoMediaType, videoSeconds };
@@ -346,8 +404,14 @@ export async function generateAndStoreVideo(args: {
       // Our own deadline is not a provider fault: the default classifier treats
       // any /timed out/ message as retryable, which would start a fresh render
       // on the next provider and spend the rest of the request budget on it.
+      // Nor is a Stop. The OpenAI client reports one as an error of its own
+      // that carries no name to tell it by, only a message reading "aborted" —
+      // which the default classifier takes for a dropped connection.
       shouldRetry: error =>
-        !(error instanceof VideoTimeoutError) && isRetryableProviderError(error)
+        !abortSignal?.aborted &&
+        (error instanceof ProviderCannotError ||
+          (!(error instanceof VideoTimeoutError) &&
+            isRetryableProviderError(error)))
     }
   );
 

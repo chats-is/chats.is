@@ -57,6 +57,24 @@ export const messageSchema = z.object({
   metadata: messageMetadataSchema.optional()
 });
 
+/**
+ * A message as a user can send one: what they typed, and files.
+ *
+ * Narrower than a stored message on purpose. The parts are kept as sent and
+ * read back on every later turn, so whatever is let in here is let in for the
+ * life of the chat — and a tool part would be a result no tool produced, which
+ * the media tools then trust as a file of this conversation.
+ *
+ * Where a file lives is not asked here. Only the server knows which store is
+ * this install's, and it asks that of a message being sent for the first time
+ * (`carriesOnlyOwnFiles`); a message already stored is resent as it stands,
+ * and one from before this store existed must still be able to be.
+ */
+export const userMessageSchema = messageSchema.extend({
+  role: z.literal('user'),
+  parts: z.array(z.union([textUIPartSchema, fileUIPartSchema])).min(1)
+});
+
 /** What the message server functions accept. */
 export const messageChatSchema = z.object({ chatId: z.string().min(1) });
 
@@ -65,9 +83,11 @@ export const messageCreateSchema = z.object({
   messages: z.array(messageSchema)
 });
 
+/** Only a user's own message can be rewritten, so it is held to what a user
+ *  may send in the first place. */
 export const messageUpdateSchema = z.object({
   id: z.string().min(1),
-  message: messageSchema
+  message: userMessageSchema
 });
 
 /** Either a single message and its replies, or a whole branch — never both

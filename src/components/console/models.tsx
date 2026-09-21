@@ -172,6 +172,7 @@ const apiParamsPlaceholderByCapability: Record<string, string> = {
   "topP": 1,
   "topK": 0,
   "maxOutputTokens": 4096,
+  "maxInputTokens": 128000,
   "frequencyPenalty": 0,
   "presencePenalty": 0
 }`,

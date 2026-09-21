@@ -94,7 +94,12 @@ export const PROVIDER_VOCAB = {
     },
     video: {
       aspectRatio: ['16:9', '9:16'],
-      resolution: ['360p', '720p', '1080p', '4k']
+      resolution: ['360p', '720p', '1080p', '4k'],
+      // Every length some Veo takes — which of them a given model takes is the
+      // model's own list in the console. Without an entry here a duration was
+      // never sent at all: the request went out bare, Veo rendered its default
+      // eight seconds, and the usage row charged for the four that were asked.
+      duration: [4, 5, 6, 7, 8]
     },
     audio: {
       voice: [

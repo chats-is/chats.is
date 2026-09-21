@@ -11,14 +11,12 @@ import {
   transcribeAudioInputSchema,
   type ChatMessage,
   type MediaToolOutput,
+  type MediaToolsOptions,
   type Model,
   type Provider,
   type TranscribeToolOutput
 } from '@/types';
-import {
-  collectConversationMediaUrls,
-  isTrustedMediaUrl
-} from '@/lib/chat-media-urls';
+import { collectConversationMediaUrls } from '@/lib/chat-media-urls';
 import {
   buildMediaToolsSystemPrompt,
   type ChatMediaToolName
@@ -39,6 +37,7 @@ import {
   generateAndStoreVideo,
   VideoTimeoutError
 } from '@/lib/video-generation';
+import { isOwnBlobUrl } from '@/server/services/blob';
 import { findModelByModelId } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
 import { getMediaDefaultModelIds } from '@/server/services/settings';
@@ -49,29 +48,50 @@ import {
   recordVideoUsage
 } from '@/server/services/usage';
 
-export type MediaToolsOptions = {
-  image?: {
-    modelId?: string;
-    size?: string;
-    aspectRatio?: string;
-    resolution?: string;
-  };
-  /** Editing an existing image is its own model choice — few can do it. */
-  imageEdit?: { modelId?: string };
-  video?: {
-    modelId?: string;
-    size?: string;
-    aspectRatio?: string;
-    resolution?: string;
-    duration?: number;
-  };
-  /** Animating an image is its own model choice — few video models take one. */
-  videoImage?: { modelId?: string };
-  /** Editing an existing video is again its own model choice. */
-  videoEdit?: { modelId?: string };
-  audio?: { modelId?: string; voice?: string };
-  stt?: { modelId?: string };
-};
+/**
+ * How many generations one reply may ask for.
+ *
+ * Each call is checked against the quota before it runs, but a call is only
+ * charged when it finishes — and a model can ask for several at once, which
+ * then all read the same balance and all pass. A video takes minutes, so that
+ * is minutes in which any number of them would be let through. The count is
+ * what is certain before anything has been charged, so it is what is limited.
+ */
+export const MAX_MEDIA_CALLS_PER_TURN = 4;
+
+/** The most a tool will read of a file it was pointed at. */
+const MAX_TOOL_MEDIA_BYTES = 25 * 1024 * 1024;
+
+/** The body, or null once it has run past `limit` — a length header is only
+ *  what the other end chose to say. */
+async function readCapped(
+  res: Response,
+  limit: number
+): Promise<Uint8Array | null> {
+  if (!res.body) return new Uint8Array();
+
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = res.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return data;
+}
 
 type ResolvedMediaModel = {
   dbModel: Model;
@@ -215,23 +235,38 @@ export async function buildMediaTools(args: {
     expectedTypePrefix: 'image/' | 'audio/',
     abortSignal: AbortSignal | undefined
   ): Promise<{ data: Uint8Array; mediaType: string } | { error: string }> => {
-    if (!knownUrls.has(url) || !isTrustedMediaUrl(url)) {
+    if (!knownUrls.has(url) || !isOwnBlobUrl(url)) {
       return {
         error: 'The URL must reference a file from this conversation.'
       };
     }
     try {
-      const res = await fetch(url, { signal: abortSignal });
+      // Blob storage answers directly; a redirect would be a way out of the
+      // host that was just checked.
+      const res = await fetch(url, { signal: abortSignal, redirect: 'error' });
       if (!res.ok) {
         throw new Error(`Failed to fetch media: ${res.status}`);
       }
+      // The whole file is held in memory to hand to a provider, none of which
+      // takes more than this — so neither does the function.
+      if (
+        Number(res.headers.get('content-length') ?? 0) > MAX_TOOL_MEDIA_BYTES
+      ) {
+        // Refused, so not read — and a body nobody reads has to be let go of,
+        // or the other end keeps sending it down a connection held open.
+        await res.body?.cancel();
+        return { error: 'The referenced file is too large.' };
+      }
       const mediaType = res.headers.get('content-type') ?? '';
       if (!mediaType.startsWith(expectedTypePrefix)) {
+        await res.body?.cancel();
         return {
           error: `The referenced file is not ${expectedTypePrefix === 'image/' ? 'an image' : 'an audio file'}.`
         };
       }
-      return { data: new Uint8Array(await res.arrayBuffer()), mediaType };
+      const data = await readCapped(res, MAX_TOOL_MEDIA_BYTES);
+      if (!data) return { error: 'The referenced file is too large.' };
+      return { data, mediaType };
     } catch (err) {
       console.error('[chat-tools] media fetch failed:', err);
       return {
@@ -242,12 +277,27 @@ export async function buildMediaTools(args: {
 
   const tools: ToolSet = {};
   const registered: ChatMediaToolName[] = [];
+  let mediaCalls = 0;
 
   const gate = async (
     dbModel: Model,
     capability: 'image' | 'video' | 'audio',
     opts?: { transcription?: boolean }
   ): Promise<{ status: 'error'; message: string } | null> => {
+    // Counted before the check rather than after it passes: the calls of one
+    // step arrive together, and would all be through the check before any of
+    // them had been counted.
+    //
+    // Pictures and video, which are what cost. Reading a message aloud or
+    // transcribing a clip is cheap and quick, and four transcriptions using
+    // up a reply's allowance would refuse the one image it then asks for.
+    if (capability !== 'audio' && ++mediaCalls > MAX_MEDIA_CALLS_PER_TURN) {
+      return {
+        status: 'error',
+        message: `This reply has already made ${MAX_MEDIA_CALLS_PER_TURN} generations, which is the most one reply may make. Tell the user the rest can be asked for in a new message.`
+      };
+    }
+
     const pre = await preflightCheck({
       userId,
       modelKey: dbModel.modelId,
@@ -514,10 +564,7 @@ export async function buildMediaTools(args: {
         // The provider fetches the source itself, so this checks the URL
         // rather than downloading it: the same two conditions the media fetch
         // applies — present in this conversation, and stored by us.
-        if (
-          !knownUrls.has(input.videoUrl) ||
-          !isTrustedMediaUrl(input.videoUrl)
-        ) {
+        if (!knownUrls.has(input.videoUrl) || !isOwnBlobUrl(input.videoUrl)) {
           return {
             status: 'error',
             message: 'That video is not part of this conversation.'

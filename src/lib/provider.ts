@@ -1,3 +1,5 @@
+import '@tanstack/react-start/server-only';
+
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createAzure } from '@ai-sdk/azure';
@@ -13,6 +15,7 @@ import {
 import { GoogleGenAI } from '@google/genai';
 import {
   APICallError,
+  RetryError,
   type ImageModel,
   type LanguageModel,
   type SpeechModel,
@@ -257,6 +260,21 @@ export class AllProvidersFailedError extends Error {
  * where every provider would fail the same way.
  */
 export function isRetryableProviderError(error: unknown): boolean {
+  // The SDK retries 408/409/429/5xx itself, and what it throws once it gives
+  // up is a RetryError wrapped around the last failure — no status of its
+  // own. Read as it stands it matches nothing below, which made the errors
+  // failover exists for the ones that never reached the next provider.
+  if (RetryError.isInstance(error)) {
+    if (error.reason === 'abort') return false;
+    return isRetryableProviderError(error.lastError);
+  }
+
+  // Stopped on purpose. Its message says "aborted", which the pattern at the
+  // bottom reads as a dropped connection — and failing over would start the
+  // same paid render on the next provider, for someone who just asked for it
+  // to stop.
+  if (error instanceof Error && error.name === 'AbortError') return false;
+
   // HTTP status from either the AI SDK (APICallError.statusCode) or a raw SDK
   // error such as the openai client used by the Sora video path (error.status).
   const status =

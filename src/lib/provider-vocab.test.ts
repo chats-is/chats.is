@@ -32,8 +32,14 @@ describe('vocabularyFor', () => {
       '16:9',
       '9:16'
     ]);
-    // One offers durations and the other does not, so nobody may pin one.
-    expect(vocabularyFor(['google', 'xai'], 'video').duration).toBeUndefined();
+    // Both take a length, and only the lengths both take may be pinned.
+    expect(vocabularyFor(['google', 'xai'], 'video').duration).toEqual([
+      4, 5, 6, 7, 8
+    ]);
+    // A length reaches Veo: it was settled, priced and then never sent.
+    expect(toRequestParts('google', 'video', { duration: 4 }).top).toEqual({
+      duration: 4
+    });
     expect(vocabularyFor(['openai', 'azure'], 'audio')).toEqual(
       vocabularyFor(['openai'], 'audio')
     );

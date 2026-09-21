@@ -334,6 +334,9 @@ export function MessageActions({
                         if (draftContent) {
                           const updated = {
                             ...message,
+                            // Editing is only offered on the user's own
+                            // messages; said here so the type agrees.
+                            role: 'user' as const,
                             content: draftContent,
                             parts: message.parts.map(part =>
                               part.type === 'text'

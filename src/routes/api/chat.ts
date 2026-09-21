@@ -20,9 +20,12 @@ import {
   type Artifact,
   type ChatErrorKind,
   type ChatMessage,
+  type ChatUsage,
   type MessageMetadata,
-  type Provider
+  type Provider,
+  type User
 } from '@/types';
+import { chatRequestSchema } from '@/types/chat';
 import {
   artifactKindFromType,
   assertArtifactPayload,
@@ -30,58 +33,56 @@ import {
 } from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
-import { normalizeChatUsage } from '@/lib/chat-usage';
+import { normalizeChatUsage, sumChatUsage } from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
+import { fitToContext } from '@/lib/context-window';
 import { pickEffort } from '@/lib/media-options';
 import {
   AllProvidersFailedError,
   getLanguageModel,
+  isRetryableProviderError,
   PROVIDER_FAILURE_MESSAGE
 } from '@/lib/provider';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
+import { openedWithError } from '@/lib/stream-failover';
 import { BASE_SYSTEM_PROMPT } from '@/lib/system-prompt';
+import { estimateTokens } from '@/lib/token-estimate';
 import {
   convertToChatMessages,
   formatLocalTime,
   formatString,
   generateUUID
 } from '@/lib/utils';
+import { authedRequest } from '@/server/middleware';
+import { carriesOnlyOwnFiles } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
-import {
-  buildMediaTools,
-  type MediaToolsOptions
-} from '@/server/services/chat-tools';
+import { buildMediaTools } from '@/server/services/chat-tools';
 import * as messages from '@/server/services/message';
 import { findModelByModelId } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
 import { getSystemPrompt, getTitleSettings } from '@/server/services/settings';
 import { recordChatUsage } from '@/server/services/usage';
-import { getUser } from '@/server/session';
 
 export const Route = createFileRoute('/api/chat')({
   server: {
-    handlers: { POST, GET }
+    middleware: [authedRequest],
+    handlers: { POST, GET, DELETE }
   }
 });
 
-// Media tools (video generation especially — Sora polls for up to 5 minutes)
-// can far outlive a plain chat completion. 300s is the hard ceiling on Vercel's
-// Hobby plan, so anything larger is silently capped rather than granted; a slow
-// video render can still exhaust the budget and time the whole request out.
+/**
+ * The generations this process is running, by chat, so a Stop that lands here
+ * takes effect at once. It is a shortcut and not the mechanism: a Stop may
+ * just as well reach another process, which is why each generation also checks
+ * that it still holds its chat (see `chats.isGenerating`).
+ */
+const running = new Map<string, AbortController>();
 
-type PostData = {
-  id: string;
-  modelId: string;
-  userMessage: Omit<ChatMessage, 'role'> & { role: 'user' };
-  parentMessageId?: string;
-  isReasoning?: boolean;
-  effort?: string;
-  /** IANA zone from the browser, so "now" can be told in the user's terms. */
-  timeZone?: string;
-  /** The browser's preferred language, e.g. `zh-CN`. */
-  language?: string;
-  mediaOptions?: MediaToolsOptions;
-};
+/** How long naming a chat may take before the chat simply stays unnamed. */
+const TITLE_TIMEOUT_MS = 15_000;
+
+/** How often a generation checks that it has not been stopped from elsewhere. */
+const STOP_CHECK_MS = 1500;
 
 /**
  * What the user is shown when a generation fails: the provider's own words
@@ -97,8 +98,8 @@ function streamErrorMessage(error: unknown): string {
 }
 
 // Verbose error serializer — resumable-stream / node-redis failures often
-// surface as empty `Error` objects under Next's ignore-listed stack redaction,
-// so dig out name/code/cause/aggregate to make the real reason visible.
+// surface as empty `Error` objects, so dig out name/code/cause/aggregate to
+// make the real reason visible.
 function describeError(err: unknown): string {
   if (!(err instanceof Error)) {
     try {
@@ -130,29 +131,57 @@ function describeError(err: unknown): string {
   return parts.join(' ');
 }
 
-async function POST({ request: req }: { request: Request }) {
-  const user = await getUser();
+async function POST({
+  request: req,
+  context
+}: {
+  request: Request;
+  context: { user: User };
+}) {
+  const { user } = context;
 
-  if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const json: PostData = await req.json();
-  const id = json.id || generateUUID();
-  const {
-    modelId,
-    userMessage,
-    parentMessageId,
-    isReasoning,
-    effort,
-    timeZone,
-    language,
-    mediaOptions
-  } = json;
-
-  if (!modelId || !userMessage) {
+  // A body that is not JSON parses to nothing, and fails the schema with the
+  // rest of what it refuses.
+  const parsed = chatRequestSchema.safeParse(
+    await req.json().catch(() => null)
+  );
+  if (!parsed.success) {
     return Response.json({ error: 'Invalid request.' }, { status: 400 });
   }
+
+  const { id, modelId, isReasoning, effort, timeZone, language, mediaOptions } =
+    parsed.data;
+  // The schema has settled the shape; the parts are typed by the tools and
+  // data this app defines, which a wire schema cannot name one by one.
+  const sent = parsed.data.userMessage as ChatMessage & { role: 'user' };
+
+  // A message already stored under this id is being answered again — a
+  // regenerate, a retry, an edit resent. Decided by the row rather than by
+  // what the request says it is, and the row is also what is answered: an
+  // edit is saved through its own endpoint before it is resent, so the stored
+  // parts are the current ones, and what the body repeats is not re-examined.
+  // That matters for an old message whose attachment predates this store —
+  // it could never pass the check below, and would make its chat impossible
+  // to regenerate.
+  const stored = await messages.findUserMessage(user.id, {
+    chatId: parsed.data.id,
+    messageId: sent.id
+  });
+
+  // A new message is held to what a user may send. The schema could only ask
+  // whether an attachment is in a blob store; here it can be asked whether it
+  // is in ours. Kept out, a file from anywhere else is an address this server
+  // and the provider would both go and fetch.
+  if (!stored && !carriesOnlyOwnFiles(sent.parts)) {
+    return Response.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  // Stamped here, not by the sender: when a message was sent decides what a
+  // later regenerate cuts away, and a time taken from the request would let
+  // the request choose.
+  const userMessage: ChatMessage & { role: 'user' } = stored
+    ? { ...sent, parts: stored.parts }
+    : { ...sent, metadata: { parentId: sent.metadata?.parentId } };
 
   // Fetch model from database to validate
   const dbModel = await findModelByModelId(modelId, 'chat');
@@ -186,7 +215,6 @@ async function POST({ request: req }: { request: Request }) {
     }
   }
 
-  let title = 'Untitled';
   // No type filter: continuing a legacy media chat reuses its row.
   const chat = await chats.getChat(user.id, {
     id,
@@ -194,6 +222,7 @@ async function POST({ request: req }: { request: Request }) {
     includeArtifacts: false
   });
   const UNTITLED = 'Untitled';
+  const title = chat?.title ?? UNTITLED;
 
   /**
    * Title from the first user message. Skipped for a refused turn — it calls a
@@ -217,10 +246,28 @@ async function POST({ request: req }: { request: Request }) {
       const input = titleInputFromMessage(userMessage);
       if (!input) return UNTITLED;
 
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model: getLanguageModel(titleProvider, titleModelId),
         instructions: titlePrompt,
-        prompt: input
+        prompt: input,
+        // The reply's stream is held open for this, and the reply is stored
+        // when that stream ends — so a title provider that hangs would hold
+        // back the storing of a reply that finished long ago. A name is a
+        // nicety; it gets a few seconds and no retries.
+        abortSignal: AbortSignal.timeout(TITLE_TIMEOUT_MS),
+        maxRetries: 0
+      });
+
+      // A generation like any other, and recorded like one: it is a call to a
+      // priced model made on this user's behalf, and the usage table is where
+      // an operator reads what their keys were spent on.
+      await recordChatUsage({
+        userId: user.id,
+        chatId: id,
+        messageId: userMessage.id,
+        modelId: titleModelId,
+        providerId: titleProvider.id,
+        usage: normalizeChatUsage(usage)
       });
 
       return sanitizeTitle(text) || UNTITLED;
@@ -231,8 +278,6 @@ async function POST({ request: req }: { request: Request }) {
   };
 
   if (!chat) {
-    title = await generateTitle();
-
     await chats.createChat(user.id, {
       id,
       title,
@@ -240,28 +285,64 @@ async function POST({ request: req }: { request: Request }) {
       modelId,
       messages: [userMessage]
     });
-  } else {
-    title = chat.title;
+  }
 
-    // A refusal on the very first message creates the chat still named
-    // "Untitled", and titling only ever ran for a chat that did not exist yet
-    // — so without this the name would stick for the life of the chat.
-    if (title === UNTITLED) {
-      const generated = await generateTitle();
-      if (generated !== UNTITLED) {
-        title = generated;
-        await chats.updateChat(user.id, { id, title });
-      }
+  // The chat exists now, so it can be claimed. A turn that would be refused
+  // anyway claims nothing; one that is refused here is refused for having too
+  // many others running, which only the claim can tell.
+  const streamId = generateUUID();
+  if (!refusal) {
+    const claimed = await chats.beginGeneration(user.id, {
+      chatId: id,
+      streamId
+    });
+    if (!claimed) {
+      console.warn(`[chat] refused (busy): user=${user.id}`);
+      refusal = {
+        kind: 'busy',
+        message:
+          'Several replies are already being written for you. Wait for one to finish, then try again.'
+      };
     }
+  }
 
-    if (parentMessageId && parentMessageId === userMessage.id) {
-      await messages.deleteMessages(user.id, { parentId: parentMessageId });
-    } else {
+  // From here the claim is held, and nothing may leave without letting it go.
+  let titleTask: Promise<string> | null = null;
+  try {
+    if (chat && !stored) {
       await messages.createMessages(user.id, {
         chatId: id,
         messages: [userMessage]
       });
+    } else if (stored && !refusal) {
+      // Only now, with the turn certain to go ahead. Cutting a chat back is
+      // not undone — the later messages go, and their files with them — so it
+      // is not done for a turn that is about to be refused: someone over
+      // their quota who pressed Regenerate would have lost the rest of the
+      // conversation and been given a refusal for it.
+      await messages.truncateAfter(user.id, {
+        chatId: id,
+        messageId: userMessage.id
+      });
     }
+
+    // Naming the chat is a model call of its own, and nothing about the reply
+    // depends on its answer — so it is started here and read once the reply
+    // is under way, rather than standing between the user and the first token.
+    //
+    // Tried while the chat is young and then let be. A chat is still unnamed
+    // after that because the title model cannot name it — no model
+    // configured, a provider that is down — and asking again on every turn
+    // for the life of the chat is a paid call that keeps failing.
+    titleTask =
+      title === UNTITLED &&
+      !refusal &&
+      (!chat || (await messages.countUserMessages(user.id, id)) <= 2)
+        ? generateTitle()
+        : null;
+  } catch (err) {
+    if (!refusal) await chats.endGeneration(id, streamId).catch(() => {});
+    throw err;
   }
 
   // The user's message is stored, so the refusal now has a turn to attach to.
@@ -314,6 +395,12 @@ async function POST({ request: req }: { request: Request }) {
       generateId: () => errorMessageId,
       onEnd: async ({ responseMessage }) => {
         if (!responseMessage) return;
+        // A refused resend leaves the chat exactly as it was: the reply it
+        // would have replaced is still there, and a stored refusal beside it
+        // would be a second answer to one message. It is shown and let go.
+        if (stored && (await messages.hasReply(user.id, userMessage.id))) {
+          return;
+        }
         try {
           await messages.createRefusal(user.id, {
             id: responseMessage.id || errorMessageId,
@@ -332,6 +419,9 @@ async function POST({ request: req }: { request: Request }) {
     return createUIMessageStreamResponse({ stream: refusalStream });
   }
 
+  // Set once the generation has claimed things that need letting go of.
+  let cleanup: (() => Promise<void>) | null = null;
+
   try {
     const historyMessages = await messages.listMessages(user.id, id);
     const chatMessages = convertToChatMessages(historyMessages);
@@ -339,8 +429,6 @@ async function POST({ request: req }: { request: Request }) {
     let reasonStartedAt: Date | null = null;
     let reasonDuration = 0;
     const assistantMessageId = generateUUID();
-    // Separate id for the resumable stream (used only when REDIS_URL is set).
-    const streamId = generateUUID();
 
     // Independent setup queries — run concurrently to keep time-to-first-token
     // down (media tool resolution should not delay plain text chats).
@@ -378,6 +466,38 @@ async function POST({ request: req }: { request: Request }) {
     // answer is stored truncated with nothing to say it was cut off, and the
     // user takes the fragment for the whole reply.
     let streamFailed = false;
+
+    // Stop. The signal reaches the model call and every tool under it. It is
+    // raised from here when the Stop request lands in this process, and from
+    // the check below when it landed in another — or when a newer turn has
+    // taken the chat over.
+    const stopper = new AbortController();
+    running.set(id, stopper);
+    const stopCheck = setInterval(() => {
+      chats
+        .isGenerating(id, streamId)
+        .then(held => {
+          if (!held) stopper.abort();
+        })
+        // A failed check is not a Stop. The next one asks again.
+        .catch(() => {});
+    }, STOP_CHECK_MS);
+    const release = async () => {
+      clearInterval(stopCheck);
+      if (running.get(id) === stopper) running.delete(id);
+      await chats.endGeneration(id, streamId).catch(() => {});
+    };
+    cleanup = release;
+
+    // Roughly what the model was sent, for charging a step that was stopped
+    // before the provider could say (see the outer `onEnd`).
+    let promptTokens = 0;
+
+    // What each step of the turn used, and the provider that served them.
+    const spent: ChatUsage[] = [];
+    let servedBy: Provider | null = null;
+    // The provider the stream was handed to, known before any step ends.
+    let lastCandidate: Provider | null = null;
     const recordStreamError = (error: unknown) => {
       const message = streamErrorMessage(error);
       streamFailed = true;
@@ -750,22 +870,48 @@ async function POST({ request: req }: { request: Request }) {
         // Media the chat model can't consume (audio/video always, images on
         // non-vision models) becomes text markers carrying the URL, so the
         // model can still reference them via the media tools.
+        const instructions = [
+          systemMessage,
+          ArtifactSystemPrompt,
+          mediaTools.systemPrompt
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+
+        // A chat longer than the model can take is sent without its
+        // beginning rather than refused for the rest of its life. Only when
+        // the operator has said how much the model takes: there are eight
+        // providers' worth of models behind this, and no list of their limits
+        // that stays true.
+        const budget = dbModel.apiParams?.maxInputTokens;
+        const fitted = budget
+          ? fitToContext(chatMessages, budget - estimateTokens(instructions))
+          : { messages: chatMessages, dropped: 0 };
+        if (fitted.dropped > 0) {
+          console.warn(
+            `[chat] chat=${id} outgrew ${modelId}: sent without its first ${fitted.dropped} messages`
+          );
+        }
+
         const modelMessages = await convertToModelMessages(
-          maskUnsupportedFileParts(chatMessages, {
+          maskUnsupportedFileParts(fitted.messages, {
             supportsVision: dbModel.supportsVision
-          })
+          }),
+          // A turn cut short mid-call is stored with the call and no result,
+          // and a call without a result is refused outright — by the SDK, and
+          // by the providers behind it. Left in, one interrupted turn would
+          // fail every turn after it in that chat.
+          { ignoreIncompleteToolCalls: true }
         );
+        promptTokens =
+          estimateTokens(instructions) +
+          estimateTokens(JSON.stringify(modelMessages));
 
         const buildStream = (failoverProvider: Provider) =>
           streamText({
             model: getLanguageModel(failoverProvider, modelId),
-            instructions: [
-              systemMessage,
-              ArtifactSystemPrompt,
-              mediaTools.systemPrompt
-            ]
-              .filter(Boolean)
-              .join('\n\n'),
+            abortSignal: stopper.signal,
+            instructions,
             messages: modelMessages,
             tools: { ...artifactTools, ...mediaTools.tools },
             ...(failoverProvider.apiOptions && {
@@ -793,60 +939,52 @@ async function POST({ request: req }: { request: Request }) {
             stopWhen: isStepCount(5),
             experimental_transform: smoothStream({ chunking: 'word' }),
             onChunk: ({ chunk }) => {
-              if (chunk.type === 'tool-call') {
-                console.log('Called Tool: ', chunk.toolName);
-              }
               if (chunk.type === 'reasoning-delta') {
-                const now = new Date();
-                reasonStartedAt ??= now;
-                console.log('Reasoning: ', chunk.text);
+                reasonStartedAt ??= new Date();
               }
             },
-            onStepEnd: ({ warnings }) => {
+            // Kept step by step and added up when the turn is over (see the
+            // outer `onEnd`). The SDK's own total exists only for a turn that
+            // ended well: a step that fails after others have answered leaves
+            // it empty, and those steps were paid for.
+            onStepEnd: ({ warnings, usage }) => {
               if (warnings) {
                 console.log('Warnings: ', warnings);
               }
-            },
-            onEnd: async ({ usage }) => {
-              if (!usage) {
-                // Provider didn't report usage — request runs free. Should not
-                // happen with major providers; surface so it's visible in logs.
-                console.warn(
-                  `[chat] no usage reported for model=${modelId}; skipping recordChatUsage`
-                );
-                return;
-              }
-              await recordChatUsage({
-                userId: user.id,
-                chatId: id,
-                messageId: assistantMessageId,
-                modelId,
-                providerId: failoverProvider.id,
-                usage: normalizeChatUsage(usage)
-              });
+              spent.push(normalizeChatUsage(usage));
+              servedBy = failoverProvider;
             }
           });
 
-        // Streaming failover is limited by design: once tokens reach the client
-        // a provider can't be swapped without duplicating output, and the AI SDK
-        // exposes no "connection established" signal before the stream is
-        // consumed (awaiting `res.response` would consume the whole stream and
-        // block until generation finishes, breaking streaming). So here we only
-        // fail over on errors thrown while *building* the stream (e.g. an invalid
-        // provider credential). Runtime/mid-stream errors surface to the client
-        // via the UI message stream. Non-streaming routes do full failover.
+        // Each candidate is read up to its first part of substance, and only
+        // one that opened with a retryable error is passed over.
         let res: ReturnType<typeof buildStream> | undefined;
         const failoverAttempts: { provider: string; error: unknown }[] = [];
         for (let i = 0; i < candidates.length; i++) {
           const candidate = candidates[i];
           const isLast = i === candidates.length - 1;
           try {
-            res = buildStream(candidate);
+            const attempt = buildStream(candidate);
+            const failed = isLast ? undefined : await openedWithError(attempt);
+            if (failed && isRetryableProviderError(failed.error)) {
+              console.warn(
+                `[chat] ${candidate.name} could not start, failing over —`,
+                describeError(failed.error)
+              );
+              failoverAttempts.push({
+                provider: candidate.name,
+                error: failed.error
+              });
+              continue;
+            }
+            // The last candidate, or an error no other provider would answer
+            // differently: the stream is used as it is, and reports itself.
+            res = attempt;
+            lastCandidate = candidate;
             break;
           } catch (error) {
-            // Any build-time error (bad/undecryptable credential, invalid
-            // provider config) means this provider can't start — try the next
-            // one regardless; rethrow only after the last candidate.
+            // Thrown while building — a credential that does not decrypt, a
+            // malformed provider config. This provider cannot start at all.
             failoverAttempts.push({ provider: candidate.name, error });
             if (isLast) {
               throw error;
@@ -926,79 +1064,171 @@ async function POST({ request: req }: { request: Request }) {
             }
           })
         );
+
+        // The reply is streaming by now. The stream stays open until this
+        // returns, so a name that arrives after a short reply still has
+        // somewhere to go.
+        if (titleTask) {
+          const generated = await titleTask;
+          if (generated !== UNTITLED) {
+            try {
+              await chats.updateChat(user.id, { id, title: generated });
+              emitTransient({ type: 'data-chat', data: { title: generated } });
+            } catch (err) {
+              // A chat left unnamed is named on its next turn; failing the
+              // reply over it would be the worse outcome.
+              console.warn('[chat] failed to store title for', id, err);
+            }
+          }
+        }
       },
       generateId: generateUUID,
-      onEnd: async ({ responseMessage }) => {
-        const finishedAt = new Date();
-        if (reasonStartedAt) {
-          reasonDuration += Math.max(
-            0,
-            finishedAt.getTime() - reasonStartedAt.getTime()
-          );
-          reasonStartedAt = null;
-        }
+      onEnd: async ({ responseMessage, isAborted }) => {
+        // Asked before the claim is let go, since letting go erases the answer.
+        const state = await chats
+          .generationState(id, streamId)
+          .catch(() => 'held' as const);
 
-        if (responseMessage) {
-          responseMessage.metadata = {
-            ...responseMessage.metadata,
-            reasonDuration:
-              responseMessage.metadata?.reasonDuration ??
-              (reasonDuration || undefined),
-            createdAt: responseMessage.metadata?.createdAt ?? finishedAt,
-            updatedAt: finishedAt
-          };
-          responseMessage.id = responseMessage.id || assistantMessageId;
-        }
-
-        if (!responseMessage) {
-          return;
-        }
-
-        // The marker says the turn was cut short; why it was cut short is in
-        // the log above, not in the thread — a provider's message means
-        // nothing to the person reading this conversation next week.
-        if (streamFailed) {
-          responseMessage.parts = [
-            ...responseMessage.parts,
-            {
-              type: 'data-error',
-              data: {
-                kind: 'incomplete',
-                message: 'This response was interrupted.'
-              }
-            }
-          ];
-        }
-
-        const persistedArtifacts = completedArtifactOrder
-          .map(artifactId => completedArtifacts.get(artifactId))
-          .filter((artifact): artifact is Artifact => Boolean(artifact));
-
-        await messages.createTurn(user.id, {
-          chatId: id,
-          message: {
-            id: responseMessage.id,
-            parentId: responseMessage.metadata?.parentId ?? userMessage.id,
-            role: 'assistant',
-            parts: responseMessage.parts,
-            reasonDuration: responseMessage.metadata?.reasonDuration,
-            createdAt: responseMessage.metadata?.createdAt ?? finishedAt,
-            updatedAt: responseMessage.metadata?.updatedAt ?? finishedAt
-          },
-          artifacts: persistedArtifacts
-        });
-
-        // Update chat model if changed
-        if (chat && chat.modelId !== modelId) {
-          try {
-            await chats.updateChat(user.id, { id, modelId });
-          } catch (err) {
-            console.warn('Unable to update chat', id, err);
-          }
+        try {
+          await settle({ responseMessage, isAborted, state });
+        } catch (err) {
+          // Nothing reads what this returns: the client has the whole reply
+          // already. A throw would only error a finished response.
+          console.error(`[chat] failed to settle turn for chat=${id}:`, err);
+        } finally {
+          // Last, so the chat reads as still being written until the reply is
+          // stored — a reload in between would otherwise find neither.
+          await release();
         }
       },
       onError: recordStreamError
     });
+
+    const settle = async ({
+      responseMessage,
+      isAborted,
+      state
+    }: {
+      responseMessage: ChatMessage | undefined;
+      isAborted: boolean;
+      state: 'held' | 'stopped' | 'superseded';
+    }) => {
+      // A stopped step reports nothing: the provider sends its count with
+      // the last chunk, and the last chunk is what was cut off. Unrecorded,
+      // stopping a reply just before it finishes would make it free — so the
+      // step is charged for what is known of it: what it was sent, and what
+      // of the reply the finished steps do not already account for.
+      if (isAborted && (servedBy ?? lastCandidate)) {
+        servedBy ??= lastCandidate;
+        const written = (responseMessage?.parts ?? [])
+          .map(part =>
+            part.type === 'text' || part.type === 'reasoning' ? part.text : ''
+          )
+          .join('');
+        const counted = spent.reduce(
+          (sum, step) =>
+            sum + (step.outputTokens ?? 0) + (step.reasoningTokens ?? 0),
+          0
+        );
+        spent.push({
+          inputTokens: promptTokens,
+          outputTokens: Math.max(0, estimateTokens(written) - counted)
+        });
+      }
+
+      // First, and whatever became of the reply: the tokens were spent even
+      // if there turns out to be no message to store.
+      if (servedBy && spent.length > 0) {
+        await recordChatUsage({
+          userId: user.id,
+          chatId: id,
+          messageId: assistantMessageId,
+          modelId,
+          providerId: servedBy.id,
+          usage: sumChatUsage(spent)
+        });
+      } else {
+        console.warn(`[chat] no usage reported for model=${modelId}`);
+      }
+
+      const finishedAt = new Date();
+      if (reasonStartedAt) {
+        reasonDuration += Math.max(
+          0,
+          finishedAt.getTime() - reasonStartedAt.getTime()
+        );
+        reasonStartedAt = null;
+      }
+
+      if (responseMessage) {
+        responseMessage.metadata = {
+          ...responseMessage.metadata,
+          reasonDuration:
+            responseMessage.metadata?.reasonDuration ??
+            (reasonDuration || undefined),
+          createdAt: responseMessage.metadata?.createdAt ?? finishedAt,
+          updatedAt: finishedAt
+        };
+        responseMessage.id = responseMessage.id || assistantMessageId;
+      }
+
+      if (!responseMessage) {
+        return;
+      }
+
+      // A newer turn has taken this chat: cut it back, and is answering it
+      // again. What this one wrote belongs to a conversation that is no
+      // longer there — stored, it would sit beside the new reply as a second
+      // answer, or fail for want of the message it answers. Its cost, above,
+      // is real either way; its words are not kept.
+      if (state === 'superseded') {
+        console.warn(`[chat] turn superseded for chat=${id}; reply not stored`);
+        return;
+      }
+
+      // The marker says the turn was cut short; why it was cut short is in
+      // the log above, not in the thread — a provider's message means
+      // nothing to the person reading this conversation next week.
+      if (streamFailed) {
+        responseMessage.parts = [
+          ...responseMessage.parts,
+          {
+            type: 'data-error',
+            data: {
+              kind: 'incomplete',
+              message: 'This response was interrupted.'
+            }
+          }
+        ];
+      }
+
+      const persistedArtifacts = completedArtifactOrder
+        .map(artifactId => completedArtifacts.get(artifactId))
+        .filter((artifact): artifact is Artifact => Boolean(artifact));
+
+      await messages.createTurn(user.id, {
+        chatId: id,
+        message: {
+          id: responseMessage.id,
+          parentId: responseMessage.metadata?.parentId ?? userMessage.id,
+          role: 'assistant',
+          parts: responseMessage.parts,
+          reasonDuration: responseMessage.metadata?.reasonDuration,
+          createdAt: responseMessage.metadata?.createdAt ?? finishedAt,
+          updatedAt: responseMessage.metadata?.updatedAt ?? finishedAt
+        },
+        artifacts: persistedArtifacts
+      });
+
+      // Update chat model if changed
+      if (chat && chat.modelId !== modelId) {
+        try {
+          await chats.updateChat(user.id, { id, modelId });
+        } catch (err) {
+          console.warn('Unable to update chat', id, err);
+        }
+      }
+    };
 
     // When Redis is configured, wrap the stream as a resumable one so a page
     // refresh can re-attach to an in-progress generation (see the GET handler).
@@ -1008,7 +1238,6 @@ async function POST({ request: req }: { request: Request }) {
     const streamContext = await getResumableStreamContext();
     if (streamContext) {
       try {
-        await chats.setStreamId(id, streamId);
         const resumable = await streamContext.resumableStream(streamId, () =>
           stream.pipeThrough(new JsonToSseTransformStream())
         );
@@ -1039,6 +1268,9 @@ async function POST({ request: req }: { request: Request }) {
     });
   } catch (err: any) {
     console.error('Chat error:', err);
+    // Nothing will reach the stream's own `onEnd`, so the claim is let go here.
+    if (cleanup) await cleanup();
+    else await chats.endGeneration(id, streamId).catch(() => {});
     return Response.json(
       { error: 'Oops, an error occurred!' },
       { status: 500 }
@@ -1053,15 +1285,18 @@ async function POST({ request: req }: { request: Request }) {
  * disabled (no REDIS_URL), the chat isn't the caller's, or the stream already
  * finished — in which case the final message is already persisted in the DB.
  */
-async function GET({ request: req }: { request: Request }) {
+async function GET({
+  request: req,
+  context
+}: {
+  request: Request;
+  context: { user: User };
+}) {
+  const { user } = context;
+
   const streamContext = await getResumableStreamContext();
   if (!streamContext) {
     return new Response(null, { status: 204 });
-  }
-
-  const user = await getUser();
-  if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const chatId = new URL(req.url).searchParams.get('chatId');
@@ -1097,4 +1332,31 @@ async function GET({ request: req }: { request: Request }) {
   return new Response(resumed.pipeThrough(new TextEncoderStream()), {
     headers: UI_MESSAGE_STREAM_HEADERS
   });
+}
+
+/**
+ * Stop the reply being written in a chat. Closing the connection does not do
+ * it: a generation deliberately outlives its reader, so that a closed tab
+ * still ends with a stored reply and a recorded cost. Stopping is said here.
+ */
+async function DELETE({
+  request: req,
+  context
+}: {
+  request: Request;
+  context: { user: User };
+}) {
+  const chatId = new URL(req.url).searchParams.get('chatId');
+  if (!chatId) {
+    return Response.json({ error: 'chatId is required' }, { status: 400 });
+  }
+
+  // Withdrawn first and scoped to the owner, so the chat id alone stops
+  // nothing of anyone else's — and only then the shortcut, for a generation
+  // that happens to be running right here.
+  const held = await chats.getStreamId(context.user.id, chatId);
+  await chats.stopGeneration(context.user.id, chatId);
+  if (held) running.get(chatId)?.abort();
+
+  return new Response(null, { status: 204 });
 }

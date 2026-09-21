@@ -51,15 +51,16 @@ describe('pruneToVocabulary', () => {
   });
 
   it('narrows to the intersection when a model can fail over', () => {
-    // Only Google takes a duration for video among these two, so nobody may
-    // pin one — and the key goes with it.
+    // Both take a length, so the field stays — it is fields this prunes, not
+    // the values in them. Only Google takes a resolution for video — Sora
+    // names its output by size — so nobody may pin one, and the key goes.
     expect(
       pruneToVocabulary(
-        { durations: [4, 8], aspectRatios: ['16:9'] },
-        vocabularyFor(['google', 'xai'], 'video'),
+        { durations: [4, 8], resolutions: ['720p'] },
+        vocabularyFor(['google', 'openai'], 'video'),
         'video'
       )
-    ).toEqual({ aspectRatios: ['16:9'] });
+    ).toEqual({ durations: [4, 8] });
   });
 
   it('keeps everything while the providers are still unknown', () => {

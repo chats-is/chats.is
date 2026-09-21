@@ -19,6 +19,8 @@ export type ChatErrorKind =
   | 'quota'
   /** The user's quota does not list this model. */
   | 'model-access'
+  /** The user already has as many replies being written as they may. */
+  | 'busy'
   /** The model or its provider no longer resolves. */
   | 'model-unavailable'
   /** The stream failed part-way; whatever had been written is all there is. */

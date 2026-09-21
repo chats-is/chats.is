@@ -20,6 +20,43 @@ export const createArtifactInputSchema = z.object({
 
 export type CreateArtifactInput = z.infer<typeof createArtifactInputSchema>;
 
+/**
+ * What the user has pinned in the media menu, sent with each turn. Every field
+ * is optional: an absent model falls back to the admin's default, and an
+ * absent option to the model's own.
+ */
+const mediaModelSchema = z.object({ modelId: z.string().max(255).optional() });
+
+export const mediaToolsOptionsSchema = z.object({
+  image: mediaModelSchema
+    .extend({
+      size: z.string().max(64).optional(),
+      aspectRatio: z.string().max(64).optional(),
+      resolution: z.string().max(64).optional()
+    })
+    .optional(),
+  /** Editing an existing image is its own model choice — few can do it. */
+  imageEdit: mediaModelSchema.optional(),
+  video: mediaModelSchema
+    .extend({
+      size: z.string().max(64).optional(),
+      aspectRatio: z.string().max(64).optional(),
+      resolution: z.string().max(64).optional(),
+      duration: z.number().positive().optional()
+    })
+    .optional(),
+  /** Animating an image is its own model choice — few video models take one. */
+  videoImage: mediaModelSchema.optional(),
+  /** Editing an existing video is again its own model choice. */
+  videoEdit: mediaModelSchema.optional(),
+  audio: mediaModelSchema
+    .extend({ voice: z.string().max(255).optional() })
+    .optional(),
+  stt: mediaModelSchema.optional()
+});
+
+export type MediaToolsOptions = z.infer<typeof mediaToolsOptionsSchema>;
+
 export const generateImageInputSchema = z.object({
   prompt: z
     .string()

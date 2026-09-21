@@ -65,6 +65,10 @@ export type ModelAPIParams = {
   topP?: number;
   topK?: number;
   maxOutputTokens?: number;
+  /** The most the model is sent. Not a provider parameter: when a chat has
+   *  outgrown it, the oldest messages are left out (see `fitToContext`).
+   *  Unset, a chat is always sent whole. */
+  maxInputTokens?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
 };
@@ -170,6 +174,7 @@ const modelAPIParamsSchema = z
     topP: z.number().optional(),
     topK: z.number().optional(),
     maxOutputTokens: z.number().optional(),
+    maxInputTokens: z.number().int().positive().optional(),
     frequencyPenalty: z.number().optional(),
     presencePenalty: z.number().optional()
   })

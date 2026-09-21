@@ -281,6 +281,17 @@ export function ChatUI({
     resume: canResume
   });
 
+  // Stopping is two things. The SDK's `stop` closes this page's connection,
+  // which ends nothing on the server — a generation outlives its reader on
+  // purpose, so a closed tab still ends with a stored reply. The request is
+  // what ends it: the model call, the tools under it, and the bill.
+  const handleStop = useCallback(async () => {
+    void fetch(`/api/chat?chatId=${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+    await stop();
+  }, [id, stop]);
+
   // Handed to the session rather than baked into it, so a turn that started on
   // one page goes on reporting to whichever page is showing it now. Written in
   // a layout effect: the page being replaced tears down first, and a passive
@@ -301,10 +312,11 @@ export function ChatUI({
       if (dataPart.type === 'data-chat' && dataPart.data) {
         const chatData = dataPart.data;
         if (chatData.title) {
-          if (!title) {
-            // Newly named, so it belongs in the sidebar…
-            refreshChats();
+          // The name reaches the sidebar whenever it changes: a new chat is
+          // announced at once and named a moment later, by a second signal.
+          if (chatData.title !== title) refreshChats();
 
+          if (!title) {
             // …and at its own address — but only if the reader is still on
             // the page that composed it, and is not already there. A turn
             // goes on streaming after its page is gone, and a reply finishing
@@ -561,7 +573,7 @@ export function ChatUI({
               messages={messages}
               setMessages={setMessages}
               status={status}
-              stop={stop}
+              stop={handleStop}
               input={input}
               setInput={setInput}
               onInputChange={e => setInput(e.target.value)}
@@ -604,7 +616,7 @@ export function ChatUI({
             messages={messages}
             setMessages={setMessages}
             status={status}
-            stop={stop}
+            stop={handleStop}
             input={input}
             setInput={setInput}
             onInputChange={e => setInput(e.target.value)}

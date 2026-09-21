@@ -39,12 +39,11 @@ export const chats = createTable(
       .default('chat')
       .$type<ChatType>(),
     modelId: varchar('model_id', { length: 255 }).notNull(),
-    // Resumable-stream id of the most recent generation (a Redis key, not a
-    // FK). Written when a generation starts and never cleared: whether the
-    // stream is still live is Redis's answer, not this column's — the GET
-    // handler asks for it and falls back to the persisted message when it has
-    // expired. Null only until the chat's first generation, and only written
-    // at all when REDIS_URL is configured.
+    // The generation writing a reply in this chat right now: set when it
+    // starts, cleared when it ends, null in between. It is the claim a
+    // generation holds on the chat (see `beginGeneration`), what Stop
+    // withdraws, and — when REDIS_URL is configured — the name of the
+    // resumable stream a reload re-attaches to. A Redis key, not a FK.
     streamId: varchar('stream_id', { length: 255 }),
     userId: varchar('user_id', { length: 255 })
       .notNull()
@@ -459,6 +458,7 @@ export const models = createTable(
       topP?: number;
       topK?: number;
       maxOutputTokens?: number;
+      maxInputTokens?: number;
       frequencyPenalty?: number;
       presencePenalty?: number;
     }>(),

@@ -79,3 +79,31 @@ export function normalizeChatUsage(raw: RawChatUsage): ChatUsage {
     reasoningTokens
   };
 }
+
+/**
+ * A turn's usage, as the sum of what each of its steps reported.
+ *
+ * The SDK offers a total of its own at the end of a turn, but only a turn that
+ * ended well has one: when a later step fails, the total comes back empty and
+ * the steps before it — answered, and paid for — count for nothing. The buckets
+ * are disjoint and additive, so adding the steps up is exact.
+ */
+export function sumChatUsage(steps: ChatUsage[]): ChatUsage {
+  const total: Required<ChatUsage> = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    reasoningTokens: 0
+  };
+
+  for (const step of steps) {
+    total.inputTokens += step.inputTokens ?? 0;
+    total.outputTokens += step.outputTokens ?? 0;
+    total.cacheReadTokens += step.cacheReadTokens ?? 0;
+    total.cacheWriteTokens += step.cacheWriteTokens ?? 0;
+    total.reasoningTokens += step.reasoningTokens ?? 0;
+  }
+
+  return total;
+}

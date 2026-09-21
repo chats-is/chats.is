@@ -131,7 +131,6 @@ function createSession(
           body: {
             id,
             userMessage,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             ...session.requestBody,
             ...body
           }

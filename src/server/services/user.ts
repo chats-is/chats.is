@@ -12,6 +12,7 @@ import {
 import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
+import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
 
 /**
  * The signed-in user's own row.
@@ -173,7 +174,17 @@ export async function deleteUser(actingUserId: string, id: string) {
     throw new PublicError('Cannot delete admin accounts');
   }
 
+  // Everything the account owns goes with the row. Its files are not rows,
+  // so they are gathered first: what its messages hold, and its avatar.
+  const [account] = await db
+    .select({ image: users.image })
+    .from(users)
+    .where(eq(users.id, id));
+  const urls = await blobUrlsOfMessages(eq(messages.userId, id));
+  if (account?.image) urls.push(account.image);
+
   await db.delete(users).where(eq(users.id, id));
+  await removeBlobs(id, urls);
   return { success: true };
 }
 
