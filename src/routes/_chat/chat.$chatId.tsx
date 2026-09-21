@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 
@@ -52,10 +52,30 @@ export const Route = createFileRoute('/_chat/chat/$chatId')({
 
 function ChatPage() {
   const { chatId } = Route.useParams();
-  const { data: chat, isPending } = useQuery(
-    chatQueries.detail({ id: chatId, includeArtifacts: true })
-  );
+  const {
+    data: chat,
+    isPending,
+    isFetching,
+    isStale
+  } = useQuery(chatQueries.detail({ id: chatId, includeArtifacts: true }));
   const app = useAppName();
+
+  // Which chat this page has finished reading for the current visit. A chat's
+  // cached copy can be far behind the chat: a new conversation moves to this
+  // address while its first reply is still being written, and what is read —
+  // and cached — at that moment is the user's message and nothing else. Coming
+  // back minutes later, that was what the conversation was seeded from, and a
+  // seed is taken once: the fresh copy arrived behind the page and went
+  // nowhere, so the reply was simply missing until the browser was reloaded.
+  //
+  // So a copy that is out of date is not drawn from. The page waits for the
+  // read already under way, as every other page here does, and draws once.
+  // Only at the start of a visit — a refresh that happens later, while the
+  // conversation is on screen, must not take the conversation down to do it.
+  const [readFor, setReadFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isPending && !isFetching) setReadFor(chatId);
+  }, [chatId, isPending, isFetching]);
 
   // A head is settled when the match is made, and a chat opened from the
   // sidebar has not been read by then. Name the tab once it arrives.
@@ -69,7 +89,8 @@ function ChatPage() {
   // very reply the reader is watching arrive.
   const live = peekChatSession(chatId);
 
-  if (isPending && !live) {
+  const behind = readFor !== chatId && (isFetching || isStale);
+  if ((isPending || behind) && !live) {
     return <ChatSkeleton />;
   }
 
