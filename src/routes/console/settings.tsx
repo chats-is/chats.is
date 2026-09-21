@@ -19,9 +19,9 @@ export const Route = createFileRoute('/console/settings')({
    */
   loader: ({ context }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(settingsQueries.list()),
-      context.queryClient.ensureQueryData(modelQueries.forSelect()),
-      context.queryClient.ensureQueryData(quotaQueries.listForSelect())
+      context.queryClient.fetchQuery(settingsQueries.list()),
+      context.queryClient.fetchQuery(modelQueries.forSelect()),
+      context.queryClient.fetchQuery(quotaQueries.listForSelect())
     ]),
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Settings') }]

@@ -10,11 +10,20 @@ import { ChatNotFound } from '@/components/chat-notfound';
 import { ChatSkeleton } from '@/components/chat-skeleton';
 import { ChatUI } from '@/components/chat-ui';
 
-// No pending component here on purpose. A placeholder at the route level would
-// unmount the whole match whenever the loader re-runs; the page says it is
-// loading from the inside instead, where it can tell a chat it has never read
-// from one it is merely revalidating.
 export const Route = createFileRoute('/_chat/chat/$chatId')({
+  // The server reads the chat and sends it with the page, but does not draw
+  // it. The conversation sits inside a scroller that only exists in a browser,
+  // so a server render of this page was the frame around an empty thread —
+  // work done to show nothing, replaced on hydration anyway. What it draws
+  // instead is the placeholder below, which is what the page shows while it
+  // loads in the browser too.
+  ssr: 'data-only',
+  // Only ever seen from the server: in the browser the loader below does not
+  // wait, so the route is never pending, and the page says it is loading from
+  // the inside — where it can tell a chat it has never read from one it is
+  // merely revalidating.
+  pendingComponent: ChatSkeleton,
+  pendingMinMs: 0,
   // No type filter: legacy media chats (image/video/audio) open here too.
   //
   // Awaited on the server, where the page is rendered once and should arrive

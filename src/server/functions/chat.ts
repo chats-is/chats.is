@@ -42,6 +42,9 @@ export const deleteAllChats = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .handler(({ context }) => chats.deleteAllChats(context.user.id));
 
+/** How many chats the sidebar reads at a time. */
+const HISTORY_PAGE_SIZE = 25;
+
 type ListInput = { type?: z.infer<typeof chatTypeSchema>; limit?: number };
 
 export const chatQueries = {
@@ -70,6 +73,9 @@ export const chatQueries = {
           ? undefined
           : allPages.reduce((n, p) => n + p.length, 0)
     }),
+  /** The sidebar's history. Named once, so the loader that primes it and the
+   *  sidebar that reads it cannot ask for different pages. */
+  history: () => chatQueries.infinite({ limit: HISTORY_PAGE_SIZE }),
   detail: (input: {
     id: string;
     type?: z.infer<typeof chatTypeSchema>;

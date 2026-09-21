@@ -1,3 +1,5 @@
+import '@tanstack/react-start/server-only';
+
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 /**
@@ -33,6 +35,11 @@ export function perRequest<TArgs extends Array<unknown>, TResult>(
 
     const pending = fn(...args);
     scope.set(key, pending);
+    // An answer is kept; a failure is not. One dropped connection would
+    // otherwise be handed to every later caller in the request as their own.
+    pending.catch(() => {
+      if (scope.get(key) === pending) scope.delete(key);
+    });
     return pending;
   };
 }

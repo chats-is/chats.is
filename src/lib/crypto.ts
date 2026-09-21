@@ -1,3 +1,5 @@
+import '@tanstack/react-start/server-only';
+
 import crypto from 'node:crypto';
 
 import { type VertexServiceAccountKey } from '@/types';

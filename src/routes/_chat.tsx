@@ -4,6 +4,7 @@ import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
 import { sessionQueries } from '@/server/functions/auth';
+import { chatQueries } from '@/server/functions/chat';
 import { settingsQueries } from '@/server/functions/settings';
 import { userQueries } from '@/server/functions/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -31,11 +32,19 @@ export const Route = createFileRoute('/_chat')({
   },
   // The user menu sits on every page under here, so the signed-in user is
   // resolved with the rest of this subtree's data rather than fetched again
-  // from the browser once the page has already drawn.
+  // from the browser once the page has already drawn. The sidebar's history
+  // is here for the same reason: it is not read during a server render, so
+  // left to the component it would arrive as placeholders and a second trip.
   loader: async ({ context }) => {
     const [settings] = await Promise.all([
       context.queryClient.ensureQueryData(settingsQueries.system()),
-      context.queryClient.ensureQueryData(userQueries.me())
+      context.queryClient.ensureQueryData(userQueries.me()),
+      // Primed, not required. The sidebar reports a failed read of its own;
+      // letting it fail here would replace the whole app with an error page
+      // over a list the reader may not even be looking at.
+      context.queryClient
+        .ensureInfiniteQueryData(chatQueries.history())
+        .catch(() => undefined)
     ]);
     return settings;
   },

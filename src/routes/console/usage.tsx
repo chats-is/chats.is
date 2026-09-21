@@ -21,7 +21,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute('/console/usage')({
   validateSearch: searchSchema,
   loader: ({ context }) =>
-    context.queryClient.ensureQueryData(modelQueries.forSelect()),
+    context.queryClient.fetchQuery(modelQueries.forSelect()),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Usage') }] }),
   pendingComponent: () => <ConsoleUsageSkeleton />,
   component: Usage

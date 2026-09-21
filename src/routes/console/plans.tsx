@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
+import { loadForVisit } from '@/lib/route-loader';
 import { planQueries } from '@/server/functions/plan';
 import { quotaQueries } from '@/server/functions/quota';
 import Plans, { PlansPending } from '@/components/console/plans';
@@ -28,10 +29,16 @@ export const Route = createFileRoute('/console/plans')({
    * dropdowns inside a dialog, and nothing on the page behind it is waiting to
    * know them.
    */
-  loader: ({ context }) => {
+  // The table on screen is a function of the address, so the loader is too:
+  // it asks for the page and filter the component is about to read, not for
+  // the first page of everything.
+  loaderDeps: ({ search }) => search,
+  loader: ({ context, deps, cause }) => {
     void context.queryClient.prefetchQuery(quotaQueries.listForSelect());
-    return context.queryClient.ensureQueryData(
-      planQueries.list(planTableInput({}))
+    return loadForVisit(
+      context.queryClient,
+      planQueries.list(planTableInput(deps)),
+      cause
     );
   },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Plans') }] }),

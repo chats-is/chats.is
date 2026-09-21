@@ -15,10 +15,8 @@ import {
   type listChats
 } from '@/server/functions/chat';
 
-const LIMIT = 25;
-
 /** The one cache the sidebar reads and every edit below writes back into. */
-const historyQuery = () => chatQueries.infinite({ limit: LIMIT });
+const historyQuery = () => chatQueries.history();
 type History = InfiniteData<Awaited<ReturnType<typeof listChats>>>;
 
 export function useChatsInfinite() {

@@ -1,5 +1,7 @@
 import { createMiddleware } from '@tanstack/react-start';
 
+import { UNAUTHORIZED } from '@/lib/auth-error';
+
 import { getUser } from './session';
 
 /**
@@ -14,7 +16,7 @@ export const authedMiddleware = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     const user = await getUser();
     if (!user) {
-      throw new Response('Unauthorized', { status: 401 });
+      throw new Response(UNAUTHORIZED, { status: 401 });
     }
     return next({ context: { user } });
   }
@@ -28,6 +30,21 @@ export const adminMiddleware = createMiddleware({ type: 'function' })
     }
     return next({ context: { user: context.user } });
   });
+
+/**
+ * The signed-in tier again, for the server routes under `routes/api/`. Those
+ * own their request, so they take a request middleware rather than a function
+ * one — and answer in JSON, which is what their callers read.
+ */
+export const authedRequest = createMiddleware({ type: 'request' }).server(
+  async ({ next }) => {
+    const user = await getUser();
+    if (!user) {
+      return Response.json({ error: UNAUTHORIZED }, { status: 401 });
+    }
+    return next({ context: { user } });
+  }
+);
 
 /**
  * Signed in or not — the session is handed over either way, because some

@@ -2,17 +2,38 @@ import '@/lib/serializable';
 
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 
+import { isUnauthorized } from '@/lib/auth-error';
 import { RouteError } from '@/components/route-error';
 
 import { routeTree } from './routeTree.gen';
+
+/**
+ * A session that ended while the page was open. The guards only run on a
+ * navigation, so the first to find out is whatever read or edit came next —
+ * and all it can do with the refusal is show it. Signing in is a full page
+ * load here, as signing out is, so the way back is one too: to the form, with
+ * this address to return to.
+ */
+function onSessionLost(error: unknown) {
+  if (typeof window === 'undefined' || !isUnauthorized(error)) return;
+
+  const { pathname, search } = window.location;
+  if (pathname === '/login') return;
+
+  window.location.assign(
+    `/login?redirect=${encodeURIComponent(pathname + search)}`
+  );
+}
 
 export function getRouter() {
   // One client per request on the server, one for the session in the browser.
   // Routes reach it through context, so a loader can prime the same cache the
   // components below it will read from.
   const queryClient = new QueryClient({
+    queryCache: new QueryCache({ onError: onSessionLost }),
+    mutationCache: new MutationCache({ onError: onSessionLost }),
     defaultOptions: {
       queries: {
         // No blanket freshness window. One was kept here to stop a page from
@@ -24,6 +45,12 @@ export function getRouter() {
         // Opening a page asks. A query that really is settled can say so where
         // it is defined.
         //
+        // What is left is not a freshness window but the length of one
+        // navigation. A loader asks, and the component it was asking for mounts
+        // a moment later; with nothing here that mount asks a second time, and
+        // a hover that preloaded makes it a third. Two seconds lets one answer
+        // serve the visit that fetched it, and is over before the next.
+        staleTime: 2 * 1000,
         // Coming back to the tab is not a request for fresh data. It reloads
         // lists under the reader's cursor, restarts work a dialog was in the
         // middle of, and asks the database for everything on screen at once —
@@ -55,7 +82,17 @@ export function getRouter() {
     // Start the moment the pointer lands, rather than after the usual pause:
     // the thing being preloaded is the conversation a click is about to ask
     // for, and half a hover is the difference between it being ready and not.
-    defaultPreloadDelay: 0,
+    //
+    // Not zero, though. At zero a pointer merely crossing the sidebar on its
+    // way somewhere else reads every conversation it passes over, messages
+    // and artifacts and all. Fifty milliseconds is shorter than any click —
+    // the pointer has to stop before a button can be pressed — and longer
+    // than a pass, so what is preloaded is what was aimed at.
+    defaultPreloadDelay: 50,
+    // The router would otherwise hold a preloaded loader's result as fresh for
+    // thirty seconds and not run the loader again on the click. Freshness is
+    // the query cache's to decide, so every load goes through to it.
+    defaultPreloadStaleTime: 0,
     // How long a load may take before it is worth saying so. Under this, the
     // placeholder never appears and the page changes once; over it, the
     // placeholder stands in until the data lands.

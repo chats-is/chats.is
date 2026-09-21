@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
+import { loadForVisit } from '@/lib/route-loader';
 import { providerQueries } from '@/server/functions/provider';
 import Providers, { ProvidersPending } from '@/components/console/providers';
 import { providerTableInput } from '@/components/console/table-filters';
@@ -27,9 +28,15 @@ export const Route = createFileRoute('/console/providers')({
    * The key is the one the component asks for on a plain visit, so it mounts
    * with data rather than skeletoning a second time.
    */
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(
-      providerQueries.list(providerTableInput({}))
+  // The table on screen is a function of the address, so the loader is too:
+  // it asks for the page and filter the component is about to read, not for
+  // the first page of everything.
+  loaderDeps: ({ search }) => search,
+  loader: ({ context, deps, cause }) =>
+    loadForVisit(
+      context.queryClient,
+      providerQueries.list(providerTableInput(deps)),
+      cause
     ),
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Providers') }]

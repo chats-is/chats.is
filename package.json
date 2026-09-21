@@ -2,11 +2,14 @@
   "name": "chats.is",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "vercel-build": "drizzle-kit migrate && vite build",
-    "start": "node .output/server/index.mjs",
+    "start": "node --env-file-if-exists=.env .output/server/index.mjs",
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",

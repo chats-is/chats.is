@@ -1,3 +1,5 @@
+import '@tanstack/react-start/server-only';
+
 import { Pool } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 

@@ -19,3 +19,33 @@ export class PublicError extends Error {
     this.name = 'PublicError';
   }
 }
+
+/**
+ * What a refused input said, if `error` is one.
+ *
+ * A server function's validator has no error type of its own: the framework
+ * throws a plain `Error` whose message is the list of issues as JSON. That is
+ * the only mark it carries, so it is read for exactly that shape and nothing
+ * looser — a list of objects that each have a `message` and a `path`.
+ *
+ * The first issue is the one reported. They were written for a reader — the
+ * same schemas label the forms — and the rest are usually its consequences.
+ */
+export function validationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error) || !error.message.startsWith('[')) return;
+
+  try {
+    const issues: unknown = JSON.parse(error.message);
+    if (!Array.isArray(issues) || issues.length === 0) return;
+
+    const isIssue = (issue: unknown): issue is { message: string } =>
+      typeof issue === 'object' &&
+      issue !== null &&
+      typeof (issue as { message?: unknown }).message === 'string' &&
+      Array.isArray((issue as { path?: unknown }).path);
+
+    return issues.every(isIssue) ? issues[0].message : undefined;
+  } catch {
+    return undefined;
+  }
+}

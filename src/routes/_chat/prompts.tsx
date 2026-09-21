@@ -19,9 +19,11 @@ const searchSchema = z.object({
 export const Route = createFileRoute('/_chat/prompts')({
   validateSearch: searchSchema,
   loader: ({ context }) =>
-    context.queryClient.ensureInfiniteQueryData(
-      promptQueries.usableInfinite({ limit: 24 })
-    ),
+    // Asked for again on every visit, first page only — see the library.
+    context.queryClient.fetchInfiniteQuery({
+      ...promptQueries.usableInfinite({ limit: 24 }),
+      pages: 1
+    }),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Prompts') }] }),
   pendingComponent: () => (
     <GalleryPending title="Prompts" toolbar={<PromptsToolbarSkeleton />} />

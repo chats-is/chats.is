@@ -24,10 +24,10 @@ export const Route = createFileRoute('/console/users/$userId')({
   // a window the page picks after it mounts, so they stay with the component.
   loader: ({ context, params }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(
+      context.queryClient.fetchQuery(
         quotaQueries.byUser({ userId: params.userId })
       ),
-      context.queryClient.ensureQueryData(
+      context.queryClient.fetchQuery(
         usageQueries.userModels({ userId: params.userId })
       )
     ]),

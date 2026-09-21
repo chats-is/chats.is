@@ -1,6 +1,11 @@
 import { createEnv } from '@t3-oss/env-core';
 import { z } from 'zod';
 
+/**
+ * The one server module that does not say `server-only`. drizzle-kit reads it
+ * through `drizzle.config.ts`, outside the build, and cannot load that marker.
+ * Nothing is lost by it: read in a browser, any of these throws.
+ */
 export const env = createEnv({
   server: {
     NODE_ENV: z
@@ -13,7 +18,6 @@ export const env = createEnv({
         port => !port || (parseInt(port) > 0 && parseInt(port) < 65536),
         'Invalid port number'
       ),
-    VERCEL_URL: z.string().optional(),
 
     // Database
     DATABASE_URL: z
@@ -24,6 +28,12 @@ export const env = createEnv({
       ),
 
     // Auth
+    // The origin the app answers from. better-auth reads this name from the
+    // environment by itself; declared here so a value that is not a URL is
+    // refused at startup rather than at the first sign-in.
+    // http(s) said outright: `localhost:3000` is a URL to a parser — scheme
+    // `localhost`, path `3000` — and is the mistake most likely to be made.
+    BETTER_AUTH_URL: z.url({ protocol: /^https?$/ }).optional(),
     AUTH_SECRET: z.string(),
     APP_SECRET: z.string().min(1),
 
@@ -45,8 +55,6 @@ export const env = createEnv({
     // Blob Store
     BLOB_READ_WRITE_TOKEN: z.string().min(1),
 
-    // Upload Path
-
     // Resumable chat streams (optional). When unset, resume is disabled and
     // chat falls back to one-shot streaming. Use an Upstash Redis `rediss://`
     // URL (or any Redis URL).
@@ -56,17 +64,17 @@ export const env = createEnv({
     UMAMI_SCRIPT_URL: z.string().optional(),
     UMAMI_WEBSITE_ID: z.string().optional()
   },
-  // import.meta.env is what Vite fills in; process.env is what drizzle-kit and
-  // the deployed function see. Reading both means one schema serves both.
+  // process.env is what the server, drizzle-kit and the deployed function all
+  // see, so one schema serves the three.
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
-    VERCEL_URL: process.env.VERCEL_URL,
 
     // Database
     DATABASE_URL: process.env.DATABASE_URL,
 
     // Auth
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     AUTH_SECRET: process.env.AUTH_SECRET,
     APP_SECRET: process.env.APP_SECRET,
 
@@ -88,13 +96,14 @@ export const env = createEnv({
     // Blob Store
     BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
 
-    // Upload Path
-
     // Resumable chat streams
     REDIS_URL: process.env.REDIS_URL,
 
     // Analytics
     UMAMI_SCRIPT_URL: process.env.UMAMI_SCRIPT_URL,
     UMAMI_WEBSITE_ID: process.env.UMAMI_WEBSITE_ID
-  }
+  },
+  // `.env.example` lists every name with nothing after it, and a copy of it
+  // leaves most that way. Empty means unset, not an invalid value.
+  emptyStringAsUndefined: true
 });

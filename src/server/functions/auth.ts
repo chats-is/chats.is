@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 
+import { env } from '@/lib/env';
 import { getUser } from '@/server/session';
 
 /**
@@ -10,6 +11,15 @@ import { getUser } from '@/server/session';
  */
 export const requireUser = createServerFn({ method: 'GET' }).handler(async () =>
   getUser()
+);
+
+/** Which ways in are configured; the sign-in form shows only those. */
+export const getSignInMethods = createServerFn({ method: 'GET' }).handler(
+  async () => ({
+    emailEnabled: env.AUTH_EMAIL_ENABLED,
+    githubEnabled: env.AUTH_GITHUB_ENABLED,
+    googleEnabled: env.AUTH_GOOGLE_ENABLED
+  })
 );
 
 /**

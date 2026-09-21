@@ -1,12 +1,17 @@
 import {
   createRootRouteWithContext,
   HeadContent,
-  Scripts
+  Scripts,
+  useLocation
 } from '@tanstack/react-router';
 import { type QueryClient } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 
-import { DEFAULT_APP_NAME } from '@/lib/constant';
+import {
+  DEFAULT_APP_DESCRIPTION,
+  DEFAULT_APP_NAME,
+  DEFAULT_APP_SUBTITLE
+} from '@/lib/constant';
 import { settingsQueries } from '@/server/functions/settings';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
@@ -16,10 +21,30 @@ import { TailwindIndicator } from '@/components/tailwind-indicator';
 
 import appCss from '../styles.css?url';
 
+/**
+ * The page a preview runs in. It is a route like any other, so it sits under
+ * this one and inherits the document — but it is not a page anyone visits. It
+ * is opened once per artifact, inside a sandbox, to run code a model wrote.
+ * Read as a visit it costs a settings query each time and is counted by the
+ * analytics as a page view; neither belongs to it, and an analytics script has
+ * no business in the same document as that code.
+ */
+const PREVIEW_FRAME = '/artifact-preview-frame';
+
+const FRAME_SETTINGS = {
+  appName: DEFAULT_APP_NAME,
+  appSubtitle: DEFAULT_APP_SUBTITLE,
+  appDescription: DEFAULT_APP_DESCRIPTION,
+  umamiScriptUrl: null,
+  umamiWebsiteId: null
+};
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
-    loader: ({ context }) =>
-      context.queryClient.ensureQueryData(settingsQueries.app()),
+    loader: ({ context, location }) =>
+      location.pathname === PREVIEW_FRAME
+        ? FRAME_SETTINGS
+        : context.queryClient.ensureQueryData(settingsQueries.app()),
     head: ({ loaderData }) => {
       const { appName, appSubtitle, appDescription } = loaderData ?? {};
       return {
@@ -63,6 +88,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const { umamiScriptUrl, umamiWebsiteId } = Route.useLoaderData();
+  const isPreviewFrame = useLocation({
+    select: location => location.pathname === PREVIEW_FRAME
+  });
 
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
@@ -76,8 +104,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Providers attribute="class" defaultTheme="system" enableSystem>
           {children}
           <TailwindIndicator />
-          <RouterDevtools />
-          <Analytics />
+          {!isPreviewFrame && <RouterDevtools />}
+          {!isPreviewFrame && <Analytics />}
         </Providers>
         <Scripts />
       </body>
