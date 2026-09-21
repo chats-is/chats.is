@@ -67,8 +67,9 @@ export const settingsQueries = {
    * moving between pages ever asks for it again. Left at that, a tab kept what
    * it was given when it opened — a model switched on in the console was not
    * on offer, and one switched off went on being offered, until the browser
-   * was reloaded. So this one keeps itself current: it is looked at again when
-   * the window is returned to, and every few minutes while it is in view.
+   * was reloaded. So this one is looked at again when the window is returned
+   * to — and on a timer never: a tab left in view and untouched keeps what it
+   * has, which is the price of not having every open tab call home for ever.
    *
    * A minute's trust in between, so that flicking between windows is not a
    * request each time. Being a minute behind is safe: a model that has since
@@ -80,8 +81,7 @@ export const settingsQueries = {
       queryKey: [...settingsQueries.key.system()] as const,
       queryFn: () => getSystemSettings(),
       staleTime: 60 * 1000,
-      refetchOnWindowFocus: true,
-      refetchInterval: 5 * 60 * 1000
+      refetchOnWindowFocus: true
     }),
   /** The installation's own name and description, read by the root route. */
   app: () =>
