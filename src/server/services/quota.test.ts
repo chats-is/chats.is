@@ -5,7 +5,8 @@ import {
   assertQuota,
   getUserQuota,
   ModelAccessDeniedError,
-  QuotaExceededError
+  QuotaExceededError,
+  QuotaMissingError
 } from './quota';
 
 /**
@@ -146,8 +147,23 @@ describe('assertQuota', () => {
     expect(h.usageQueried).toBe(false);
   });
 
-  it('returns when no caps are configured (free use)', async () => {
+  /**
+   * A quota is what lets someone spend. No override, no plan quota and no
+   * default is not "unlimited" — that is a quota too, and has to be given.
+   */
+  it('refuses a user with no quota at all', async () => {
     givenQuota(null);
+    await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaMissingError);
+    expect(h.usageQueried).toBe(false);
+  });
+
+  it('passes a quota that sets no caps, without reading usage', async () => {
+    givenQuota({
+      isUnlimited: false,
+      allowedModelIds: [],
+      fiveHour: null,
+      sevenDay: null
+    });
     await expect(assertQuota('u1')).resolves.toBeUndefined();
     expect(h.usageQueried).toBe(false);
   });

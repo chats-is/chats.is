@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
+import { CircleAlert, Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
 
 import { pageTitle } from '@/lib/head';
 import { getConsoleOverview } from '@/server/functions/overview';
@@ -15,10 +15,28 @@ export const Route = createFileRoute('/console/')({
 });
 
 function ConsoleHome() {
-  const { providers, models, prompts, settings, users } = Route.useLoaderData();
+  const { hasDefaultQuota, providers, models, prompts, settings, users } =
+    Route.useLoaderData();
 
   return (
     <div className="space-y-6">
+      {!hasDefaultQuota && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p>
+            No default quota is set. Anyone without a quota of their own, or a
+            plan that has one, cannot use the app. Create one under{' '}
+            <Link to="/console/quotas" className="font-medium underline">
+              Quotas
+            </Link>{' '}
+            and choose it as the default in{' '}
+            <Link to="/console/settings" className="font-medium underline">
+              Settings
+            </Link>
+            .
+          </p>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link to="/console/providers">
           <Card className="transition-colors hover:bg-accent">

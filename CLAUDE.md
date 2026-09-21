@@ -56,8 +56,10 @@ Configuration is a local `.env`, and `.env.example` lists every variable. Four a
 `BLOB_READ_WRITE_TOKEN`. The rest are optional — `REDIS_URL` turns on resumable streams, and each login
 method stays off until enabled. Variables the browser reads are prefixed `VITE_` and declared
 separately in `src/lib/env.public.ts`, apart from the server schema in `src/lib/env.ts`; today that is
-`VITE_UPLOAD_PATH`, the blob prefix uploads are written under, which defaults to `uploads`. A fresh install has no providers or models, so the first account, which
-becomes an admin, has to add them in `/console` before anything can answer.
+`VITE_UPLOAD_PATH`, the blob prefix uploads are written under, which defaults to `uploads`. A fresh install has no providers, models or quotas, so the first account, which
+becomes an admin, has to add them in `/console` before anything can answer — and a
+quota is required: a user with no quota of their own, no plan that carries one, and
+no default set for the install is refused.
 
 ## Stack
 

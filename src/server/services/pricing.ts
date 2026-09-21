@@ -445,6 +445,62 @@ export async function listPricingWithModels(
   };
 }
 
+/** The rates that decide which way a model bills. */
+type BillingStyles = Partial<
+  Record<
+    | 'input'
+    | 'output'
+    | 'image'
+    | 'video'
+    | 'videoSeconds'
+    | 'audioCharacters'
+    | 'audioInput'
+    | 'audioOutput'
+    | 'audioSeconds',
+    unknown
+  >
+>;
+
+/**
+ * Why a set of rates cannot be billed from, or null when it can.
+ *
+ * Each capability bills in exactly one style, and a row priced in two has no
+ * defined cost — the cost engine picks one and the other is silently ignored.
+ * Shared by the console form and the price sync, since either can write a row.
+ */
+export function pricingStyleConflict(
+  capability: 'chat' | 'image' | 'video' | 'audio',
+  p: BillingStyles
+): string | null {
+  // Image models bill EITHER per-image OR per-token, never both — the two
+  // styles are mutually exclusive (see calculateImageCost).
+  if (
+    capability === 'image' &&
+    p.image != null &&
+    (p.input != null || p.output != null)
+  ) {
+    return 'Image pricing must be either Per image OR token-based (Input + Output), not both.';
+  }
+
+  // Audio is one-of-three: per-character (classic TTS), per-token, or
+  // per-second (STT).
+  const audioStyles = [
+    p.audioCharacters != null,
+    p.audioInput != null || p.audioOutput != null,
+    p.audioSeconds != null
+  ].filter(Boolean).length;
+  if (capability === 'audio' && audioStyles > 1) {
+    return 'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per second.';
+  }
+
+  // Video is the same either/or: per-video (flat) OR per-second.
+  if (capability === 'video' && p.video != null && p.videoSeconds != null) {
+    return 'Video pricing must be either Per video OR Per second, not both.';
+  }
+
+  return null;
+}
+
 /**
  * Create or replace a model's pricing. One row per model.
  *
@@ -464,37 +520,8 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
   // gate share the same rule.
   const cap = model.capability;
 
-  // Image models bill EITHER per-image OR per-token, never both — the two
-  // styles are mutually exclusive (see calculateImageCost).
-  if (
-    cap === 'image' &&
-    data.image != null &&
-    (data.input != null || data.output != null)
-  ) {
-    throw new PublicError(
-      'Image pricing must be either Per image OR token-based (Input + Output), not both.'
-    );
-  }
-
-  // Audio is one-of-three: per-character (classic TTS), per-token, or
-  // per-second (STT).
-  const audioStyles = [
-    data.audioCharacters != null,
-    data.audioInput != null || data.audioOutput != null,
-    data.audioSeconds != null
-  ].filter(Boolean).length;
-  if (cap === 'audio' && audioStyles > 1) {
-    throw new PublicError(
-      'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per second.'
-    );
-  }
-
-  // Video is the same either/or: per-video (flat) OR per-second.
-  if (cap === 'video' && data.video != null && data.videoSeconds != null) {
-    throw new PublicError(
-      'Video pricing must be either Per video OR Per second, not both.'
-    );
-  }
+  const conflict = pricingStyleConflict(cap, data);
+  if (conflict) throw new PublicError(conflict);
 
   const missing = pricingMissingFields(
     cap,

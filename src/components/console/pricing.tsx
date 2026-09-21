@@ -557,6 +557,7 @@ export default function PricingPage() {
       let created = 0;
       let updated = 0;
       let unchanged = 0;
+      const skipped: string[] = [];
       for (const source of previewSources) {
         const from = groups[source];
         if (from.length === 0) continue;
@@ -568,6 +569,7 @@ export default function PricingPage() {
         created += result.created;
         updated += result.updated;
         unchanged += result.unchanged;
+        skipped.push(...result.skipped.map(entry => entry.modelId));
       }
       queryClient.invalidateQueries({
         queryKey: pricingQueries.key.listWithModels()
@@ -576,6 +578,11 @@ export default function PricingPage() {
       toast.success(
         `Applied: ${created} new, ${updated} updated${unchanged ? `, ${unchanged} unchanged` : ''}`
       );
+      if (skipped.length > 0) {
+        toast.warning(
+          `Left as they were, because the source's prices would have stopped them working: ${skipped.join(', ')}`
+        );
+      }
     } catch {
       // Toast already shown in onError.
     }

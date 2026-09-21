@@ -200,8 +200,32 @@ export class QuotaExceededError extends Error {
   }
 }
 
+/**
+ * Nobody has given this user a quota: no override, no plan that carries one,
+ * and no default for the install.
+ */
+export class QuotaMissingError extends Error {
+  constructor() {
+    super(
+      'Your account has no usage quota yet. Ask the administrator to assign one.'
+    );
+    this.name = 'QuotaMissingError';
+  }
+}
+
 export async function assertQuota(userId: string): Promise<void> {
   const resolved = await getResolvedQuota(userId);
+
+  // A quota is what lets someone spend. Without one there is nothing to check
+  // against, and that is a refusal rather than a pass — an install is not open
+  // to everyone who signs up until its operator says how much each may use.
+  // Unlimited use is a quota too, and is granted the same way: by making one.
+  //
+  // It also settles what a failed read means. The default's id comes from
+  // settings, which answer "unset" when the database cannot be reached; read
+  // as a pass, a bad minute would have lifted every limit there is.
+  if (resolved.source === 'none') throw new QuotaMissingError();
+
   if (resolved.isUnlimited) return;
 
   const capFiveHour = resolved.fiveHour;

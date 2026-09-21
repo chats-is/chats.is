@@ -1,9 +1,17 @@
 import '@tanstack/react-start/server-only';
 
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { models, prompts, providers, settings, users } from '@/db/schema';
+import {
+  models,
+  prompts,
+  providers,
+  quotas,
+  settings,
+  users
+} from '@/db/schema';
+import { getDefaultQuotaId } from '@/server/services/settings';
 
 /**
  * The nine numbers the console's home page shows, counted in one round trip.
@@ -61,7 +69,19 @@ export async function getConsoleOverview() {
         .from(users)
     ]);
 
+  // Whether the install has a default quota that still exists. Without one,
+  // anyone with no quota of their own and no plan that carries one is refused
+  // at the gate — which on a new install is everybody, the admin included.
+  const defaultQuotaId = await getDefaultQuotaId();
+  const [defaultQuota] = defaultQuotaId
+    ? await db
+        .select({ id: quotas.id })
+        .from(quotas)
+        .where(eq(quotas.id, defaultQuotaId))
+    : [];
+
   return {
+    hasDefaultQuota: Boolean(defaultQuota),
     providers: providerRows[0] ?? { total: 0, enabled: 0 },
     models: modelRows[0] ?? { total: 0, enabled: 0 },
     prompts: promptRows[0] ?? { total: 0, public: 0, private: 0 },

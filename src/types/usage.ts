@@ -88,13 +88,13 @@ export type UserUsageKpi = {
   reasoningTokens: number;
 };
 
-/** User-facing log row shape. No cost field. */
+/** User-facing log row shape. No cost, and no provider: which upstream account
+ *  served a request — and what the operator chose to call it — is how the
+ *  install is run, not something about the user's own usage. */
 export type UserUsageRow = {
   id: string;
   createdAt: Date | string;
   modelId: string | null;
-  providerId: string | null;
-  providerName: string | null;
   capability: 'chat' | 'image' | 'video' | 'audio';
   inputTokens: number;
   outputTokens: number;

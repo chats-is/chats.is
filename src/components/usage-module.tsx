@@ -160,8 +160,9 @@ function bucketByLocalDay(
       groupKey = r.modelId ?? 'unknown';
       groupLabel = r.modelId ?? 'unknown';
     } else if (groupBy === 'provider') {
-      groupKey = r.providerId ?? 'unknown';
-      groupLabel = r.providerName ?? 'Unknown';
+      // Only the console's rows name a provider; a user's own do not.
+      groupKey = ('providerId' in r ? r.providerId : null) ?? 'unknown';
+      groupLabel = ('providerName' in r ? r.providerName : null) ?? 'Unknown';
     } else {
       groupKey = r.capability;
       groupLabel = r.capability;

@@ -6,7 +6,8 @@ import {
   assertModelAccess,
   assertQuota,
   ModelAccessDeniedError,
-  QuotaExceededError
+  QuotaExceededError,
+  QuotaMissingError
 } from '@/server/services/quota';
 
 export type PreflightResult =
@@ -63,6 +64,14 @@ export async function preflightCheck(args: {
         message: err.message,
         kind: 'model-access'
       };
+    }
+    if (err instanceof QuotaMissingError) {
+      // For the operator: the reader cannot fix this, and the log is where
+      // someone who can will look.
+      console.error(
+        `[preflight] user=${args.userId} has no quota: no override, no plan quota, and no default is set`
+      );
+      return { ok: false, status: 403, message: err.message, kind: 'quota' };
     }
     if (err instanceof QuotaExceededError) {
       // Plain message only — the live UsageLimitAlert (powered by

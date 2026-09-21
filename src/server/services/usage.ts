@@ -296,7 +296,14 @@ async function queryUsageRowsUser(args: {
   userId: string;
 }): Promise<UserUsageRow[]> {
   const rows = await queryUsageRows(args);
-  return rows.map(({ cost: _cost, ...rest }) => rest);
+  return rows.map(
+    ({
+      cost: _cost,
+      providerId: _providerId,
+      providerName: _providerName,
+      ...rest
+    }) => rest
+  );
 }
 
 async function queryKpi(args: { since: Date; userId?: string }) {

@@ -5,7 +5,8 @@ import {
   assertModelAccess,
   assertQuota,
   ModelAccessDeniedError,
-  QuotaExceededError
+  QuotaExceededError,
+  QuotaMissingError
 } from '@/server/services/quota';
 
 import { preflightCheck } from './preflight';
@@ -40,9 +41,16 @@ vi.mock('@/server/services/quota', () => {
       this.resetAt = detail.resetAt;
     }
   }
+  class QuotaMissingError extends Error {
+    constructor() {
+      super('Your account has no usage quota yet.');
+      this.name = 'QuotaMissingError';
+    }
+  }
   return {
     ModelAccessDeniedError,
     QuotaExceededError,
+    QuotaMissingError,
     assertModelAccess: vi.fn(),
     assertQuota: vi.fn()
   };
@@ -95,6 +103,12 @@ describe('preflightCheck', () => {
     );
     const result = await preflightCheck(args);
     expect(result).toMatchObject({ ok: false, status: 429 });
+  });
+
+  it('refuses a user nobody has given a quota, and says so', async () => {
+    mockAssertQuota.mockRejectedValue(new QuotaMissingError());
+    const result = await preflightCheck(args);
+    expect(result).toMatchObject({ ok: false, status: 403, kind: 'quota' });
   });
 
   it('rethrows unexpected errors', async () => {

@@ -60,6 +60,9 @@ export type PricingSyncResult = {
   unchanged: number;
   /** modelIds in our DB that the remote source had no entry for. */
   notFound: string[];
+  /** Models left as they were, because what the source offered would have
+   *  stopped them working — and why. */
+  skipped: Array<{ modelId: string; reason: string }>;
 };
 
 const pricingSourceSchema = z.enum(['manual', 'models.dev', 'llm-metadata']);

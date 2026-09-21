@@ -49,7 +49,11 @@ export const getAllModels = perRequest(
         // Enabled bindings ordered by priority, the provider enabled too.
         const providersList: ProviderBinding[] = (m.providers ?? [])
           .filter(b => b.isEnabled && b.provider?.isEnabled)
-          .sort((a, b) => a.priority - b.priority);
+          // Two bindings may share a priority — the form takes any number —
+          // and the rows arrive in no promised order, so which provider a
+          // model reached first could change from one request to the next.
+          // The id settles a tie the same way every time.
+          .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
 
         return { ...m, providers: providersList };
       })
@@ -127,7 +131,10 @@ export async function listModels(filter: z.infer<typeof modelListSchema>) {
       with: {
         providers: {
           with: { provider: true },
-          orderBy: (binding, { asc }) => [asc(binding.priority)]
+          orderBy: (binding, { asc }) => [
+            asc(binding.priority),
+            asc(binding.id)
+          ]
         }
       }
     }),

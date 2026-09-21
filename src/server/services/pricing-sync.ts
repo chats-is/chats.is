@@ -11,6 +11,10 @@ import { BedrockModels, VertexAIModels } from '@/lib/constant';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, models } from '@/db/schema';
+import {
+  pricingMissingFields,
+  pricingStyleConflict
+} from '@/server/services/pricing';
 
 const SOURCE_URLS: Record<PricingSource, string> = {
   'models.dev': 'https://models.dev/api.json',
@@ -159,7 +163,7 @@ export async function previewPricingSync(args: {
       // would actually serve the model first.
       providers: {
         with: { provider: true },
-        orderBy: (binding, { asc }) => [asc(binding.priority)]
+        orderBy: (binding, { asc }) => [asc(binding.priority), asc(binding.id)]
       }
     }
   });
@@ -223,7 +227,8 @@ export async function runPricingSync(args: {
     updated: 0,
     created: 0,
     unchanged: 0,
-    notFound: []
+    notFound: [],
+    skipped: []
   };
 
   const targets = await db.query.models.findMany({
@@ -264,25 +269,81 @@ export async function runPricingSync(args: {
       continue;
     }
 
+    // A rate the source does not list is left as it is, not cleared. The
+    // sources are partial — one may know a model's input price and not its
+    // output — and the row may hold what an admin entered by hand; a sync that
+    // wrote null over it took a working model out of service, since a chat
+    // model with no output rate is refused at the gate.
+    const kept = (
+      remoteValue: number | undefined,
+      key:
+        | 'input'
+        | 'output'
+        | 'cacheRead'
+        | 'cacheWrite'
+        | 'reasoning'
+        | 'image'
+        | 'audioInput'
+        | 'audioOutput'
+    ): string | null => toNumeric(remoteValue) ?? existing?.[key] ?? null;
+
     const valuesToWrite = {
       modelId: m.modelId,
-      input: toNumeric(remote.cost.input),
-      output: toNumeric(remote.cost.output),
-      // Cache R/W default to "0" (free) when the remote doesn't list them,
-      // so the cost engine doesn't fall back to input rate.
-      cacheRead: toNumeric(remote.cost.cache_read) ?? '0',
-      cacheWrite: toNumeric(remote.cost.cache_write) ?? '0',
+      input: kept(remote.cost.input, 'input'),
+      output: kept(remote.cost.output, 'output'),
+      // Cache R/W default to "0" (free) when neither the remote nor the row
+      // has them, so the cost engine doesn't fall back to input rate.
+      cacheRead: kept(remote.cost.cache_read, 'cacheRead') ?? '0',
+      cacheWrite: kept(remote.cost.cache_write, 'cacheWrite') ?? '0',
       // Reasoning stays null when not provided — calc falls back to output rate.
-      reasoning: toNumeric(remote.cost.reasoning),
-      image: toNumeric(remote.cost.per_image),
+      reasoning: kept(remote.cost.reasoning, 'reasoning'),
+      image: kept(remote.cost.per_image, 'image'),
       // Token-based audio rates (gpt-4o-mini-tts, omni). Classic TTS bills per
       // character — the remote sources don't list a per-character rate, so
       // audioCharacters is configured manually (left untouched by sync).
-      audioInput: toNumeric(remote.cost.input_audio),
-      audioOutput: toNumeric(remote.cost.output_audio),
+      audioInput: kept(remote.cost.input_audio, 'audioInput'),
+      audioOutput: kept(remote.cost.output_audio, 'audioOutput'),
       source: args.source,
       updatedAt: new Date()
     };
+
+    // One case where what was there has to give way. An image model bills per
+    // image or per token, never both, and which one is the provider's to say.
+    // When the source names one style completely and only that one, it has
+    // changed how the model is billed; keeping the other rate beside it would
+    // make every sync from then on a conflict, skipped for ever, with the
+    // model charged at a style its provider has dropped.
+    if (m.capability === 'image') {
+      const perToken =
+        remote.cost.input !== undefined && remote.cost.output !== undefined;
+      const perImage = remote.cost.per_image !== undefined;
+      if (perToken && !perImage) valuesToWrite.image = null;
+      if (perImage && !perToken) {
+        valuesToWrite.input = null;
+        valuesToWrite.output = null;
+      }
+    }
+
+    // Keeping what was there can still leave a row priced two ways at once —
+    // per image by hand, per token from the source. A model that works today
+    // is not traded for one that does not: it is left alone and reported.
+    if (existing) {
+      const merged = { ...existing, ...valuesToWrite };
+      const direction = { transcription: m.supportsTranscription ?? false };
+      const worked =
+        pricingMissingFields(m.capability, existing, direction).length === 0 &&
+        !pricingStyleConflict(m.capability, existing);
+      const conflict = pricingStyleConflict(m.capability, merged);
+      const missing = pricingMissingFields(m.capability, merged, direction);
+
+      if (worked && (conflict || missing.length > 0)) {
+        result.skipped.push({
+          modelId: m.modelId,
+          reason: conflict ?? `Would be left without: ${missing.join(', ')}`
+        });
+        continue;
+      }
+    }
 
     if (existing) {
       // Numeric compare — DB stores "0.0010000000" but remote returns "0.001".
