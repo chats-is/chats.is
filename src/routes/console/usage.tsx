@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
+import { loadForVisit } from '@/lib/route-loader';
 import { modelQueries } from '@/server/functions/model';
 import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
 import Usage from '@/components/console/usage';
@@ -20,8 +21,8 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute('/console/usage')({
   validateSearch: searchSchema,
-  loader: ({ context }) =>
-    context.queryClient.fetchQuery(modelQueries.forSelect()),
+  loader: ({ context, cause }) =>
+    loadForVisit(context.queryClient, modelQueries.forSelect(), cause),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Usage') }] }),
   pendingComponent: () => <ConsoleUsageSkeleton />,
   component: Usage

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
+import { loadForVisit } from '@/lib/route-loader';
 import { quotaQueries } from '@/server/functions/quota';
 import { usageQueries } from '@/server/functions/usage';
 import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
@@ -22,13 +23,17 @@ export const Route = createFileRoute('/console/users/$userId')({
   validateSearch: searchSchema,
   // Only what the route parameter alone decides. The usage figures are cut by
   // a window the page picks after it mounts, so they stay with the component.
-  loader: ({ context, params }) =>
+  loader: ({ context, params, cause }) =>
     Promise.all([
-      context.queryClient.fetchQuery(
-        quotaQueries.byUser({ userId: params.userId })
+      loadForVisit(
+        context.queryClient,
+        quotaQueries.byUser({ userId: params.userId }),
+        cause
       ),
-      context.queryClient.fetchQuery(
-        usageQueries.userModels({ userId: params.userId })
+      loadForVisit(
+        context.queryClient,
+        usageQueries.userModels({ userId: params.userId }),
+        cause
       )
     ]),
   head: ({ matches }) => ({

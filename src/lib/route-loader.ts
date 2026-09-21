@@ -8,22 +8,29 @@ import {
 /**
  * Load the query a page is about to read, for the visit that is happening.
  *
- * Arriving at a page waits for it, so the page is drawn once and with data.
- * Staying on it — another page of the table, a filter, a letter typed into
- * search — does not: the rows already on screen stay where they are while the
- * next ones load, and a loader that waited would swap them for a placeholder
- * on every keystroke. `cause` is the router's word for which of the two this
- * is, and it goes by the route, so a change of search on the same page stays.
+ * A page opens from what is already held and is brought up to date behind the
+ * scenes: the read is started here and not waited for, and the component
+ * reading the same key redraws when it lands. Only with nothing held at all is
+ * there something to wait for, and then the page waits — drawn once, with
+ * data, rather than empty and then filled.
+ *
+ * Staying on a page — another page of the table, a filter, a letter typed into
+ * search — never waits, held or not: the rows on screen stay where they are
+ * while the next ones load, and a loader that waited would swap them for a
+ * placeholder on every keystroke. `cause` is the router's word for it, and it
+ * goes by the route, so a change of search on the same page is staying.
  */
 export function loadForVisit<TData, TKey extends ReadonlyArray<unknown>>(
   queryClient: QueryClient,
   options: FetchQueryOptions<TData, Error, TData, TKey>,
   cause: 'enter' | 'stay' | 'preload'
 ): Promise<TData | void> {
-  if (cause === 'stay') {
+  const held = queryClient.getQueryData(options.queryKey) !== undefined;
+
+  if (cause === 'stay' || held) {
     // Started, and not handed back. A promise returned from a loader is one
-    // the router waits on — returning this one made every page turn wait out
-    // its request behind the placeholder, exactly as a first visit does.
+    // the router waits on — returning this one would make the page wait out
+    // its request behind the placeholder, which is what a first visit does.
     void queryClient.prefetchQuery(options);
     return Promise.resolve();
   }
@@ -31,15 +38,29 @@ export function loadForVisit<TData, TKey extends ReadonlyArray<unknown>>(
 }
 
 /**
+ * For the one kind of page that must never be drawn from an old copy: spread
+ * into the route's `loader` beside its `handler`, and have the handler await
+ * `fetchQuery`.
+ *
+ * Coming back to a page it has shown, the router draws it at once and runs the
+ * loader behind it. That is right for nearly everything here — a table that is
+ * a moment behind corrects itself as the read lands. It is wrong for a form
+ * that is about to be saved: the console's settings are edited as a whole, and
+ * saving a form opened on last visit's values writes those values back over
+ * whatever changed since.
+ */
+export const WAIT_FOR_FRESH = { staleReloadMode: 'blocking' } as const;
+
+/**
  * For the two galleries — the library and the prompts — which open from what
  * is already held and are brought up to date behind the page. Spread into the
  * route's `loader` beside its `handler`, with `openGallery` as the handler.
  *
- * Every other page waits for a fresh answer before it is drawn, and that is
- * the router's default here. These two are the exception because of what they
- * hold: a list that only grows at the top. Out of date means a new item is
- * missing for a moment, never that something shown is wrong — and they are
- * pages a reader flicks to and from, where the wait was the whole cost.
+ * This is the router's own default, and is said out loud on these two routes
+ * because of what they hold: a list that only grows at the top. Out of date
+ * means a new item is missing for a moment, never that something shown is
+ * wrong — and they are pages a reader flicks to and from, where a wait was the
+ * whole cost.
  */
 export const OPEN_FROM_CACHE = { staleReloadMode: 'background' } as const;
 

@@ -44,6 +44,33 @@ describe('loadForVisit', () => {
     );
   });
 
+  /**
+   * Coming back to a page whose rows are already held: they are drawn at once,
+   * and the read that brings them up to date runs behind the page.
+   */
+  it('opens from what is held, and refreshes it without being waited for', async () => {
+    const client = new QueryClient();
+    let finish: (rows: string) => void = () => {};
+    const queryFn = vi.fn(
+      () => new Promise<string>(resolve => (finish = resolve))
+    );
+    const options = table(queryFn);
+    client.setQueryData(options.queryKey, 'last visit', {
+      updatedAt: Date.now() - 60_000
+    });
+
+    // Settles while the read is still out — this is what the router waits on.
+    await loadForVisit(client, options, 'enter');
+
+    expect(queryFn).toHaveBeenCalledOnce();
+    expect(client.getQueryData(options.queryKey)).toBe('last visit');
+
+    finish('this visit');
+    await vi.waitFor(() =>
+      expect(client.getQueryData(options.queryKey)).toBe('this visit')
+    );
+  });
+
   it('lets a failed read reach the route when arriving, not when staying', async () => {
     const failing = () => Promise.reject(new Error('down'));
     const client = new QueryClient({

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
+import { WAIT_FOR_FRESH } from '@/lib/route-loader';
 import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import { settingsQueries } from '@/server/functions/settings';
@@ -17,12 +18,15 @@ export const Route = createFileRoute('/console/settings')({
    * disables itself, which is the right answer for an installation with no
    * models and the wrong one for models still on their way.
    */
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.fetchQuery(settingsQueries.list()),
-      context.queryClient.fetchQuery(modelQueries.forSelect()),
-      context.queryClient.fetchQuery(quotaQueries.listForSelect())
-    ]),
+  loader: {
+    ...WAIT_FOR_FRESH,
+    handler: ({ context }) =>
+      Promise.all([
+        context.queryClient.fetchQuery(settingsQueries.list()),
+        context.queryClient.fetchQuery(modelQueries.forSelect()),
+        context.queryClient.fetchQuery(quotaQueries.listForSelect())
+      ])
+  },
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Settings') }]
   }),
