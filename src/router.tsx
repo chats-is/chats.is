@@ -93,6 +93,17 @@ export function getRouter() {
     // thirty seconds and not run the loader again on the click. Freshness is
     // the query cache's to decide, so every load goes through to it.
     defaultPreloadStaleTime: 0,
+    // And the router waits for that load. It keeps the pages it has shown for
+    // half an hour, and coming back to one it would otherwise draw it at once
+    // and run the loader behind it — so a loader that awaits fresh data awaited
+    // it for nobody: the page was already up, reading the last visit's rows out
+    // of the query cache, and swapped them a moment later. Opening a page asks,
+    // and this is what makes the page wait for the answer.
+    //
+    // It costs nothing where nothing is asked: a layout that stays put while
+    // the page under it changes is not reloaded at all, and a loader that only
+    // reads what is already cached returns at once.
+    defaultStaleReloadMode: 'blocking',
     // How long a load may take before it is worth saying so. Under this, the
     // placeholder never appears and the page changes once; over it, the
     // placeholder stands in until the data lands.
