@@ -19,8 +19,7 @@ export const Route = createFileRoute('/api/files/upload')({
  * Signs a token for one upload, which the browser then sends straight to blob
  * storage — and receives the completion callback afterwards. No file passes
  * through here: a Vercel function cannot receive more than 4.5 MB of request
- * body on any plan, and video does not fit. Nothing here touches the bytes: a Vercel function cannot receive
- * more than 4.5 MB of request body on any plan, and video does not fit.
+ * body on any plan, and video does not fit.
  *
  * The token is the only thing standing between the store and the internet, so
  * everything is decided here, before it is signed:

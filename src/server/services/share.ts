@@ -100,12 +100,24 @@ export async function listShares(
  * holds it.
  */
 export async function getSharedChat(id: string) {
+  const link = await db.query.shares.findFirst({
+    where: eq(shares.id, id),
+    columns: { userId: true }
+  });
+  if (!link) return undefined;
+
+  // Only what the person who shared it wrote or was answered with. A chat's
+  // rows are its owner's by construction; this is what holds if one ever is
+  // not, since nobody reading a share link could tell.
+  const owner = link.userId;
+
   const share = await db.query.shares.findFirst({
     where: eq(shares.id, id),
     with: {
       chat: {
         with: {
           messages: {
+            where: (messages, { eq }) => eq(messages.userId, owner),
             orderBy: (messages, { asc }) => [asc(messages.createdAt)],
             columns: {
               chatId: false,
@@ -113,6 +125,7 @@ export async function getSharedChat(id: string) {
             }
           },
           artifacts: {
+            where: (artifacts, { eq }) => eq(artifacts.userId, owner),
             orderBy: (artifacts, { asc }) => [asc(artifacts.createdAt)],
             columns: {
               userId: false
@@ -120,7 +133,8 @@ export async function getSharedChat(id: string) {
           }
         },
         columns: {
-          userId: false
+          userId: false,
+          streamId: false
         }
       }
     }

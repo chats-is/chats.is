@@ -10,6 +10,8 @@ import {
   userSearchSchema
 } from '@/types/user';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
+import { PublicError } from '@/server/public-error';
+import { isOwnBlobUrl } from '@/server/services/blob';
 import * as users from '@/server/services/user';
 
 export const getMe = createServerFn({ method: 'GET' })
@@ -22,7 +24,12 @@ export const getMe = createServerFn({ method: 'GET' })
 export const updateProfile = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .validator(profileUpdateSchema)
-  .handler(({ data, context }) => users.updateProfile(context.user.id, data));
+  .handler(({ data, context }) => {
+    if (data.image && !isOwnBlobUrl(data.image)) {
+      throw new PublicError('Upload a picture to use as your avatar');
+    }
+    return users.updateProfile(context.user.id, data);
+  });
 
 export const listUsers = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])

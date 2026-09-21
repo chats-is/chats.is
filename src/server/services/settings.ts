@@ -3,6 +3,7 @@ import '@tanstack/react-start/server-only';
 import { eq, inArray } from 'drizzle-orm';
 import { type z } from 'zod';
 
+import { type Model } from '@/types';
 import { type settingSchema } from '@/types/settings';
 import {
   DEFAULT_APP_DESCRIPTION,
@@ -162,8 +163,42 @@ export const getAppSettings = perRequest('getAppSettings', async () => {
   };
 });
 
+/**
+ * A model as a browser may hold it.
+ *
+ * The catalogue is read with each model's providers attached, and a provider
+ * row is where the key lives — encrypted, but this is sent to every page,
+ * including a share link opened by someone with no account. So what leaves is
+ * named field by field: the provider's identity, which the menus draw, and
+ * nothing of how it is reached. The model's system prompt and sampling
+ * parameters are the operator's, and the server is the only reader they have.
+ */
+function toClientModel(model: Model): Model {
+  const { systemPrompt: _systemPrompt, apiParams: _apiParams, ...rest } = model;
+
+  return {
+    ...rest,
+    providers: (model.providers ?? []).map(binding => ({
+      id: binding.id,
+      modelId: binding.modelId,
+      providerId: binding.providerId,
+      priority: binding.priority,
+      isEnabled: binding.isEnabled,
+      provider: binding.provider
+        ? {
+            id: binding.provider.id,
+            name: binding.provider.name,
+            type: binding.provider.type,
+            image: binding.provider.image,
+            isEnabled: binding.provider.isEnabled
+          }
+        : null
+    }))
+  };
+}
+
 export async function getSystemSettings() {
-  const [allModels, values] = await Promise.all([
+  const [models, values] = await Promise.all([
     getAllModels(),
     getSettings([
       'speech.enabled',
@@ -177,6 +212,7 @@ export async function getSystemSettings() {
       'default.stt.modelId'
     ])
   ]);
+  const allModels = models.map(toClientModel);
 
   return {
     speechEnabled: values['speech.enabled'] === 'true',

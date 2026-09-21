@@ -70,20 +70,6 @@ export async function listProvidersForSelect() {
   });
 }
 
-/** The enabled providers, without the key column at all. */
-export async function listEnabledProviders() {
-  return await db.query.providers.findMany({
-    where: eq(providers.isEnabled, true),
-    orderBy: (providers, { asc, desc }) => [
-      asc(providers.displayOrder),
-      desc(providers.createdAt)
-    ],
-    columns: {
-      apiKey: false // Mask API key for public access
-    }
-  });
-}
-
 export async function createProvider(
   input: z.infer<typeof providerCreateSchema>
 ) {

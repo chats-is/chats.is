@@ -246,6 +246,12 @@ export function ArtifactPreviewFrameClient() {
       // but this rejects messages from any other window/script.
       if (event.source !== window.parent) return;
       if (event.data?.type !== 'artifact-preview-render') return;
+      // This page runs whatever it is sent. That is only safe inside the
+      // sandbox the app puts it in, where the origin is opaque. The sandbox is
+      // an attribute of the embedding iframe, though, not of this page — so
+      // another site can frame this address without one, and what it sent
+      // would then run as this origin. Opaque or nothing.
+      if (window.origin !== 'null') return;
 
       setRuntimeError(null);
       setRenderNonce(nonce => nonce + 1);

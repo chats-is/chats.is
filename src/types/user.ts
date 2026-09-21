@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isTrustedMediaUrl } from '@/lib/chat-media-urls';
+
 import { paginationSchema } from './pagination';
 
 /**
@@ -8,7 +10,14 @@ import { paginationSchema } from './pagination';
  */
 export const profileUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  image: z.url().optional()
+  // A picture the user uploaded here. An account that signed in with Google
+  // or GitHub has theirs set by that sign-in, which does not pass through
+  // this. Any address at all would be one the console then loads on every
+  // admin's screen — a request to a host of the user's choosing, from them.
+  image: z
+    .url()
+    .refine(isTrustedMediaUrl, 'Upload a picture to use as your avatar')
+    .optional()
 });
 
 /** The console's user table: narrowed by name or email, then cut to one page. */

@@ -503,21 +503,13 @@ export function ArtifactRuntimePreview({
     const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
     const content = artifact.content ?? '';
 
-    // A self-closing <head/> must be expanded first — the open-tag regex below
-    // would match it and drop the meta OUTSIDE the head, where browsers ignore
-    // an http-equiv CSP entirely.
-    if (/<head[^>]*\/>/i.test(content)) {
-      return content.replace(
-        /<head([^>]*)\/>/i,
-        (_match, attrs: string) => `<head${attrs}>${meta}</head>`
-      );
-    }
-    if (/<head[^>]*>/i.test(content)) {
-      return content.replace(/(<head[^>]*>)/i, `$1${meta}`);
-    }
-    if (/<html[^>]*>/i.test(content)) {
-      return content.replace(/(<html[^>]*>)/i, `$1<head>${meta}</head>`);
-    }
+    // The policy goes in a head of our own, ahead of everything the artifact
+    // wrote. Finding the artifact's <head> to put it in means reading HTML
+    // with a pattern, and the first `<head>` in the text need not be a tag —
+    // inside a comment it takes the policy with it, and the page runs with
+    // none. A parser that meets a second <html>, <head> or <body> keeps their
+    // contents and folds their attributes into the ones it has, so the
+    // document renders as written, under a policy it had no part in placing.
     return `<!DOCTYPE html><html><head>${meta}</head><body>${content}</body></html>`;
   }, [artifact.content]);
 

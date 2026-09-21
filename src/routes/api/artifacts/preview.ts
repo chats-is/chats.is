@@ -3,15 +3,20 @@ import { createFileRoute } from '@tanstack/react-router';
 import ts from 'typescript';
 import { z } from 'zod';
 
+import { type User } from '@/types';
 import { looksLikeJsx, validatePreviewImports } from '@/lib/artifact';
 import { normalizeCodeLanguage } from '@/lib/code-language';
-import { getUser } from '@/server/session';
+import { authedRequest } from '@/server/middleware';
 
 export const Route = createFileRoute('/api/artifacts/preview')({
   server: {
+    middleware: [authedRequest],
     handlers: { POST }
   }
 });
+
+/** The most source one preview may carry, across all its files. */
+const MAX_TOTAL_CODE = 1_000_000;
 
 const requestSchema = z.object({
   entryPath: z.string().min(1).max(500),
@@ -25,6 +30,16 @@ const requestSchema = z.object({
     )
     .min(1)
     .max(50)
+    // Each file has a ceiling and so does their number, which still multiply
+    // out to ten megabytes — all of it compiled in one go, on the thread
+    // that serves everyone else. An artifact is a component and a few
+    // helpers; a whole one is a small fraction of this.
+    .refine(
+      files =>
+        files.reduce((total, file) => total + file.code.length, 0) <=
+        MAX_TOTAL_CODE,
+      { message: 'Preview is too large' }
+    )
 });
 
 type PreviewInput = z.infer<typeof requestSchema>;
@@ -40,8 +55,21 @@ const normalizePreviewLanguage = (language?: string) =>
 // --- Compile cache (per server instance) -----------------------------------
 // Identical input always produces identical output, so memoize by a hash of the
 // request. Bounded LRU: re-inserting on hit keeps hot entries, oldest evicted.
+//
+// Bounded by what it holds as well as by how many: entries run from a few
+// kilobytes to a few megabytes, so a count alone lets a few hundred large ones
+// keep gigabytes alive for the life of the process.
 const CACHE_MAX = 256;
+const CACHE_MAX_BYTES = 32 * 1024 * 1024;
 const compileCache = new Map<string, PreviewResult>();
+const entryBytes = new Map<string, number>();
+let cacheBytes = 0;
+
+const evict = (key: string) => {
+  compileCache.delete(key);
+  cacheBytes -= entryBytes.get(key) ?? 0;
+  entryBytes.delete(key);
+};
 
 const cacheKey = (input: PreviewInput) => {
   const canonical = {
@@ -67,10 +95,19 @@ const cacheGet = (key: string) => {
 };
 
 const cacheSet = (key: string, result: PreviewResult) => {
+  const bytes = JSON.stringify(result.body).length;
+  // One that would take a large share of the cache by itself is not worth
+  // evicting many others for; compiling it again is the cheaper loss.
+  if (bytes > CACHE_MAX_BYTES / 8) return;
+
   compileCache.set(key, result);
-  if (compileCache.size > CACHE_MAX) {
+  entryBytes.set(key, bytes);
+  cacheBytes += bytes;
+
+  while (compileCache.size > CACHE_MAX || cacheBytes > CACHE_MAX_BYTES) {
     const oldest = compileCache.keys().next().value;
-    if (oldest !== undefined) compileCache.delete(oldest);
+    if (oldest === undefined) break;
+    evict(oldest);
   }
 };
 
@@ -198,12 +235,14 @@ const compilePreview = (input: PreviewInput): PreviewResult => {
   }
 };
 
-async function POST({ request: req }: { request: Request }) {
-  const user = await getUser();
-
-  if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+async function POST({
+  request: req,
+  context
+}: {
+  request: Request;
+  context: { user: User };
+}) {
+  const { user } = context;
 
   if (isRateLimited(user.id)) {
     return Response.json(

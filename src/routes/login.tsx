@@ -1,21 +1,11 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 
-import { env } from '@/lib/env';
 import { pageTitle } from '@/lib/head';
-import { sessionQueries } from '@/server/functions/auth';
+import { staysOnThisSite } from '@/lib/safe-redirect';
+import { getSignInMethods, sessionQueries } from '@/server/functions/auth';
 import { LoginForm } from '@/components/login-form';
 import { RoutePending } from '@/components/route-pending';
-
-/** Which ways in are configured; the form shows only those. */
-const getSignInMethods = createServerFn({ method: 'GET' }).handler(
-  async () => ({
-    emailEnabled: env.AUTH_EMAIL_ENABLED,
-    githubEnabled: env.AUTH_GITHUB_ENABLED,
-    googleEnabled: env.AUTH_GOOGLE_ENABLED
-  })
-);
 
 /**
  * Where to go once signed in. Only a path inside this app: a crafted link
@@ -24,11 +14,7 @@ const getSignInMethods = createServerFn({ method: 'GET' }).handler(
  * dropped rather than rejected, so a bad link still reaches the form.
  */
 const searchSchema = z.object({
-  redirect: z
-    .string()
-    .refine(to => /^\/(?![/\\])/.test(to))
-    .optional()
-    .catch(undefined)
+  redirect: z.string().refine(staysOnThisSite).optional().catch(undefined)
 });
 
 export const Route = createFileRoute('/login')({

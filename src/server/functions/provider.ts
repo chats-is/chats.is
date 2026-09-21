@@ -29,10 +29,6 @@ export const listProvidersForSelect = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .handler(() => providers.listProvidersForSelect());
 
-export const listEnabledProviders = createServerFn({ method: 'GET' }).handler(
-  () => providers.listEnabledProviders()
-);
-
 export const createProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(providerCreateSchema)
@@ -77,7 +73,6 @@ export const providerQueries = {
   key: {
     list: () => ['provider', 'list'] as const,
     forSelect: () => ['provider', 'forSelect'] as const,
-    enabled: () => ['provider', 'enabled'] as const,
     remoteModels: () => ['provider', 'remoteModels'] as const,
     compatible: () => ['provider', 'compatible'] as const
   },
@@ -99,11 +94,6 @@ export const providerQueries = {
     queryOptions({
       queryKey: [...providerQueries.key.forSelect()] as const,
       queryFn: () => listProvidersForSelect()
-    }),
-  enabled: () =>
-    queryOptions({
-      queryKey: [...providerQueries.key.enabled()] as const,
-      queryFn: () => listEnabledProviders()
     }),
   /** Reaches the provider's own API, so it is only fetched on demand. */
   remoteModels: (input: { providerId: string }) =>
