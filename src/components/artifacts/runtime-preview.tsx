@@ -6,6 +6,7 @@ import {
   useRef,
   useState
 } from 'react';
+import { useMatch } from '@tanstack/react-router';
 import { AlertCircle, LoaderCircle } from 'lucide-react';
 
 import { type Artifact } from '@/types';
@@ -222,6 +223,14 @@ function ReactArtifactPreview({
   // preview). Deferring would let the entry path and the file contents come
   // from different content versions, producing a mismatched/failed compile.
   const content = artifact.content ?? '';
+  // On a share page there is no session, and the link stands in for one: the
+  // request names it and the artifact, and the server checks that the one is
+  // in the chat the other opens. The link's id is in the address.
+  const shareId = useMatch({
+    from: '/share/$id',
+    shouldThrow: false,
+    select: match => match.params.id
+  });
   const [status, setStatus] = useState<PreviewStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [compiledFiles, setCompiledFiles] = useState<Record<
@@ -289,9 +298,13 @@ function ReactArtifactPreview({
   const requestBody = useMemo(
     () =>
       content.trim()
-        ? JSON.stringify({ entryPath: currentEntryPath, files: previewFiles })
+        ? JSON.stringify({
+            entryPath: currentEntryPath,
+            files: previewFiles,
+            ...(shareId && { share: { id: shareId, artifactId: artifact.id } })
+          })
         : '',
-    [currentEntryPath, previewFiles, content]
+    [currentEntryPath, previewFiles, content, shareId, artifact.id]
   );
 
   useEffect(() => {

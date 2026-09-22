@@ -7,7 +7,7 @@ import { pageWindow } from '@/types/pagination';
 import { type sharePageSchema } from '@/types/shared-link';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { chats, shares } from '@/db/schema';
+import { artifacts, chats, shares } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 /**
@@ -141,6 +141,33 @@ export async function getSharedChat(id: string) {
   });
 
   return share?.chat;
+}
+
+/**
+ * One artifact of a shared chat, for compiling its preview.
+ *
+ * The person reading a share link has no session, and the preview of a React
+ * artifact is built on the server. So the request names the link and the
+ * artifact, and this says whether that pairing is real: the artifact is in
+ * the chat the link opens, and was made by the person who shared it. What
+ * comes back is the artifact's own source, so the caller can hold the request
+ * to it — a share link is not a licence to compile whatever is sent.
+ */
+export async function getSharedArtifact(shareId: string, artifactId: string) {
+  const link = await db.query.shares.findFirst({
+    where: eq(shares.id, shareId),
+    columns: { chatId: true, userId: true }
+  });
+  if (!link) return undefined;
+
+  return await db.query.artifacts.findFirst({
+    where: and(
+      eq(artifacts.id, artifactId),
+      eq(artifacts.chatId, link.chatId),
+      eq(artifacts.userId, link.userId)
+    ),
+    columns: { id: true, content: true }
+  });
 }
 
 export async function deleteShare(userId: string, id: string) {

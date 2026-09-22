@@ -5,12 +5,20 @@ import { z } from 'zod';
 
 import { type User } from '@/types';
 import { looksLikeJsx, validatePreviewImports } from '@/lib/artifact';
+import { UNAUTHORIZED } from '@/lib/auth-error';
 import { normalizeCodeLanguage } from '@/lib/code-language';
-import { authedRequest } from '@/server/middleware';
+import { optionalAuthRequest } from '@/server/middleware';
+import { getSharedArtifact } from '@/server/services/share';
 
+/**
+ * Open to two callers: a signed-in user, previewing anything; and a reader of
+ * a share link, previewing an artifact of the chat it opens. The second is
+ * checked below rather than by a tier, because what it needs is not a session
+ * but the link — see `getSharedArtifact`.
+ */
 export const Route = createFileRoute('/api/artifacts/preview')({
   server: {
-    middleware: [authedRequest],
+    middleware: [optionalAuthRequest],
     handlers: { POST }
   }
 });
@@ -39,7 +47,11 @@ const requestSchema = z.object({
         files.reduce((total, file) => total + file.code.length, 0) <=
         MAX_TOTAL_CODE,
       { message: 'Preview is too large' }
-    )
+    ),
+  /** Sent instead of a session by a share page: which link, which artifact. */
+  share: z
+    .object({ id: z.string().min(1), artifactId: z.string().min(1) })
+    .optional()
 });
 
 type PreviewInput = z.infer<typeof requestSchema>;
@@ -111,14 +123,16 @@ const cacheSet = (key: string, result: PreviewResult) => {
   }
 };
 
-// --- Rate limit (per user, per server instance) ----------------------------
-// Compilation is CPU-bound; cap how often a single user can trigger it.
+// --- Rate limit (per caller, per server instance) --------------------------
+// Compilation is CPU-bound; cap how often a single caller can trigger it. A
+// caller is a user, or — for the readers of a share link, who have no identity
+// here — the link itself.
 const RATE_LIMIT = 60;
 const RATE_WINDOW_MS = 10_000;
 const rateBuckets = new Map<string, number[]>();
 let rateCalls = 0;
 
-const isRateLimited = (userId: string) => {
+const isRateLimited = (caller: string) => {
   const now = Date.now();
 
   // Periodically evict buckets whose timestamps have all expired so inactive
@@ -131,16 +145,35 @@ const isRateLimited = (userId: string) => {
     }
   }
 
-  const recent = (rateBuckets.get(userId) ?? []).filter(
+  const recent = (rateBuckets.get(caller) ?? []).filter(
     time => now - time < RATE_WINDOW_MS
   );
   if (recent.length >= RATE_LIMIT) {
-    rateBuckets.set(userId, recent);
+    rateBuckets.set(caller, recent);
     return true;
   }
   recent.push(now);
-  rateBuckets.set(userId, recent);
+  rateBuckets.set(caller, recent);
   return false;
+};
+
+/**
+ * Whether a request made on a share link, with no session, may be compiled:
+ * the artifact it names is in the shared chat, and what it asks to compile is
+ * that artifact's source and nothing else. Every file of a preview carries
+ * the artifact's whole content — the paths are virtual — so each is held to
+ * it. Without this, a share link would make the compiler public.
+ */
+const isSharedSource = async (input: PreviewInput): Promise<boolean> => {
+  if (!input.share) return false;
+
+  const artifact = await getSharedArtifact(
+    input.share.id,
+    input.share.artifactId
+  );
+  if (!artifact?.content) return false;
+
+  return input.files.every(file => file.code === artifact.content);
 };
 
 const compilePreview = (input: PreviewInput): PreviewResult => {
@@ -240,22 +273,34 @@ async function POST({
   context
 }: {
   request: Request;
-  context: { user: User };
+  context: { user: User | null };
 }) {
   const { user } = context;
-
-  if (isRateLimited(user.id)) {
-    return Response.json(
-      { error: 'Too many preview requests. Please slow down.' },
-      { status: 429 }
-    );
-  }
 
   const json = await req.json().catch(() => null);
   const parsed = requestSchema.safeParse(json);
 
   if (!parsed.success) {
     return Response.json({ error: 'Invalid preview payload' }, { status: 400 });
+  }
+
+  if (!user && !parsed.data.share) {
+    return Response.json({ error: UNAUTHORIZED }, { status: 401 });
+  }
+
+  // The limit is applied before the share is looked up, on the link the
+  // request claims: proving the claim costs two reads, and a request that
+  // proves nothing would otherwise cost them without limit.
+  const caller = user ? user.id : `share:${parsed.data.share!.id}`;
+  if (isRateLimited(caller)) {
+    return Response.json(
+      { error: 'Too many preview requests. Please slow down.' },
+      { status: 429 }
+    );
+  }
+
+  if (!user && !(await isSharedSource(parsed.data))) {
+    return Response.json({ error: UNAUTHORIZED }, { status: 401 });
   }
 
   const key = cacheKey(parsed.data);

@@ -11,17 +11,27 @@ import { ArtifactsPanel } from '@/components/artifacts-panel';
 import { Messages } from '@/components/messages';
 
 interface SharedChatViewProps {
+  title: string;
+  /** Drawn under the title: when it was, and how long it is. */
+  subtitle: string;
   modelId: string;
   messages: ChatMessage[];
   artifacts: Artifact[];
-  className?: string;
 }
 
+/**
+ * Laid out the way the chat is: a header bar with the title, the thread
+ * scrolling under it, and the artifact panel opening beside both — the header
+ * belongs to the thread and moves over with it. Fills the window, like the
+ * chat, so the panel stands the full height rather than ending where the
+ * messages do.
+ */
 export function SharedChatView({
+  title,
+  subtitle,
   modelId,
   messages,
-  artifacts,
-  className
+  artifacts
 }: SharedChatViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -35,8 +45,29 @@ export function SharedChatView({
     [artifacts]
   );
 
+  const thread = (
+    <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+      <header className="flex h-16 shrink-0 flex-col items-center justify-center border-b px-4">
+        <span className="max-w-full truncate font-semibold">{title}</span>
+        <span className="text-xs text-muted-foreground">{subtitle}</span>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <Messages
+          modelId={modelId}
+          messages={messages}
+          artifacts={artifactList}
+          onSelectArtifact={artifactId => {
+            setSelectedId(artifactId);
+            setPanelOpen(true);
+          }}
+          isReadonly={true}
+        />
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex min-h-0 w-full">
+    <div className="flex h-svh w-full overflow-hidden">
       {panelOpen && isDesktop ? (
         <ResizablePanelGroup
           orientation="horizontal"
@@ -45,21 +76,9 @@ export function SharedChatView({
           <ResizablePanel
             defaultSize="44%"
             minSize="35%"
-            className="h-full min-w-0 overflow-hidden"
+            className="flex h-full min-w-0 flex-col overflow-hidden"
           >
-            <div className="h-full min-w-0 overflow-hidden">
-              <Messages
-                className={className}
-                modelId={modelId}
-                messages={messages}
-                artifacts={artifactList}
-                onSelectArtifact={artifactId => {
-                  setSelectedId(artifactId);
-                  setPanelOpen(true);
-                }}
-                isReadonly={true}
-              />
-            </div>
+            {thread}
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel
@@ -80,19 +99,7 @@ export function SharedChatView({
         </ResizablePanelGroup>
       ) : (
         <>
-          <div className="min-w-0 flex-1">
-            <Messages
-              className={className}
-              modelId={modelId}
-              messages={messages}
-              artifacts={artifactList}
-              onSelectArtifact={artifactId => {
-                setSelectedId(artifactId);
-                setPanelOpen(true);
-              }}
-              isReadonly={true}
-            />
-          </div>
+          {thread}
           <ArtifactsPanel
             open={panelOpen}
             onOpenChange={setPanelOpen}

@@ -53,3 +53,8 @@ export const authedRequest = createMiddleware({ type: 'request' }).server(
 export const optionalAuthMiddleware = createMiddleware({
   type: 'function'
 }).server(async ({ next }) => next({ context: { user: await getUser() } }));
+
+/** The same, for a server route. */
+export const optionalAuthRequest = createMiddleware({
+  type: 'request'
+}).server(async ({ next }) => next({ context: { user: await getUser() } }));
