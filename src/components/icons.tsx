@@ -79,22 +79,4 @@ function IconLoading({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-/**
- * One dot, breathing: it swells and brightens, then settles, and again. For
- * something that is under way and will be for a while — beneath a reply that
- * has said what it has to say so far and is still being written.
- */
-function IconBreathing({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div className={cn('flex h-6 items-center', className)} {...props}>
-      <motion.div
-        className="size-2.5 rounded-full bg-current"
-        initial={{ scale: 1, opacity: 0.3 }}
-        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 1, 0.3] }}
-        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-      />
-    </div>
-  );
-}
-
-export { IconBreathing, IconGitHub, IconGoogle, IconLoading };
+export { IconGitHub, IconGoogle, IconLoading };

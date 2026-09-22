@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
-import { ArrowUp, Loader2, Square } from 'lucide-react';
+import { ArrowUp, Square } from 'lucide-react';
 import Textarea from 'react-textarea-autosize';
 
 import { type Attachment, type ChatMessage } from '@/types';
@@ -194,11 +194,7 @@ export function ChatPromptForm({
                   uploadQueue.length > 0
                 }
               >
-                {status === 'submitted' ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <ArrowUp className="size-4" />
-                )}
+                <ArrowUp className="size-4" />
                 <span className="sr-only">Send message</span>
               </Button>
             )}

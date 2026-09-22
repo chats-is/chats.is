@@ -6,7 +6,7 @@ import { type Artifact, type ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { DocumentPreview } from '@/components/artifacts/document-preview';
 import { AudioPlayer } from '@/components/audio-player';
-import { IconBreathing, IconLoading } from '@/components/icons';
+import { IconLoading } from '@/components/icons';
 import { MediaLightbox } from '@/components/media-lightbox';
 import {
   isMediaToolPart,
@@ -96,20 +96,6 @@ export function Message({
   const hasVisibleReasoningDisplay =
     hasReasoningPart &&
     (mergedReasoningText.length > 0 || showReasoningLoading);
-  // The reply has shown something and the turn is still open. The mark stays
-  // under it for as long as that is so — not only while nothing is arriving,
-  // because "nothing arriving" cannot be told from the parts: a provider that
-  // hands a tool call over whole keeps the text part open through the silence
-  // in which it writes the artifact, and the text ends only when the call
-  // lands. Without a mark that silence reads as a finished reply, and the
-  // artifact then appears from nowhere.
-  const showWorkingAfterContent =
-    status === 'streaming' &&
-    isLastMessage === true &&
-    (hasVisibleTextContent ||
-      hasVisibleArtifacts ||
-      hasFilePart ||
-      hasMediaToolPart);
   const showSubmittedAssistantLoading =
     message.role === 'assistant' &&
     status === 'submitted' &&
@@ -343,11 +329,6 @@ export function Message({
             {showSubmittedAssistantLoading && (
               <div className="my-1">
                 <IconLoading className="text-muted-foreground" />
-              </div>
-            )}
-            {showWorkingAfterContent && (
-              <div className="my-1">
-                <IconBreathing className="text-muted-foreground" />
               </div>
             )}
             {status === 'streaming' &&
