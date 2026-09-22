@@ -317,6 +317,11 @@ export function ProvidersPending() {
 export default function ProvidersPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // What the row said when the form was opened on it, sent back with the save
+  // so that a row someone changed in between is refused rather than undone.
+  // Held apart from the table's rows on purpose: those are refreshed behind
+  // the dialog, and reading the stamp from them would always match.
+  const [openedOn, setOpenedOn] = useState<Date | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useSearchFilter('q', '');
   const [page, setPage] = useSearchFilter('page', 1);
@@ -340,7 +345,9 @@ export default function ProvidersPage() {
 
   const updateMutation = useMutation({
     mutationFn: mutating(updateProvider),
-    onSuccess: invalidate
+    onSuccess: invalidate,
+    // A refused save means the table behind the dialog is out of date.
+    onError: invalidate
   });
 
   const deleteMutation = useMutation({
@@ -420,7 +427,11 @@ export default function ProvidersPage() {
 
       try {
         if (editingId) {
-          await updateMutation.mutateAsync({ id: editingId, ...payload });
+          await updateMutation.mutateAsync({
+            id: editingId,
+            ...payload,
+            expectedUpdatedAt: openedOn ?? undefined
+          });
         } else {
           await createMutation.mutateAsync(
             payload as Parameters<typeof createMutation.mutateAsync>[0]
@@ -435,6 +446,7 @@ export default function ProvidersPage() {
 
   const openFor = (provider: Provider | null) => {
     setEditingId(provider?.id ?? null);
+    setOpenedOn(provider?.updatedAt ?? null);
 
     if (!provider) {
       setDefaults(EMPTY_FORM);

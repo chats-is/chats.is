@@ -96,6 +96,10 @@ type EditTarget = {
   modelDbId: string;
   modelName: string;
   capability: 'chat' | 'image' | 'video' | 'audio';
+  /** The price row's `updatedAt` when the dialog opened, or `null` for a model
+   *  with no price yet — sent back with the save, so a price someone set in
+   *  between is refused rather than overwritten. */
+  openedOn: Date | null;
 };
 
 /** Every rate a model can carry, as typed. Blank means "not priced". */
@@ -356,7 +360,13 @@ export default function PricingPage() {
       setEdit(null);
       toast.success('Pricing saved');
     },
-    onError: e => toast.error(e.message)
+    onError: e => {
+      toast.error(e.message);
+      // A refused save means the table behind the dialog is out of date.
+      queryClient.invalidateQueries({
+        queryKey: pricingQueries.key.listWithModels()
+      });
+    }
   });
 
   // Two mutation instances so we can fire them in parallel without state
@@ -401,7 +411,8 @@ export default function PricingPage() {
       await upsertMutation.mutateAsync({
         modelDbId: edit.modelDbId,
         ...rates,
-        source: 'manual'
+        source: 'manual',
+        expectedUpdatedAt: edit.openedOn
       });
     }
   });
@@ -410,7 +421,8 @@ export default function PricingPage() {
     setEdit({
       modelDbId: row.id,
       modelName: row.name,
-      capability: row.capability
+      capability: row.capability,
+      openedOn: row.pricing?.updatedAt ?? null
     });
     const values = {
       input: fromNum(row.pricing?.input),

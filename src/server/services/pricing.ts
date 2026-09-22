@@ -18,6 +18,11 @@ import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, modelProviders, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
+import {
+  assertWritten,
+  StaleEditError,
+  unchangedSince
+} from '@/server/services/stale-edit';
 
 const EMPTY_SNAPSHOT: PriceSnapshot = {
   inputPrice: null,
@@ -563,11 +568,24 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
   const existing = await db.query.modelPricings.findFirst({
     where: eq(modelPricings.modelId, model.modelId)
   });
+  // A form opened on a model with no price says so with `null`; if there is
+  // one by now, somebody else priced it in the meantime.
+  if (existing && data.expectedUpdatedAt === null) {
+    throw new StaleEditError('price');
+  }
+
   if (existing) {
-    await db
+    const written = await db
       .update(modelPricings)
       .set(values)
-      .where(eq(modelPricings.id, existing.id));
+      .where(
+        and(
+          eq(modelPricings.id, existing.id),
+          unchangedSince(modelPricings.updatedAt, data.expectedUpdatedAt)
+        )
+      )
+      .returning({ id: modelPricings.id });
+    assertWritten(written, data.expectedUpdatedAt, 'price');
   } else {
     await db.insert(modelPricings).values({
       id: generateUUID(),

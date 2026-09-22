@@ -355,6 +355,11 @@ export function ModelsPending() {
 export default function ModelsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // What the row said when the form was opened on it, sent back with the save
+  // so that a row someone changed in between is refused rather than undone.
+  // Held apart from the table's rows on purpose: those are refreshed behind
+  // the dialog, and reading the stamp from them would always match.
+  const [openedOn, setOpenedOn] = useState<Date | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filterCapability, setFilterCapability] = useSearchFilter(
     'capability',
@@ -381,7 +386,9 @@ export default function ModelsPage() {
 
   const updateMutation = useMutation({
     mutationFn: mutating(updateModel),
-    onSuccess: invalidate
+    onSuccess: invalidate,
+    // A refused save means the table behind the dialog is out of date.
+    onError: invalidate
   });
 
   const deleteMutation = useMutation({
@@ -445,7 +452,11 @@ export default function ModelsPage() {
 
       try {
         if (editingId) {
-          await updateMutation.mutateAsync({ id: editingId, ...payload });
+          await updateMutation.mutateAsync({
+            id: editingId,
+            ...payload,
+            expectedUpdatedAt: openedOn ?? undefined
+          });
         } else {
           await createMutation.mutateAsync(payload);
         }
@@ -458,6 +469,7 @@ export default function ModelsPage() {
 
   const openFor = (model: Model | null) => {
     setEditingId(model?.id ?? null);
+    setOpenedOn(model?.updatedAt ?? null);
 
     if (!model) {
       setDefaults(EMPTY_FORM);
