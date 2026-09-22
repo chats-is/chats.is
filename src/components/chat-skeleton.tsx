@@ -47,12 +47,6 @@ export function ChatSkeleton() {
           </div>
         ))}
       </div>
-      {/* The composer holds its place. It is the one part of the page that is
-          the same in every chat, so letting it vanish and come back makes the
-          whole layout jump for something that never actually changed. */}
-      <div className="mx-auto w-full max-w-4xl px-4 pb-4">
-        <Skeleton className="h-[76px] w-full rounded-2xl" />
-      </div>
     </div>
   );
 }
