@@ -81,31 +81,6 @@ export type UsageKpi = {
   reasoningTokens: number;
 };
 
-/** User-facing KPI shape. No cost / dollar fields — only token counts. */
-export type UserUsageKpi = {
-  requests: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  reasoningTokens: number;
-};
-
-/** User-facing log row shape. No cost, and no provider: which upstream account
- *  served a request — and what the operator chose to call it — is how the
- *  install is run, not something about the user's own usage. */
-export type UserUsageRow = {
-  id: string;
-  createdAt: Date | string;
-  modelId: string | null;
-  capability: 'chat' | 'image' | 'video' | 'audio';
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  reasoningTokens: number;
-};
-
 /** Minimal row shape consumed by the `UsageQuantity` cell renderer.
  *  Compatible with `UsageRow` but only the fields it actually reads. */
 export type UsageRowLike = {

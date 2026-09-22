@@ -9,8 +9,7 @@ import {
   type RecordImageUsageInput,
   type RecordTranscriptionUsageInput,
   type RecordVideoUsageInput,
-  type UsageRow,
-  type UserUsageRow
+  type UsageRow
 } from '@/types';
 import { type usageLogFilterSchema } from '@/types/usage';
 import { generateUUID, parseNumber } from '@/lib/utils';
@@ -287,31 +286,7 @@ export async function recordTranscriptionUsage(
 
 // =============================================================================
 // KPI tile aggregate — TZ-independent (sums over the whole window)
-//
-// `queryKpi` is admin-facing and returns cost. `queryKpiUser` strips the
-// dollar field — user-end procedures must never expose cost.
 // =============================================================================
-async function queryKpiUser(args: { since: Date; userId: string }) {
-  const { totalCost: _totalCost, ...tokensOnly } = await queryKpi(args);
-  return tokensOnly;
-}
-
-async function queryUsageRowsUser(args: {
-  since: Date;
-  userId: string;
-}): Promise<UserUsageRow[]> {
-  const rows = await queryUsageRows(args);
-  return rows.map(
-    ({
-      cost: _cost,
-      providerId: _providerId,
-      providerName: _providerName,
-      providerModelId: _providerModelId,
-      ...rest
-    }) => rest
-  );
-}
-
 async function queryKpi(args: { since: Date; userId?: string }) {
   const baseWhere = and(
     gte(usage.createdAt, args.since),
@@ -395,16 +370,7 @@ async function queryUsageRows(args: {
   }));
 }
 
-/** A KPI tile and the rows behind it — what every usage screen asks for. The
- *  user-end variant drops cost: user-facing procedures never expose dollars. */
-export async function getMyUsage(userId: string, since: Date) {
-  const [kpi, rows] = await Promise.all([
-    queryKpiUser({ since, userId }),
-    queryUsageRowsUser({ since, userId })
-  ]);
-  return { kpi, rows };
-}
-
+/** A KPI tile and the rows behind it — what every usage screen asks for. */
 export async function adminUsageByUser(userId: string, since: Date) {
   const [kpi, rows] = await Promise.all([
     queryKpi({ since, userId }),

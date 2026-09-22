@@ -4,9 +4,7 @@ import {
   type DailyDay,
   type DailyGroup,
   type UsageKpi,
-  type UsageRow,
-  type UserUsageKpi,
-  type UserUsageRow
+  type UsageRow
 } from '@/types';
 import { formatNumber, formatUsd } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,16 +26,18 @@ export function LimitsSkeleton() {
   return (
     <section className="space-y-3">
       <Skeleton className="h-5 w-16" />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-5">
         {[0, 1].map(i => (
-          <Card key={i} className="py-0">
-            <CardContent className="space-y-2 p-4">
+          <div key={i} className="space-y-2">
+            <div className="flex justify-between">
               <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-8 w-16" />
-              <Skeleton className="h-2 w-full" />
-              <Skeleton className="h-3 w-32" />
-            </CardContent>
-          </Card>
+              <Skeleton className="h-3 w-24" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-1.5 flex-1" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </div>
         ))}
       </div>
     </section>
@@ -144,10 +144,7 @@ const fmtDayLong = (s: string) => {
  *  is decided — it uses `new Date(row.createdAt)` + local-TZ getters, which
  *  is identical to what the Logs table uses to render times, so the chart and
  *  Logs are guaranteed to agree. */
-function bucketByLocalDay(
-  rows: UsageRow[] | UserUsageRow[],
-  groupBy: GroupBy
-): DailyDay[] {
+function bucketByLocalDay(rows: UsageRow[], groupBy: GroupBy): DailyDay[] {
   const byDay = new Map<string, Map<string, DailyGroup>>();
   for (const r of rows) {
     const created =
@@ -492,10 +489,8 @@ function DayTooltipContent({
 }
 
 type Props = {
-  /** Admin shape carries `totalCost`; user shape doesn't. */
-  kpi: UsageKpi | UserUsageKpi;
-  /** Admin rows carry `cost`; user rows don't. */
-  rows: UsageRow[] | UserUsageRow[];
+  kpi: UsageKpi;
+  rows: UsageRow[];
   days?: number;
   chartTitle?: string;
 };
@@ -692,7 +687,7 @@ export function UsageModule({
 
       {isAdmin && (
         <DailyStackedChart
-          rows={rows as UsageRow[]}
+          rows={rows}
           groupBy="model"
           days={days}
           title={chartTitle}

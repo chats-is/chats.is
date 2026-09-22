@@ -9,14 +9,8 @@ import {
   usageRangeSchema,
   usageUserSchema
 } from '@/types/usage';
-import { adminMiddleware, authedMiddleware } from '@/server/middleware';
+import { adminMiddleware } from '@/server/middleware';
 import * as usage from '@/server/services/usage';
-
-/** /settings/usage — the calling user's own usage. */
-export const getMyUsage = createServerFn({ method: 'GET' })
-  .middleware([authedMiddleware])
-  .validator(usageRangeSchema)
-  .handler(({ data, context }) => usage.getMyUsage(context.user.id, data.from));
 
 /** /console/users/[id] — admin view of one user. */
 export const adminUsageByUser = createServerFn({ method: 'GET' })
@@ -49,17 +43,11 @@ export const usageQueries = {
   /** Key prefixes, shared by the readers and by anything that
    *  invalidates them, so the two can never drift apart. */
   key: {
-    me: () => ['usage', 'me'] as const,
     byUser: () => ['usage', 'byUser'] as const,
     adminList: () => ['usage', 'adminList'] as const,
     userModels: () => ['usage', 'userModels'] as const,
     log: () => ['usage', 'log'] as const
   },
-  me: (input: { from: Date }) =>
-    queryOptions({
-      queryKey: [...usageQueries.key.me(), input.from.toISOString()] as const,
-      queryFn: () => getMyUsage({ data: input })
-    }),
   byUser: (input: { userId: string; from: Date }) =>
     queryOptions({
       queryKey: [

@@ -74,8 +74,6 @@ export type {
   RecordTranscriptionUsageInput,
   UsageRow,
   UsageKpi,
-  UserUsageRow,
-  UserUsageKpi,
   UsageRowLike,
   DailyGroup,
   DailyDay

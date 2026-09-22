@@ -1,41 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
-import { reportWindowStart } from '@/lib/utils';
 import { quotaQueries } from '@/server/functions/quota';
-import { usageQueries } from '@/server/functions/usage';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 import { Countdown } from '@/components/usage-limit-alert';
-import {
-  LimitsSkeleton,
-  UsageModule,
-  UsageModuleSkeleton
-} from '@/components/usage-module';
+import { LimitsSkeleton } from '@/components/usage-module';
 
 export function SettingsUsage() {
   const queryClient = useQueryClient();
-  const [days, setDays] = useState(7);
   const [refreshing, setRefreshing] = useState(false);
-  const from = useMemo(() => reportWindowStart(days), [days]);
   const { data: quota, isLoading: quotaLoading } = useQuery(quotaQueries.me());
-  const { data: usage, isLoading } = useQuery(usageQueries.me({ from }));
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: usageQueries.all() }),
-        queryClient.invalidateQueries({ queryKey: quotaQueries.key.me() })
-      ]);
+      await queryClient.invalidateQueries({ queryKey: quotaQueries.key.me() });
     } finally {
       setRefreshing(false);
     }
@@ -44,12 +24,12 @@ export function SettingsUsage() {
   const hasLimits = !!(quota?.fiveHour || quota?.sevenDay);
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">Usage</h1>
           <p className="text-sm text-muted-foreground">
-            Your remaining limits and usage stats.
+            Your remaining limits.
           </p>
         </div>
         <Button
@@ -64,65 +44,35 @@ export function SettingsUsage() {
         </Button>
       </div>
 
-      {/* Usage limits — always current (5h / weekly), not affected by the
-          report date filter. */}
+      {/* The limits as they stand now: the 5-hour and the weekly window, one
+          under the other. */}
       {quotaLoading ? (
         <LimitsSkeleton />
       ) : (
         hasLimits && (
           <section className="space-y-3">
             <h2 className="text-sm font-medium">Limits</h2>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-5">
               {quota.fiveHour && (
-                <QuotaSnapshotCard
-                  label="5-hour limit"
-                  window={quota.fiveHour}
-                />
+                <QuotaWindowRow label="5-hour" window={quota.fiveHour} />
               )}
               {quota.sevenDay && (
-                <QuotaSnapshotCard
-                  label="Weekly limit"
-                  window={quota.sevenDay}
-                />
+                <QuotaWindowRow label="Weekly" window={quota.sevenDay} />
               )}
             </div>
           </section>
         )
       )}
-
-      {/* Usage report — date filter sits directly above it. */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium">Stats</h2>
-          <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
-            <SelectTrigger className="w-40 rounded-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Today</SelectItem>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {isLoading ? (
-          <UsageModuleSkeleton />
-        ) : usage ? (
-          <UsageModule kpi={usage.kpi} rows={usage.rows} days={days} />
-        ) : null}
-      </section>
     </div>
   );
 }
 
 /**
- * User-facing per-window quota card. Shows ONLY:
- *   - remaining % gauge
- *   - reset time
- * Never displays the underlying dollar limit / used amount.
+ * One window of the user's quota, as a row: what it is and when it resets
+ * above, how much of it is left below. Shows ONLY the share remaining and
+ * the reset time — never the dollar limit or the amount used behind them.
  */
-function QuotaSnapshotCard({
+function QuotaWindowRow({
   label,
   window
 }: {
@@ -130,27 +80,36 @@ function QuotaSnapshotCard({
   window: { remainingPct: number; resetAt: Date | string | null };
 }) {
   const pct = window.remainingPct;
-  const barColor =
-    pct <= 10 ? 'bg-destructive' : pct <= 30 ? 'bg-amber-500' : 'bg-green-500';
+  // Three bands, read at a glance: plenty, running down, nearly out. The
+  // track is the same colour, faint, so the empty part reads as the same bar.
+  const [barColor, trackColor] =
+    pct <= 20
+      ? ['bg-destructive', 'bg-destructive/15']
+      : pct <= 50
+        ? ['bg-amber-500', 'bg-amber-500/15']
+        : ['bg-primary', 'bg-primary/15'];
 
   return (
-    <Card className="py-0">
-      <CardContent className="space-y-2 p-4">
-        <div className="text-sm font-medium text-muted-foreground">{label}</div>
-        <div className="text-2xl font-bold">{pct}%</div>
-        <div className="text-xs text-muted-foreground">remaining</div>
-        <div className="h-2 w-full rounded-full bg-muted">
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-4 text-sm">
+        <span className="font-medium">{label}</span>
+        {window.resetAt && (
+          <span className="text-xs text-muted-foreground">
+            Resets in <Countdown target={new Date(window.resetAt)} />
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <div className={`h-1.5 flex-1 rounded-full ${trackColor}`}>
           <div
-            className={`h-2 rounded-full ${barColor}`}
+            className={`h-1.5 rounded-full ${barColor}`}
             style={{ width: `${pct}%` }}
           />
         </div>
-        {window.resetAt && (
-          <div className="text-xs text-muted-foreground">
-            Resets in <Countdown target={new Date(window.resetAt)} />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+          {pct}% left
+        </span>
+      </div>
+    </div>
   );
 }
