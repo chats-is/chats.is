@@ -168,7 +168,15 @@ export const PROVIDER_VOCAB = {
   },
   anthropic: { chat: { effort: EFFORTS } },
   deepseek: { chat: { effort: EFFORTS } },
-  bedrock: { chat: { effort: EFFORTS } }
+  bedrock: {
+    // Nova Canvas names its output by pixels: each side a multiple of 16
+    // between 320 and 4096, the two within 1:4 of each other, and the whole
+    // under 4.19 megapixels. The AI SDK splits `size` into width and height.
+    image: {
+      size: ['1024x1024', '1280x720', '720x1280', '1536x1024', '1024x1536']
+    },
+    chat: { effort: EFFORTS }
+  }
 } as const satisfies Partial<
   Record<ProviderType, Partial<Record<ModelCapability, Vocabulary>>>
 >;
@@ -266,6 +274,7 @@ const TARGETS: Partial<
     Partial<Record<ModelCapability, Partial<Record<VocabField, Target>>>>
   >
 > = {
+  bedrock: { image: { size: { at: 'top', key: 'size' } } },
   openai: {
     image: { size: { at: 'top', key: 'size' } },
     // Sora is called directly rather than through the AI SDK, so `top` here

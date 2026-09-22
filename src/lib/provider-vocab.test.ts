@@ -98,6 +98,19 @@ describe('toRequestParts', () => {
     });
   });
 
+  it('names a size to Nova Canvas, and nothing else', () => {
+    // Bedrock's image model takes only the pixels; a ratio or a resolution
+    // settled for some other provider on the failover list is dropped here.
+    expect(
+      toRequestParts('bedrock', 'image', {
+        size: '1280x720',
+        aspectRatio: '16:9',
+        resolution: '2K'
+      })
+    ).toEqual({ top: { size: '1280x720' }, provider: {}, imageConfig: {} });
+    expect(vocabularyFor(['bedrock'], 'video')).toEqual({});
+  });
+
   it("keeps xAI's resolution in its own namespace", () => {
     expect(
       toRequestParts('xai', 'video', {
