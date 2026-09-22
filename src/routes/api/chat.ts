@@ -45,16 +45,15 @@ import {
 } from '@/lib/provider';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
 import { openedWithError } from '@/lib/stream-failover';
-import { BASE_SYSTEM_PROMPT } from '@/lib/system-prompt';
+import { buildBaseSystemPrompt } from '@/lib/system-prompt';
 import { estimateTokens } from '@/lib/token-estimate';
 import {
   convertToChatMessages,
   formatLocalTime,
-  formatString,
   generateUUID
 } from '@/lib/utils';
 import { authedRequest } from '@/server/middleware';
-import { carriesOnlyOwnFiles } from '@/server/services/blob';
+import { carriesOnlyOwnFiles, isOwnBlobUrl } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
 import { buildMediaTools } from '@/server/services/chat-tools';
 import * as messages from '@/server/services/message';
@@ -445,14 +444,14 @@ async function POST({
     // Only the app's own part is a template. What an admin wrote, and what
     // the model carries, follow it verbatim.
     const systemMessage = [
-      formatString(BASE_SYSTEM_PROMPT, {
-        provider: dbModel.providers[0]?.provider?.name || '',
+      buildBaseSystemPrompt({
+        provider: dbModel.providers[0]?.provider?.name,
         modelId,
         // The server's clock, told in the user's zone. Sending their own
         // timestamp would carry their clock's errors with it; sending UTC
         // makes "today" wrong for most of the world.
         datetime: formatLocalTime(timeZone),
-        language: language || ''
+        language
       }),
       systemPromptContent
     ]
@@ -751,6 +750,7 @@ async function POST({
           if (
             kind === 'image' &&
             input.fileUrl &&
+            isOwnBlobUrl(input.fileUrl) &&
             input.fileUrl !== state.lastUrl
           ) {
             emitTransient({
@@ -768,7 +768,10 @@ async function POST({
           }
 
           if (kind === 'file') {
-            const nextUrl = input.fileUrl ?? null;
+            const nextUrl =
+              input.fileUrl && isOwnBlobUrl(input.fileUrl)
+                ? input.fileUrl
+                : null;
             const nextFileName = input.fileName ?? null;
             const nextMimeType = input.mimeType ?? null;
             const nextSize = input.size ?? null;
@@ -829,11 +832,16 @@ async function POST({
             },
             execute: async (input, options?: { toolCallId?: string }) => {
               assertArtifactPayload(input);
+              // The model is not told about file artifacts, and has no way
+              // to make a file; a `fileUrl` it sends anyway is an address of
+              // its own choosing, which must not become a file of ours.
+              if (input.fileUrl && !isOwnBlobUrl(input.fileUrl)) {
+                throw new Error('fileUrl must be a file stored by this app');
+              }
               const streamState = options?.toolCallId
                 ? toolArtifactStates.get(options.toolCallId)
                 : undefined;
-              const artifactId =
-                streamState?.artifactId ?? input.id ?? generateUUID();
+              const artifactId = streamState?.artifactId ?? generateUUID();
               const artifact = createArtifactRecord(input, artifactId);
               if (!completedArtifacts.has(artifact.id)) {
                 completedArtifactOrder.push(artifact.id);

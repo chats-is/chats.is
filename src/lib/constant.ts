@@ -143,28 +143,36 @@ export const BedrockModels: Record<string, string> = {
 export type ChatMediaToolName =
   MediaToolName | 'transcribe_audio' | 'edit_video';
 
-const MediaToolDescriptions: Record<ChatMediaToolName, string> = {
+/**
+ * What each media tool is for, said once — on the tool itself, as its
+ * description, where the model reads it beside the parameters. The system
+ * prompt no longer repeats it: two copies of the same guidance drifted apart.
+ * The values a model offers (sizes, voices, durations) are appended per
+ * model where the tool is registered.
+ */
+export const MediaToolGuidance: Record<ChatMediaToolName, string> = {
   generate_image:
-    '- generate_image: create a new image from a text description. Use when the user asks for a picture, illustration, photo, logo, or any visual.',
+    'Create a new image from a text description. Use when the user asks for a picture, illustration, photo, logo, or any visual.',
   edit_image:
-    "- edit_image: modify an existing image from this conversation (a user upload or a previously generated image). Pass that image's URL as `imageUrl` and describe the change in `prompt`.",
+    "Modify an existing image from this conversation (a user upload or a previously generated image). Pass that image's URL as `imageUrl` and describe the change in `prompt`.",
   generate_video:
-    '- generate_video: create a video from a text description, or animate an image from this conversation by passing its URL as `imageUrl`.',
+    'Create a video from a text description, or animate an image from this conversation by passing its URL as `imageUrl`.',
   edit_video:
-    "- edit_video: modify an existing video from this conversation (a user upload or a previously generated one) — use this whenever the user asks to change a video that already exists, never generate_video. Pass that video's URL as `videoUrl` and describe the change in `prompt`. Length, aspect ratio and resolution are inherited from the source.",
+    "Modify an existing video from this conversation (a user upload or a previously generated one) — use this whenever the user asks to change a video that already exists, never generate_video. Pass that video's URL as `videoUrl` and describe the change in `prompt`. Length, aspect ratio and resolution are inherited from the source.",
   text_to_speech:
-    '- text_to_speech: convert text to spoken audio (e.g. "read this aloud", "say this"). Pass the exact final text to speak — write it out first if it needs composing.',
+    'Convert text to spoken audio (e.g. "read this aloud", "say this"). Pass the exact final text to speak — write it out first if it needs composing.',
   transcribe_audio:
-    "- transcribe_audio: transcribe an audio file from this conversation to text (speech-to-text). Pass that audio's URL as `audioUrl`. Use when the user asks what an audio says or to transcribe/translate it."
+    "Transcribe an audio file from this conversation to text (speech-to-text). Pass that audio's URL as `audioUrl`. Use when the user asks what an audio says or to transcribe it; translating or summarising the transcript is then yours to do."
 };
 
+/** The rules that hold for every media tool; what each one is for is on the
+ *  tool. Nothing when no media tool is registered. */
 export function buildMediaToolsSystemPrompt(
   tools: ChatMediaToolName[]
 ): string {
   if (tools.length === 0) return '';
   return [
-    'You also have media generation tools:',
-    ...tools.map(name => MediaToolDescriptions[name]),
+    'You also have media tools; each says what it is for.',
     '',
     "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields. What you pass is a suggestion for what the user did not settle: anything they chose in the app's own settings is used instead, and where neither says anything the model's first listed value applies.",
     '',
@@ -173,7 +181,7 @@ export function buildMediaToolsSystemPrompt(
 }
 
 export const ArtifactSystemPrompt = [
-  'Use the create_artifact tool for substantial, self-contained, reusable content: code files, runnable React UIs, full documents, data tables, or generated media. Do NOT use it for short snippets, brief explanations, or conversational replies — keep those inline in the chat.',
+  'Use the create_artifact tool for substantial, self-contained, reusable content: code files, runnable React UIs, full documents, or data tables. Do NOT use it for short snippets, brief explanations, or conversational replies — keep those inline in the chat.',
   '',
   'Always set a concise, descriptive `title` (2–6 words) — it labels the artifact in the canvas and the artifact switcher.',
   '',
@@ -181,9 +189,8 @@ export const ArtifactSystemPrompt = [
   '- code: source code. Set `language` (e.g. tsx, ts, python, sql).',
   '- markdown / html / text: rendered or plain documents.',
   '- json: structured data; an array of row objects (or arrays) renders as a table.',
-  '- image / file: generated media — provide `fileUrl` and `mimeType` (plus `fileName`/`size` when known).',
   '',
-  'For non-file types, always put the COMPLETE content in `content`. Never truncate or use placeholders like "// rest unchanged". Each create_artifact call produces a separate artifact; to revise something, create a new artifact with the full updated content.',
+  'Always put the COMPLETE content in `content`. Never truncate or use placeholders like "// rest unchanged". Each create_artifact call produces a separate artifact; to revise something, create a new artifact with the full updated content.',
   '',
   'Live Preview is available for html, markdown, SVG (type code, language svg), and React/TS code. To make React/TS code previewable, follow this contract exactly:',
   '- Use type "code" with `language` one of react/tsx/jsx/typescript/javascript.',

@@ -7,7 +7,6 @@ import { artifactTypeSchema } from './artifact';
 // part type narrowing via ChatTools).
 
 export const createArtifactInputSchema = z.object({
-  id: z.string().min(1).optional(),
   title: z.string().min(1),
   type: artifactTypeSchema,
   language: z.string().optional(),

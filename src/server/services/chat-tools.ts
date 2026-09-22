@@ -19,6 +19,7 @@ import {
 import { collectConversationMediaUrls } from '@/lib/chat-media-urls';
 import {
   buildMediaToolsSystemPrompt,
+  MediaToolGuidance,
   type ChatMediaToolName
 } from '@/lib/constant';
 import { generateAndStoreImage } from '@/lib/image-generation';
@@ -381,7 +382,7 @@ export async function buildMediaTools(args: {
       const { dbModel } = image;
       tools.generate_image = tool({
         description:
-          'Generate a new image from a text description.' +
+          MediaToolGuidance.generate_image +
           optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
           optionsHint('sizes', dbModel.uiOptions?.sizes) +
           optionsHint('resolutions', dbModel.uiOptions?.resolutions),
@@ -412,8 +413,7 @@ export async function buildMediaTools(args: {
       imageEdit ?? (image?.dbModel.supportsImageEdit ? image : null);
 
     tools.edit_image = tool({
-      description:
-        'Edit an existing image from this conversation based on a text instruction.',
+      description: MediaToolGuidance.edit_image,
       inputSchema: editImageInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
         if (!editor) {
@@ -448,8 +448,8 @@ export async function buildMediaTools(args: {
         // description that says "short" beside a list ending in 60 contradicts
         // it.
         (videoImage || dbModel.supportsImageToVideo
-          ? 'Generate a video from a text description, optionally animating an image from this conversation.'
-          : 'Generate a video from a text description.') +
+          ? MediaToolGuidance.generate_video
+          : 'Create a video from a text description.') +
         optionsHint('sizes', dbModel.uiOptions?.sizes) +
         optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
         optionsHint('resolutions', dbModel.uiOptions?.resolutions) +
@@ -557,8 +557,7 @@ export async function buildMediaTools(args: {
     const { dbModel, candidates } = videoEdit;
 
     tools.edit_video = tool({
-      description:
-        'Edit an existing video from this conversation based on a text instruction.',
+      description: MediaToolGuidance.edit_video,
       inputSchema: editVideoInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
         // The provider fetches the source itself, so this checks the URL
@@ -644,7 +643,7 @@ export async function buildMediaTools(args: {
 
     tools.text_to_speech = tool({
       description:
-        'Convert text to spoken audio (text-to-speech).' +
+        MediaToolGuidance.text_to_speech +
         optionsHint('voices', dbModel.uiOptions?.voices),
       inputSchema: textToSpeechInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
@@ -697,8 +696,7 @@ export async function buildMediaTools(args: {
     const { dbModel, candidates } = stt;
 
     tools.transcribe_audio = tool({
-      description:
-        'Transcribe an audio file from this conversation to text (speech-to-text).',
+      description: MediaToolGuidance.transcribe_audio,
       inputSchema: transcribeAudioInputSchema,
       execute: async (
         input,
