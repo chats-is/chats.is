@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
-import { loadForVisit } from '@/lib/route-loader';
 import { modelQueries } from '@/server/functions/model';
 import { promptQueries } from '@/server/functions/prompt';
 import Prompts, { PromptsPending } from '@/components/console/prompts';
@@ -33,16 +32,10 @@ export const Route = createFileRoute('/console/prompts')({
    * dropdowns inside a dialog, and nothing on the page behind it is waiting to
    * know them.
    */
-  // The table on screen is a function of the address, so the loader is too:
-  // it asks for the page and filter the component is about to read, not for
-  // the first page of everything.
-  loaderDeps: ({ search }) => search,
-  loader: ({ context, deps, cause }) => {
+  loader: ({ context }) => {
     void context.queryClient.prefetchQuery(modelQueries.forSelect());
-    return loadForVisit(
-      context.queryClient,
-      promptQueries.adminList(promptTableInput(deps)),
-      cause
+    return context.queryClient.ensureQueryData(
+      promptQueries.adminList(promptTableInput({}))
     );
   },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Prompts') }] }),

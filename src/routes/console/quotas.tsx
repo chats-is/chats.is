@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
-import { loadForVisit } from '@/lib/route-loader';
 import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import Quotas, { QuotasPending } from '@/components/console/quotas';
@@ -29,16 +28,10 @@ export const Route = createFileRoute('/console/quotas')({
    * dropdowns inside a dialog, and nothing on the page behind it is waiting to
    * know them.
    */
-  // The table on screen is a function of the address, so the loader is too:
-  // it asks for the page and filter the component is about to read, not for
-  // the first page of everything.
-  loaderDeps: ({ search }) => search,
-  loader: ({ context, deps, cause }) => {
+  loader: ({ context }) => {
     void context.queryClient.prefetchQuery(modelQueries.forSelect());
-    return loadForVisit(
-      context.queryClient,
-      quotaQueries.list(quotaTableInput(deps)),
-      cause
+    return context.queryClient.ensureQueryData(
+      quotaQueries.list(quotaTableInput({}))
     );
   },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Quotas') }] }),

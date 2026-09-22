@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
-import { loadForVisit } from '@/lib/route-loader';
 import { pricingQueries } from '@/server/functions/pricing';
 import Pricing, { PricingPending } from '@/components/console/pricing';
 import { pricingTableInput } from '@/components/console/table-filters';
@@ -29,15 +28,9 @@ export const Route = createFileRoute('/console/pricing')({
    * The key is the one the component asks for on a plain visit, so it mounts
    * with data rather than skeletoning a second time.
    */
-  // The table on screen is a function of the address, so the loader is too:
-  // it asks for the page and filter the component is about to read, not for
-  // the first page of everything.
-  loaderDeps: ({ search }) => search,
-  loader: ({ context, deps, cause }) =>
-    loadForVisit(
-      context.queryClient,
-      pricingQueries.listWithModels(pricingTableInput(deps)),
-      cause
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(
+      pricingQueries.listWithModels(pricingTableInput({}))
     ),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Pricing') }] }),
   pendingComponent: PricingPending,

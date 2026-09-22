@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
-import { loadForVisit } from '@/lib/route-loader';
 import { modelQueries } from '@/server/functions/model';
 import { providerQueries } from '@/server/functions/provider';
 import Models, { ModelsPending } from '@/components/console/models';
@@ -35,16 +34,10 @@ export const Route = createFileRoute('/console/models')({
    * select inside the Add Model dialog, and nothing on the page behind that
    * dialog is waiting to know it.
    */
-  // The table on screen is a function of the address, so the loader is too:
-  // it asks for the page and filter the component is about to read, not for
-  // the first page of everything.
-  loaderDeps: ({ search }) => search,
-  loader: ({ context, deps, cause }) => {
+  loader: ({ context }) => {
     void context.queryClient.prefetchQuery(providerQueries.forSelect());
-    return loadForVisit(
-      context.queryClient,
-      modelQueries.list(modelTableInput(deps)),
-      cause
+    return context.queryClient.ensureQueryData(
+      modelQueries.list(modelTableInput({}))
     );
   },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Models') }] }),

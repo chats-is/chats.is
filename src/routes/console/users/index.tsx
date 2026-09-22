@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
-import { loadForVisit } from '@/lib/route-loader';
 import { quotaQueries } from '@/server/functions/quota';
 import { userQueries } from '@/server/functions/user';
 import { userTableInput } from '@/components/console/table-filters';
@@ -33,17 +32,11 @@ export const Route = createFileRoute('/console/users/')({
    * not waited for: the toolbar stands in for the counts, and the options fill
    * a select inside a row that does not exist yet.
    */
-  // The table on screen is a function of the address, so the loader is too:
-  // it asks for the page and filter the component is about to read, not for
-  // the first page of everything.
-  loaderDeps: ({ search }) => search,
-  loader: ({ context, deps, cause }) => {
+  loader: ({ context }) => {
     void context.queryClient.prefetchQuery(userQueries.stats());
     void context.queryClient.prefetchQuery(quotaQueries.listForSelect());
-    return loadForVisit(
-      context.queryClient,
-      userQueries.list(userTableInput(deps)),
-      cause
+    return context.queryClient.ensureQueryData(
+      userQueries.list(userTableInput({}))
     );
   },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Users') }] }),

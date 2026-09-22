@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { pageTitle } from '@/lib/head';
-import { OPEN_FROM_CACHE, openGallery } from '@/lib/route-loader';
 import { promptQueries } from '@/server/functions/prompt';
 import {
   GalleryPending,
@@ -19,15 +18,11 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute('/_chat/prompts')({
   validateSearch: searchSchema,
-  // Opens from what is held and is refreshed behind the page — see the library.
-  loader: {
-    ...OPEN_FROM_CACHE,
-    handler: ({ context }) =>
-      openGallery(
-        context.queryClient,
-        promptQueries.usableInfinite({ limit: 24 })
-      )
-  },
+  // Only a first visit, with nothing held, waits — see the library.
+  loader: ({ context }) =>
+    context.queryClient.ensureInfiniteQueryData(
+      promptQueries.usableInfinite({ limit: 24 })
+    ),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Prompts') }] }),
   pendingComponent: () => (
     <GalleryPending title="Prompts" toolbar={<PromptsToolbarSkeleton />} />
