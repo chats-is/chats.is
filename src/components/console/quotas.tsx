@@ -303,11 +303,6 @@ export default function QuotasPage() {
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // What the row said when the form was opened on it, sent back with the save
-  // so that a row someone changed in between is refused rather than undone.
-  // Held apart from the table's rows on purpose: those are refreshed behind
-  // the dialog, and reading the stamp from them would always match.
-  const [openedOn, setOpenedOn] = useState<Date | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const invalidate = () => {
@@ -330,9 +325,7 @@ export default function QuotasPage() {
     onSuccess: () => {
       invalidate();
       toast.success('Quota saved');
-    },
-    // A refused save means the table behind the dialog is out of date.
-    onError: invalidate
+    }
   });
 
   const del = useMutation({
@@ -362,11 +355,7 @@ export default function QuotasPage() {
 
       try {
         if (editingId) {
-          await update.mutateAsync({
-            id: editingId,
-            ...payload,
-            expectedUpdatedAt: openedOn ?? undefined
-          });
+          await update.mutateAsync({ id: editingId, ...payload });
         } else {
           await create.mutateAsync(payload);
         }
@@ -379,7 +368,6 @@ export default function QuotasPage() {
 
   const openFor = (quota: Quota | null) => {
     setEditingId(quota?.id ?? null);
-    setOpenedOn(quota?.updatedAt ?? null);
     const values = quota
       ? {
           name: quota.name,

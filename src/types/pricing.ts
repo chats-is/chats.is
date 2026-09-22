@@ -95,9 +95,6 @@ export const pricingListSchema = z.object({
 });
 
 export const pricingUpsertSchema = z.object({
-  /** The `updatedAt` the form was opened on — or `null` when it was opened on
-   *  a model with no price yet. See `stale-edit`. */
-  expectedUpdatedAt: z.coerce.date().nullable().optional(),
   modelDbId: z.string().min(1),
   input: priceNumberSchema,
   output: priceNumberSchema,

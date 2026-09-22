@@ -13,7 +13,6 @@ import {
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { prompts } from '@/db/schema';
-import { assertWritten, unchangedSince } from '@/server/services/stale-edit';
 
 // `id` last so the order is total: prompts seeded together share a display
 // order and a creation time, and paging by row offset over an order that
@@ -198,19 +197,12 @@ export async function createPrompt(
 }
 
 async function writePromptFields(input: z.infer<typeof promptUpdateSchema>) {
-  const { id, expectedUpdatedAt, ...updates } = input;
+  const { id, ...updates } = input;
 
-  const written = await db
+  await db
     .update(prompts)
     .set({ ...updates, updatedAt: new Date() })
-    .where(
-      and(
-        eq(prompts.id, id),
-        unchangedSince(prompts.updatedAt, expectedUpdatedAt)
-      )
-    )
-    .returning({ id: prompts.id });
-  assertWritten(written, expectedUpdatedAt, 'prompt');
+    .where(eq(prompts.id, id));
 }
 
 /**

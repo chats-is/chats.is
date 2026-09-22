@@ -17,9 +17,6 @@ export const planCreateSchema = z.object({
 });
 
 export const planUpdateSchema = z.object({
-  /** The `updatedAt` the edit form was opened on. Named by a form so that a
-   *  save over someone else's change is refused; see `stale-edit`. */
-  expectedUpdatedAt: z.coerce.date().optional(),
   id: z.string().min(1),
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional().nullable(),

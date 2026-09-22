@@ -17,7 +17,6 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { modelProviders, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
-import { assertWritten, unchangedSince } from '@/server/services/stale-edit';
 
 /** The console's provider table: one page of providers with their models,
  *  API keys masked. */
@@ -101,8 +100,7 @@ export async function updateProvider(
     throw new PublicError('Provider not found');
   }
 
-  const { id, apiKey, apiOptions, baseUrl, expectedUpdatedAt, ...updates } =
-    input;
+  const { id, apiKey, apiOptions, baseUrl, ...updates } = input;
   let resolvedApiKey = apiKey;
 
   if (input.type === 'vertex' && apiKey) {
@@ -137,7 +135,7 @@ export async function updateProvider(
     }
   }
 
-  const written = await db
+  await db
     .update(providers)
     .set({
       ...updates,
@@ -148,14 +146,7 @@ export async function updateProvider(
       ...(apiOptions !== undefined && { apiOptions }),
       updatedAt: new Date()
     })
-    .where(
-      and(
-        eq(providers.id, id),
-        unchangedSince(providers.updatedAt, expectedUpdatedAt)
-      )
-    )
-    .returning({ id: providers.id });
-  assertWritten(written, expectedUpdatedAt, 'provider');
+    .where(eq(providers.id, id));
 }
 
 export async function deleteProvider(id: string) {

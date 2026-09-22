@@ -210,9 +210,6 @@ export const modelCreateSchema = z.object({
 });
 
 export const modelUpdateSchema = z.object({
-  /** The `updatedAt` the edit form was opened on. Named by a form so that a
-   *  save over someone else's change is refused; see `stale-edit`. */
-  expectedUpdatedAt: z.coerce.date().optional(),
   id: z.string().min(1),
   name: z.string().min(1).max(100).optional(),
   modelId: z.string().min(1).max(255).optional(),

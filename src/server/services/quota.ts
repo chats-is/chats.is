@@ -17,7 +17,6 @@ import { db } from '@/db';
 import { quotas, usage, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { getDefaultQuotaId } from '@/server/services/settings';
-import { assertWritten, unchangedSince } from '@/server/services/stale-edit';
 
 type QuotaRow = typeof quotas.$inferSelect;
 
@@ -343,7 +342,7 @@ export async function createQuota(input: z.infer<typeof quotaCreateSchema>) {
 }
 
 export async function updateQuota(input: z.infer<typeof quotaUpdateSchema>) {
-  const { id, expectedUpdatedAt, ...updates } = input;
+  const { id, ...updates } = input;
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (updates.name !== undefined) patch.name = updates.name;
   if (updates.description !== undefined)
@@ -399,17 +398,7 @@ export async function updateQuota(input: z.infer<typeof quotaUpdateSchema>) {
     patch.sevenDay = null;
   }
 
-  const written = await db
-    .update(quotas)
-    .set(patch)
-    .where(
-      and(
-        eq(quotas.id, id),
-        unchangedSince(quotas.updatedAt, expectedUpdatedAt)
-      )
-    )
-    .returning({ id: quotas.id });
-  assertWritten(written, expectedUpdatedAt, 'quota');
+  await db.update(quotas).set(patch).where(eq(quotas.id, id));
 }
 
 export async function deleteQuota(id: string) {

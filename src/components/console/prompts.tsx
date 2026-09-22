@@ -266,9 +266,7 @@ export default function PromptsPage() {
     onSuccess: async () => {
       await invalidate();
       toast.success('Prompt updated');
-    },
-    // A refused save means the table behind the dialog is out of date.
-    onError: invalidate
+    }
   });
 
   const adminDeleteMutation = useMutation({
@@ -302,10 +300,7 @@ export default function PromptsPage() {
         if (editingPrompt) {
           await adminUpdateMutation.mutateAsync({
             id: editingPrompt.id,
-            ...payload,
-            // The row as the form was opened on it — `editingPrompt` is that
-            // copy, not the table's, which is refreshed behind the dialog.
-            expectedUpdatedAt: editingPrompt.updatedAt
+            ...payload
           });
         } else {
           await adminCreateMutation.mutateAsync(payload);

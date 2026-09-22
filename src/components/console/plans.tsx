@@ -177,11 +177,6 @@ export default function PlansPage() {
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // What the row said when the form was opened on it, sent back with the save
-  // so that a row someone changed in between is refused rather than undone.
-  // Held apart from the table's rows on purpose: those are refreshed behind
-  // the dialog, and reading the stamp from them would always match.
-  const [openedOn, setOpenedOn] = useState<Date | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const create = useMutation({
@@ -197,10 +192,7 @@ export default function PlansPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
       toast.success('Plan saved');
-    },
-    // A refused save means the table behind the dialog is out of date.
-    onError: () =>
-      queryClient.invalidateQueries({ queryKey: planQueries.key.list() })
+    }
   });
 
   const del = useMutation({
@@ -231,11 +223,7 @@ export default function PlansPage() {
         // Awaited so the form stays in its submitting state — and so the
         // dialog closes only once the write has actually landed.
         if (editingId) {
-          await update.mutateAsync({
-            id: editingId,
-            ...payload,
-            expectedUpdatedAt: openedOn ?? undefined
-          });
+          await update.mutateAsync({ id: editingId, ...payload });
         } else {
           await create.mutateAsync(payload);
         }
@@ -250,7 +238,6 @@ export default function PlansPage() {
   // what decides which record it is pointed at.
   const openFor = (plan: Plan | null) => {
     setEditingId(plan?.id ?? null);
-    setOpenedOn(plan?.updatedAt ?? null);
     const values = plan
       ? {
           name: plan.name,

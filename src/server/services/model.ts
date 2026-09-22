@@ -15,7 +15,6 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { modelProviders, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
-import { assertWritten, unchangedSince } from '@/server/services/stale-edit';
 
 type Provider = typeof providers.$inferSelect;
 type ProviderBinding = typeof modelProviders.$inferSelect & {
@@ -263,12 +262,7 @@ export async function createModel(input: z.infer<typeof modelCreateSchema>) {
 }
 
 export async function updateModel(input: z.infer<typeof modelUpdateSchema>) {
-  const {
-    id,
-    providers: inputProviders,
-    expectedUpdatedAt,
-    ...updates
-  } = input;
+  const { id, providers: inputProviders, ...updates } = input;
   const sanitizedUpdates = { ...updates };
   // modelId is the immutable business key — it's referenced by pricing /
   // usage / quota / settings and the model_providers FK, none of which
@@ -298,19 +292,10 @@ export async function updateModel(input: z.infer<typeof modelUpdateSchema>) {
   }
 
   await db.transaction(async tx => {
-    const written = await tx
+    await tx
       .update(models)
       .set({ ...sanitizedUpdates, updatedAt: new Date() })
-      .where(
-        and(
-          eq(models.id, id),
-          unchangedSince(models.updatedAt, expectedUpdatedAt)
-        )
-      )
-      .returning({ id: models.id });
-    // Thrown inside the transaction, so the pairings below are not touched
-    // either when the save is refused.
-    assertWritten(written, expectedUpdatedAt, 'model');
+      .where(eq(models.id, id));
 
     // Replace the pairings when an explicit list is supplied. Never empty by
     // here, so the delete is always followed by an insert.

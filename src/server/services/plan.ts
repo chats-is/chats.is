@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { pageWindow } from '@/types/pagination';
@@ -13,7 +13,6 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { plans, quotas, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
-import { assertWritten, unchangedSince } from '@/server/services/stale-edit';
 
 /**
  * Plans as the user end may see them: id, name, description, order.
@@ -87,7 +86,7 @@ export async function createPlan(input: z.infer<typeof planCreateSchema>) {
 }
 
 export async function updatePlan(input: z.infer<typeof planUpdateSchema>) {
-  const { id, expectedUpdatedAt, ...updates } = input;
+  const { id, ...updates } = input;
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (updates.name !== undefined) patch.name = updates.name;
   if (updates.description !== undefined)
@@ -99,14 +98,7 @@ export async function updatePlan(input: z.infer<typeof planUpdateSchema>) {
   if (updates.displayOrder !== undefined)
     patch.displayOrder = updates.displayOrder;
 
-  const written = await db
-    .update(plans)
-    .set(patch)
-    .where(
-      and(eq(plans.id, id), unchangedSince(plans.updatedAt, expectedUpdatedAt))
-    )
-    .returning({ id: plans.id });
-  assertWritten(written, expectedUpdatedAt, 'plan');
+  await db.update(plans).set(patch).where(eq(plans.id, id));
 }
 
 export async function deletePlan(id: string) {
