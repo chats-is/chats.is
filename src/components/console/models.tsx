@@ -30,6 +30,7 @@ import {
   type listModels
 } from '@/server/functions/model';
 import { providerQueries } from '@/server/functions/provider';
+import { settingsQueries } from '@/server/functions/settings';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -375,8 +376,13 @@ export default function ModelsPage() {
   );
   const { data: providers } = useQuery(providerQueries.forSelect());
 
-  const invalidate = () =>
+  // The models on offer in the chat are read from the system settings, which
+  // a layout holds for a minute: a model switched off here must go off the
+  // menu at once, not when that minute is up.
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: modelQueries.all() });
+    queryClient.invalidateQueries({ queryKey: settingsQueries.key.system() });
+  };
 
   const createMutation = useMutation({
     mutationFn: mutating(createModel),

@@ -48,14 +48,8 @@ export const planQueries = {
   /** Key prefixes, shared by the readers and by anything that
    *  invalidates them, so the two can never drift apart. */
   key: {
-    listPublic: () => ['plan', 'listPublic'] as const,
     list: () => ['plan', 'list'] as const
   },
-  listPublic: () =>
-    queryOptions({
-      queryKey: [...planQueries.key.listPublic()] as const,
-      queryFn: () => listPublicPlans()
-    }),
   /** One page of the console's plan table. */
   list: (input: { page?: number; pageSize?: number } = {}) =>
     queryOptions({

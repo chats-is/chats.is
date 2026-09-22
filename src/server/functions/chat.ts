@@ -52,15 +52,9 @@ export const chatQueries = {
   /** Key prefixes, shared by the readers and by anything that
    *  invalidates them, so the two can never drift apart. */
   key: {
-    list: () => ['chat', 'list'] as const,
     infinite: () => ['chat', 'infinite'] as const,
     detail: () => ['chat', 'detail'] as const
   },
-  list: (input: ListInput = {}) =>
-    queryOptions({
-      queryKey: [...chatQueries.key.list(), input] as const,
-      queryFn: () => listChats({ data: input })
-    }),
   /** The sidebar pages through history; the cursor is the row offset. */
   infinite: (input: ListInput = {}) =>
     infiniteQueryOptions({

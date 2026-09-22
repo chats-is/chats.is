@@ -51,12 +51,10 @@ export function getRouter() {
         // a hover that preloaded makes it a third. Two seconds lets one answer
         // serve the visit that fetched it, and is over before the next.
         staleTime: 2 * 1000,
-        // Coming back to the tab is not a request for fresh data. It reloads
-        // lists under the reader's cursor, restarts work a dialog was in the
-        // middle of, and asks the database for everything on screen at once —
-        // for data that changes when someone changes it, not while nobody is
-        // looking. Several components had already turned this off one at a
-        // time; it is one decision, so it is made once.
+        // Coming back to the tab is not a request for fresh data — and with
+        // two seconds of freshness, it would be a request for everything on
+        // screen at once, most of it read again on the next navigation
+        // anyway. Off everywhere; nothing turns it on for itself.
         refetchOnWindowFocus: false
       }
     }

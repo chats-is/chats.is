@@ -1,5 +1,4 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
 
 import {
   messageChatSchema,
@@ -34,17 +33,3 @@ export const deleteMessages = createServerFn({ method: 'POST' })
   .handler(({ data, context }) =>
     messages.deleteMessages(context.user.id, data)
   );
-
-export const messageQueries = {
-  all: () => ['message'] as const,
-  /** Key prefixes, shared by the readers and by anything that
-   *  invalidates them, so the two can never drift apart. */
-  key: {
-    list: () => ['message', 'list'] as const
-  },
-  list: (input: { chatId: string }) =>
-    queryOptions({
-      queryKey: [...messageQueries.key.list(), input] as const,
-      queryFn: () => listMessages({ data: input })
-    })
-};

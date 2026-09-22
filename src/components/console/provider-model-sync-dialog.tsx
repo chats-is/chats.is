@@ -12,6 +12,7 @@ import {
   syncProviderModels,
   type fetchProviderModels
 } from '@/server/functions/provider';
+import { settingsQueries } from '@/server/functions/settings';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -147,6 +148,9 @@ export function ProviderModelSyncDialog({
     onSuccess: (result: Output<typeof syncProviderModels>) => {
       queryClient.invalidateQueries({ queryKey: providerQueries.all() });
       queryClient.invalidateQueries({ queryKey: modelQueries.all() });
+      queryClient.invalidateQueries({
+        queryKey: settingsQueries.key.system()
+      });
       reset();
       onOpenChange(false);
       toast.success(

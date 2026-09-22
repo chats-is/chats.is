@@ -20,6 +20,7 @@ import { ProviderTypes } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
+import { modelQueries } from '@/server/functions/model';
 import {
   createProvider,
   deleteProvider,
@@ -29,6 +30,7 @@ import {
   updateProvider,
   type listProviders
 } from '@/server/functions/provider';
+import { settingsQueries } from '@/server/functions/settings';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -334,8 +336,14 @@ export default function ProvidersPage() {
     providerQueries.list(providerTableInput({ q: search, page }))
   );
 
-  const invalidate = () =>
+  // A model is drawn with its providers — their names, whether they are on —
+  // and the chat's menu is drawn from what can answer; a provider changed
+  // here changes both.
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: providerQueries.all() });
+    queryClient.invalidateQueries({ queryKey: modelQueries.all() });
+    queryClient.invalidateQueries({ queryKey: settingsQueries.key.system() });
+  };
 
   const createMutation = useMutation({
     mutationFn: mutating(createProvider),

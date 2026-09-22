@@ -41,8 +41,7 @@ export const shareQueries = {
   /** Key prefixes, shared by the readers and by anything that
    *  invalidates them, so the two can never drift apart. */
   key: {
-    list: () => ['share', 'list'] as const,
-    detail: () => ['share', 'detail'] as const
+    list: () => ['share', 'list'] as const
   },
   /** One page of the user's share links. */
   list: (input: { page?: number; pageSize?: number } = {}) =>
@@ -56,10 +55,5 @@ export const shareQueries = {
       // a first load and blank the table. The previous page stays on screen
       // until the next one lands.
       placeholderData: keepPreviousData
-    }),
-  detail: (input: { id: string }) =>
-    queryOptions({
-      queryKey: [...shareQueries.key.detail(), input] as const,
-      queryFn: () => getSharedChat({ data: input })
     })
 };

@@ -69,7 +69,6 @@ export function useChats() {
 
   const settle = () => {
     queryClient.invalidateQueries({ queryKey: chatQueries.key.infinite() });
-    queryClient.invalidateQueries({ queryKey: chatQueries.key.list() });
   };
 
   const update = useMutation({

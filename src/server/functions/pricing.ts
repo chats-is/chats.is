@@ -67,8 +67,7 @@ export const pricingQueries = {
   /** Key prefixes, shared by the readers and by anything that
    *  invalidates them, so the two can never drift apart. */
   key: {
-    listWithModels: () => ['pricing', 'listWithModels'] as const,
-    searchRemote: () => ['pricing', 'searchRemote'] as const
+    listWithModels: () => ['pricing', 'listWithModels'] as const
   },
   /** One page of the console's pricing table. */
   listWithModels: (input: PricingListInput = {}) =>
@@ -82,15 +81,5 @@ export const pricingQueries = {
       // a first load and blank the table. The previous page stays on screen
       // until the next one lands.
       placeholderData: keepPreviousData
-    }),
-  /** Reads the upstream catalogue, so it is only fetched when asked for. */
-  searchRemote: (input: {
-    source: 'models.dev' | 'llm-metadata';
-    query?: string;
-    limit?: number;
-  }) =>
-    queryOptions({
-      queryKey: [...pricingQueries.key.searchRemote(), input] as const,
-      queryFn: () => searchRemotePricing({ data: { limit: 50, ...input } })
     })
 };

@@ -1,22 +1,28 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import { CircleAlert, Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
 
 import { pageTitle } from '@/lib/head';
-import { getConsoleOverview } from '@/server/functions/overview';
+import { overviewQueries } from '@/server/functions/overview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConsoleCardsSkeleton } from '@/components/console/skeletons';
 
 export const Route = createFileRoute('/console/')({
-  // Nine counts, counted by the database and carried by one call.
-  loader: () => getConsoleOverview(),
+  // Nine counts, counted by the database and carried by one call — through
+  // the cache, like every other page, so a return draws what was held and
+  // reads again behind it.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(overviewQueries.console()),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Console') }] }),
   pendingComponent: () => <ConsoleCardsSkeleton />,
   component: ConsoleHome
 });
 
 function ConsoleHome() {
-  const { hasDefaultQuota, providers, models, prompts, settings, users } =
-    Route.useLoaderData();
+  const { data } = useQuery(overviewQueries.console());
+  // Primed by the loader; a placeholder only for the cache being emptied.
+  if (!data) return <ConsoleCardsSkeleton />;
+  const { hasDefaultQuota, providers, models, prompts, settings, users } = data;
 
   return (
     <div className="space-y-6">
