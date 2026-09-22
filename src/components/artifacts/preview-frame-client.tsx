@@ -40,6 +40,53 @@ type RenderState =
       component: React.ComponentType;
     };
 
+/**
+ * Storage the artifact can use, since the real one is out of reach.
+ *
+ * The frame runs at an opaque origin — that is what makes running the
+ * model's code safe — and an opaque origin has no `localStorage` or
+ * `sessionStorage`: reading either throws. Artifacts reach for them all the
+ * time, to remember a theme or a score, and one that does should run rather
+ * than crash. So each is replaced with a store that lives in memory. It lasts
+ * as long as the frame: a preview does not persist across reloads, and it
+ * must not, since anything it kept would be kept per origin, and every
+ * artifact here shares the one opaque origin.
+ */
+function memoryStorage(): Storage {
+  const store = new Map<string, string>();
+  const storage: Storage = {
+    get length() {
+      return store.size;
+    },
+    key: index => [...store.keys()][index] ?? null,
+    getItem: key => store.get(String(key)) ?? null,
+    setItem: (key, value) => {
+      store.set(String(key), String(value));
+    },
+    removeItem: key => {
+      store.delete(String(key));
+    },
+    clear: () => store.clear()
+  };
+  return storage;
+}
+
+function installMemoryStorage() {
+  for (const name of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      // Reachable, so leave it: the frame is not sandboxed, and the guard
+      // below will refuse to run anything anyway.
+      void window[name];
+    } catch {
+      Object.defineProperty(window, name, {
+        value: memoryStorage(),
+        configurable: true,
+        writable: true
+      });
+    }
+  }
+}
+
 type PreviewMessage = {
   type: 'artifact-preview-render';
   entryPath: string;
@@ -240,6 +287,8 @@ export function ArtifactPreviewFrameClient() {
   }, [state, runtimeError]);
 
   useEffect(() => {
+    installMemoryStorage();
+
     const handleMessage = (event: MessageEvent<PreviewMessage>) => {
       // Only accept render instructions from the embedding parent window.
       // Defense in depth: the frame is already sandboxed to an opaque origin,
