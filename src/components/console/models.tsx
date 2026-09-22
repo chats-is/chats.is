@@ -17,6 +17,7 @@ import { type ModelCapability, type ProviderType } from '@/types';
 import { modelCapabilitySchema } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { isPriced } from '@/lib/pricing-summary';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
@@ -75,6 +76,7 @@ import {
   DataTable
 } from '@/components/console/data-table';
 import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
+import { ProviderBindings } from '@/components/console/provider-bindings';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { modelTableInput } from '@/components/console/table-filters';
 import {
@@ -271,14 +273,11 @@ const modelColumns = (actions: {
     }),
     helper.display({
       id: 'provider',
-      header: 'Provider',
+      header: 'Providers',
       meta: { cellClassName: 'text-sm' },
-      cell: ({ row }) => {
-        return (row.original.providers ?? [])
-          .map(binding => binding.provider?.name)
-          .filter(Boolean)
-          .join(', ');
-      }
+      cell: ({ row }) => (
+        <ProviderBindings bindings={row.original.providers ?? []} />
+      )
     }),
     helper.accessor('capability', {
       header: 'Capability',
@@ -287,6 +286,21 @@ const modelColumns = (actions: {
           {row.original.capability}
         </span>
       )
+    }),
+    helper.accessor(row => isPriced(row.capability, row.pricing), {
+      id: 'pricing',
+      header: 'Pricing',
+      meta: { align: 'center', headClassName: 'w-24' },
+      cell: ({ row }) =>
+        isPriced(row.original.capability, row.original.pricing) ? (
+          <span className="text-xs text-muted-foreground">Set</span>
+        ) : (
+          // Unpriced is the case worth the eye: what it bills is recorded
+          // and costed at nothing until someone gives it a rate.
+          <span className="inline-flex items-center rounded-full border border-amber-300 px-1.5 py-px text-[11px] font-medium whitespace-nowrap text-amber-700 dark:border-amber-900 dark:text-amber-400">
+            Not set
+          </span>
+        )
     }),
     helper.accessor('isEnabled', {
       header: 'Enabled',

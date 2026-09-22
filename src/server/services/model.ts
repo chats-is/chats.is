@@ -163,14 +163,17 @@ export async function listModels(filter: z.infer<typeof modelListSchema>) {
             asc(binding.priority),
             asc(binding.id)
           ]
-        }
+        },
+        // A model bills on one price row, so the table can say whether it
+        // has one without a second page to go and look at.
+        pricings: { limit: 1 }
       }
     }),
     db.select({ count: count() }).from(models).where(where)
   ]);
 
   return {
-    rows,
+    rows: rows.map(m => ({ ...m, pricing: m.pricings[0] ?? null })),
     total: Number(totalRow?.count ?? 0),
     page: filter.page,
     pageSize: filter.pageSize

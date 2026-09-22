@@ -29,14 +29,14 @@ export const ConsoleNavigation = {
       icon: Cpu
     },
     {
-      title: 'Prompts',
-      url: '/console/prompts',
-      icon: Sparkles
-    },
-    {
       title: 'Pricing',
       url: '/console/pricing',
       icon: CircleDollarSign
+    },
+    {
+      title: 'Prompts',
+      url: '/console/prompts',
+      icon: Sparkles
     },
     {
       title: 'Quotas',
