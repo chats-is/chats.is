@@ -183,16 +183,21 @@ const userColumns = (ctx: {
               }
             >
               <SelectTrigger className="w-28">
-                <div className="flex items-center gap-2">
-                  {saving ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : user.role === 'admin' ? (
-                    <ShieldCheck className="size-3" />
-                  ) : (
-                    <UserIcon className="size-3" />
-                  )}
-                  <span>{user.role === 'admin' ? 'Admin' : 'User'}</span>
-                </div>
+                {/* Inside a SelectValue, not in place of one: the menu is
+                    positioned against the value node, and without one it is
+                    never placed — and an unplaced menu takes no choice. */}
+                <SelectValue>
+                  <div className="flex items-center gap-2">
+                    {saving ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : user.role === 'admin' ? (
+                      <ShieldCheck className="size-3" />
+                    ) : (
+                      <UserIcon className="size-3" />
+                    )}
+                    <span>{user.role === 'admin' ? 'Admin' : 'User'}</span>
+                  </div>
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="user">
