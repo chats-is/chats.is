@@ -95,8 +95,8 @@ export function getRouter() {
     defaultPreloadStaleTime: 0,
     // Coming back to a page it has shown, the router draws it at once and runs
     // the loader behind it; the page redraws when the read lands. Left as the
-    // router has it. The one page that must not be drawn from an old copy — the
-    // console's settings form — says so itself (`WAIT_FOR_FRESH`).
+    // router has it. A form that must not be saved on an old copy — the
+    // console's settings — holds itself until the read lands instead.
     // How long a load may take before it is worth saying so. Under this, the
     // placeholder never appears and the page changes once; over it, the
     // placeholder stands in until the data lands.

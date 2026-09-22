@@ -33,7 +33,6 @@ import {
   settingsQueries
 } from '@/server/functions/settings';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useAppForm } from '@/components/app-form';
 import { ModelStatusBadge } from '@/components/console/model-status';
@@ -167,12 +166,10 @@ const KEYS = [
  * model picks, then the two switches.
  */
 export function ConsoleSettings() {
-  const { form, isLoading } = useSettingsForm(KEYS);
-
-  if (isLoading) return <SettingsPending />;
+  const { form, isHeld } = useSettingsForm(KEYS);
 
   return (
-    <SettingsForm form={form}>
+    <SettingsForm form={form} isHeld={isHeld}>
       <ApplicationSettings form={form} />
       <ModelDefaults form={form} />
       <SpeechSettings form={form} />
@@ -517,7 +514,7 @@ function SettingsRow({
  */
 function useSettingsForm(keys: readonly string[]) {
   const queryClient = useQueryClient();
-  const { data: settings, isLoading } = useQuery(settingsQueries.list());
+  const { data: settings, isFetching } = useQuery(settingsQueries.list());
 
   const mutation = useMutation({
     mutationFn: mutating(bulkUpdateSettings),
@@ -571,7 +568,12 @@ function useSettingsForm(keys: readonly string[]) {
     form.reset(valuesOf(settings));
   }, [settings, form]);
 
-  return { form, isLoading };
+  // Held while the values are on their way — drawn from what was held, if
+  // anything was, but not to be edited until they are what the server has.
+  // Not once something has been edited: that read is going to be ignored.
+  const isHeld = isFetching && !isDirty;
+
+  return { form, isHeld };
 }
 
 /** The rows as the form holds them: dotted keys expanded into an object. */
@@ -596,12 +598,15 @@ type SettingsFormApi = ReturnType<typeof useSettingsForm>['form'];
 /**
  * The page's fields, and the Save that commits them. Submitting is what
  * saves, so the button is inside the form rather than wired to a handler.
+ * Held — every field and the button — while the values are being read.
  */
 function SettingsForm({
   form,
+  isHeld,
   children
 }: {
   form: SettingsFormApi;
+  isHeld: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -610,10 +615,11 @@ function SettingsForm({
         e.preventDefault();
         form.handleSubmit();
       }}
-      className="space-y-6"
     >
-      {children}
-      <SettingsSaveBar form={form} />
+      <fieldset disabled={isHeld} className="min-w-0 space-y-6">
+        {children}
+        <SettingsSaveBar form={form} />
+      </fieldset>
     </form>
   );
 }
@@ -638,103 +644,4 @@ function SettingsSaveBar({ form }: { form: SettingsFormApi }) {
       </Button>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Before the values arrive
-// ---------------------------------------------------------------------------
-
-/** Stands in for a row's icon, in the space the real one occupies. */
-function IconStandIn({ className }: { className?: string }) {
-  return <Skeleton className={cn('rounded', className)} />;
-}
-
-/** Whatever the row turns out to be: a label, a line about it, its key, and
- *  its control. `control` is the shape the real one has, so a switch does not
- *  stand in as something select-sized and then shrink. */
-function PendingRow({ control = 'h-9 w-full' }: { control?: string }) {
-  return (
-    <SettingsRow
-      icon={IconStandIn}
-      label={<Skeleton className="h-4 w-44 max-w-full" />}
-      hint={<Skeleton className="h-3.5 w-80 max-w-full" />}
-      settingKey={<Skeleton className="h-2.5 w-36 max-w-full" />}
-    >
-      <Skeleton className={control} />
-    </SettingsRow>
-  );
-}
-
-/** The heading bar above a block of fields, outside a `SettingsList`. */
-function PendingHead({ width }: { width: string }) {
-  return (
-    <div className="border-b bg-muted/50 px-4 py-3">
-      <Skeleton className={cn('h-3.5', width)} />
-    </div>
-  );
-}
-
-function PendingField({
-  width,
-  control,
-  className
-}: {
-  width: string;
-  control: string;
-  className?: string;
-}) {
-  return (
-    <div className={cn('space-y-2', className)}>
-      <Skeleton className={cn('h-4', width)} />
-      <Skeleton className={cn('w-full', control)} />
-    </div>
-  );
-}
-
-/**
- * The page in the order it is read, with a bar standing in for each piece of
- * content. Built out of the same `SettingsList` and `SettingsRow` the page
- * itself uses: a placeholder made of its own markup drifts the moment a row
- * grows a line, this one cannot, and it is the height the page will be, so
- * nothing moves when the values land.
- */
-export function SettingsPending() {
-  return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-lg border">
-        <PendingHead width="w-24" />
-        <div className="grid gap-4 p-4 md:grid-cols-2">
-          <PendingField width="w-20" control="h-9" />
-          <PendingField width="w-24" control="h-9" />
-          {/* A textarea sizes to what it holds, so an empty one sits at its
-              floor — which is where an unset setting starts. */}
-          <PendingField width="w-28" control="h-16" className="md:col-span-2" />
-          <PendingField width="w-40" control="h-32" className="md:col-span-2" />
-        </div>
-      </div>
-
-      <SettingsList title={<Skeleton className="h-3.5 w-16" />}>
-        {Array.from({ length: 9 }).map((_, row) => (
-          <PendingRow key={row} />
-        ))}
-      </SettingsList>
-
-      {/* Speech is a switch, which is the one control here that is not the
-          width of the column. */}
-      <SettingsList title={<Skeleton className="h-3.5 w-16" />}>
-        <PendingRow control="h-[1.15rem] w-8 rounded-full" />
-      </SettingsList>
-
-      <SettingsList title={<Skeleton className="h-3.5 w-14" />}>
-        <PendingRow />
-      </SettingsList>
-
-      <PendingSave />
-    </div>
-  );
-}
-
-/** Save, which the page ends on. */
-function PendingSave() {
-  return <Skeleton className="h-9 w-32" />;
 }

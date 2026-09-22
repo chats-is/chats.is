@@ -38,20 +38,6 @@ export function loadForVisit<TData, TKey extends ReadonlyArray<unknown>>(
 }
 
 /**
- * For the one kind of page that must never be drawn from an old copy: spread
- * into the route's `loader` beside its `handler`, and have the handler await
- * `fetchQuery`.
- *
- * Coming back to a page it has shown, the router draws it at once and runs the
- * loader behind it. That is right for nearly everything here — a table that is
- * a moment behind corrects itself as the read lands. It is wrong for a form
- * that is about to be saved: the console's settings are edited as a whole, and
- * saving a form opened on last visit's values writes those values back over
- * whatever changed since.
- */
-export const WAIT_FOR_FRESH = { staleReloadMode: 'blocking' } as const;
-
-/**
  * For the two galleries — the library and the prompts — which open from what
  * is already held and are brought up to date behind the page. Spread into the
  * route's `loader` beside its `handler`, with `openGallery` as the handler.

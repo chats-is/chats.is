@@ -1,35 +1,34 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { pageTitle } from '@/lib/head';
-import { WAIT_FOR_FRESH } from '@/lib/route-loader';
+import { loadForVisit } from '@/lib/route-loader';
 import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import { settingsQueries } from '@/server/functions/settings';
-import {
-  ConsoleSettings,
-  SettingsPending
-} from '@/components/console/settings';
+import { ConsoleSettings } from '@/components/console/settings';
 
 export const Route = createFileRoute('/console/settings')({
   /**
-   * The values and the lists the rows read from, all awaited. A row says
-   * whether the model it names is still available, which is the wrong thing to
-   * answer from a list that has not arrived — and a select with nothing in it
-   * disables itself, which is the right answer for an installation with no
-   * models and the wrong one for models still on their way.
+   * The values and the lists the rows read from. A first visit waits for all
+   * three, so the page is drawn once, with its values; after that it is drawn
+   * from what is held and the values are read again behind it, with the form
+   * held until they land — the console's settings are edited as a whole, and
+   * a form saved on last visit's values writes those back over whatever
+   * changed since. The values are read again on every visit, however recent
+   * the last; the lists, only when stale.
    */
-  loader: {
-    ...WAIT_FOR_FRESH,
-    handler: ({ context }) =>
-      Promise.all([
-        context.queryClient.fetchQuery(settingsQueries.list()),
-        context.queryClient.fetchQuery(modelQueries.forSelect()),
-        context.queryClient.fetchQuery(quotaQueries.listForSelect())
-      ])
-  },
+  loader: ({ context, cause }) =>
+    Promise.all([
+      loadForVisit(
+        context.queryClient,
+        { ...settingsQueries.list(), staleTime: 0 },
+        cause
+      ),
+      loadForVisit(context.queryClient, modelQueries.forSelect(), cause),
+      loadForVisit(context.queryClient, quotaQueries.listForSelect(), cause)
+    ]),
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Settings') }]
   }),
-  pendingComponent: SettingsPending,
   component: ConsoleSettings
 });
