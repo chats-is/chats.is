@@ -41,7 +41,8 @@ import {
   AllProvidersFailedError,
   getLanguageModel,
   isRetryableProviderError,
-  PROVIDER_FAILURE_MESSAGE
+  PROVIDER_FAILURE_MESSAGE,
+  resolveModelId
 } from '@/lib/provider';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
 import { openedWithError } from '@/lib/stream-failover';
@@ -57,7 +58,7 @@ import { carriesOnlyOwnFiles, isOwnBlobUrl } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
 import { buildMediaTools } from '@/server/services/chat-tools';
 import * as messages from '@/server/services/message';
-import { findModelByModelId } from '@/server/services/model';
+import { findModelByModelId, usableCandidates } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
 import { getSystemPrompt, getTitleSettings } from '@/server/services/settings';
 import { recordChatUsage } from '@/server/services/usage';
@@ -184,7 +185,7 @@ async function POST({
 
   // Fetch model from database to validate
   const dbModel = await findModelByModelId(modelId, 'chat');
-  const candidates = dbModel?.providers.map(binding => binding.provider!) ?? [];
+  const candidates = dbModel ? usableCandidates(dbModel) : [];
 
   // A refusal is not returned as an HTTP error: it is persisted as the
   // assistant turn, so the user still sees why when they come back to the
@@ -266,6 +267,7 @@ async function POST({
         messageId: userMessage.id,
         modelId: titleModelId,
         providerId: titleProvider.id,
+        providerModelId: resolveModelId(titleProvider, titleModelId),
         usage: normalizeChatUsage(usage)
       });
 
@@ -1153,6 +1155,7 @@ async function POST({
           messageId: assistantMessageId,
           modelId,
           providerId: servedBy.id,
+          providerModelId: resolveModelId(servedBy, modelId),
           usage: sumChatUsage(spent)
         });
       } else {

@@ -12,7 +12,7 @@ import {
   type providerUpdateSchema
 } from '@/types/provider';
 import { decrypt, encrypt, maskedKey } from '@/lib/crypto';
-import { getProviderModels, toProviderModelId } from '@/lib/provider';
+import { getProviderModels } from '@/lib/provider';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { modelProviders, models, providers } from '@/db/schema';
@@ -200,36 +200,6 @@ export async function fetchProviderModels(providerId: string) {
     name: modelId,
     exists: existingIds.has(modelId)
   }));
-}
-
-/** Enabled providers whose API actually offers this model — the same-kind
- *  providers it can fail over between. One whose listing errors is omitted. */
-export async function compatibleProviders(modelId: string) {
-  const enabledProviders = await db.query.providers.findMany({
-    where: eq(providers.isEnabled, true),
-    orderBy: (providers, { asc, desc }) => [
-      asc(providers.displayOrder),
-      desc(providers.createdAt)
-    ]
-  });
-
-  const checks = await Promise.all(
-    enabledProviders.map(async provider => {
-      try {
-        const ids = await getProviderModels(provider);
-        // Vertex/Bedrock list models under their renamed ids — compare
-        // against the upstream id the provider would actually receive.
-        const target = toProviderModelId(provider.type, modelId);
-        return ids.includes(target) || ids.includes(modelId)
-          ? { id: provider.id, name: provider.name }
-          : null;
-      } catch {
-        return null;
-      }
-    })
-  );
-
-  return checks.filter((p): p is { id: string; name: string } => p !== null);
 }
 
 /** Create the selected models this install does not have yet, and report

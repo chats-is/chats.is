@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only';
 
 import { generateSpeech } from 'ai';
 
-import { type Model, type Provider } from '@/types';
+import { type Candidate, type Model, type Provider } from '@/types';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import { getSpeechModel, runWithProviderFailover } from '@/lib/provider';
 import { defaultVoice } from '@/lib/provider-vocab';
@@ -21,7 +21,7 @@ export async function generateAndStoreSpeech(args: {
   userId: string;
   text: string;
   dbModel: Model;
-  candidates: Provider[];
+  candidates: Candidate[];
   voice?: string;
   abortSignal?: AbortSignal;
 }): Promise<SpeechGenerationResult> {

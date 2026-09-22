@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only';
 
 import { generateImage, generateText, type ModelMessage } from 'ai';
 
-import { type Model, type Provider } from '@/types';
+import { type Candidate, type Model, type Provider } from '@/types';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getImageModel,
@@ -31,7 +31,7 @@ export async function generateAndStoreImage(args: {
   userId: string;
   prompt: string;
   dbModel: Model;
-  candidates: Provider[];
+  candidates: Candidate[];
   size?: `${number}x${number}` | string;
   aspectRatio?: `${number}:${number}`;
   resolution?: string;

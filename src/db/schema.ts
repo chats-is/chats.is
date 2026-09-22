@@ -502,6 +502,10 @@ export const modelProviders = createTable(
     providerId: varchar('provider_id', { length: 255 })
       .notNull()
       .references(() => providers.id, { onDelete: 'cascade' }),
+    // The id this provider knows the model by, when it is not the model's
+    // own: an alias, a dated snapshot, a deployment name. Null sends the
+    // model's id (renamed for Vertex and Bedrock as before).
+    providerModelId: varchar('provider_model_id', { length: 255 }),
     priority: integer('priority').notNull().default(0),
     isEnabled: boolean('is_enabled').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -712,6 +716,9 @@ export const usage = createTable(
     messageId: varchar('message_id', { length: 255 }),
     modelId: varchar('model_id', { length: 255 }),
     providerId: varchar('provider_id', { length: 255 }),
+    // The id the provider was actually asked for, when the binding routed
+    // the model to one of its own. Null: the model's id as it is.
+    providerModelId: varchar('provider_model_id', { length: 255 }),
     capability: varchar('capability', { length: 32 })
       .notNull()
       .$type<'chat' | 'image' | 'video' | 'audio'>(),

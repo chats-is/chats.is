@@ -3,12 +3,18 @@ import '@tanstack/react-start/server-only';
 import { experimental_generateVideo as generateVideo } from 'ai';
 import OpenAI, { AzureOpenAI } from 'openai';
 
-import { type Model, type Provider, type ProviderConfig } from '@/types';
+import {
+  type Candidate,
+  type Model,
+  type Provider,
+  type ProviderConfig
+} from '@/types';
 import { decrypt } from '@/lib/crypto';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getVideoModel,
   isRetryableProviderError,
+  resolveModelId,
   runWithProviderFailover
 } from '@/lib/provider';
 import { toRequestParts } from '@/lib/provider-vocab';
@@ -243,7 +249,7 @@ export async function generateAndStoreVideo(args: {
   userId: string;
   prompt: string;
   dbModel: Model;
-  candidates: Provider[];
+  candidates: Candidate[];
   /** For a model that names its output by pixels — Sora takes this, not a ratio. */
   size?: string;
   aspectRatio?: `${number}:${number}`;
@@ -281,7 +287,8 @@ export async function generateAndStoreVideo(args: {
       // Sora has no AI SDK support yet — use the custom path. Azure exposes
       // video only through its OpenAI-compatible API (no AI SDK support
       // either), so it always takes this path regardless of deployment name.
-      if (modelId.includes('sora') || provider.type === 'azure') {
+      const providerModelId = resolveModelId(provider, modelId);
+      if (providerModelId.includes('sora') || provider.type === 'azure') {
         if (inputVideoUrl) {
           throw new ProviderCannotError(
             `${dbModel.name} cannot edit a video; it generates from text only.`
@@ -304,7 +311,7 @@ export async function generateAndStoreVideo(args: {
           );
         }
         const soraResult = await generateWithSora({
-          model: modelId,
+          model: providerModelId,
           prompt,
           provider,
           // Through the same catalogue as every other provider, even though

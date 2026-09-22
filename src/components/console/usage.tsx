@@ -67,6 +67,13 @@ const logColumns = helper.columns([
           {row.original.capability}
         </div>
         <div className="font-mono text-xs">{row.original.modelId ?? '—'}</div>
+        {/* Routed: the id the provider was actually asked for. */}
+        {row.original.providerModelId &&
+          row.original.providerModelId !== row.original.modelId && (
+            <div className="font-mono text-xs text-muted-foreground">
+              → {row.original.providerModelId}
+            </div>
+          )}
       </>
     )
   }),

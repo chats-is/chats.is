@@ -28,6 +28,7 @@ export type {
   SentEffort
 } from './model';
 export type {
+  Candidate,
   Provider,
   ProviderConfig,
   ProviderType,

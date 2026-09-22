@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useStore } from '@tanstack/react-form';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -124,7 +123,11 @@ const modelSchema = z
     uiOptions: jsonObject,
     apiParams: jsonObject,
     providers: z.array(
-      z.object({ providerId: z.string(), isEnabled: z.boolean() })
+      z.object({
+        providerId: z.string(),
+        providerModelId: z.string(),
+        isEnabled: z.boolean()
+      })
     )
   })
   // A model is only reachable through a provider, and the list is a failover
@@ -168,7 +171,7 @@ const EMPTY_FORM: ModelForm = {
   systemPrompt: '',
   uiOptions: '',
   apiParams: '',
-  providers: [{ providerId: '', isEnabled: true }]
+  providers: [{ providerId: '', providerModelId: '', isEnabled: true }]
 };
 
 const apiParamsPlaceholderByCapability: Record<string, string> = {
@@ -448,6 +451,7 @@ export default function ModelsPage() {
           .filter(b => b.providerId)
           .map((b, index) => ({
             providerId: b.providerId,
+            providerModelId: b.providerModelId.trim() || null,
             priority: index,
             isEnabled: b.isEnabled
           }))
@@ -479,7 +483,11 @@ export default function ModelsPage() {
     const bindings = (model.providers ?? [])
       .slice()
       .sort((a, b) => a.priority - b.priority)
-      .map(b => ({ providerId: b.providerId, isEnabled: b.isEnabled }));
+      .map(b => ({
+        providerId: b.providerId,
+        providerModelId: b.providerModelId ?? '',
+        isEnabled: b.isEnabled
+      }));
 
     const values = {
       name: model.name,
@@ -504,7 +512,9 @@ export default function ModelsPage() {
       // A model always has at least one binding, but the form needs a row to
       // draw even if one ever arrives without.
       providers:
-        bindings.length > 0 ? bindings : [{ providerId: '', isEnabled: true }]
+        bindings.length > 0
+          ? bindings
+          : [{ providerId: '', providerModelId: '', isEnabled: true }]
     };
     setDefaults(values);
     form.reset(values);
@@ -540,22 +550,16 @@ export default function ModelsPage() {
     []
   );
 
-  // Debounce the modelId before querying compatible providers, so typing in the
-  // Model ID field doesn't fan out a /models call to every provider per keystroke.
-  const typedModelId = useStore(form.store, state => state.values.modelId);
-  const [debouncedModelId, setDebouncedModelId] = useState('');
-  useEffect(() => {
-    const trimmed = typedModelId.trim();
-    const timer = setTimeout(() => setDebouncedModelId(trimmed), 400);
-    return () => clearTimeout(timer);
-  }, [typedModelId]);
-
-  // Providers that actually support the entered modelId — the only ones a
-  // binding may select (same-kind failover).
-  const { data: compatibleProviders } = useQuery({
-    ...providerQueries.compatible({ modelId: debouncedModelId }),
-    enabled: isOpen && !!debouncedModelId
-  });
+  // Every provider that is switched on. Which of them serves a given model id
+  // is the admin's to know, not the provider's list to decide: a provider
+  // accepts ids its listing leaves out — an alias, a dated snapshot, a
+  // deployment name — and a menu gated on the listing offered nothing for
+  // those. A provider bound earlier and since switched off is still shown on
+  // its row, so the row does not read as empty.
+  const enabledProviders = useMemo(
+    () => (providers ?? []).filter(provider => provider.isEnabled),
+    [providers]
+  );
 
   return (
     <div className="space-y-6">
@@ -666,6 +670,7 @@ export default function ModelsPage() {
                           onClick={() =>
                             providersField.pushValue({
                               providerId: '',
+                              providerModelId: '',
                               isEnabled: true
                             })
                           }
@@ -676,10 +681,7 @@ export default function ModelsPage() {
                       </div>
                       <div className="space-y-1">
                         {providersField.state.value.map((binding, index) => {
-                          const options = compatibleProviders ?? [];
-                          // An already-bound provider that the current model
-                          // id is no longer compatible with still has to be
-                          // shown, or the row would look empty.
+                          const options = enabledProviders;
                           const selectedMissing =
                             !!binding.providerId &&
                             !options.some(p => p.id === binding.providerId);
@@ -717,6 +719,20 @@ export default function ModelsPage() {
                                   <field.SelectField
                                     placeholder="Select provider"
                                     options={selectOptions}
+                                    fieldClassName="flex-1 space-y-0"
+                                  />
+                                )}
+                              </form.AppField>
+                              {/* The id this provider knows the model by,
+                                  when that is not the model's own — an
+                                  alias, a dated snapshot, a deployment
+                                  name. Blank sends the model id. */}
+                              <form.AppField
+                                name={`providers[${index}].providerModelId`}
+                              >
+                                {field => (
+                                  <field.TextField
+                                    placeholder="Model id at this provider"
                                     fieldClassName="flex-1 space-y-0"
                                   />
                                 )}

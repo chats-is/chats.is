@@ -161,7 +161,11 @@ function MediaKind({
   // model configured before it closed can still carry values its providers
   // have no parameter for, and a row for one of those would promise a setting
   // that never leaves the browser.
+  // Only the providers a call may reach: a binding switched off, or one
+  // whose provider is, has no say in what the menu offers — it was left in
+  // the list to name the model, not to answer for it.
   const providerTypes = (selected?.providers ?? [])
+    .filter(binding => binding.isEnabled && binding.provider?.isEnabled)
     .map(binding => binding.provider?.type)
     .filter((type): type is ProviderType => !!type);
 

@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { type z } from 'zod';
 
-import { modelRefSchema, modelSyncSchema } from '@/types/model';
+import { modelSyncSchema } from '@/types/model';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   providerCreateSchema,
@@ -62,11 +62,6 @@ export const fetchProviderModels = createServerFn({ method: 'GET' })
   .validator(providerRefSchema)
   .handler(({ data }) => providers.fetchProviderModels(data.providerId));
 
-export const compatibleProviders = createServerFn({ method: 'GET' })
-  .middleware([adminMiddleware])
-  .validator(modelRefSchema)
-  .handler(({ data }) => providers.compatibleProviders(data.modelId));
-
 export const syncProviderModels = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(modelSyncSchema)
@@ -79,8 +74,7 @@ export const providerQueries = {
   key: {
     list: () => ['provider', 'list'] as const,
     forSelect: () => ['provider', 'forSelect'] as const,
-    remoteModels: () => ['provider', 'remoteModels'] as const,
-    compatible: () => ['provider', 'compatible'] as const
+    remoteModels: () => ['provider', 'remoteModels'] as const
   },
   /** One page of the console's provider table. */
   list: (input: ProviderListInput = {}) =>
@@ -106,10 +100,5 @@ export const providerQueries = {
     queryOptions({
       queryKey: [...providerQueries.key.remoteModels(), input] as const,
       queryFn: () => fetchProviderModels({ data: input })
-    }),
-  compatible: (input: { modelId: string }) =>
-    queryOptions({
-      queryKey: [...providerQueries.key.compatible(), input] as const,
-      queryFn: () => compatibleProviders({ data: input })
     })
 };

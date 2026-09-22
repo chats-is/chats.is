@@ -3,9 +3,13 @@ import { generateSpeech, NoSpeechGeneratedError } from 'ai';
 
 import { type User } from '@/types';
 import { speechRequestSchema } from '@/types/speech';
-import { getSpeechModel, runWithProviderFailover } from '@/lib/provider';
+import {
+  getSpeechModel,
+  resolveModelId,
+  runWithProviderFailover
+} from '@/lib/provider';
 import { authedRequest } from '@/server/middleware';
-import { findModelByModelId } from '@/server/services/model';
+import { findModelByModelId, usableCandidates } from '@/server/services/model';
 import { preflightGate } from '@/server/services/preflight';
 import { getSpeechSettings } from '@/server/services/settings';
 import { recordAudioUsage } from '@/server/services/usage';
@@ -59,7 +63,7 @@ async function POST({
 
   // Fetch model from database to validate
   const dbModel = await findModelByModelId(modelId, 'audio');
-  const candidates = dbModel?.providers.map(binding => binding.provider!) ?? [];
+  const candidates = dbModel ? usableCandidates(dbModel) : [];
   if (!dbModel || candidates.length === 0) {
     console.error(`[speech] model unavailable: ${modelId}`);
     return Response.json(
@@ -107,6 +111,7 @@ async function POST({
       userId: user.id,
       modelId,
       providerId: usedProvider.id,
+      providerModelId: resolveModelId(usedProvider, modelId),
       // TTS bills per input character (generateSpeech reports no token usage).
       audioCharacters: text.length
     });

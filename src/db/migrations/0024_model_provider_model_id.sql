@@ -1,0 +1,1 @@
+ALTER TABLE "model_provider" ADD COLUMN "provider_model_id" varchar(255);

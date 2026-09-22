@@ -169,6 +169,20 @@
       "when": 1789821250278,
       "tag": "0023_drop_model_provider_id",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790081996701,
+      "tag": "0024_model_provider_model_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790084937528,
+      "tag": "0025_usage_provider_model_id",
+      "breakpoints": true
     }
   ]
 }

@@ -264,6 +264,12 @@ const userLogColumns = (filterByModel: (modelId: string) => void) =>
           >
             {row.original.modelId ?? '—'}
           </button>
+          {row.original.providerModelId &&
+            row.original.providerModelId !== row.original.modelId && (
+              <div className="font-mono text-xs text-muted-foreground">
+                → {row.original.providerModelId}
+              </div>
+            )}
         </>
       )
     }),

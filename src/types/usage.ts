@@ -16,6 +16,8 @@ type RecordUsageBase = {
    * told which provider it belongs to.
    */
   providerId: string;
+  /** The id the provider was asked for, when it differs from the model's. */
+  providerModelId?: string | null;
 };
 
 export type RecordChatUsageInput = RecordUsageBase & {
@@ -58,6 +60,7 @@ export type UsageRow = {
   modelId: string | null;
   providerId: string | null;
   providerName: string | null;
+  providerModelId: string | null;
   capability: 'chat' | 'image' | 'video' | 'audio';
   cost: string | number;
   inputTokens: number;

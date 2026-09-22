@@ -102,6 +102,8 @@ export type ModelProviderBinding = {
   id: string;
   modelId: string;
   providerId: string;
+  /** The id this provider knows the model by, when not the model's own. */
+  providerModelId?: string | null;
   priority: number;
   isEnabled: boolean;
   provider?: ModelProvider | null;
@@ -144,6 +146,7 @@ export type Model = {
 
 const providerBindingSchema = z.object({
   providerId: z.string().min(1),
+  providerModelId: z.string().trim().max(255).nullable().optional(),
   priority: z.number().int().optional(),
   isEnabled: z.boolean().optional()
 });
@@ -235,9 +238,6 @@ export const modelToggleSchema = z.object({
   id: z.string().min(1),
   isEnabled: z.boolean()
 });
-
-/** Addressing a model by its business key rather than its row id. */
-export const modelRefSchema = z.object({ modelId: z.string().min(1) });
 
 /** Which of a provider's models to bring into this install. */
 export const modelSyncSchema = z.object({

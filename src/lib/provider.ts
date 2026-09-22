@@ -23,6 +23,7 @@ import {
 } from 'ai';
 
 import {
+  type Candidate,
   type Provider,
   type ProviderConfig,
   type ProviderType,
@@ -161,58 +162,52 @@ function createProviderSDK(config: ProviderConfig): any {
  * Get a language model by provider config and model ID
  */
 export function getLanguageModel(
-  provider: ProviderConfig,
+  provider: Candidate,
   modelId: string
 ): LanguageModel {
   const sdk = createProviderSDK(provider);
-  const resolvedModelId =
-    provider.type === 'vertex'
-      ? toVertexModelId(modelId)
-      : provider.type === 'bedrock'
-        ? toBedrockModelId(modelId)
-        : modelId;
-  return sdk(resolvedModelId);
+  return sdk(resolveModelId(provider, modelId));
 }
 
 /**
  * Get an image model by provider config and model ID
  */
 export function getImageModel(
-  provider: ProviderConfig,
+  provider: Candidate,
   modelId: string
 ): ImageModel {
   const sdk = createProviderSDK(provider);
-  return sdk.image(modelId);
+  return sdk.image(resolveModelId(provider, modelId));
 }
 
 /**
  * Get a speech model by provider config and model ID
  */
 export function getSpeechModel(
-  provider: ProviderConfig,
+  provider: Candidate,
   modelId: string
 ): SpeechModel {
   const sdk = createProviderSDK(provider);
-  return sdk.speech(modelId);
+  return sdk.speech(resolveModelId(provider, modelId));
 }
 
 /**
  * Get a video model by provider config and model ID
  */
-export function getVideoModel(provider: ProviderConfig, modelId: string) {
+export function getVideoModel(provider: Candidate, modelId: string) {
   const sdk = createProviderSDK(provider);
-  return sdk.video(modelId);
+  return sdk.video(resolveModelId(provider, modelId));
 }
 
 /**
  * Get a transcription (STT) model by provider config and model ID
  */
 export function getTranscriptionModel(
-  provider: ProviderConfig,
+  provider: Candidate,
   modelId: string
 ): TranscriptionModel {
   const sdk = createProviderSDK(provider);
-  return sdk.transcription(modelId);
+  return sdk.transcription(resolveModelId(provider, modelId));
 }
 
 // ============================================================================
@@ -228,6 +223,16 @@ export function toProviderModelId(type: ProviderType, modelId: string): string {
   if (type === 'vertex') return toVertexModelId(modelId);
   if (type === 'bedrock') return toBedrockModelId(modelId);
   return modelId;
+}
+
+/**
+ * The id to send this candidate for the model: the one its binding names,
+ * if it names one, else the model's own — renamed for Vertex and Bedrock,
+ * which list the same models under ids of their own.
+ */
+export function resolveModelId(candidate: Candidate, modelId: string): string {
+  const routed = candidate.routedModelId?.trim();
+  return routed || toProviderModelId(candidate.type, modelId);
 }
 
 /**

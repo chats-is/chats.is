@@ -37,6 +37,13 @@ export type Provider = ProviderConfig & {
   name: string;
 };
 
+/**
+ * A provider as one of a model's candidates: the provider, and the id it
+ * knows the model by when that is not the model's own (`routedModelId`,
+ * from the binding). Absent, the model's id is sent.
+ */
+export type Candidate = Provider & { routedModelId?: string | null };
+
 export type VertexAuthMode = 'service_account' | 'api_key';
 
 export type VertexServiceAccountKey = {

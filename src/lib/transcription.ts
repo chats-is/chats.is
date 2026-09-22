@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only';
 
 import { transcribe } from 'ai';
 
-import { type Model, type Provider } from '@/types';
+import { type Candidate, type Model, type Provider } from '@/types';
 import { audioDurationInSeconds } from '@/lib/media-duration';
 import { getTranscriptionModel, runWithProviderFailover } from '@/lib/provider';
 
@@ -22,7 +22,7 @@ export async function transcribeAudio(args: {
   /** The uploaded file's type, so the duration can be read from the bytes. */
   mediaType?: string;
   dbModel: Model;
-  candidates: Provider[];
+  candidates: Candidate[];
   abortSignal?: AbortSignal;
 }): Promise<TranscriptionOutput> {
   const { audio, mediaType, dbModel, candidates, abortSignal } = args;

@@ -14,7 +14,11 @@ import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
-import { findModelByModelId, getAllModels } from '@/server/services/model';
+import {
+  findModelByModelId,
+  getAllModels,
+  usableCandidates
+} from '@/server/services/model';
 
 const getSettings = perRequest(
   'getSettings',
@@ -121,7 +125,8 @@ export const getTitleSettings = perRequest('getTitleSettings', async () => {
   return {
     prompt: DEFAULT_TITLE_PROMPT,
     modelId,
-    provider: model?.providers?.[0]?.provider ?? null
+    // The first provider that can answer, not the first the model names.
+    provider: model ? (usableCandidates(model)[0] ?? null) : null
   };
 });
 

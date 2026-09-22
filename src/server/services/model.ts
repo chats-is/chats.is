@@ -10,6 +10,7 @@ import {
   type modelUpdateSchema
 } from '@/types/model';
 import { pageWindow } from '@/types/pagination';
+import { type Candidate } from '@/types/provider';
 import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
@@ -21,12 +22,13 @@ type ProviderBinding = typeof modelProviders.$inferSelect & {
   provider: Provider | null;
 };
 type Model = typeof models.$inferSelect & {
-  /** Priority-ordered, enabled provider bindings for failover. */
+  /** Every provider binding, in priority order — the ones switched off too.
+   *  `usableCandidates` narrows to the ones a call may reach. */
   providers: ProviderBinding[];
 };
 
 /**
- * Every enabled model with its usable provider bindings.
+ * Every enabled model that something can answer for, with all its bindings.
  *
  * Exported only because the settings service assembles the console's model
  * lists from it — it was private while both lived in one file.
@@ -44,22 +46,48 @@ export const getAllModels = perRequest(
       orderBy: (models, { asc }) => [asc(models.displayOrder)]
     });
 
-    return result
-      .map(m => {
-        // Enabled bindings ordered by priority, the provider enabled too.
-        const providersList: ProviderBinding[] = (m.providers ?? [])
-          .filter(b => b.isEnabled && b.provider?.isEnabled)
+    return (
+      result
+        .map(m => {
+          // Every binding, ordered by priority — the ones switched off too.
+          // The first is what the model is presented as, on or off: its name
+          // and icon in the menus, and what the model is told it is. Which of
+          // them a call may reach is a separate question, answered by
+          // `usableCandidates`.
+          //
           // Two bindings may share a priority — the form takes any number —
           // and the rows arrive in no promised order, so which provider a
           // model reached first could change from one request to the next.
           // The id settles a tie the same way every time.
-          .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+          const providersList: ProviderBinding[] = (m.providers ?? [])
+            .slice()
+            .sort(
+              (a, b) => a.priority - b.priority || a.id.localeCompare(b.id)
+            );
 
-        return { ...m, providers: providersList };
-      })
-      .filter(m => m.providers.length > 0);
+          return { ...m, providers: providersList };
+        })
+        // On offer only if something can answer for it.
+        .filter(m => usableCandidates(m).length > 0)
+    );
   }
 );
+
+/**
+ * The providers a call may reach for this model, in priority order: the
+ * bindings that are on, whose provider is on, each carrying the id it
+ * routes to. A model keeps its bindings that are off — the first binding
+ * names the model whether or not it can answer — so this is where a call
+ * leaves them out.
+ */
+export function usableCandidates(model: Model): Candidate[] {
+  return (model.providers ?? [])
+    .filter(binding => binding.isEnabled && binding.provider?.isEnabled)
+    .map(binding => ({
+      ...binding.provider!,
+      routedModelId: binding.providerModelId
+    }));
+}
 
 export const findModelByModelId = perRequest(
   'findModelByModelId',
@@ -270,6 +298,7 @@ export async function createModel(input: z.infer<typeof modelCreateSchema>) {
         id: generateUUID(),
         modelId: normalizedModelId,
         providerId: b.providerId,
+        providerModelId: b.providerModelId?.trim() || null,
         priority: b.priority ?? index,
         isEnabled: b.isEnabled ?? true
       }))
@@ -325,6 +354,7 @@ export async function updateModel(input: z.infer<typeof modelUpdateSchema>) {
           id: generateUUID(),
           modelId: targetModelId,
           providerId: b.providerId,
+          providerModelId: b.providerModelId?.trim() || null,
           priority: b.priority ?? index,
           isEnabled: b.isEnabled ?? true
         }))

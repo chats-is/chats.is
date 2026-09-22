@@ -9,11 +9,11 @@ import {
   generateVideoInputSchema,
   textToSpeechInputSchema,
   transcribeAudioInputSchema,
+  type Candidate,
   type ChatMessage,
   type MediaToolOutput,
   type MediaToolsOptions,
   type Model,
-  type Provider,
   type TranscribeToolOutput
 } from '@/types';
 import { collectConversationMediaUrls } from '@/lib/chat-media-urls';
@@ -31,6 +31,7 @@ import {
   pickSize,
   pickVoice
 } from '@/lib/media-options';
+import { resolveModelId } from '@/lib/provider';
 import { generateAndStoreSpeech } from '@/lib/speech-generation';
 import { transcribeAudio } from '@/lib/transcription';
 import { isSttModel, isTtsModel } from '@/lib/utils';
@@ -39,7 +40,7 @@ import {
   VideoTimeoutError
 } from '@/lib/video-generation';
 import { isOwnBlobUrl } from '@/server/services/blob';
-import { findModelByModelId } from '@/server/services/model';
+import { findModelByModelId, usableCandidates } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
 import { getMediaDefaultModelIds } from '@/server/services/settings';
 import {
@@ -96,7 +97,7 @@ async function readCapped(
 
 type ResolvedMediaModel = {
   dbModel: Model;
-  candidates: Provider[];
+  candidates: Candidate[];
 };
 
 async function resolveMediaModel(
@@ -106,7 +107,7 @@ async function resolveMediaModel(
 ): Promise<ResolvedMediaModel | null> {
   if (!modelId) return null;
   const dbModel = await findModelByModelId(modelId, capability);
-  const candidates = dbModel?.providers.map(binding => binding.provider!) ?? [];
+  const candidates = dbModel ? usableCandidates(dbModel) : [];
   if (!dbModel || candidates.length === 0) return null;
   if (accepts && !accepts(dbModel)) return null;
   return { dbModel, candidates };
@@ -358,6 +359,7 @@ export async function buildMediaTools(args: {
           messageId: assistantMessageId,
           modelId: dbModel.modelId,
           providerId: result.provider.id,
+          providerModelId: resolveModelId(result.provider, dbModel.modelId),
           imageCount: 1,
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens
@@ -527,6 +529,10 @@ export async function buildMediaTools(args: {
             messageId: assistantMessageId,
             modelId: on.dbModel.modelId,
             providerId: result.provider.id,
+            providerModelId: resolveModelId(
+              result.provider,
+              on.dbModel.modelId
+            ),
             videoCount: 1,
             videoSeconds: result.videoSeconds
           });
@@ -612,6 +618,7 @@ export async function buildMediaTools(args: {
             messageId: assistantMessageId,
             modelId: dbModel.modelId,
             providerId: result.provider.id,
+            providerModelId: resolveModelId(result.provider, dbModel.modelId),
             videoCount: 1,
             videoSeconds: result.videoSeconds
           });
@@ -670,6 +677,7 @@ export async function buildMediaTools(args: {
             messageId: assistantMessageId,
             modelId: dbModel.modelId,
             providerId: result.provider.id,
+            providerModelId: resolveModelId(result.provider, dbModel.modelId),
             // TTS bills per input character (generateSpeech reports no
             // token usage).
             audioCharacters: result.characters
@@ -729,6 +737,7 @@ export async function buildMediaTools(args: {
             messageId: assistantMessageId,
             modelId: dbModel.modelId,
             providerId: result.provider.id,
+            providerModelId: resolveModelId(result.provider, dbModel.modelId),
             audioSeconds: result.durationInSeconds
           });
 
