@@ -7,11 +7,13 @@ import { z } from 'zod';
 import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
 import {
   adminCreatePrompt,
   adminDeletePrompt,
+  adminGetPrompt,
   adminUpdatePrompt,
   promptQueries,
   type adminListPrompts
@@ -56,6 +58,8 @@ import {
 } from '@/components/console/toolbar';
 
 type AdminPrompt = Awaited<ReturnType<typeof adminListPrompts>>['rows'][number];
+/** What the edit form is filled from: the prompt as read when it opens. */
+type EditablePrompt = NonNullable<Awaited<ReturnType<typeof adminGetPrompt>>>;
 
 const promptSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
@@ -229,7 +233,9 @@ export default function PromptsPage() {
   const { user } = useCurrentUser();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null);
+  const [editingPrompt, setEditingPrompt] = useState<EditablePrompt | null>(
+    null
+  );
   const [deletePrompt, setDeletePrompt] = useState<AdminPrompt | null>(null);
   const [search, setSearch] = useSearchFilter('q', '');
   const [page, setPage] = useSearchFilter('page', 1);
@@ -312,7 +318,7 @@ export default function PromptsPage() {
     }
   });
 
-  const openFor = (prompt: AdminPrompt | null) => {
+  const openFor = (prompt: EditablePrompt | null) => {
     setEditingPrompt(prompt);
     const values = prompt
       ? {
@@ -329,8 +335,26 @@ export default function PromptsPage() {
     setIsOpen(true);
   };
 
+  // Editing opens the form on the row as the table shows it, held, and fills
+  // it again from the prompt as read now — then it can be typed in.
+  const record = useEditRecord(
+    id => adminGetPrompt({ data: { id } }),
+    'prompt',
+    () => setIsOpen(false)
+  );
+  // Every way out of the dialog: a read still out for it is no longer wanted.
+  const close = () => {
+    record.cancel();
+    setIsOpen(false);
+  };
+  const openEdit = async (shown: AdminPrompt) => {
+    openFor(shown);
+    const prompt = await record.load(shown.id);
+    if (prompt) openFor(prompt);
+  };
+
   const columns = useMemo(
-    () => promptColumns({ modelName, edit: openFor, remove: setDeletePrompt }),
+    () => promptColumns({ modelName, edit: openEdit, remove: setDeletePrompt }),
     [models]
   );
 
@@ -345,7 +369,10 @@ export default function PromptsPage() {
           />
         </ConsoleFilters>
 
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog
+          open={isOpen}
+          onOpenChange={open => (open ? setIsOpen(true) : close())}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={() => openFor(null)}>
               <Plus className="size-4" />
@@ -365,7 +392,10 @@ export default function PromptsPage() {
               }}
               className="space-y-3.5"
             >
-              <div className="-mx-6 max-h-[60vh] space-y-3.5 overflow-y-auto px-6">
+              <fieldset
+                disabled={record.isLoading}
+                className="-mx-6 max-h-[60vh] min-w-0 space-y-3.5 overflow-y-auto px-6"
+              >
                 <form.AppField name="name">
                   {field => (
                     <field.TextField
@@ -507,7 +537,7 @@ export default function PromptsPage() {
                     </div>
                   )}
                 </form.Field>
-              </div>
+              </fieldset>
 
               <div className="flex justify-end gap-2">
                 <form.Subscribe selector={state => state.isSubmitting}>
@@ -515,7 +545,7 @@ export default function PromptsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setIsOpen(false)}
+                      onClick={close}
                       disabled={isSubmitting}
                     >
                       Cancel
@@ -523,7 +553,7 @@ export default function PromptsPage() {
                   )}
                 </form.Subscribe>
                 <form.AppForm>
-                  <form.SubmitButton>
+                  <form.SubmitButton disabled={record.isLoading}>
                     {editingPrompt ? 'Save Changes' : 'Create'}
                   </form.SubmitButton>
                 </form.AppForm>

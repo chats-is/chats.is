@@ -22,6 +22,12 @@ export const listPlans = createServerFn({ method: 'GET' })
   .validator(planListSchema)
   .handler(({ data }) => plans.listPlans(data));
 
+/** One plan, for the edit form. */
+export const getPlan = createServerFn({ method: 'GET' })
+  .middleware([adminMiddleware])
+  .validator(planIdSchema)
+  .handler(({ data }) => plans.getPlan(data.id));
+
 export const createPlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planCreateSchema)

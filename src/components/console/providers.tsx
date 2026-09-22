@@ -18,10 +18,12 @@ import {
 } from '@/types';
 import { ProviderTypes } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   createProvider,
   deleteProvider,
+  getProvider,
   providerQueries,
   toggleEnabledProvider,
   updateProvider,
@@ -77,6 +79,8 @@ import {
 import { ModelIcon } from '@/components/model-icon';
 
 type Provider = Awaited<ReturnType<typeof listProviders>>['rows'][number];
+/** What the edit form is filled from: the provider as read when it opens. */
+type EditableProvider = NonNullable<Awaited<ReturnType<typeof getProvider>>>;
 
 type ProviderForm = {
   name: string;
@@ -358,8 +362,11 @@ export default function ProvidersPage() {
     onError: error => toast.error(error.message)
   });
 
-  const editingProvider = data?.rows.find(p => p.id === editingId);
-  const editingVertexKey = vertexKeyOf(editingProvider);
+  // The provider the form was filled from, for what the form shows of the
+  // key it will not send back.
+  const [editingProvider, setEditingProvider] =
+    useState<EditableProvider | null>(null);
+  const editingVertexKey = vertexKeyOf(editingProvider ?? undefined);
   const editingVertexAuthMode: VertexAuthMode | null =
     editingProvider?.type === 'vertex'
       ? editingVertexKey
@@ -433,8 +440,9 @@ export default function ProvidersPage() {
     }
   });
 
-  const openFor = (provider: Provider | null) => {
+  const openFor = (provider: EditableProvider | null) => {
     setEditingId(provider?.id ?? null);
+    setEditingProvider(provider);
 
     if (!provider) {
       setDefaults(EMPTY_FORM);
@@ -468,13 +476,31 @@ export default function ProvidersPage() {
     setIsOpen(true);
   };
 
+  // Editing opens the form on the row as the table shows it, held, and fills
+  // it again from the provider as read now — then it can be typed in.
+  const record = useEditRecord(
+    id => getProvider({ data: { id } }),
+    'provider',
+    () => setIsOpen(false)
+  );
+  // Every way out of the dialog: a read still out for it is no longer wanted.
+  const close = () => {
+    record.cancel();
+    setIsOpen(false);
+  };
+  const openEdit = async (shown: Provider) => {
+    openFor(shown);
+    const provider = await record.load(shown.id);
+    if (provider) openFor(provider);
+  };
+
   const columns = useMemo(
     () =>
       providerColumns({
         toggle: (provider, isEnabled) =>
           toggleMutation.mutate({ id: provider.id, isEnabled }),
         sync: setModelSyncProviderId,
-        edit: openFor,
+        edit: openEdit,
         remove: setDeleteId
       }),
     []
@@ -585,7 +611,10 @@ export default function ProvidersPage() {
           />
         </ConsoleFilters>
 
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog
+          open={isOpen}
+          onOpenChange={open => (open ? setIsOpen(true) : close())}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={() => openFor(null)}>
               <Plus className="size-4" />
@@ -605,7 +634,10 @@ export default function ProvidersPage() {
               }}
               className="space-y-4"
             >
-              <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
+              <fieldset
+                disabled={record.isLoading}
+                className="-mx-6 max-h-[60vh] min-w-0 space-y-4 overflow-y-auto px-6"
+              >
                 <form.AppField name="name">
                   {field => (
                     <field.TextField label="Name" placeholder="OpenAI" />
@@ -833,17 +865,13 @@ export default function ProvidersPage() {
                     />
                   )}
                 </form.AppField>
-              </div>
+              </fieldset>
               <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsOpen(false)}
-                >
+                <Button type="button" variant="outline" onClick={close}>
                   Cancel
                 </Button>
                 <form.AppForm>
-                  <form.SubmitButton>
+                  <form.SubmitButton disabled={record.isLoading}>
                     {editingId ? 'Save Changes' : 'Create'}
                   </form.SubmitButton>
                 </form.AppForm>

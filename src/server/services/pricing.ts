@@ -508,6 +508,24 @@ export function pricingStyleConflict(
  * combination the cost engine could not resolve — an image model priced both
  * per-image and per-token has no defined cost.
  */
+/** One model and its price as the console edits them — a row of the pricing
+ *  table, read at the moment the form opens. */
+export async function getModelPricing(modelDbId: string) {
+  const model = await db.query.models.findFirst({
+    where: eq(models.id, modelDbId),
+    with: {
+      providers: {
+        with: { provider: true },
+        orderBy: (b, { asc }) => [asc(b.priority)]
+      },
+      pricings: { limit: 1 }
+    }
+  });
+  if (!model) return undefined;
+
+  return { ...model, pricing: model.pricings[0] ?? null };
+}
+
 export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
   const model = await db.query.models.findFirst({
     where: eq(models.id, data.modelDbId)

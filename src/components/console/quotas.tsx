@@ -5,11 +5,13 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { mutating } from '@/lib/mutation';
+import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
 import {
   createQuota,
   deleteQuota,
+  getQuota,
   quotaQueries,
   updateQuota,
   type listQuotas
@@ -53,6 +55,8 @@ import { quotaTableInput } from '@/components/console/table-filters';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 
 type Quota = Awaited<ReturnType<typeof listQuotas>>['rows'][number];
+/** What the edit form is filled from: the quota as read when it opens. */
+type EditableQuota = NonNullable<Awaited<ReturnType<typeof getQuota>>>;
 type Role = 'strict' | 'standard' | 'flexible' | 'custom';
 
 // 5h limit as a fraction of the weekly limit. Weekly is the anchor — admin
@@ -366,7 +370,7 @@ export default function QuotasPage() {
     }
   });
 
-  const openFor = (quota: Quota | null) => {
+  const openFor = (quota: EditableQuota | null) => {
     setEditingId(quota?.id ?? null);
     const values = quota
       ? {
@@ -384,8 +388,26 @@ export default function QuotasPage() {
     setOpen(true);
   };
 
+  // Editing opens the form on the row as the table shows it, held, and fills
+  // it again from the quota as read now — then it can be typed in.
+  const record = useEditRecord(
+    id => getQuota({ data: { id } }),
+    'quota',
+    () => setOpen(false)
+  );
+  // Every way out of the dialog: a read still out for it is no longer wanted.
+  const close = () => {
+    record.cancel();
+    setOpen(false);
+  };
+  const openEdit = async (shown: Quota) => {
+    openFor(shown);
+    const quota = await record.load(shown.id);
+    if (quota) openFor(quota);
+  };
+
   const columns = useMemo(
-    () => quotaColumns({ edit: openFor, remove: setDeleteId }),
+    () => quotaColumns({ edit: openEdit, remove: setDeleteId }),
     []
   );
 
@@ -403,7 +425,10 @@ export default function QuotasPage() {
     <div className="space-y-6">
       <ConsoleToolbar>
         <ConsoleFilters />
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={open => (open ? setOpen(true) : close())}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={() => openFor(null)}>
               <Plus className="size-4" />
@@ -426,7 +451,10 @@ export default function QuotasPage() {
               }}
               className="space-y-4"
             >
-              <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
+              <fieldset
+                disabled={record.isLoading}
+                className="-mx-6 max-h-[60vh] min-w-0 space-y-4 overflow-y-auto px-6"
+              >
                 <form.AppField name="name">
                   {field => (
                     <field.TextField
@@ -572,14 +600,14 @@ export default function QuotasPage() {
                     </div>
                   )}
                 </form.Field>
-              </div>
+              </fieldset>
               <DialogFooter>
                 <form.Subscribe selector={state => state.isSubmitting}>
                   {isSubmitting => (
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setOpen(false)}
+                      onClick={close}
                       disabled={isSubmitting}
                     >
                       Cancel
@@ -587,7 +615,7 @@ export default function QuotasPage() {
                   )}
                 </form.Subscribe>
                 <form.AppForm>
-                  <form.SubmitButton>
+                  <form.SubmitButton disabled={record.isLoading}>
                     {editingId ? 'Save Changes' : 'Create'}
                   </form.SubmitButton>
                 </form.AppForm>

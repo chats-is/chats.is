@@ -160,6 +160,23 @@ export async function listModels(filter: z.infer<typeof modelListSchema>) {
  * is `status`; the bindings it is read from do not travel, because nothing
  * choosing a model reads them.
  */
+/**
+ * One model as the console edits it — the same shape as a row of the table,
+ * read at the moment the edit form opens so the form starts from what is
+ * there now rather than from whenever the table was last drawn.
+ */
+export async function getModel(id: string) {
+  return await db.query.models.findFirst({
+    where: eq(models.id, id),
+    with: {
+      providers: {
+        with: { provider: true },
+        orderBy: (binding, { asc }) => [asc(binding.priority), asc(binding.id)]
+      }
+    }
+  });
+}
+
 export async function listModelsForSelect() {
   const rows = await db.query.models.findMany({
     orderBy: (models, { asc, desc }) => [

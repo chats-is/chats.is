@@ -60,6 +60,18 @@ export async function listProviders(
  * Unpaged, like the model selector's list, and without the key or the models
  * relation — a provider picker reads only the identity it shows.
  */
+/** One provider as the console edits it: a row of the table, read at the
+ *  moment the edit form opens. The key is masked as it is there. */
+export async function getProvider(id: string) {
+  const provider = await db.query.providers.findFirst({
+    where: eq(providers.id, id)
+  });
+  if (!provider) return undefined;
+
+  const { apiKey, ...rest } = provider;
+  return { ...rest, maskedKey: maskedKey(provider.type, apiKey) };
+}
+
 export async function listProvidersForSelect() {
   return await db.query.providers.findMany({
     orderBy: (providers, { asc, desc }) => [

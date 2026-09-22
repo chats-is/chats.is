@@ -18,6 +18,12 @@ export const listQuotas = createServerFn({ method: 'GET' })
   .validator(quotaListSchema)
   .handler(({ data }) => quotas.listQuotas(data));
 
+/** One quota, for the edit form. */
+export const getQuota = createServerFn({ method: 'GET' })
+  .middleware([adminMiddleware])
+  .validator(quotaIdSchema)
+  .handler(({ data }) => quotas.getQuota(data.id));
+
 export const listQuotasForSelect = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .handler(() => quotas.listQuotasForSelect());

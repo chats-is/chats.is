@@ -29,6 +29,12 @@ export const listProvidersForSelect = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .handler(() => providers.listProvidersForSelect());
 
+/** One provider, for the edit form. */
+export const getProvider = createServerFn({ method: 'GET' })
+  .middleware([adminMiddleware])
+  .validator(providerIdSchema)
+  .handler(({ data }) => providers.getProvider(data.id));
+
 export const createProvider = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(providerCreateSchema)

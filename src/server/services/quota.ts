@@ -341,6 +341,11 @@ export async function createQuota(input: z.infer<typeof quotaCreateSchema>) {
   return { id };
 }
 
+/** One quota as the console edits it, read at the moment the form opens. */
+export async function getQuota(id: string) {
+  return await db.query.quotas.findFirst({ where: eq(quotas.id, id) });
+}
+
 export async function updateQuota(input: z.infer<typeof quotaUpdateSchema>) {
   const { id, ...updates } = input;
   const patch: Record<string, unknown> = { updatedAt: new Date() };

@@ -5,10 +5,12 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { mutating } from '@/lib/mutation';
+import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   createPlan,
   deletePlan,
+  getPlan,
   planQueries,
   updatePlan,
   type listPlans
@@ -50,6 +52,8 @@ import { planTableInput } from '@/components/console/table-filters';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 
 type Plan = Awaited<ReturnType<typeof listPlans>>['rows'][number];
+/** What the edit form is filled from: the plan as read when it opens. */
+type EditablePlan = NonNullable<Awaited<ReturnType<typeof getPlan>>>;
 
 const planSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
@@ -236,7 +240,7 @@ export default function PlansPage() {
 
   // The dialog is a single form reused for "new" and "edit", so opening it is
   // what decides which record it is pointed at.
-  const openFor = (plan: Plan | null) => {
+  const openFor = (plan: EditablePlan | null) => {
     setEditingId(plan?.id ?? null);
     const values = plan
       ? {
@@ -251,8 +255,26 @@ export default function PlansPage() {
     setOpen(true);
   };
 
+  // Editing opens the form on the row as the table shows it, held, and fills
+  // it again from the plan as read now — then it can be typed in.
+  const record = useEditRecord(
+    id => getPlan({ data: { id } }),
+    'plan',
+    () => setOpen(false)
+  );
+  // Every way out of the dialog: a read still out for it is no longer wanted.
+  const close = () => {
+    record.cancel();
+    setOpen(false);
+  };
+  const openEdit = async (shown: Plan) => {
+    openFor(shown);
+    const plan = await record.load(shown.id);
+    if (plan) openFor(plan);
+  };
+
   const columns = useMemo(
-    () => planColumns({ edit: openFor, remove: setDeleteId }),
+    () => planColumns({ edit: openEdit, remove: setDeleteId }),
     []
   );
 
@@ -265,7 +287,10 @@ export default function PlansPage() {
     <div className="space-y-6">
       <ConsoleToolbar>
         <ConsoleFilters />
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={open => (open ? setOpen(true) : close())}
+        >
           <DialogTrigger asChild>
             <Button
               className="gap-2"
@@ -291,7 +316,10 @@ export default function PlansPage() {
               }}
               className="space-y-4"
             >
-              <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
+              <fieldset
+                disabled={record.isLoading}
+                className="-mx-6 max-h-[60vh] min-w-0 space-y-4 overflow-y-auto px-6"
+              >
                 <div className="grid grid-cols-2 gap-4">
                   <form.AppField name="name">
                     {field => (
@@ -321,14 +349,14 @@ export default function PlansPage() {
                     />
                   )}
                 </form.AppField>
-              </div>
+              </fieldset>
               <DialogFooter>
                 <form.Subscribe selector={state => state.isSubmitting}>
                   {isSubmitting => (
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setOpen(false)}
+                      onClick={close}
                       disabled={isSubmitting}
                     >
                       Cancel
@@ -336,7 +364,7 @@ export default function PlansPage() {
                   )}
                 </form.Subscribe>
                 <form.AppForm>
-                  <form.SubmitButton>
+                  <form.SubmitButton disabled={record.isLoading}>
                     {editingId ? 'Save Changes' : 'Create'}
                   </form.SubmitButton>
                 </form.AppForm>

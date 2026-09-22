@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { type z } from 'zod';
 
+import { modelIdSchema } from '@/types/model';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   pricingIdSchema,
@@ -23,6 +24,12 @@ export const listPricingWithModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(pricingListSchema)
   .handler(({ data }) => pricing.listPricingWithModels(data));
+
+/** One model and its price, for the edit form. */
+export const getModelPricing = createServerFn({ method: 'GET' })
+  .middleware([adminMiddleware])
+  .validator(modelIdSchema)
+  .handler(({ data }) => pricing.getModelPricing(data.id));
 
 export const upsertPricing = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])

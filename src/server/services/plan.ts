@@ -85,6 +85,14 @@ export async function createPlan(input: z.infer<typeof planCreateSchema>) {
   return { id };
 }
 
+/** One plan as the console edits it, read at the moment the form opens. */
+export async function getPlan(id: string) {
+  return await db.query.plans.findFirst({
+    where: eq(plans.id, id),
+    with: { quota: true }
+  });
+}
+
 export async function updatePlan(input: z.infer<typeof planUpdateSchema>) {
   const { id, ...updates } = input;
   const patch: Record<string, unknown> = { updatedAt: new Date() };

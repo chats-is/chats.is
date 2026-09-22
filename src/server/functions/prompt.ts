@@ -25,6 +25,12 @@ export const adminListPrompts = createServerFn({ method: 'GET' })
   .validator(promptListSchema)
   .handler(({ data }) => prompts.adminListPrompts(data));
 
+/** One prompt, whoever owns it, for the console's edit form. */
+export const adminGetPrompt = createServerFn({ method: 'GET' })
+  .middleware([adminMiddleware])
+  .validator(promptIdSchema)
+  .handler(({ data }) => prompts.adminGetPrompt(data.id));
+
 export const listPrompts = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(promptPageSchema)

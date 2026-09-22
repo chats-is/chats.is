@@ -296,6 +296,7 @@ function SwitchField({
  */
 function SubmitButton({
   children,
+  disabled,
   ...props
 }: React.ComponentProps<typeof Button>) {
   const form = useFormContext();
@@ -307,7 +308,9 @@ function SubmitButton({
   return (
     <Button
       type="submit"
-      disabled={!canSubmit || isSubmitting}
+      // A reason of the caller's own — the form is still being filled, say —
+      // adds to the form's, and neither overrides the other.
+      disabled={disabled || !canSubmit || isSubmitting}
       className="gap-2"
       {...props}
     >

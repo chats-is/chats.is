@@ -18,10 +18,12 @@ import { type ModelCapability, type ProviderType } from '@/types';
 import { modelCapabilitySchema } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
+import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   createModel,
   deleteModel,
+  getModel,
   modelQueries,
   toggleEnabledModel,
   updateModel,
@@ -84,6 +86,8 @@ import { UiOptionsField } from '@/components/console/ui-options-field';
 import { ModelIcon } from '@/components/model-icon';
 
 type Model = Awaited<ReturnType<typeof listModels>>['rows'][number];
+/** What the edit form is filled from: the model as read when it opens. */
+type EditableModel = NonNullable<Awaited<ReturnType<typeof getModel>>>;
 
 const CAPABILITY_OPTIONS = CAPABILITIES.map(c => ({
   value: c.value,
@@ -456,7 +460,7 @@ export default function ModelsPage() {
     }
   });
 
-  const openFor = (model: Model | null) => {
+  const openFor = (model: EditableModel | null) => {
     setEditingId(model?.id ?? null);
 
     if (!model) {
@@ -501,12 +505,30 @@ export default function ModelsPage() {
     setIsOpen(true);
   };
 
+  // Editing opens the form on the row as the table shows it, held, and fills
+  // it again from the model as read now — then it can be typed in.
+  const record = useEditRecord(
+    id => getModel({ data: { id } }),
+    'model',
+    () => setIsOpen(false)
+  );
+  // Every way out of the dialog: a read still out for it is no longer wanted.
+  const close = () => {
+    record.cancel();
+    setIsOpen(false);
+  };
+  const openEdit = async (shown: Model) => {
+    openFor(shown);
+    const model = await record.load(shown.id);
+    if (model) openFor(model);
+  };
+
   const columns = useMemo(
     () =>
       modelColumns({
         toggle: (model, isEnabled) =>
           toggleMutation.mutate({ id: model.id, isEnabled }),
-        edit: openFor,
+        edit: openEdit,
         remove: setDeleteId
       }),
     []
@@ -553,7 +575,10 @@ export default function ModelsPage() {
           </Select>
         </ConsoleFilters>
 
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog
+          open={isOpen}
+          onOpenChange={open => (open ? setIsOpen(true) : close())}
+        >
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={() => openFor(null)}>
               <Plus className="size-4" />
@@ -573,7 +598,10 @@ export default function ModelsPage() {
               }}
               className="space-y-4"
             >
-              <div className="-mx-6 max-h-[60vh] space-y-4 overflow-y-auto px-6">
+              <fieldset
+                disabled={record.isLoading}
+                className="-mx-6 max-h-[60vh] min-w-0 space-y-4 overflow-y-auto px-6"
+              >
                 <div className="grid grid-cols-2 gap-4">
                   <form.AppField name="name">
                     {field => (
@@ -926,7 +954,7 @@ export default function ModelsPage() {
                     );
                   }}
                 </form.Subscribe>
-              </div>
+              </fieldset>
 
               <div className="flex justify-end gap-2">
                 <form.Subscribe selector={state => state.isSubmitting}>
@@ -934,7 +962,7 @@ export default function ModelsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setIsOpen(false)}
+                      onClick={close}
                       disabled={isSubmitting}
                     >
                       Cancel
@@ -942,7 +970,7 @@ export default function ModelsPage() {
                   )}
                 </form.Subscribe>
                 <form.AppForm>
-                  <form.SubmitButton>
+                  <form.SubmitButton disabled={record.isLoading}>
                     {editingId ? 'Save Changes' : 'Create'}
                   </form.SubmitButton>
                 </form.AppForm>

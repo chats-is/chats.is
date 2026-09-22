@@ -222,6 +222,15 @@ export async function updatePrompt(
   await writePromptFields(input);
 }
 
+/** One prompt as the console edits it, whoever owns it, read at the moment
+ *  the form opens. */
+export async function adminGetPrompt(id: string) {
+  return await db.query.prompts.findFirst({
+    where: eq(prompts.id, id),
+    with: promptOwner
+  });
+}
+
 export async function adminUpdatePrompt(
   input: z.infer<typeof promptUpdateSchema>
 ) {

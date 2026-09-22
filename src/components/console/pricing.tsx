@@ -6,8 +6,10 @@ import { toast } from 'sonner';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { formatUsd } from '@/lib/utils';
+import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
+  getModelPricing,
   previewPricingSync,
   pricingQueries,
   runPricingSync,
@@ -220,6 +222,8 @@ function summarizePricing(
   return lines;
 }
 
+/** What the edit form is filled from: the row as read when it opens. */
+type EditableRow = NonNullable<Awaited<ReturnType<typeof getModelPricing>>>;
 type PricingRow = Awaited<
   ReturnType<typeof listPricingWithModels>
 >['rows'][number];
@@ -406,7 +410,8 @@ export default function PricingPage() {
     }
   });
 
-  const openEdit = (row: PricingRow) => {
+  /** Fill the form from a model and its price. */
+  const fill = (row: EditableRow) => {
     setEdit({
       modelDbId: row.id,
       modelName: row.name,
@@ -428,6 +433,25 @@ export default function PricingPage() {
     };
     setDefaults(values);
     form.reset(values);
+  };
+
+  // Editing opens the form on the row as the table shows it, held, and fills
+  // it again from the model and its price as read now — then it can be typed
+  // in.
+  const record = useEditRecord(
+    id => getModelPricing({ data: { id } }),
+    'model',
+    () => setEdit(null)
+  );
+  // Every way out of the dialog: a read still out for it is no longer wanted.
+  const close = () => {
+    record.cancel();
+    setEdit(null);
+  };
+  const openEdit = async (shown: PricingRow) => {
+    fill(shown);
+    const fresh = await record.load(shown.id);
+    if (fresh) fill(fresh);
   };
 
   const columns = useMemo(() => pricingColumns(openEdit), []);
@@ -683,7 +707,7 @@ export default function PricingPage() {
         }
       />
 
-      <Dialog open={!!edit} onOpenChange={open => !open && setEdit(null)}>
+      <Dialog open={!!edit} onOpenChange={open => !open && close()}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Pricing — {edit?.modelName}</DialogTitle>
@@ -700,7 +724,10 @@ export default function PricingPage() {
             >
               <form.Subscribe selector={state => state.values}>
                 {values => (
-                  <div className="-mx-6 grid max-h-[60vh] grid-cols-2 gap-4 overflow-y-auto px-6">
+                  <fieldset
+                    disabled={record.isLoading}
+                    className="-mx-6 grid max-h-[60vh] min-w-0 grid-cols-2 gap-4 overflow-y-auto px-6"
+                  >
                     {edit.capability === 'chat' && (
                       <>
                         <PriceField name="input" label="Input / 1M tokens" />
@@ -825,7 +852,7 @@ export default function PricingPage() {
                         />
                       </>
                     )}
-                  </div>
+                  </fieldset>
                 )}
               </form.Subscribe>
               <DialogFooter className="mt-4">
@@ -834,7 +861,7 @@ export default function PricingPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setEdit(null)}
+                      onClick={close}
                       disabled={isSubmitting}
                     >
                       Cancel
@@ -842,7 +869,9 @@ export default function PricingPage() {
                   )}
                 </form.Subscribe>
                 <form.AppForm>
-                  <form.SubmitButton>Save</form.SubmitButton>
+                  <form.SubmitButton disabled={record.isLoading}>
+                    Save
+                  </form.SubmitButton>
                 </form.AppForm>
               </DialogFooter>
             </form>

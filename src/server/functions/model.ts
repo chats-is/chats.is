@@ -27,6 +27,12 @@ export const listModelsForSelect = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .handler(() => models.listModelsForSelect());
 
+/** One model, for the edit form. */
+export const getModel = createServerFn({ method: 'GET' })
+  .middleware([adminMiddleware])
+  .validator(modelIdSchema)
+  .handler(({ data }) => models.getModel(data.id));
+
 export const createModel = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(modelCreateSchema)
