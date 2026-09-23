@@ -33,13 +33,16 @@ export function modelIdentityColumns<T extends ModelLike>(
   return [
     helper.display({
       id: 'icon',
-      header: 'Icon',
-      meta: { headClassName: 'w-16' },
+      header: '',
+      meta: { align: 'center', headClassName: 'w-16' },
       cell: ({ row }) =>
         row.original.image ? (
-          <ModelIcon image={row.original.image} className="size-8" />
+          <ModelIcon
+            image={row.original.image}
+            className="mx-auto block size-8"
+          />
         ) : (
-          <div className="size-8 rounded border bg-muted" />
+          <div className="mx-auto size-8 rounded border bg-muted" />
         )
     }),
     helper.display({

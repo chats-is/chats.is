@@ -119,27 +119,20 @@ const promptColumns = (ctx: {
   helper.columns([
     helper.display({
       id: 'image',
-      header: 'Image',
-      meta: { headClassName: 'w-20' },
+      header: '',
+      meta: { align: 'center', headClassName: 'w-16' },
       cell: ({ row }) =>
         row.original.image ? (
           <img
             src={row.original.image}
             alt=""
-            className="size-8 rounded border object-cover"
+            className="mx-auto block size-8 rounded border object-cover"
           />
         ) : (
-          <div className="size-8 rounded border bg-muted" />
+          <div className="mx-auto size-8 rounded border bg-muted" />
         )
     }),
     helper.accessor('name', { header: 'Name' }),
-    helper.accessor(row => row.user?.name || row.user?.email, {
-      id: 'owner',
-      header: 'Owner',
-      meta: { cellClassName: 'text-sm text-muted-foreground' },
-      cell: ({ row }) =>
-        row.original.user?.name || row.original.user?.email || '—'
-    }),
     helper.accessor('tags', {
       header: 'Tags',
       cell: ({ row }) =>
@@ -165,6 +158,13 @@ const promptColumns = (ctx: {
           className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
         />
       )
+    }),
+    helper.accessor(row => row.user?.name || row.user?.email, {
+      id: 'owner',
+      header: 'Owner',
+      meta: { cellClassName: 'text-sm text-muted-foreground' },
+      cell: ({ row }) =>
+        row.original.user?.name || row.original.user?.email || '—'
     }),
     helper.accessor('visibility', {
       header: 'Visibility',

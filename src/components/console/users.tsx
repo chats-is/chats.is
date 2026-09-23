@@ -79,7 +79,10 @@ const userColumns = (ctx: {
     helper.display({
       id: 'avatar',
       header: '',
-      meta: { headClassName: 'w-12' },
+      // Held at the width the other console tables give their icon column:
+      // this table is wide enough that the browser would otherwise take a
+      // pixel from it.
+      meta: { align: 'center', headClassName: 'w-16 min-w-16' },
       cell: ({ row }) => {
         const user = row.original;
         return (
@@ -87,7 +90,7 @@ const userColumns = (ctx: {
             to="/console/users/$userId"
             params={{ userId: user.id }}
             aria-label={user.name || user.email}
-            className="block size-8 overflow-hidden rounded-full border bg-muted"
+            className="mx-auto block size-8 overflow-hidden rounded-full border bg-muted"
           >
             {user.image ? (
               <img
