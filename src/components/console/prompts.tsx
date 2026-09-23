@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -141,12 +142,20 @@ const promptColumns = (ctx: {
     }),
     helper.accessor('tags', {
       header: 'Tags',
-      cell: ({ row }) => (
-        <LabelBadges
-          values={row.original.tags}
-          className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-        />
-      )
+      cell: ({ row }) =>
+        row.original.tags?.length ? (
+          <div className="flex flex-wrap gap-1">
+            {row.original.tags.map(tag => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+              >
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        ) : null
     }),
     helper.accessor('models', {
       header: 'Models',
@@ -161,9 +170,7 @@ const promptColumns = (ctx: {
       header: 'Visibility',
       meta: { headClassName: 'w-24' },
       cell: ({ row }) => (
-        <span className="rounded bg-muted px-2 py-1 text-xs">
-          {row.original.visibility}
-        </span>
+        <Badge variant="secondary">{row.original.visibility}</Badge>
       )
     }),
     helper.display({

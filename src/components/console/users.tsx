@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Check,
+  CircleCheck,
   Github,
   Loader2,
   Mail,
@@ -122,7 +122,7 @@ const userColumns = (ctx: {
     helper.display({
       id: 'provider',
       header: 'Provider',
-      meta: { headClassName: 'w-32' },
+      meta: { headClassName: 'w-24' },
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           {row.original.accounts && row.original.accounts.length > 0 ? (
@@ -151,13 +151,20 @@ const userColumns = (ctx: {
     }),
     helper.accessor('emailVerified', {
       header: 'Verified',
-      meta: { headClassName: 'w-32', cellClassName: 'text-sm' },
+      meta: {
+        align: 'center',
+        headClassName: 'w-24',
+        cellClassName: 'text-sm'
+      },
       // Verification is a yes or no now, not a date: the auth library records
       // whether an address was confirmed, not when. The column always asked
       // "Verified".
       cell: ({ row }) =>
         row.original.emailVerified ? (
-          <Check className="size-4 text-muted-foreground" />
+          <CircleCheck
+            className="mx-auto size-4 text-green-600 dark:text-green-500"
+            aria-label="Verified"
+          />
         ) : (
           <span className="text-muted-foreground">—</span>
         )
@@ -169,7 +176,7 @@ const userColumns = (ctx: {
     }),
     helper.accessor('role', {
       header: 'Role',
-      meta: { align: 'center', headClassName: 'w-32' },
+      meta: { align: 'center', headClassName: 'w-40' },
       cell: ({ row }) => {
         const user = row.original;
         const saving = ctx.updatingRoleUserId === user.id;
@@ -182,7 +189,7 @@ const userColumns = (ctx: {
                 ctx.setRole(user, value as 'user' | 'admin')
               }
             >
-              <SelectTrigger className="w-28">
+              <SelectTrigger className="w-36">
                 {/* Inside a SelectValue, not in place of one: the menu is
                     positioned against the value node, and without one it is
                     never placed — and an unplaced menu takes no choice. */}

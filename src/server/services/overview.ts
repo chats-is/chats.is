@@ -3,14 +3,7 @@ import '@tanstack/react-start/server-only';
 import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import {
-  models,
-  prompts,
-  providers,
-  quotas,
-  settings,
-  users
-} from '@/db/schema';
+import { models, prompts, providers, quotas, users } from '@/db/schema';
 import { getDefaultQuotaId } from '@/server/services/settings';
 
 /**
@@ -24,50 +17,48 @@ import { getDefaultQuotaId } from '@/server/services/settings';
 export async function getConsoleOverview() {
   const count = sql<number>`count(*)`.mapWith(Number);
 
-  const [providerRows, modelRows, promptRows, settingRows, userRows] =
-    await Promise.all([
-      db
-        .select({
-          total: count,
-          enabled:
-            sql<number>`count(*) filter (where ${providers.isEnabled})`.mapWith(
-              Number
-            )
-        })
-        .from(providers),
-      db
-        .select({
-          total: count,
-          enabled:
-            sql<number>`count(*) filter (where ${models.isEnabled})`.mapWith(
-              Number
-            )
-        })
-        .from(models),
-      db
-        .select({
-          total: count,
-          public:
-            sql<number>`count(*) filter (where ${prompts.visibility} = 'public')`.mapWith(
-              Number
-            ),
-          private:
-            sql<number>`count(*) filter (where ${prompts.visibility} = 'private')`.mapWith(
-              Number
-            )
-        })
-        .from(prompts),
-      db.select({ total: count }).from(settings),
-      db
-        .select({
-          total: count,
-          admins:
-            sql<number>`count(*) filter (where ${users.role} = 'admin')`.mapWith(
-              Number
-            )
-        })
-        .from(users)
-    ]);
+  const [providerRows, modelRows, promptRows, userRows] = await Promise.all([
+    db
+      .select({
+        total: count,
+        enabled:
+          sql<number>`count(*) filter (where ${providers.isEnabled})`.mapWith(
+            Number
+          )
+      })
+      .from(providers),
+    db
+      .select({
+        total: count,
+        enabled:
+          sql<number>`count(*) filter (where ${models.isEnabled})`.mapWith(
+            Number
+          )
+      })
+      .from(models),
+    db
+      .select({
+        total: count,
+        public:
+          sql<number>`count(*) filter (where ${prompts.visibility} = 'public')`.mapWith(
+            Number
+          ),
+        private:
+          sql<number>`count(*) filter (where ${prompts.visibility} = 'private')`.mapWith(
+            Number
+          )
+      })
+      .from(prompts),
+    db
+      .select({
+        total: count,
+        admins:
+          sql<number>`count(*) filter (where ${users.role} = 'admin')`.mapWith(
+            Number
+          )
+      })
+      .from(users)
+  ]);
 
   // Whether the install has a default quota that still exists. Without one,
   // anyone with no quota of their own and no plan that carries one is refused
@@ -85,7 +76,6 @@ export async function getConsoleOverview() {
     providers: providerRows[0] ?? { total: 0, enabled: 0 },
     models: modelRows[0] ?? { total: 0, enabled: 0 },
     prompts: promptRows[0] ?? { total: 0, public: 0, private: 0 },
-    settings: settingRows[0] ?? { total: 0 },
     users: userRows[0] ?? { total: 0, admins: 0 }
   };
 }

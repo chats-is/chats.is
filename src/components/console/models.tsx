@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
+  CircleCheck,
   Image as ImageIcon,
   Loader2,
   Pencil,
@@ -76,7 +77,7 @@ import {
   DataTable
 } from '@/components/console/data-table';
 import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
-import { ProviderBindings } from '@/components/console/provider-bindings';
+import { modelIdentityColumns } from '@/components/console/model-identity-columns';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { modelTableInput } from '@/components/console/table-filters';
 import {
@@ -85,6 +86,7 @@ import {
   ConsoleToolbar
 } from '@/components/console/toolbar';
 import { UiOptionsField } from '@/components/console/ui-options-field';
+import { UnpricedBadge } from '@/components/console/unpriced-badge';
 import { ModelIcon } from '@/components/model-icon';
 
 type Model = Awaited<ReturnType<typeof listModels>>['rows'][number];
@@ -244,62 +246,21 @@ const modelColumns = (actions: {
   remove: (id: string) => void;
 }) =>
   helper.columns([
-    helper.display({
-      id: 'icon',
-      header: 'Icon',
-      meta: { headClassName: 'w-20' },
-      cell: ({ row }) =>
-        row.original.image ? (
-          <ModelIcon image={row.original.image} className="size-8" />
-        ) : (
-          <div className="size-8 rounded border bg-muted" />
-        )
-    }),
-    helper.accessor('name', {
-      header: 'Model',
-      cell: ({ row }) => (
-        <>
-          <div className="font-medium">{row.original.name}</div>
-          <div className="font-mono text-xs text-muted-foreground">
-            {row.original.modelId}
-          </div>
-        </>
-      )
-    }),
-    helper.accessor('aliases', {
-      header: 'Aliases',
-      meta: { cellClassName: 'text-sm text-muted-foreground' },
-      cell: ({ row }) => row.original.aliases?.join(', ') || '-'
-    }),
-    helper.display({
-      id: 'provider',
-      header: 'Providers',
-      meta: { cellClassName: 'text-sm' },
-      cell: ({ row }) => (
-        <ProviderBindings bindings={row.original.providers ?? []} />
-      )
-    }),
-    helper.accessor('capability', {
-      header: 'Capability',
-      cell: ({ row }) => (
-        <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-          {row.original.capability}
-        </span>
-      )
-    }),
+    ...modelIdentityColumns(helper),
     helper.accessor(row => isPriced(row.capability, row.pricing), {
       id: 'pricing',
       header: 'Pricing',
-      meta: { align: 'center', headClassName: 'w-24' },
+      // The one column left to take up the width, so the identity columns
+      // keep theirs and match the pricing table's.
+      meta: { align: 'center' },
       cell: ({ row }) =>
         isPriced(row.original.capability, row.original.pricing) ? (
-          <span className="text-xs text-muted-foreground">Set</span>
+          <CircleCheck
+            className="mx-auto size-4 text-green-600 dark:text-green-500"
+            aria-label="Priced"
+          />
         ) : (
-          // Unpriced is the case worth the eye: what it bills is recorded
-          // and costed at nothing until someone gives it a rate.
-          <span className="inline-flex items-center rounded-full border border-amber-300 px-1.5 py-px text-[11px] font-medium whitespace-nowrap text-amber-700 dark:border-amber-900 dark:text-amber-400">
-            Not set
-          </span>
+          <UnpricedBadge />
         )
     }),
     helper.accessor('isEnabled', {

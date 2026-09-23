@@ -151,7 +151,7 @@ export function ConsoleTableSkeleton<TData extends RowData>({
 }
 
 /** The console home, whose page is a grid of counts. */
-export function ConsoleCardsSkeleton({ count = 5 }: { count?: number }) {
+export function ConsoleCardsSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

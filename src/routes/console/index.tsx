@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { CircleAlert, Cpu, Settings, Sparkles, Users, Zap } from 'lucide-react';
+import { CircleAlert, Cpu, Sparkles, Users, Zap } from 'lucide-react';
 
 import { pageTitle } from '@/lib/head';
 import { overviewQueries } from '@/server/functions/overview';
@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConsoleCardsSkeleton } from '@/components/console/skeletons';
 
 export const Route = createFileRoute('/console/')({
-  // Nine counts, counted by the database and carried by one call — through
+  // The counts, taken by the database and carried by one call — through
   // the cache, like every other page, so a return draws what was held and
   // reads again behind it.
   loader: ({ context }) =>
@@ -22,7 +22,7 @@ function ConsoleHome() {
   const { data } = useQuery(overviewQueries.console());
   // Primed by the loader; a placeholder only for the cache being emptied.
   if (!data) return <ConsoleCardsSkeleton />;
-  const { hasDefaultQuota, providers, models, prompts, settings, users } = data;
+  const { hasDefaultQuota, providers, models, prompts, users } = data;
 
   return (
     <div className="space-y-6">
@@ -84,21 +84,6 @@ function ConsoleHome() {
               <div className="text-2xl font-bold">{prompts.total}</div>
               <p className="text-xs text-muted-foreground">
                 {prompts.public} public / {prompts.private} private
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/console/settings">
-          <Card className="transition-colors hover:bg-accent">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Settings</CardTitle>
-              <Settings className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{settings.total}</div>
-              <p className="text-xs text-muted-foreground">
-                System configuration
               </p>
             </CardContent>
           </Card>

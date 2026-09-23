@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -226,11 +227,7 @@ const providerColumns = (actions: {
     helper.accessor('type', {
       header: 'Type',
       meta: { headClassName: 'w-28' },
-      cell: ({ row }) => (
-        <span className="rounded bg-muted px-2 py-1 text-xs">
-          {row.original.type}
-        </span>
-      )
+      cell: ({ row }) => <Badge variant="secondary">{row.original.type}</Badge>
     }),
     helper.accessor('isEnabled', {
       header: 'Enabled',

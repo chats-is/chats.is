@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { quotaQueries } from '@/server/functions/quota';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Countdown } from '@/components/usage-limit-alert';
 import { LimitsSkeleton } from '@/components/usage-module';
 
@@ -81,13 +83,14 @@ function QuotaWindowRow({
 }) {
   const pct = window.remainingPct;
   // Three bands, read at a glance: plenty, running down, nearly out. The
-  // track is the same colour, faint, so the empty part reads as the same bar.
-  const [barColor, trackColor] =
+  // track is the same colour, faint, so the empty part reads as the same bar;
+  // the component's own colours are the first band.
+  const band =
     pct <= 20
-      ? ['bg-destructive', 'bg-destructive/15']
+      ? 'bg-destructive/15 [&_[data-slot=progress-indicator]]:bg-destructive'
       : pct <= 50
-        ? ['bg-amber-500', 'bg-amber-500/15']
-        : ['bg-primary', 'bg-primary/15'];
+        ? 'bg-amber-500/15 [&_[data-slot=progress-indicator]]:bg-amber-500'
+        : 'bg-primary/15';
 
   return (
     <div className="space-y-2">
@@ -100,12 +103,7 @@ function QuotaWindowRow({
         )}
       </div>
       <div className="flex items-center gap-3">
-        <div className={`h-1.5 flex-1 rounded-full ${trackColor}`}>
-          <div
-            className={`h-1.5 rounded-full ${barColor}`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
+        <Progress value={pct} className={cn('h-1.5 flex-1', band)} />
         <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
           {pct}% left
         </span>

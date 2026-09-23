@@ -1,15 +1,24 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Loader2, Pencil, RefreshCw, Search } from 'lucide-react';
+import {
+  ChevronDown,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  Search,
+  Trash2
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
-import { summarizePricing } from '@/lib/pricing-summary';
-import { formatUsd } from '@/lib/utils';
+import { summarizePricingRows } from '@/lib/pricing-summary';
+import { cn, formatUsd } from '@/lib/utils';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
+import { modelQueries } from '@/server/functions/model';
 import {
+  deletePricing,
   getModelPricing,
   previewPricingSync,
   pricingQueries,
@@ -17,6 +26,16 @@ import {
   upsertPricing,
   type listPricingWithModels
 } from '@/server/functions/pricing';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -46,7 +65,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ProviderBindings } from '@/components/console/provider-bindings';
+import { modelIdentityColumns } from '@/components/console/model-identity-columns';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { pricingTableInput } from '@/components/console/table-filters';
 import {
@@ -54,7 +73,7 @@ import {
   ConsoleSearch,
   ConsoleToolbar
 } from '@/components/console/toolbar';
-import { ModelIcon } from '@/components/model-icon';
+import { UnpricedBadge } from '@/components/console/unpriced-badge';
 
 type PricingSource = 'models.dev' | 'llm-metadata';
 const ALL_SOURCES: PricingSource[] = ['models.dev', 'llm-metadata'];
@@ -149,61 +168,33 @@ type PricingRow = Awaited<
 
 const helper = createAppColumnHelper<PricingRow>();
 
-const pricingColumns = (edit: (row: PricingRow) => void) =>
+const pricingColumns = (actions: {
+  edit: (row: PricingRow) => void;
+  remove: (row: PricingRow) => void;
+}) =>
   helper.columns([
-    helper.display({
-      id: 'icon',
-      header: 'Icon',
-      meta: { headClassName: 'w-20' },
-      cell: ({ row }) =>
-        row.original.image ? (
-          <ModelIcon image={row.original.image} className="size-8" />
-        ) : (
-          <div className="size-8 rounded border bg-muted" />
-        )
-    }),
-    helper.accessor('name', {
-      header: 'Model',
-      cell: ({ row }) => (
-        <>
-          <div className="font-medium">{row.original.name}</div>
-          <div className="font-mono text-xs text-muted-foreground">
-            {row.original.modelId}
-          </div>
-        </>
-      )
-    }),
-    helper.display({
-      id: 'provider',
-      header: 'Providers',
-      meta: { cellClassName: 'text-sm' },
-      cell: ({ row }) => <ProviderBindings bindings={row.original.providers} />
-    }),
-    helper.accessor('capability', {
-      header: 'Capability',
-      cell: ({ row }) => (
-        <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-          {row.original.capability}
-        </span>
-      )
-    }),
+    ...modelIdentityColumns(helper),
     helper.display({
       id: 'pricing',
       header: 'Pricing',
       meta: {
-        headClassName: 'w-56',
-        cellClassName: 'font-mono text-xs text-muted-foreground'
+        headClassName: 'w-92',
+        cellClassName: 'font-mono text-[11px] text-muted-foreground'
       },
       cell: ({ row }) => {
-        const lines = summarizePricing(
+        const rows = summarizePricingRows(
           row.original.capability,
           row.original.pricing
         );
-        if (lines.length === 0) return '—';
+        if (rows.length === 0) return <UnpricedBadge />;
         return (
           <div className="space-y-0.5">
-            {lines.map(line => (
-              <div key={line}>{line}</div>
+            {rows.map(group => (
+              <div key={group[0]} className="flex gap-x-2 whitespace-nowrap">
+                {group.map(line => (
+                  <span key={line}>{line}</span>
+                ))}
+              </div>
             ))}
           </div>
         );
@@ -212,17 +203,40 @@ const pricingColumns = (edit: (row: PricingRow) => void) =>
     helper.accessor(row => row.pricing?.source, {
       id: 'source',
       header: 'Source',
-      meta: { align: 'right', cellClassName: 'text-xs text-muted-foreground' },
+      meta: {
+        align: 'right',
+        cellClassName: 'text-xs whitespace-nowrap text-muted-foreground'
+      },
       cell: ({ row }) => row.original.pricing?.source ?? '—'
     }),
     helper.display({
       id: 'actions',
       header: 'Actions',
-      meta: { align: 'right', headClassName: 'w-24' },
+      meta: {
+        align: 'right',
+        headClassName: 'w-24',
+        cellClassName: 'whitespace-nowrap'
+      },
       cell: ({ row }) => (
-        <Button variant="ghost" size="sm" onClick={() => edit(row.original)}>
-          <Pencil className="size-4" />
-        </Button>
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => actions.edit(row.original)}
+          >
+            <Pencil className="size-4" />
+          </Button>
+          {/* Only a price that exists can be taken away; the space is kept
+              either way so the edit buttons stay in one column. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(!row.original.pricing && 'invisible')}
+            onClick={() => actions.remove(row.original)}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </>
       )
     })
   ]);
@@ -242,7 +256,12 @@ const noop = () => {};
  * record to act on, and the cells that would call them are bars.
  */
 export function PricingPending() {
-  return <ConsoleTableSkeleton columns={pricingColumns(noop)} filters={1} />;
+  return (
+    <ConsoleTableSkeleton
+      columns={pricingColumns({ edit: noop, remove: noop })}
+      filters={1}
+    />
+  );
 }
 
 export default function PricingPage() {
@@ -269,14 +288,32 @@ export default function PricingPage() {
     )
   );
 
+  // A price is read by the models table too, which says whether each model
+  // has one.
+  const invalidatePrices = () => {
+    queryClient.invalidateQueries({
+      queryKey: pricingQueries.key.listWithModels()
+    });
+    queryClient.invalidateQueries({ queryKey: modelQueries.key.list() });
+  };
+
   const upsertMutation = useMutation({
     mutationFn: mutating(upsertPricing),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: pricingQueries.key.listWithModels()
-      });
+      invalidatePrices();
       setEdit(null);
       toast.success('Pricing saved');
+    },
+    onError: e => toast.error(e.message)
+  });
+
+  const [removing, setRemoving] = useState<PricingRow | null>(null);
+  const deleteMutation = useMutation({
+    mutationFn: mutating(deletePricing),
+    onSuccess: () => {
+      invalidatePrices();
+      setRemoving(null);
+      toast.success('Pricing deleted');
     },
     onError: e => toast.error(e.message)
   });
@@ -372,7 +409,10 @@ export default function PricingPage() {
     if (fresh) fill(fresh);
   };
 
-  const columns = useMemo(() => pricingColumns(openEdit), []);
+  const columns = useMemo(
+    () => pricingColumns({ edit: openEdit, remove: setRemoving }),
+    []
+  );
 
   /**
    * One rate. Several rates are mutually exclusive billing styles — typing in
@@ -513,9 +553,7 @@ export default function PricingPage() {
         unchanged += result.unchanged;
         skipped.push(...result.skipped.map(entry => entry.modelId));
       }
-      queryClient.invalidateQueries({
-        queryKey: pricingQueries.key.listWithModels()
-      });
+      invalidatePrices();
       setPreviewOpen(false);
       toast.success(
         `Applied: ${created} new, ${updated} updated${unchanged ? `, ${unchanged} unchanged` : ''}`
@@ -810,6 +848,41 @@ export default function PricingPage() {
         applyPending={syncMutation.isPending}
         onApply={apply}
       />
+
+      <AlertDialog
+        open={!!removing}
+        onOpenChange={open => !open && setRemoving(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Pricing</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove the price of {removing?.name}? Its usage will be recorded
+              at no cost until it is priced again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removing?.pricing) {
+                  deleteMutation.mutate({ id: removing.pricing.id });
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              variant="destructive"
+              className="gap-2"
+            >
+              {deleteMutation.isPending && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
