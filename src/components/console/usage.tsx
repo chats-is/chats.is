@@ -10,8 +10,6 @@ import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
 import { usageQueries, type adminUsageLog } from '@/server/functions/usage';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -24,11 +22,12 @@ import {
   DataTable
 } from '@/components/console/data-table';
 import { ModelStatusBadge } from '@/components/console/model-status';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import {
-  DailyStackedChart,
-  UsageModule,
-  UsageModuleSkeleton
-} from '@/components/usage-module';
+  ConsoleFilters,
+  ConsoleSearch,
+  ConsoleToolbar
+} from '@/components/console/toolbar';
 import { UsageQuantity } from '@/components/usage-quantity';
 import { UsageUnitPrice } from '@/components/usage-unit-price';
 
@@ -96,93 +95,19 @@ const logColumns = helper.columns([
   })
 ]);
 
+/**
+ * Every call the install made, one row each, filtered by who, which model,
+ * what kind and how far back. The figures these add up to are on the
+ * overview.
+ */
 export default function UsagePage() {
   const queryClient = useQueryClient();
-  const [days, setDays] = useSearchFilter('days', 7);
-  const [refreshing, setRefreshing] = useState(false);
-  const from = useMemo(() => reportWindowStart(days), [days]);
-  const { data, isLoading } = useQuery(usageQueries.adminList({ from }));
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await queryClient.invalidateQueries({ queryKey: usageQueries.all() });
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium">Stats</h2>
-          <div className="flex items-center gap-2">
-            <Select
-              value={String(days)}
-              onValueChange={v => setDays(Number(v))}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Today</SelectItem>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              aria-label="Refresh"
-            >
-              <RefreshCw
-                className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
-              />
-            </Button>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <UsageModuleSkeleton isAdmin />
-        ) : (
-          data && (
-            <>
-              <UsageModule
-                kpi={data.kpi}
-                rows={data.rows}
-                days={days}
-                chartTitle="Daily model cost"
-              />
-              <DailyStackedChart
-                rows={data.rows}
-                groupBy="provider"
-                days={days}
-                title="Daily provider cost"
-              />
-              <DailyStackedChart
-                rows={data.rows}
-                groupBy="capability"
-                days={days}
-                title="Daily capability cost"
-              />
-            </>
-          )
-        )}
-
-        <UsageLog days={days} />
-      </section>
-    </div>
-  );
-}
-
-function UsageLog({ days }: { days: number }) {
   const [userQuery, setUserQuery] = useSearchFilter('user', '');
   const [modelId, setModelId] = useSearchFilter('model', '');
   const [capability, setCapability] = useSearchFilter('capability', '');
+  const [days, setDays] = useSearchFilter('days', 7);
   const [page, setPage] = useSearchFilter('page', 1);
+  const [refreshing, setRefreshing] = useState(false);
 
   const from = useMemo(() => reportWindowStart(days), [days]);
 
@@ -201,16 +126,25 @@ function UsageLog({ days }: { days: number }) {
     })
   );
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: usageQueries.key.log()
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
-    <Card className="py-0">
-      <CardContent className="p-4">
-        <div className="mb-3 text-base font-medium">Logs</div>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Input
-            placeholder="Search user (name or email)..."
+    <div className="space-y-6">
+      <ConsoleToolbar>
+        <ConsoleFilters>
+          <ConsoleSearch
+            placeholder="Search user..."
             value={userQuery}
-            onChange={e => setUserQuery(e.target.value)}
-            className="w-64"
+            onChange={setUserQuery}
           />
           <Select
             value={modelId || '__all__'}
@@ -247,25 +181,49 @@ function UsageLog({ days }: { days: number }) {
               ))}
             </SelectContent>
           </Select>
-        </div>
+          <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Today</SelectItem>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </ConsoleFilters>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          aria-label="Refresh"
+        >
+          <RefreshCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </Button>
+      </ConsoleToolbar>
 
-        <DataTable
-          columns={logColumns}
-          data={isLoading ? undefined : data?.rows}
-          dense
-          empty="No records."
-          tableClassName="text-sm"
-          pending={isPlaceholderData}
-          pagination={
-            data && {
-              page: data.page,
-              pageSize: data.pageSize,
-              total: data.total,
-              onPageChange: setPage
-            }
+      <DataTable
+        columns={logColumns}
+        data={isLoading ? undefined : data?.rows}
+        dense
+        empty="No records."
+        tableClassName="text-sm"
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
           }
-        />
-      </CardContent>
-    </Card>
+        }
+      />
+    </div>
   );
+}
+
+/** The usage page while its first rows are on their way. */
+export function UsagePending() {
+  return <ConsoleTableSkeleton columns={logColumns} filters={3} />;
 }

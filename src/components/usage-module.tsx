@@ -202,13 +202,16 @@ function bucketByLocalDay(rows: UsageRow[], groupBy: GroupBy): DailyDay[] {
  *  `'YYYY-MM-DD'` strings in the user's local timezone. */
 function buildContinuousDays(
   daily: DailyDay[],
-  days: number | undefined
+  days: number | undefined,
+  endDay?: Date
 ): DailyDay[] {
   const byKey = new Map<string, DailyDay>();
   for (const d of daily) byKey.set(d.day.slice(0, 10), d);
 
-  const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // The last day drawn: today, unless the window is a chosen range that
+  // ends earlier.
+  const last = endDay ?? new Date();
+  const end = new Date(last.getFullYear(), last.getMonth(), last.getDate());
 
   let start: Date;
   if (typeof days === 'number' && days > 0) {
@@ -236,6 +239,8 @@ type ChartProps = {
   rows: UsageRow[];
   groupBy?: GroupBy;
   days?: number;
+  /** The window's last day; today when not given. */
+  endDay?: Date;
   title?: string;
 };
 
@@ -247,13 +252,14 @@ export function DailyStackedChart({
   rows,
   groupBy = 'model',
   days,
+  endDay,
   title
 }: ChartProps) {
   const daily = useMemo(() => bucketByLocalDay(rows, groupBy), [rows, groupBy]);
 
   const continuous = useMemo(
-    () => buildContinuousDays(daily, days),
-    [daily, days]
+    () => buildContinuousDays(daily, days, endDay),
+    [daily, days, endDay]
   );
 
   // Color mapping by total cost rank — biggest spender gets stable color.
@@ -492,6 +498,8 @@ type Props = {
   kpi: UsageKpi;
   rows: UsageRow[];
   days?: number;
+  /** The window's last day; today when not given. */
+  endDay?: Date;
   chartTitle?: string;
 };
 
@@ -501,6 +509,7 @@ export function UsageModule({
   kpi,
   rows,
   days,
+  endDay,
   chartTitle = 'Daily cost'
 }: Props) {
   // User mode strips all cost-related UI. Detected by absence of totalCost.
@@ -513,7 +522,11 @@ export function UsageModule({
   // Daily series for each KPI sparkline. Reuses the same bucketing as the
   // logs table so chart and table agree on which row falls on which day.
   const series = useMemo(() => {
-    const daily = buildContinuousDays(bucketByLocalDay(rows, 'model'), days);
+    const daily = buildContinuousDays(
+      bucketByLocalDay(rows, 'model'),
+      days,
+      endDay
+    );
     return daily.map(d => {
       const cost = d.groups.reduce((sum, g) => sum + Number(g.cost ?? 0), 0);
       const requests = d.groups.reduce((sum, g) => sum + g.requests, 0);
@@ -544,7 +557,7 @@ export function UsageModule({
         tokensTotal: inputTokens + outputTokens
       };
     });
-  }, [rows, days]);
+  }, [rows, days, endDay]);
 
   return (
     <div className="space-y-4">
@@ -690,6 +703,7 @@ export function UsageModule({
           rows={rows}
           groupBy="model"
           days={days}
+          endDay={endDay}
           title={chartTitle}
         />
       )}

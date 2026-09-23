@@ -89,6 +89,7 @@
     "openai": "^6.49.0",
     "radix-ui": "^1.6.7",
     "react": "^19.2.0",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4",

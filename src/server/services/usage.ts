@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -287,9 +287,10 @@ export async function recordTranscriptionUsage(
 // =============================================================================
 // KPI tile aggregate — TZ-independent (sums over the whole window)
 // =============================================================================
-async function queryKpi(args: { since: Date; userId?: string }) {
+async function queryKpi(args: { since: Date; until?: Date; userId?: string }) {
   const baseWhere = and(
     gte(usage.createdAt, args.since),
+    args.until ? lt(usage.createdAt, args.until) : undefined,
     args.userId ? eq(usage.userId, args.userId) : undefined
   );
   const rows = await db
@@ -325,10 +326,12 @@ async function queryKpi(args: { since: Date; userId?: string }) {
 
 async function queryUsageRows(args: {
   since: Date;
+  until?: Date;
   userId?: string;
 }): Promise<UsageRow[]> {
   const where = and(
     gte(usage.createdAt, args.since),
+    args.until ? lt(usage.createdAt, args.until) : undefined,
     args.userId ? eq(usage.userId, args.userId) : undefined
   );
   const rows = await db
@@ -379,10 +382,10 @@ export async function adminUsageByUser(userId: string, since: Date) {
   return { kpi, rows };
 }
 
-export async function adminListUsage(since: Date) {
+export async function adminListUsage(since: Date, until?: Date) {
   const [kpi, rows] = await Promise.all([
-    queryKpi({ since }),
-    queryUsageRows({ since })
+    queryKpi({ since, until }),
+    queryUsageRows({ since, until })
   ]);
   return { kpi, rows };
 }

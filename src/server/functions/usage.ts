@@ -18,11 +18,11 @@ export const adminUsageByUser = createServerFn({ method: 'GET' })
   .validator(usageByUserRangeSchema)
   .handler(({ data }) => usage.adminUsageByUser(data.userId, data.from));
 
-/** /console/usage — admin view across everyone. */
+/** The console overview's stats — admin view across everyone. */
 export const adminListUsage = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageRangeSchema)
-  .handler(({ data }) => usage.adminListUsage(data.from));
+  .handler(({ data }) => usage.adminListUsage(data.from, data.to));
 
 export const adminUserModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
@@ -57,11 +57,12 @@ export const usageQueries = {
       ] as const,
       queryFn: () => adminUsageByUser({ data: input })
     }),
-  adminList: (input: { from: Date }) =>
+  adminList: (input: { from: Date; to?: Date }) =>
     queryOptions({
       queryKey: [
         ...usageQueries.key.adminList(),
-        input.from.toISOString()
+        input.from.toISOString(),
+        input.to?.toISOString() ?? null
       ] as const,
       queryFn: () => adminListUsage({ data: input })
     }),

@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/functions/model';
-import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
-import Usage from '@/components/console/usage';
+import Usage, { UsagePending } from '@/components/console/usage';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
  *  and come back to. Each is optional: a filter at its default is simply
@@ -23,6 +22,6 @@ export const Route = createFileRoute('/console/usage')({
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(modelQueries.forSelect()),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Usage') }] }),
-  pendingComponent: () => <ConsoleUsageSkeleton />,
+  pendingComponent: UsagePending,
   component: Usage
 });

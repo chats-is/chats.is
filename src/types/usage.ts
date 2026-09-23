@@ -140,7 +140,11 @@ export type DailyDay = {
  * filters on a timestamptz column — which keeps the KPI window and the
  * browser's local-day chart buckets aligned.
  */
-export const usageRangeSchema = z.object({ from: z.date() });
+/** A report window: from `from`, up to but not including `to` when given. */
+export const usageRangeSchema = z.object({
+  from: z.date(),
+  to: z.date().optional()
+});
 
 export const usageByUserRangeSchema = z.object({
   userId: z.string().min(1),
