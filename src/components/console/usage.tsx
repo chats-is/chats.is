@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { CAPABILITIES } from '@/lib/constant';
-import { formatUsd, reportWindowStart } from '@/lib/utils';
+import { formatUsd } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
 import { usageQueries, type adminUsageLog } from '@/server/functions/usage';
@@ -28,6 +28,10 @@ import {
   ConsoleSearch,
   ConsoleToolbar
 } from '@/components/console/toolbar';
+import {
+  DateRangeFilter,
+  useReportWindow
+} from '@/components/date-range-filter';
 import { UsageQuantity } from '@/components/usage-quantity';
 import { UsageUnitPrice } from '@/components/usage-unit-price';
 
@@ -105,17 +109,17 @@ export default function UsagePage() {
   const [userQuery, setUserQuery] = useSearchFilter('user', '');
   const [modelId, setModelId] = useSearchFilter('model', '');
   const [capability, setCapability] = useSearchFilter('capability', '');
-  const [days, setDays] = useSearchFilter('days', 7);
   const [page, setPage] = useSearchFilter('page', 1);
   const [refreshing, setRefreshing] = useState(false);
 
-  const from = useMemo(() => reportWindowStart(days), [days]);
+  const { window, value, until, setWindow } = useReportWindow();
 
   const { data: models } = useQuery(modelQueries.forSelect());
 
   const { data, isLoading, isPlaceholderData } = useQuery(
     usageQueries.log({
-      from,
+      from: window.start,
+      to: until,
       userQuery: userQuery.trim() || undefined,
       modelId: modelId || undefined,
       capability: capability
@@ -181,16 +185,12 @@ export default function UsagePage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Today</SelectItem>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
+          <DateRangeFilter
+            value={value}
+            start={window.start}
+            last={window.last}
+            onChange={setWindow}
+          />
         </ConsoleFilters>
         <Button
           variant="outline"

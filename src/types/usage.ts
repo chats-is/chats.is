@@ -140,6 +140,15 @@ export type DailyDay = {
  * filters on a timestamptz column — which keeps the KPI window and the
  * browser's local-day chart buckets aligned.
  */
+/** A report window in the address: a preset of the last N days, or a range
+ *  of local calendar days as `'YYYY-MM-DD'`, both ends included. */
+const dayKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const reportWindowSearchSchema = z.object({
+  days: z.coerce.number().int().positive().optional(),
+  from: dayKeySchema.optional(),
+  to: dayKeySchema.optional()
+});
+
 /** A report window: from `from`, up to but not including `to` when given. */
 export const usageRangeSchema = z.object({
   from: z.date(),
@@ -156,6 +165,7 @@ export const usageUserSchema = z.object({ userId: z.string().min(1) });
 /** What the admin log may be narrowed by. */
 export const usageLogFilterSchema = z.object({
   from: z.date().optional(),
+  /** Up to but not including — the start of the day after the last. */
   to: z.date().optional(),
   userId: z.string().optional(),
   userQuery: z.string().optional(),

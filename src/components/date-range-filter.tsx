@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { type DateRange } from 'react-day-picker';
 
-import { cn } from '@/lib/utils';
+import { cn, reportWindowStart } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -21,6 +22,75 @@ const PRESETS = [
   { days: 7, label: 'Last 7 days' },
   { days: 30, label: 'Last 30 days' }
 ];
+
+const DEFAULT_DAYS = 7;
+
+/** `'YYYY-MM-DD'` → local midnight of that day. */
+const parseDay = (key: string) => {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const addDays = (date: Date, n: number) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+
+/**
+ * The window a report covers, from the address: a chosen range of calendar
+ * days when both ends are there, else the last N days ending today.
+ */
+function useWindowFromSearch() {
+  const search: { days?: number; from?: string; to?: string } = useSearch({
+    strict: false
+  });
+  return useMemo(() => {
+    if (search.from && search.to) {
+      const start = parseDay(search.from);
+      const last = parseDay(search.to);
+      const days = Math.round((last.getTime() - start.getTime()) / 864e5) + 1;
+      return { custom: true, start, last, days };
+    }
+    const days = search.days ?? DEFAULT_DAYS;
+    const start = reportWindowStart(days);
+    return { custom: false, start, last: addDays(start, days - 1), days };
+  }, [search.days, search.from, search.to]);
+}
+
+/**
+ * A report window kept in the address — the overview's stats and the usage
+ * log read theirs the same way. Gives the days it covers, the value for the
+ * filter, the exclusive end to query up to, and the setter.
+ */
+export function useReportWindow() {
+  const navigate = useNavigate();
+  const window = useWindowFromSearch();
+
+  const value: DateRangeValue = window.custom
+    ? { from: window.start, to: window.last }
+    : { days: window.days };
+  // A chosen range ends at the close of its last day; a preset runs to now.
+  const until = window.custom ? addDays(window.last, 1) : undefined;
+
+  // One entry per choice, so the back button undoes it. Either kind of
+  // window replaces the other, the default leaves the address clean, and a
+  // paged table starts over at its first page.
+  const setWindow = (next: DateRangeValue) =>
+    void navigate({
+      to: '.',
+      search: (previous: Record<string, unknown>) => {
+        const { days: _d, from: _f, to: _t, page: _p, ...rest } = previous;
+        if (!('days' in next)) {
+          return {
+            ...rest,
+            from: format(next.from, 'yyyy-MM-dd'),
+            to: format(next.to, 'yyyy-MM-dd')
+          };
+        }
+        return next.days === DEFAULT_DAYS ? rest : { ...rest, days: next.days };
+      }
+    });
+
+  return { window, value, until, setWindow };
+}
 
 /**
  * One control for a report window: the button names it, and opens the
@@ -81,7 +151,9 @@ export function DateRangeFilter({
           <CalendarIcon className="size-4 text-muted-foreground" />
           {preset
             ? preset.label
-            : `${format(start, 'LLL d, y')} – ${format(last, 'LLL d, y')}`}
+            : start.getTime() === last.getTime()
+              ? format(start, 'LLL d, y')
+              : `${format(start, 'LLL d, y')} – ${format(last, 'LLL d, y')}`}
         </Button>
       </PopoverTrigger>
       <PopoverContent

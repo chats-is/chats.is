@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, asc, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -408,7 +408,7 @@ export async function adminUsageLog(
 ) {
   const whereParts = [
     data.from ? gte(usage.createdAt, data.from) : undefined,
-    data.to ? lte(usage.createdAt, data.to) : undefined,
+    data.to ? lt(usage.createdAt, data.to) : undefined,
     data.userId ? eq(usage.userId, data.userId) : undefined,
     data.modelId ? eq(usage.modelId, data.modelId) : undefined,
     data.capability ? eq(usage.capability, data.capability) : undefined

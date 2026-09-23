@@ -25,12 +25,12 @@ export function ConsoleToolbar({ children }: { children: React.ReactNode }) {
  * The filters at the left of a toolbar.
  *
  * Holds its width even with nothing in it, so a page with no filters still puts
- * its action where every other page puts one.
+ * its action where every other page puts one. Not capped: the search box caps
+ * itself, so a page with more filters beside it keeps the same search box
+ * rather than squeezing it.
  */
 export function ConsoleFilters({ children }: { children?: React.ReactNode }) {
-  return (
-    <div className="flex max-w-2xl flex-1 items-center gap-2">{children}</div>
-  );
+  return <div className="flex flex-1 items-center gap-2">{children}</div>;
 }
 
 /** The search box a console toolbar opens with. */

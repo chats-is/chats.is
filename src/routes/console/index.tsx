@@ -1,25 +1,17 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { CircleAlert, Cpu, Sparkles, Users, Zap } from 'lucide-react';
-import { z } from 'zod';
 
+import { reportWindowSearchSchema } from '@/types/usage';
 import { pageTitle } from '@/lib/head';
 import { overviewQueries } from '@/server/functions/overview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConsoleCardsSkeleton } from '@/components/console/skeletons';
 import { UsageStats } from '@/components/console/usage-stats';
 
-/** The stats' window lives in the address, so a view can be linked: a
- *  preset number of days, or a chosen range of local calendar days. */
-const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const searchSchema = z.object({
-  days: z.coerce.number().int().positive().optional(),
-  from: dayKey.optional(),
-  to: dayKey.optional()
-});
-
 export const Route = createFileRoute('/console/')({
-  validateSearch: searchSchema,
+  // The stats' window lives in the address, so a view can be linked.
+  validateSearch: reportWindowSearchSchema,
   // The counts, taken by the database and carried by one call — through
   // the cache, like every other page, so a return draws what was held and
   // reads again behind it.
