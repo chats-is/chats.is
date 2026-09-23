@@ -80,6 +80,15 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        // A sign-in by email code carries no name, and better-auth stores it
+        // as empty — so the user would go by nothing anywhere a name is
+        // shown. They go by their address's local part until they set one,
+        // as migration 0020 named the accounts that came before. Names are
+        // display names and may repeat; the email is what is unique.
+        before: async user => {
+          if (user.name.trim()) return;
+          return { data: { ...user, name: user.email.split('@')[0] } };
+        },
         after: async user => {
           // Counted rather than assumed, so it stays correct if the first
           // admin is later demoted and someone else signs up.
