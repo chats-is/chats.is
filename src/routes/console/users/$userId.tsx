@@ -2,17 +2,18 @@ import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
+import { reportWindowSearchSchema } from '@/types/usage';
 import { pageTitle } from '@/lib/head';
 import { quotaQueries } from '@/server/functions/quota';
 import { usageQueries } from '@/server/functions/usage';
-import { ConsoleUsageSkeleton } from '@/components/console/skeletons';
-import UserDetail from '@/components/console/user-detail';
+import UserDetail, {
+  UserDetailSkeleton
+} from '@/components/console/user-detail';
 
 /** Filters live in the address, so a filtered view can be linked, refreshed
  *  and come back to. Each is optional: a filter at its default is simply
  *  absent, which keeps an unfiltered page's URL clean. */
-const searchSchema = z.object({
-  days: z.coerce.number().int().positive().optional(),
+const searchSchema = reportWindowSearchSchema.extend({
   model: z.string().optional(),
   capability: z.string().optional(),
   page: pageSearchSchema
@@ -34,7 +35,7 @@ export const Route = createFileRoute('/console/users/$userId')({
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'User usage limits') }]
   }),
-  pendingComponent: () => <ConsoleUsageSkeleton columns={5} />,
+  pendingComponent: UserDetailSkeleton,
   component: UserDetailPage
 });
 

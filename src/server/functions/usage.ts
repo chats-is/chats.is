@@ -16,7 +16,9 @@ import * as usage from '@/server/services/usage';
 export const adminUsageByUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageByUserRangeSchema)
-  .handler(({ data }) => usage.adminUsageByUser(data.userId, data.from));
+  .handler(({ data }) =>
+    usage.adminUsageByUser(data.userId, data.from, data.to)
+  );
 
 /** The console overview's stats — admin view across everyone. */
 export const adminListUsage = createServerFn({ method: 'GET' })
@@ -48,12 +50,13 @@ export const usageQueries = {
     userModels: () => ['usage', 'userModels'] as const,
     log: () => ['usage', 'log'] as const
   },
-  byUser: (input: { userId: string; from: Date }) =>
+  byUser: (input: { userId: string; from: Date; to?: Date }) =>
     queryOptions({
       queryKey: [
         ...usageQueries.key.byUser(),
         input.userId,
-        input.from.toISOString()
+        input.from.toISOString(),
+        input.to?.toISOString() ?? null
       ] as const,
       queryFn: () => adminUsageByUser({ data: input })
     }),

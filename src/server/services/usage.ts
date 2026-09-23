@@ -374,10 +374,14 @@ async function queryUsageRows(args: {
 }
 
 /** A KPI tile and the rows behind it — what every usage screen asks for. */
-export async function adminUsageByUser(userId: string, since: Date) {
+export async function adminUsageByUser(
+  userId: string,
+  since: Date,
+  until?: Date
+) {
   const [kpi, rows] = await Promise.all([
-    queryKpi({ since, userId }),
-    queryUsageRows({ since, userId })
+    queryKpi({ since, until, userId }),
+    queryUsageRows({ since, until, userId })
   ]);
   return { kpi, rows };
 }

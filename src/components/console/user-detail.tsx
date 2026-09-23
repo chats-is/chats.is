@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Link } from '@tanstack/react-router';
+import { Link, useCanGoBack, useRouter } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { CAPABILITIES } from '@/lib/constant';
-import { formatUsd, reportWindowStart } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { quotaQueries } from '@/server/functions/quota';
-import { usageQueries, type adminUsageLog } from '@/server/functions/usage';
+import { usageQueries } from '@/server/functions/usage';
 import { userQueries } from '@/server/functions/user';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -20,44 +22,42 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable } from '@/components/console/data-table';
+import { ConsoleTableSkeleton } from '@/components/console/skeletons';
+import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
+import { UsageItems, usageLogColumns } from '@/components/console/usage-log';
 import {
-  createAppColumnHelper,
-  DataTable
-} from '@/components/console/data-table';
-import {
-  LimitsSkeleton,
-  UsageModule,
-  UsageModuleSkeleton
-} from '@/components/usage-module';
-import { UsageQuantity } from '@/components/usage-quantity';
-import { UsageUnitPrice } from '@/components/usage-unit-price';
-
-const fmtDate = (d: Date | string | null) =>
-  d ? new Date(d).toLocaleString() : '—';
+  DateRangeFilter,
+  useReportWindow
+} from '@/components/date-range-filter';
+import { Countdown } from '@/components/usage-limit-alert';
+import { UsageModule, UsageModuleSkeleton } from '@/components/usage-module';
 
 const sourceLabel: Record<string, string> = {
-  override: 'User override',
-  plan: 'Plan',
-  default: 'Default quota',
-  none: 'No quota'
+  override: 'set on the user',
+  plan: 'from the plan',
+  default: 'the default'
 };
 
+/**
+ * One user, as the console sees them: who they are and how much of their
+ * limits is left, side by side at the top; then one date range that governs
+ * both what follows — their figures, and the log of the calls behind them.
+ */
 export default function UserDetail({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
-  const [days, setDays] = useSearchFilter('days', 7);
+  const { window, value, until, setWindow } = useReportWindow();
   const [refreshing, setRefreshing] = useState(false);
 
-  const from = useMemo(() => reportWindowStart(days), [days]);
-
   const { data: user, isLoading: userLoading } = useQuery(
-    userQueries.detail({
-      id: userId
-    })
+    userQueries.detail({ id: userId })
   );
   const { data: status, isLoading: statusLoading } = useQuery(
     quotaQueries.byUser({ userId })
   );
-  const { data: usage } = useQuery(usageQueries.byUser({ userId, from }));
+  const { data: usage } = useQuery(
+    usageQueries.byUser({ userId, from: window.start, to: until })
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -76,33 +76,35 @@ export default function UserDetail({ userId }: { userId: string }) {
     }
   };
 
-  if (userLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="size-14 rounded-full" />
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-4 w-56" />
-            <Skeleton className="h-3 w-64" />
-          </div>
-        </div>
-        <LimitsSkeleton />
-        <UsageModuleSkeleton isAdmin />
-      </div>
-    );
-  }
+  // Back to wherever the user was opened from — the users list or the usage
+  // log both lead here. A page opened on its own has nowhere to go back to,
+  // and goes to the list.
+  const router = useRouter();
+  const canGoBack = useCanGoBack();
+  const backClass =
+    'inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground';
+  const back = canGoBack ? (
+    <button
+      type="button"
+      onClick={() => router.history.back()}
+      className={backClass}
+    >
+      <ArrowLeft className="size-4" />
+      Back
+    </button>
+  ) : (
+    <Link to="/console/users" className={backClass}>
+      <ArrowLeft className="size-4" />
+      Back to users
+    </Link>
+  );
+
+  if (userLoading) return <UserDetailSkeleton />;
 
   if (!user) {
     return (
       <div className="space-y-4">
-        <Link
-          to="/console/users"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to users
-        </Link>
+        {back}
         <div className="text-sm text-muted-foreground">User not found.</div>
       </div>
     );
@@ -111,13 +113,7 @@ export default function UserDetail({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <Link
-          to="/console/users"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to users
-        </Link>
+        {back}
         <Button
           variant="outline"
           size="icon"
@@ -129,180 +125,187 @@ export default function UserDetail({ userId }: { userId: string }) {
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="size-14 overflow-hidden rounded-full border bg-muted">
-          {user.image ? (
-            <img
-              src={user.image}
-              alt={user.name || ''}
-              width={56}
-              height={56}
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center text-lg font-medium text-muted-foreground">
-              {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+      <Card className="py-0">
+        <CardContent className="grid gap-6 p-5 md:grid-cols-2">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="size-14 shrink-0 overflow-hidden rounded-full border bg-muted">
+              {user.image ? (
+                <img
+                  src={user.image}
+                  alt={user.name || ''}
+                  width={56}
+                  height={56}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <div className="flex size-full items-center justify-center text-lg font-medium text-muted-foreground">
+                  {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-xl font-semibold">
-            {user.name || 'No name'}
-          </h1>
-          <div className="truncate text-sm text-muted-foreground">
-            {user.email}
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-xl font-semibold">
+                  {user.name || 'No name'}
+                </h1>
+                <Badge variant="secondary">{user.role}</Badge>
+              </div>
+              <div className="truncate text-sm text-muted-foreground">
+                {user.email}
+              </div>
+              <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                {status && (
+                  <>
+                    <span>{status.plan?.name ?? 'No plan'}</span>
+                    <span>·</span>
+                    <span>
+                      {status.source === 'none'
+                        ? 'No quota'
+                        : `Quota ${status.name ?? '—'}, ${sourceLabel[status.source] ?? status.source}`}
+                    </span>
+                    <span>·</span>
+                  </>
+                )}
+                <span>{user.chatCount} chats</span>
+                <span>·</span>
+                <span>{user.messageCount} messages</span>
+                <span>·</span>
+                <span>
+                  Joined {new Date(user.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>Joined {fmtDate(user.createdAt)}</span>
-            <span>·</span>
-            <span>Role: {user.role}</span>
-            <span>·</span>
-            <span>{user.chatCount} chats</span>
-            <span>·</span>
-            <span>{user.messageCount} messages</span>
+
+          <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
+            {statusLoading || !status ? (
+              <>
+                <LimitRowSkeleton />
+                <LimitRowSkeleton />
+              </>
+            ) : status.source === 'none' ? (
+              <p className="text-sm text-muted-foreground">
+                No quota applies to this user, so their requests are refused.
+              </p>
+            ) : status.isUnlimited ? (
+              <p className="text-sm text-muted-foreground">
+                Unlimited — no spending limits apply.
+              </p>
+            ) : status.fiveHour || status.sevenDay ? (
+              <>
+                {status.fiveHour && (
+                  <LimitRow label="5-hour" window={status.fiveHour} />
+                )}
+                {status.sevenDay && (
+                  <LimitRow label="Weekly" window={status.sevenDay} />
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Their quota sets no limits.
+              </p>
+            )}
           </div>
-        </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <DateRangeFilter
+          value={value}
+          start={window.start}
+          last={window.last}
+          onChange={setWindow}
+        />
       </div>
 
-      {status && status.source !== 'none' && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-          <span>
-            Plan:{' '}
-            <span className="font-medium">
-              {status.plan?.name ?? 'Free (no plan)'}
-            </span>
-          </span>
-          <span>·</span>
-          <span>
-            Quota: <span className="font-medium">{status.name ?? '—'}</span>
-          </span>
-          <span>·</span>
-          <span>
-            Source:{' '}
-            <span className="font-medium">
-              {sourceLabel[status.source] ?? status.source}
-            </span>
-          </span>
-          {status.isUnlimited && (
-            <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300">
-              Unlimited
-            </span>
-          )}
-        </div>
-      )}
-
-      {statusLoading ? (
-        <LimitsSkeleton />
+      {usage ? (
+        <UsageModule
+          kpi={usage.kpi}
+          rows={usage.rows}
+          days={window.days}
+          endDay={window.last}
+        />
       ) : (
-        status &&
-        (status.fiveHour || status.sevenDay) && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-medium">Limits</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {status.fiveHour && (
-                <QuotaCard label="5-hour limit" stat={status.fiveHour} />
-              )}
-              {status.sevenDay && (
-                <QuotaCard label="Weekly limit" stat={status.sevenDay} />
-              )}
-            </div>
-          </section>
-        )
+        <UsageModuleSkeleton isAdmin />
       )}
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium">Stats</h2>
-          <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Today</SelectItem>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {usage ? (
-          <UsageModule kpi={usage.kpi} rows={usage.rows} days={days} />
-        ) : (
-          <UsageModuleSkeleton isAdmin />
-        )}
-
-        <UserLogs userId={userId} days={days} />
-      </section>
+      <UserLogs userId={userId} from={window.start} to={until} />
     </div>
   );
 }
 
-type UsageLogRow = Awaited<ReturnType<typeof adminUsageLog>>['rows'][number];
+/**
+ * One window of the user's limits: its name and when it resets, over a bar of
+ * what is left. The bands read at a glance — plenty, running down, nearly
+ * out — and are the ones the user sees on their own usage page.
+ */
+function LimitRow({
+  label,
+  window
+}: {
+  label: string;
+  window: { remainingPct: number; resetAt: Date | string | null };
+}) {
+  const pct = window.remainingPct;
+  const band =
+    pct <= 20
+      ? 'bg-destructive/15 [&_[data-slot=progress-indicator]]:bg-destructive'
+      : pct <= 50
+        ? 'bg-amber-500/15 [&_[data-slot=progress-indicator]]:bg-amber-500'
+        : 'bg-primary/15';
 
-const helper = createAppColumnHelper<UsageLogRow>();
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-4 text-sm">
+        <span className="font-medium">{label}</span>
+        {window.resetAt && (
+          <span className="text-xs text-muted-foreground">
+            Resets in <Countdown target={new Date(window.resetAt)} />
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <Progress value={pct} className={cn('h-1.5 flex-1', band)} />
+        <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+          {pct}% left
+        </span>
+      </div>
+    </div>
+  );
+}
 
-/** The model cell doubles as a filter control, so it needs the setter. */
-const userLogColumns = (filterByModel: (modelId: string) => void) =>
-  helper.columns([
-    helper.accessor('createdAt', {
-      header: 'Time',
-      meta: { cellClassName: 'text-xs text-muted-foreground' },
-      cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
-    }),
-    helper.accessor('modelId', {
-      header: 'Model',
-      meta: { cellClassName: 'align-middle' },
-      cell: ({ row }) => (
-        <>
-          <div className="text-xs text-muted-foreground">
-            {row.original.capability}
-          </div>
-          <button
-            type="button"
-            onClick={() => filterByModel(row.original.modelId ?? '')}
-            className="block font-mono text-xs hover:text-primary"
-          >
-            {row.original.modelId ?? '—'}
-          </button>
-          {row.original.providerModelId &&
-            row.original.providerModelId !== row.original.modelId && (
-              <div className="font-mono text-xs text-muted-foreground">
-                → {row.original.providerModelId}
-              </div>
-            )}
-        </>
-      )
-    }),
-    helper.display({
-      id: 'quantity',
-      header: 'Quantity',
-      meta: { cellClassName: 'align-middle font-mono text-xs' },
-      cell: ({ row }) => <UsageQuantity row={row.original} />
-    }),
-    helper.display({
-      id: 'unitPrice',
-      header: 'Unit Price',
-      meta: { cellClassName: 'align-middle font-mono text-xs' },
-      cell: ({ row }) => <UsageUnitPrice row={row.original} />
-    }),
-    helper.accessor('cost', {
-      header: 'Cost',
-      meta: { align: 'right', cellClassName: 'font-mono text-sm' },
-      cell: ({ row }) => formatUsd(row.original.cost)
-    })
-  ]);
+function LimitRowSkeleton() {
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <Skeleton className="h-1.5 w-full" />
+    </div>
+  );
+}
 
-function UserLogs({ userId, days }: { userId: string; days: number }) {
+/** The user's calls over the page's date range, filterable by model and
+ *  kind. The model cell doubles as a filter control, so it needs the setter. */
+function UserLogs({
+  userId,
+  from,
+  to
+}: {
+  userId: string;
+  from: Date;
+  to: Date | undefined;
+}) {
   const [modelId, setModelId] = useSearchFilter('model', '');
   const [capability, setCapability] = useSearchFilter('capability', '');
   const [page, setPage] = useSearchFilter('page', 1);
-
-  const from = useMemo(() => reportWindowStart(days), [days]);
 
   const { data, isLoading, isPlaceholderData } = useQuery(
     usageQueries.log({
       userId,
       from,
+      to,
       modelId: modelId || undefined,
       capability: capability
         ? (capability as 'chat' | 'image' | 'video' | 'audio')
@@ -314,13 +317,15 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
 
   const { data: userModels } = useQuery(usageQueries.userModels({ userId }));
 
-  const columns = useMemo(() => userLogColumns(setModelId), []);
+  const columns = useMemo(
+    () => usageLogColumns({ withUser: false, onModelClick: setModelId }),
+    [setModelId]
+  );
 
   return (
-    <Card className="py-0">
-      <CardContent className="p-4">
-        <div className="mb-3 text-base font-medium">Logs</div>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="space-y-4">
+      <ConsoleToolbar>
+        <ConsoleFilters>
           <Select
             value={modelId || '__all__'}
             onValueChange={v => setModelId(v === '__all__' ? '' : v)}
@@ -353,78 +358,58 @@ function UserLogs({ userId, days }: { userId: string; days: number }) {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </ConsoleFilters>
+      </ConsoleToolbar>
 
-        <DataTable
-          columns={columns}
-          data={isLoading ? undefined : data?.rows}
-          dense
-          empty="No records."
-          tableClassName="text-sm"
-          pending={isPlaceholderData}
-          pagination={
-            data && {
-              page: data.page,
-              pageSize: data.pageSize,
-              total: data.total,
-              onPageChange: setPage
-            }
+      <DataTable
+        columns={columns}
+        data={isLoading ? undefined : data?.rows}
+        dense
+        empty="No records."
+        tableClassName="text-sm"
+        renderSubRows={row => <UsageItems row={row} withUser={false} />}
+        getRowId={row => row.id}
+        pending={isPlaceholderData}
+        pagination={
+          data && {
+            page: data.page,
+            pageSize: data.pageSize,
+            total: data.total,
+            onPageChange: setPage
           }
-        />
-      </CardContent>
-    </Card>
+        }
+      />
+    </div>
   );
 }
 
-function QuotaCard({
-  label,
-  stat
-}: {
-  label: string;
-  stat: { remainingPct: number; resetAt: Date | string | null };
-}) {
-  const remainingPct = stat.remainingPct;
-  const barColor =
-    remainingPct <= 10
-      ? 'bg-destructive'
-      : remainingPct <= 30
-        ? 'bg-amber-500'
-        : 'bg-green-500';
+/** The page before the user has loaded, in the shape it will take. */
+export function UserDetailSkeleton() {
   return (
-    <Card className="py-0">
-      <CardContent className="space-y-2 p-4">
-        <div className="text-sm font-medium text-muted-foreground">{label}</div>
-        <div className="text-2xl font-bold">{remainingPct}%</div>
-        <div className="text-xs text-muted-foreground">remaining</div>
-        <div className="h-2 w-full rounded-full bg-muted">
-          <div
-            className={`h-2 rounded-full ${barColor}`}
-            style={{ width: `${remainingPct}%` }}
-          />
-        </div>
-        {stat.resetAt && (
-          <div className="text-xs text-muted-foreground">
-            Resets {fmtResetAt(new Date(stat.resetAt))}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="size-9" />
+      </div>
+      <Card className="py-0">
+        <CardContent className="grid gap-6 p-5 md:grid-cols-2">
+          <div className="flex items-center gap-4">
+            <Skeleton className="size-14 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-4 w-56" />
+              <Skeleton className="h-3 w-72" />
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
+            <LimitRowSkeleton />
+            <LimitRowSkeleton />
+          </div>
+        </CardContent>
+      </Card>
+      <Skeleton className="h-9 w-36" />
+      <UsageModuleSkeleton isAdmin />
+      <ConsoleTableSkeleton columns={4} search={false} filters={2} />
+    </div>
   );
 }
-
-const fmtResetAt = (d: Date): string => {
-  const diffMs = d.getTime() - Date.now();
-  if (diffMs > 0 && diffMs < 24 * 60 * 60 * 1000) {
-    return d.toLocaleTimeString(undefined, {
-      hour: 'numeric',
-      minute: '2-digit'
-    });
-  }
-  return d.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-};

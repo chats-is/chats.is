@@ -81,7 +81,7 @@ export type UsageKpi = {
   reasoningTokens: number;
 };
 
-/** Minimal row shape consumed by the `UsageQuantity` cell renderer.
+/** Minimal row shape the usage breakdown (`lib/usage-breakdown.ts`) reads.
  *  Compatible with `UsageRow` but only the fields it actually reads. */
 export type UsageRowLike = {
   capability: 'chat' | 'image' | 'video' | 'audio';
@@ -155,9 +155,8 @@ export const usageRangeSchema = z.object({
   to: z.date().optional()
 });
 
-export const usageByUserRangeSchema = z.object({
-  userId: z.string().min(1),
-  from: z.date()
+export const usageByUserRangeSchema = usageRangeSchema.extend({
+  userId: z.string().min(1)
 });
 
 export const usageUserSchema = z.object({ userId: z.string().min(1) });

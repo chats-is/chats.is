@@ -17,7 +17,6 @@ import {
   type ConsoleColumns
 } from '@/components/console/data-table';
 import { TablePaginationSkeleton } from '@/components/table-pagination';
-import { UsageModuleSkeleton } from '@/components/usage-module';
 
 /**
  * What a console page shows before its data arrives.
@@ -168,35 +167,6 @@ export function ConsoleCardsSkeleton({ count = 4 }: { count?: number }) {
           </Card>
         ))}
       </div>
-    </div>
-  );
-}
-
-/**
- * Usage: the stat cards and charts, then the log beneath them.
- *
- * `columns` because the two pages that use this have logs of different widths —
- * the platform-wide log carries a User column the single-user one does not.
- */
-export function ConsoleUsageSkeleton({ columns = 6 }: { columns?: number }) {
-  return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <Skeleton className="h-4 w-12" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-9 w-40" />
-            <Skeleton className="size-9" />
-          </div>
-        </div>
-        <UsageModuleSkeleton isAdmin />
-        <Card className="py-0">
-          <CardContent className="space-y-3 p-4">
-            <Skeleton className="h-5 w-16" />
-            <ConsoleTableSkeleton columns={columns} toolbar={false} />
-          </CardContent>
-        </Card>
-      </section>
     </div>
   );
 }
