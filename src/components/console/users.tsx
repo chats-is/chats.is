@@ -62,15 +62,6 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
 
 const QUOTA_NONE = '__none__';
 
-const formatDate = (date: Date | null) => {
-  if (!date) return 'Never';
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-};
-
 const helper = createAppColumnHelper<User>();
 
 /**
@@ -85,46 +76,73 @@ const userColumns = (ctx: {
   setQuota: (user: User, quotaId: string) => void;
 }) =>
   helper.columns([
-    helper.accessor('name', {
-      header: 'User',
+    helper.display({
+      id: 'avatar',
+      header: '',
+      meta: { headClassName: 'w-12' },
       cell: ({ row }) => {
         const user = row.original;
         return (
           <Link
             to="/console/users/$userId"
             params={{ userId: user.id }}
-            className="flex items-center gap-3 hover:text-primary"
+            aria-label={user.name || user.email}
+            className="block size-8 overflow-hidden rounded-full border bg-muted"
           >
-            <div className="size-8 overflow-hidden rounded-full border bg-muted">
-              {user.image ? (
-                <img
-                  src={user.image}
-                  alt={user.name || ''}
-                  width={32}
-                  height={32}
-                  className="size-full object-cover"
-                />
-              ) : (
-                <div className="flex size-full items-center justify-center text-xs font-medium text-muted-foreground">
-                  {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
-                </div>
-              )}
-            </div>
-            <span className="font-medium">{user.name || 'No name'}</span>
+            {user.image ? (
+              <img
+                src={user.image}
+                alt=""
+                width={32}
+                height={32}
+                className="size-full object-cover"
+              />
+            ) : (
+              <span className="flex size-full items-center justify-center text-xs font-medium text-muted-foreground">
+                {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+              </span>
+            )}
+          </Link>
+        );
+      }
+    }),
+    helper.accessor('name', {
+      header: 'Name',
+      // One line, cut short rather than wrapped or pushing the table wide:
+      // `max-w-0` lets the column give way below the width of its text.
+      meta: { headClassName: 'w-52', cellClassName: 'max-w-0' },
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <Link
+            to="/console/users/$userId"
+            params={{ userId: user.id }}
+            title={user.name || undefined}
+            className="block truncate font-medium hover:text-primary"
+          >
+            {user.name || 'No name'}
           </Link>
         );
       }
     }),
     helper.accessor('email', {
       header: 'Email',
-      meta: { cellClassName: 'text-sm text-muted-foreground' }
+      meta: {
+        headClassName: 'w-76',
+        cellClassName: 'max-w-0 text-sm text-muted-foreground'
+      },
+      cell: ({ row }) => (
+        <div className="truncate" title={row.original.email}>
+          {row.original.email}
+        </div>
+      )
     }),
     helper.display({
       id: 'provider',
       header: 'Provider',
-      meta: { headClassName: 'w-24' },
+      meta: { align: 'center', headClassName: 'w-20' },
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           {row.original.accounts && row.original.accounts.length > 0 ? (
             row.original.accounts.map((account, idx) => (
               <ProviderIcon key={idx} provider={account.providerId} />
@@ -140,7 +158,7 @@ const userColumns = (ctx: {
       header: 'Plan',
       meta: {
         align: 'center',
-        headClassName: 'w-28',
+        headClassName: 'w-24',
         cellClassName: 'text-sm'
       },
       cell: ({ row }) => (
@@ -153,7 +171,7 @@ const userColumns = (ctx: {
       header: 'Verified',
       meta: {
         align: 'center',
-        headClassName: 'w-24',
+        headClassName: 'w-20',
         cellClassName: 'text-sm'
       },
       // Verification is a yes or no now, not a date: the auth library records
@@ -171,12 +189,15 @@ const userColumns = (ctx: {
     }),
     helper.accessor('createdAt', {
       header: 'Joined',
-      meta: { headClassName: 'w-32', cellClassName: 'text-sm' },
-      cell: ({ row }) => formatDate(row.original.createdAt)
+      meta: {
+        headClassName: 'w-40',
+        cellClassName: 'text-sm whitespace-nowrap'
+      },
+      cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
     }),
     helper.accessor('role', {
       header: 'Role',
-      meta: { align: 'center', headClassName: 'w-40' },
+      meta: { align: 'center', headClassName: 'w-32' },
       cell: ({ row }) => {
         const user = row.original;
         const saving = ctx.updatingRoleUserId === user.id;
@@ -189,7 +210,7 @@ const userColumns = (ctx: {
                 ctx.setRole(user, value as 'user' | 'admin')
               }
             >
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="w-28">
                 {/* Inside a SelectValue, not in place of one: the menu is
                     positioned against the value node, and without one it is
                     never placed — and an unplaced menu takes no choice. */}
@@ -228,7 +249,7 @@ const userColumns = (ctx: {
     helper.accessor(row => row.quota?.id, {
       id: 'quota',
       header: 'Quota',
-      meta: { align: 'center', headClassName: 'w-40' },
+      meta: { align: 'center', headClassName: 'w-32' },
       cell: ({ row }) => {
         const user = row.original;
         const saving = ctx.updatingQuotaUserId === user.id;
@@ -239,7 +260,7 @@ const userColumns = (ctx: {
               disabled={saving || !ctx.quotaOptions?.length}
               onValueChange={value => ctx.setQuota(user, value)}
             >
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="w-28">
                 {saving ? (
                   <Loader2 className="size-3 animate-spin" />
                 ) : (
