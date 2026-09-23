@@ -457,6 +457,8 @@ export async function adminUsageLog(
       userEmail: users.email,
       modelId: usage.modelId,
       providerModelId: usage.providerModelId,
+      // Who served the call, as the row recorded it.
+      providerName: providers.name,
       capability: usage.capability,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
@@ -469,6 +471,7 @@ export async function adminUsageLog(
       audioInputTokens: usage.audioInputTokens,
       audioOutputTokens: usage.audioOutputTokens,
       audioCharacters: usage.audioCharacters,
+      audioSeconds: usage.audioSeconds,
       inputPrice: usage.inputPrice,
       outputPrice: usage.outputPrice,
       cacheReadPrice: usage.cacheReadPrice,
@@ -480,10 +483,12 @@ export async function adminUsageLog(
       audioInputPrice: usage.audioInputPrice,
       audioOutputPrice: usage.audioOutputPrice,
       audioCharactersPrice: usage.audioCharactersPrice,
+      audioSecondsPrice: usage.audioSecondsPrice,
       cost: usage.cost
     })
     .from(usage)
     .leftJoin(users, eq(users.id, usage.userId))
+    .leftJoin(providers, eq(providers.id, usage.providerId))
     .where(where)
     // `id` last so the order is total: rows recorded in the same instant would
     // otherwise sort arbitrarily, and offset paging over an order that leaves

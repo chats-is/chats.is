@@ -1,3 +1,4 @@
+import { Fragment, useState } from 'react';
 import {
   createTableHook,
   rowPaginationFeature,
@@ -5,6 +6,7 @@ import {
   type ColumnDef,
   type RowData
 } from '@tanstack/react-table';
+import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -85,6 +87,7 @@ export type ConsoleColumns<TData extends RowData> = Array<
  * render would invalidate the row model on every pass.
  */
 const NO_ROWS: Array<never> = [];
+const NO_IDS: ReadonlySet<string> = new Set();
 
 const ALIGN = { center: 'text-center', right: 'text-right' } as const;
 
@@ -111,7 +114,9 @@ export function DataTable<TData extends RowData>({
   pending,
   pagination,
   className,
-  tableClassName
+  tableClassName,
+  renderSubRows,
+  getRowId
 }: {
   columns: ConsoleColumns<TData>;
   /** Undefined while the query is in flight — the rows stand in until it lands. */
@@ -133,10 +138,29 @@ export function DataTable<TData extends RowData>({
   pagination?: TablePage;
   className?: string;
   tableClassName?: string;
+  /** The rows a record opens onto, as table rows under the table's own
+   *  columns, so what they hold lines up with the record's. Given, every row
+   *  opens and closes on a click, with a chevron leading its first cell. */
+  renderSubRows?: (row: TData) => React.ReactNode;
+  /** A row's own identity. Rows are otherwise told apart by position, which a
+   *  refetch can hand to a different record. */
+  getRowId?: (row: TData) => string;
 }) {
+  // The open rows, by identity, so a refetch leaves open what was open. A new
+  // page or filter brings other records, and those arrive closed.
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(NO_IDS);
+  const toggle = (id: string) =>
+    setOpenIds(previous => {
+      const ids = new Set(previous);
+      if (!ids.delete(id)) ids.add(id);
+      return ids;
+    });
+  const expandable = renderSubRows !== undefined;
+
   const table = useAppTable({
     columns,
     data: data ?? NO_ROWS,
+    ...(getRowId && { getRowId: (row: TData) => getRowId(row) }),
     // The server cut the page, so the table counts pages rather than slicing
     // rows. `rowCount` is what it counts them from.
     manualPagination: true,
@@ -178,7 +202,7 @@ export function DataTable<TData extends RowData>({
                 key={group.id}
                 className="bg-muted/50 hover:bg-muted/50"
               >
-                {group.headers.map(header => {
+                {group.headers.map((header, index) => {
                   const meta = header.column.columnDef.meta;
                   return (
                     <TableHead
@@ -186,6 +210,8 @@ export function DataTable<TData extends RowData>({
                       className={cn(
                         'h-auto text-sm font-medium',
                         dense ? 'p-2' : 'p-3',
+                        // Past the chevron, so the heading sits over the text.
+                        expandable && index === 0 && (dense ? 'pl-8' : 'pl-9'),
                         alignOf(meta),
                         meta?.headClassName
                       )}
@@ -233,26 +259,75 @@ export function DataTable<TData extends RowData>({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map(row => (
-                <TableRow key={row.id} className="hover:bg-muted/30">
-                  {row.getAllCells().map(cell => {
-                    const meta = cell.column.columnDef.meta;
-                    return (
-                      <TableCell
-                        key={cell.id}
-                        className={cn(
-                          'whitespace-normal',
-                          dense ? 'p-2' : 'p-3',
-                          alignOf(meta),
-                          meta?.cellClassName
-                        )}
-                      >
-                        <table.FlexRender cell={cell} />
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))
+              rows.map(row => {
+                const isOpen = openIds.has(row.id);
+                return (
+                  <Fragment key={row.id}>
+                    <TableRow
+                      className={cn(
+                        'hover:bg-muted/30',
+                        expandable && 'cursor-pointer',
+                        // No rule between a row and the rows it opens onto.
+                        isOpen && 'border-b-0'
+                      )}
+                      aria-expanded={expandable ? isOpen : undefined}
+                      onClick={
+                        expandable
+                          ? event => {
+                              // A link or button in the row does its own thing.
+                              if (
+                                (event.target as HTMLElement).closest(
+                                  'a, button'
+                                )
+                              )
+                                return;
+                              toggle(row.id);
+                            }
+                          : undefined
+                      }
+                    >
+                      {row.getAllCells().map((cell, index) => {
+                        const meta = cell.column.columnDef.meta;
+                        return (
+                          <TableCell
+                            key={cell.id}
+                            className={cn(
+                              'whitespace-normal',
+                              dense ? 'p-2' : 'p-3',
+                              alignOf(meta),
+                              meta?.cellClassName
+                            )}
+                          >
+                            {expandable && index === 0 ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  aria-label={isOpen ? 'Collapse' : 'Expand'}
+                                  className="flex shrink-0 text-muted-foreground"
+                                  onClick={() => toggle(row.id)}
+                                >
+                                  <ChevronRight
+                                    className={cn(
+                                      'size-4 transition-transform',
+                                      isOpen && 'rotate-90'
+                                    )}
+                                  />
+                                </button>
+                                <div className="min-w-0">
+                                  <table.FlexRender cell={cell} />
+                                </div>
+                              </div>
+                            ) : (
+                              <table.FlexRender cell={cell} />
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                    {expandable && isOpen && renderSubRows(row.original)}
+                  </Fragment>
+                );
+              })
             )}
           </TableBody>
         </Table>

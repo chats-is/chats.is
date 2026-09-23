@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
+import { ExternalLink, RefreshCw } from 'lucide-react';
 
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { CAPABILITIES } from '@/lib/constant';
-import { formatUsd } from '@/lib/utils';
+import { usageBreakdown, usageSummary } from '@/lib/usage-breakdown';
+import { cn, formatUsd } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
 import { usageQueries, type adminUsageLog } from '@/server/functions/usage';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -17,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { TableCell, TableRow } from '@/components/ui/table';
 import {
   createAppColumnHelper,
   DataTable
@@ -32,8 +35,6 @@ import {
   DateRangeFilter,
   useReportWindow
 } from '@/components/date-range-filter';
-import { UsageQuantity } from '@/components/usage-quantity';
-import { UsageUnitPrice } from '@/components/usage-unit-price';
 
 type UsageLogRow = Awaited<ReturnType<typeof adminUsageLog>>['rows'][number];
 
@@ -42,62 +43,120 @@ const helper = createAppColumnHelper<UsageLogRow>();
 const logColumns = helper.columns([
   helper.accessor('createdAt', {
     header: 'Time',
-    meta: { cellClassName: 'text-xs text-muted-foreground' },
+    meta: {
+      headClassName: 'w-52',
+      cellClassName: 'text-xs whitespace-nowrap text-muted-foreground'
+    },
     cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
   }),
   helper.accessor('userName', {
     header: 'User',
-    meta: { cellClassName: 'text-sm' },
+    meta: { headClassName: 'w-48', cellClassName: 'max-w-48' },
+    // The name alone keeps the row to one line; an account with no name goes
+    // by its address.
     cell: ({ row }) => (
       <Link
         to="/console/users/$userId"
         params={{ userId: row.original.userId }}
-        className="hover:text-primary"
+        title={row.original.userEmail ?? undefined}
+        // Only the name and its icon open the user: the rest of the cell
+        // belongs to the row, which opens on a click.
+        className="group inline-flex max-w-full items-center gap-1 font-medium hover:text-primary"
       >
-        <div className="font-medium">{row.original.userName ?? 'Unknown'}</div>
-        <div className="text-xs text-muted-foreground">
-          {row.original.userEmail}
-        </div>
+        <span className="truncate underline-offset-4 group-hover:underline">
+          {row.original.userName || row.original.userEmail || 'Unknown'}
+        </span>
+        <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
       </Link>
     )
   }),
   helper.accessor('modelId', {
     header: 'Model',
-    meta: { cellClassName: 'align-middle' },
+    meta: { headClassName: 'w-96' },
+    // One line: the model asked for, the id the provider was actually asked
+    // for when routed, and what kind of call it was.
     cell: ({ row }) => (
-      <>
-        <div className="text-xs text-muted-foreground">
-          {row.original.capability}
-        </div>
-        <div className="font-mono text-xs">{row.original.modelId ?? '—'}</div>
-        {/* Routed: the id the provider was actually asked for. */}
+      <div className="flex items-center gap-2 font-mono text-xs whitespace-nowrap">
+        <span>{row.original.modelId ?? '—'}</span>
         {row.original.providerModelId &&
           row.original.providerModelId !== row.original.modelId && (
-            <div className="font-mono text-xs text-muted-foreground">
+            <span className="text-muted-foreground">
               → {row.original.providerModelId}
-            </div>
+            </span>
           )}
-      </>
+        <Badge variant="secondary" className="font-sans">
+          {row.original.capability}
+        </Badge>
+      </div>
     )
   }),
   helper.display({
-    id: 'quantity',
-    header: 'Quantity',
-    meta: { cellClassName: 'align-middle font-mono text-xs' },
-    cell: ({ row }) => <UsageQuantity row={row.original} />
-  }),
-  helper.display({
-    id: 'unitPrice',
-    header: 'Unit Price',
-    meta: { cellClassName: 'align-middle font-mono text-xs' },
-    cell: ({ row }) => <UsageUnitPrice row={row.original} />
+    id: 'usage',
+    header: 'Usage',
+    meta: { align: 'right', cellClassName: 'whitespace-nowrap tabular-nums' },
+    cell: ({ row }) => usageSummary(row.original)
   }),
   helper.accessor('cost', {
     header: 'Cost',
-    meta: { align: 'right', cellClassName: 'font-mono text-sm' },
+    meta: {
+      align: 'right',
+      headClassName: 'w-36',
+      cellClassName: 'font-mono whitespace-nowrap'
+    },
     cell: ({ row }) => formatUsd(row.original.cost)
   })
 ]);
+
+/**
+ * What a record was billed for, a row per item under the record's own
+ * columns: the item and its rate under Model, how much of it under Usage, what
+ * it came to under Cost — so the quantities add up to the record's usage and
+ * the subtotals to its cost, each right beneath the figure it makes up.
+ */
+function UsageItems({ row }: { row: UsageLogRow }) {
+  const items = usageBreakdown(row);
+  const cell = 'px-2 py-1.5 text-xs';
+  const provider = (
+    <TableCell className={cn(cell, 'text-muted-foreground')}>
+      via {row.providerName ?? 'an unknown provider'}
+    </TableCell>
+  );
+
+  if (items.length === 0) {
+    return (
+      <TableRow className="border-b hover:bg-muted/30">
+        <TableCell className={cell} />
+        {provider}
+        <TableCell colSpan={3} className={cn(cell, 'text-muted-foreground')}>
+          No rate was recorded for this call, so nothing was billed.
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return items.map((item, index) => (
+    <TableRow
+      key={item.label}
+      className={cn(
+        'hover:bg-muted/30',
+        index < items.length - 1 && 'border-b-0'
+      )}
+    >
+      <TableCell className={cell} />
+      {index === 0 ? provider : <TableCell className={cell} />}
+      <TableCell className={cell}>
+        <span className="inline-block w-24">{item.label}</span>
+        <span className="font-mono text-muted-foreground">{item.rate}</span>
+      </TableCell>
+      <TableCell className={cn(cell, 'text-right tabular-nums')}>
+        {item.quantity}
+      </TableCell>
+      <TableCell className={cn(cell, 'text-right font-mono')}>
+        {formatUsd(item.subtotal)}
+      </TableCell>
+    </TableRow>
+  ));
+}
 
 /**
  * Every call the install made, one row each, filtered by who, which model,
@@ -209,6 +268,8 @@ export default function UsagePage() {
         dense
         empty="No records."
         tableClassName="text-sm"
+        renderSubRows={row => <UsageItems row={row} />}
+        getRowId={row => row.id}
         pending={isPlaceholderData}
         pagination={
           data && {
