@@ -9,11 +9,12 @@ import {
 } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { Loader2, Paperclip, Plus } from 'lucide-react';
+import { Camera, Loader2, Paperclip, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type Attachment } from '@/types';
 import { uploadFile } from '@/lib/api';
+import { canCaptureScreen, captureScreenshot } from '@/lib/screenshot';
 import { modelMatchesId } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { Button } from '@/components/ui/button';
@@ -51,8 +52,11 @@ interface AddFilesMenuProps {
  * Which media models generate what is not a choice made per message: the chat
  * model picks the tool from what was asked, and the models it uses are
  * configured once, in the settings beside the model picker. So this menu is
- * about files, and the accepted types follow what this setup can do with one:
- * images need a vision-capable chat model, audio an STT model to transcribe it.
+ * about what a message carries: files, and a screenshot taken on the spot. The
+ * accepted types follow what this setup can do with a file: an image, when the
+ * chat model looks at it or a tool edits or animates it; audio, when a model
+ * transcribes it; video, when one edits it. A screenshot is an image, and is
+ * offered where images are.
  */
 export function AddFilesMenu({
   disabled,
@@ -79,12 +83,9 @@ export function AddFilesMenu({
   // A video is only worth taking when something can act on it.
   const canEditVideo = !!videoModels?.some(model => model.supportsVideoEdit);
 
-  const handleFileChange = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-      // Reset first: picking the same file twice in a row fires no change event
-      // otherwise, so a removed-then-re-added attachment would look ignored.
-      e.target.value = '';
+  /** Upload files and add them to the message — picked, or captured. */
+  const uploadFiles = useCallback(
+    async (files: File[]) => {
       if (!files.length) return;
 
       if (attachments.length + files.length > MAX_ATTACHMENTS) {
@@ -146,15 +147,39 @@ export function AddFilesMenu({
     ]
   );
 
+  const handleFileChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      // Reset first: picking the same file twice in a row fires no change event
+      // otherwise, so a removed-then-re-added attachment would look ignored.
+      e.target.value = '';
+      await uploadFiles(files);
+    },
+    [uploadFiles]
+  );
+
+  const handleScreenshot = useCallback(async () => {
+    try {
+      const file = await captureScreenshot();
+      if (file) await uploadFiles([file]);
+    } catch (error) {
+      console.error('Screenshot error: ', error);
+      toast.error('Could not take a screenshot');
+    }
+  }, [uploadFiles]);
+
   const accept = [
     ...(canAttachImages ? IMAGE_TYPES : []),
     ...(hasSttModels ? AUDIO_TYPES : []),
     ...(canEditVideo ? VIDEO_TYPES : [])
   ].join(',');
-
-  if (!accept) {
-    return null;
-  }
+  // The button is the way into the menu, and the menu is more than uploading:
+  // it stays, and offers an upload only when some kind of file can be taken.
+  const canUpload = accept !== '';
+  // A screenshot is an image, so it goes where images may — and only where
+  // the browser can capture the screen at all.
+  const canScreenshot = canAttachImages && canCaptureScreen();
+  const hasItems = canUpload || canScreenshot;
 
   if (!mounted) {
     return <Skeleton className="size-9 rounded-full" />;
@@ -162,16 +187,18 @@ export function AddFilesMenu({
 
   return (
     <>
-      <input
-        multiple
-        ref={fileInputRef}
-        tabIndex={-1}
-        className="hidden"
-        type="file"
-        accept={accept}
-        disabled={disabled || uploading}
-        onChange={handleFileChange}
-      />
+      {canUpload && (
+        <input
+          multiple
+          ref={fileInputRef}
+          tabIndex={-1}
+          className="hidden"
+          type="file"
+          accept={accept}
+          disabled={disabled || uploading}
+          onChange={handleFileChange}
+        />
+      )}
       <DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -180,7 +207,7 @@ export function AddFilesMenu({
                 type="button"
                 variant="outline"
                 size="icon"
-                disabled={disabled || uploading}
+                disabled={disabled || uploading || !hasItems}
                 className="size-9 rounded-full text-muted-foreground shadow-none"
               >
                 {uploading ? (
@@ -195,16 +222,24 @@ export function AddFilesMenu({
           <TooltipContent>Add to this message</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuItem
-            onSelect={() =>
-              // The menu closes itself on select, which steals the click if the
-              // dialog opens in the same frame.
-              requestAnimationFrame(() => fileInputRef.current?.click())
-            }
-          >
-            <Paperclip className="size-4" />
-            Add files or photos
-          </DropdownMenuItem>
+          {canUpload && (
+            <DropdownMenuItem
+              onSelect={() =>
+                // The menu closes itself on select, which steals the click if
+                // the dialog opens in the same frame.
+                requestAnimationFrame(() => fileInputRef.current?.click())
+              }
+            >
+              <Paperclip className="size-4" />
+              Add files or photos
+            </DropdownMenuItem>
+          )}
+          {canScreenshot && (
+            <DropdownMenuItem onSelect={() => void handleScreenshot()}>
+              <Camera className="size-4" />
+              Take a screenshot
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>

@@ -18,13 +18,15 @@ interface AttachmentsPreviewProps {
   uploadQueue: string[];
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
+  className?: string;
 }
 
 export const AttachmentsPreview = ({
   disabled,
   uploadQueue,
   attachments,
-  setAttachments
+  setAttachments,
+  className
 }: AttachmentsPreviewProps) => {
   const [isPending, startTransition] = useTransition();
 
@@ -40,7 +42,12 @@ export const AttachmentsPreview = ({
 
   return (
     (attachments.length > 0 || uploadQueue.length > 0) && (
-      <div className="mx-3 flex space-x-2 rounded-t-xl border border-b-0 bg-muted p-3 shadow-md">
+      <div
+        className={cn(
+          'mx-3 flex space-x-2 rounded-t-xl border border-b-0 bg-muted p-3 shadow-md',
+          className
+        )}
+      >
         {attachments.map((attachment, index) => (
           <div key={index} className="relative">
             <div

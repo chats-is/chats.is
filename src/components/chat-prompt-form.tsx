@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
-import { ArrowUp, Square } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Square } from 'lucide-react';
 import Textarea from 'react-textarea-autosize';
 
 import { type Attachment, type ChatMessage } from '@/types';
@@ -48,7 +48,7 @@ export function ChatPromptForm({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
-  const { chatModels, sttModels, videoModels } = useSystemSettings();
+  const { chatModels, imageModels, videoModels } = useSystemSettings();
 
   // Two distinct dead ends, both of which make a submission fail:
   //   - no chat model is configured at all;
@@ -72,15 +72,25 @@ export function ChatPromptForm({
       ? 'Select a model to start.'
       : 'Send a message.';
 
-  // Attachments: images need a vision-capable chat model, audio needs an STT
-  // model to transcribe it. The `+` menu settles *which* STT model when the
-  // user picks that row, so existence is enough here.
-  const canAttachImages = !!modelOptions.supportsVision;
-  const canAttachAudio = !!sttModels?.length;
-  // Video too, or a model that can only edit video would take an attachment
-  // the user then has no thumbnail, progress or remove button for.
-  const canAttachVideo = !!videoModels?.some(model => model.supportsVideoEdit);
-  const showAttachments = canAttachImages || canAttachAudio || canAttachVideo;
+  // An image is worth taking for either of two things, each decided on its
+  // own: the chat model looking at it, or a tool working from it — editing it,
+  // or animating it into a video. Whether the model itself sees an image stays
+  // with `supportsVision`: without it, the server hands the model the image's
+  // address, which is what the tools take. Audio and video are offered by the
+  // menu on the same terms: when something can act on them.
+  const canAttachImages =
+    !!modelOptions.supportsVision ||
+    !!imageModels?.some(model => model.supportsImageEdit) ||
+    !!videoModels?.some(model => model.supportsImageToVideo);
+
+  // An image attached under another model still goes with the message. When
+  // neither this model nor any tool can do anything with it, that is said
+  // beside it, in the strip under the attachments.
+  const unusableImage =
+    !canAttachImages &&
+    attachments.some(attachment =>
+      attachment.contentType?.startsWith('image/')
+    );
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,13 +113,27 @@ export function ChatPromptForm({
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="w-full">
-      {showAttachments && (
-        <AttachmentsPreview
-          disabled={status === 'submitted' || status === 'streaming'}
-          uploadQueue={uploadQueue}
-          attachments={attachments}
-          setAttachments={setAttachments}
-        />
+      {/* Whatever is attached is shown, whatever the model now selected
+          takes: an attachment still goes with the message, and one out of
+          sight could be neither seen nor removed. */}
+      <AttachmentsPreview
+        disabled={status === 'submitted' || status === 'streaming'}
+        uploadQueue={uploadQueue}
+        attachments={attachments}
+        setAttachments={setAttachments}
+        // Room under the thumbnails for the notice that tucks over its edge.
+        className={unusableImage ? 'pb-6' : undefined}
+      />
+      {/* Under the attachments it is about, in a warning's own colours, and
+          stacked the way they are: its rounded top laid over their lower edge,
+          as they sit under the composer's. */}
+      {unusableImage && (
+        <div className="mx-3 -mt-3 flex items-center gap-2 rounded-t-xl border border-b-0 border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-md dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50">
+          <AlertTriangle className="size-4 shrink-0" />
+          <span className="flex-1">
+            The selected model can’t see images, and no tool can use them.
+          </span>
+        </div>
       )}
       <div className="w-full rounded-2xl border bg-background p-4 shadow-md">
         <div className="relative flex w-full items-start space-x-2">
