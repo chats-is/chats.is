@@ -514,10 +514,15 @@ export function UsageModule({
 }: Props) {
   // User mode strips all cost-related UI. Detected by absence of totalCost.
   const isAdmin = 'totalCost' in kpi;
-  // "Total tokens" = input + output. Providers count cache read as a subset
-  // of input, so adding cache R/W would double-count. Cache figures stay in
-  // the hover breakdown for transparency.
-  const tokensTotal = kpi.inputTokens + kpi.outputTokens;
+  // Every token the calls used. The buckets are stored apart — input is the
+  // uncached part only, output the text only (see normalizeChatUsage) — so
+  // the total is their sum, and matches what the usage log counts per row.
+  const tokensTotal =
+    kpi.inputTokens +
+    kpi.cacheReadTokens +
+    kpi.cacheWriteTokens +
+    kpi.outputTokens +
+    kpi.reasoningTokens;
 
   // Daily series for each KPI sparkline. Reuses the same bucketing as the
   // logs table so chart and table agree on which row falls on which day.
@@ -553,8 +558,13 @@ export function UsageModule({
         cacheReadTokens,
         cacheWriteTokens,
         reasoningTokens,
-        // Total = input + output (cache R already counted inside input)
-        tokensTotal: inputTokens + outputTokens
+        // All five buckets, as the headline figure adds them.
+        tokensTotal:
+          inputTokens +
+          cacheReadTokens +
+          cacheWriteTokens +
+          outputTokens +
+          reasoningTokens
       };
     });
   }, [rows, days, endDay]);
