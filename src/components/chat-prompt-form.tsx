@@ -9,7 +9,10 @@ import { modelMatchesId } from '@/lib/utils';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { Button } from '@/components/ui/button';
 import { AddFilesMenu } from '@/components/add-files-menu';
-import { AttachmentsPreview } from '@/components/attachments-preview';
+import {
+  AttachmentsPreview,
+  type PendingUpload
+} from '@/components/attachments-preview';
 import { MediaSettingsMenu } from '@/components/media-settings-menu';
 import { ModelMenu, type ModelOptions } from '@/components/model-menu';
 
@@ -44,7 +47,9 @@ export function ChatPromptForm({
   onOptionsChange
 }: ChatPromptFormProps) {
   const { formRef, onKeyDown } = useEnterSubmit();
-  const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
+  const [uploads, setUploads] = useState<Array<PendingUpload>>([]);
+  // Sending waits for what is still uploading; a failed one does not hold it.
+  const uploading = uploads.some(upload => !upload.error);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
@@ -100,6 +105,11 @@ export function ChatPromptForm({
     if (!onSubmit(attachments)) return;
     setInput('');
     setAttachments([]);
+    // Only failed ones can be left by now — sending waits for the rest.
+    for (const upload of uploads) {
+      if (upload.previewUrl) URL.revokeObjectURL(upload.previewUrl);
+    }
+    setUploads([]);
   };
 
   const handleOptionsChange = useCallback(
@@ -118,7 +128,8 @@ export function ChatPromptForm({
           sight could be neither seen nor removed. */}
       <AttachmentsPreview
         disabled={status === 'submitted' || status === 'streaming'}
-        uploadQueue={uploadQueue}
+        uploads={uploads}
+        setUploads={setUploads}
         attachments={attachments}
         setAttachments={setAttachments}
         // Room under the thumbnails for the notice that tucks over its edge.
@@ -181,8 +192,8 @@ export function ChatPromptForm({
             <AddFilesMenu
               disabled={status === 'submitted' || status === 'streaming'}
               canAttachImages={canAttachImages}
-              uploadQueue={uploadQueue}
-              setUploadQueue={setUploadQueue}
+              uploads={uploads}
+              setUploads={setUploads}
               attachments={attachments}
               setAttachments={setAttachments}
             />
@@ -215,7 +226,7 @@ export function ChatPromptForm({
                   cannotSend ||
                   input?.trim() === '' ||
                   status === 'submitted' ||
-                  uploadQueue.length > 0
+                  uploading
                 }
               >
                 <ArrowUp className="size-4" />

@@ -9,13 +9,13 @@ import {
 } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { Camera, Loader2, Paperclip, Plus } from 'lucide-react';
+import { Camera, Paperclip, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type Attachment } from '@/types';
 import { uploadFile } from '@/lib/api';
 import { canCaptureScreen, captureScreenshot } from '@/lib/screenshot';
-import { modelMatchesId } from '@/lib/utils';
+import { generateUUID, modelMatchesId } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +30,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { type PendingUpload } from '@/components/attachments-preview';
 
 const IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 const AUDIO_TYPES = ['.mp3', '.wav', '.m4a', '.ogg', '.flac'];
@@ -40,8 +41,8 @@ interface AddFilesMenuProps {
   disabled?: boolean;
   /** Vision-capable chat model selected. */
   canAttachImages: boolean;
-  uploadQueue: string[];
-  setUploadQueue: Dispatch<SetStateAction<Array<string>>>;
+  uploads: PendingUpload[];
+  setUploads: Dispatch<SetStateAction<Array<PendingUpload>>>;
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
 }
@@ -61,8 +62,8 @@ interface AddFilesMenuProps {
 export function AddFilesMenu({
   disabled,
   canAttachImages,
-  uploadQueue,
-  setUploadQueue,
+  uploads,
+  setUploads,
   attachments,
   setAttachments
 }: AddFilesMenuProps) {
@@ -77,18 +78,22 @@ export function AddFilesMenu({
   const { user } = useCurrentUser();
   const { preferences, setPreference } = usePreferences();
 
-  const uploading = uploadQueue.length > 0;
   const sttModelId = preferences.sttModelId || defaults.sttModelId || '';
   const hasSttModels = !!sttModels?.length;
   // A video is only worth taking when something can act on it.
   const canEditVideo = !!videoModels?.some(model => model.supportsVideoEdit);
 
-  /** Upload files and add them to the message — picked, or captured. */
+  /**
+   * Upload files and add them to the message — picked, or captured. Each is
+   * shown the moment it is chosen and uploads on its own, so more can be added
+   * while others are on their way, and one that fails stays in view, marked.
+   */
   const uploadFiles = useCallback(
     async (files: File[]) => {
       if (!files.length) return;
 
-      if (attachments.length + files.length > MAX_ATTACHMENTS) {
+      const inFlight = uploads.filter(upload => !upload.error).length;
+      if (attachments.length + inFlight + files.length > MAX_ATTACHMENTS) {
         toast.error(`Maximum of ${MAX_ATTACHMENTS} files allowed for upload`);
         return;
       }
@@ -97,8 +102,7 @@ export function AddFilesMenu({
         toast.error('Please sign in again to upload');
         return;
       }
-
-      setUploadQueue(files.map(file => file.name));
+      const userId = user.id;
 
       // Audio is transcribed on arrival, so an audio file needs a model that
       // can do it settled now — an upload with nothing to transcribe it would
@@ -115,31 +119,52 @@ export function AddFilesMenu({
         setPreference('sttModelId', sttModels[0].modelId);
       }
 
-      try {
-        const uploaded = await Promise.all(
-          files.map(async file => {
-            const result = await uploadFile(file, { userId: user.id });
-            if (result && 'error' in result) {
-              toast.error(result.error);
-              return;
-            }
-            return result;
-          })
-        );
-        setAttachments(current => [
-          ...current,
-          ...uploaded.filter(attachment => attachment !== undefined)
-        ]);
-      } catch (error) {
-        console.error('Uploading files error: ', error);
-      } finally {
-        setUploadQueue([]);
-      }
+      const pending: PendingUpload[] = files.map(file => ({
+        id: generateUUID(),
+        name: file.name,
+        contentType: file.type,
+        previewUrl: file.type.startsWith('image/')
+          ? URL.createObjectURL(file)
+          : undefined,
+        progress: 0,
+        controller: new AbortController()
+      }));
+      setUploads(current => [...current, ...pending]);
+
+      await Promise.all(
+        files.map(async (file, index) => {
+          const upload = pending[index];
+          const update = (patch: Partial<PendingUpload>) =>
+            setUploads(current =>
+              current.map(u => (u.id === upload.id ? { ...u, ...patch } : u))
+            );
+
+          const result = await uploadFile(file, {
+            userId,
+            onProgress: progress => update({ progress }),
+            abortSignal: upload.controller.signal
+          });
+          // Cancelled from the preview, which has already let it go.
+          if (upload.controller.signal.aborted) return;
+
+          if (!result || 'error' in result) {
+            const message = result?.error ?? 'Upload failed';
+            update({ error: message });
+            toast.error(`${file.name}: ${message}`);
+            return;
+          }
+
+          if (upload.previewUrl) URL.revokeObjectURL(upload.previewUrl);
+          setUploads(current => current.filter(u => u.id !== upload.id));
+          setAttachments(current => [...current, result]);
+        })
+      );
     },
     [
       attachments,
+      uploads,
       setAttachments,
-      setUploadQueue,
+      setUploads,
       user?.id,
       sttModels,
       sttModelId,
@@ -195,7 +220,7 @@ export function AddFilesMenu({
           className="hidden"
           type="file"
           accept={accept}
-          disabled={disabled || uploading}
+          disabled={disabled}
           onChange={handleFileChange}
         />
       )}
@@ -207,14 +232,10 @@ export function AddFilesMenu({
                 type="button"
                 variant="outline"
                 size="icon"
-                disabled={disabled || uploading || !hasItems}
+                disabled={disabled || !hasItems}
                 className="size-9 rounded-full text-muted-foreground shadow-none"
               >
-                {uploading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
+                <Plus className="size-4" />
                 <span className="sr-only">Add to this message</span>
               </Button>
             </DropdownMenuTrigger>

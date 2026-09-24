@@ -43,7 +43,13 @@ export const createSpeech = async (
  */
 export const uploadFile = async (
   file: File,
-  options: { userId: string; type?: UploadType }
+  options: {
+    userId: string;
+    type?: UploadType;
+    /** Called as the upload advances, with how much of it is done (0–100). */
+    onProgress?: (percentage: number) => void;
+    abortSignal?: AbortSignal;
+  }
 ): Promise<Attachment | Result> => {
   const type = options.type ?? 'attachment';
   const ext = file.name.includes('.')
@@ -64,7 +70,11 @@ export const uploadFile = async (
       access: 'public',
       contentType: file.type,
       handleUploadUrl: '/api/files/upload',
-      clientPayload: type
+      clientPayload: type,
+      abortSignal: options.abortSignal,
+      ...(options.onProgress && {
+        onUploadProgress: ({ percentage }) => options.onProgress?.(percentage)
+      })
     });
 
     return {
