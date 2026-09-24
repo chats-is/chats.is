@@ -39,7 +39,7 @@ const MAX_ATTACHMENTS = 5;
 
 interface AddFilesMenuProps {
   disabled?: boolean;
-  /** Vision-capable chat model selected. */
+  /** An image can be taken: the chat model sees it, or a tool uses it. */
   canAttachImages: boolean;
   uploads: PendingUpload[];
   setUploads: Dispatch<SetStateAction<Array<PendingUpload>>>;
@@ -83,6 +83,12 @@ export function AddFilesMenu({
   // A video is only worth taking when something can act on it.
   const canEditVideo = !!videoModels?.some(model => model.supportsVideoEdit);
 
+  // What already holds a place in the message: attached, or on its way. A
+  // failed upload holds none.
+  const occupied =
+    attachments.length + uploads.filter(upload => !upload.error).length;
+  const limitMessage = `Maximum of ${MAX_ATTACHMENTS} files allowed for upload`;
+
   /**
    * Upload files and add them to the message — picked, or captured. Each is
    * shown the moment it is chosen and uploads on its own, so more can be added
@@ -92,9 +98,8 @@ export function AddFilesMenu({
     async (files: File[]) => {
       if (!files.length) return;
 
-      const inFlight = uploads.filter(upload => !upload.error).length;
-      if (attachments.length + inFlight + files.length > MAX_ATTACHMENTS) {
-        toast.error(`Maximum of ${MAX_ATTACHMENTS} files allowed for upload`);
+      if (occupied + files.length > MAX_ATTACHMENTS) {
+        toast.error(limitMessage);
         return;
       }
 
@@ -161,8 +166,8 @@ export function AddFilesMenu({
       );
     },
     [
-      attachments,
-      uploads,
+      occupied,
+      limitMessage,
       setAttachments,
       setUploads,
       user?.id,
@@ -184,6 +189,12 @@ export function AddFilesMenu({
   );
 
   const handleScreenshot = useCallback(async () => {
+    // Checked before the capture, not after: asking for a screen to share
+    // and then turning the picture away wastes the user's choice.
+    if (occupied >= MAX_ATTACHMENTS) {
+      toast.error(limitMessage);
+      return;
+    }
     try {
       const file = await captureScreenshot();
       if (file) await uploadFiles([file]);
@@ -191,7 +202,7 @@ export function AddFilesMenu({
       console.error('Screenshot error: ', error);
       toast.error('Could not take a screenshot');
     }
-  }, [uploadFiles]);
+  }, [occupied, limitMessage, uploadFiles]);
 
   const accept = [
     ...(canAttachImages ? IMAGE_TYPES : []),
