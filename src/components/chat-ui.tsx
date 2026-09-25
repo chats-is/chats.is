@@ -21,6 +21,7 @@ import {
   retainChatSession
 } from '@/lib/chat-session';
 import { resolveAutoOption } from '@/lib/media-options';
+import { markStopped } from '@/lib/message-content';
 import { takePendingPrompt } from '@/lib/pending-prompt';
 import { modelMatchesId } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
@@ -307,7 +308,17 @@ export function ChatUI({
       method: 'DELETE'
     }).catch(() => {});
     await stop();
-  }, [id, stop]);
+    // What the server stores of a stopped reply, done here to the copy this
+    // page holds: the stream is closed, so the server's version never comes.
+    setMessages(current => {
+      const last = current[current.length - 1];
+      if (last?.role !== 'assistant') return current;
+      return [
+        ...current.slice(0, -1),
+        { ...last, parts: markStopped(last.parts) }
+      ];
+    });
+  }, [id, stop, setMessages]);
 
   // Handed to the session rather than baked into it, so a turn that started on
   // one page goes on reporting to whichever page is showing it now. Written in

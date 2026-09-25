@@ -41,6 +41,7 @@ import {
 import { ArtifactSystemPrompt } from '@/lib/constant';
 import { fitToContext } from '@/lib/context-window';
 import { pickEffort } from '@/lib/media-options';
+import { markStopped } from '@/lib/message-content';
 import {
   AllProvidersFailedError,
   getLanguageModel,
@@ -1235,6 +1236,12 @@ async function POST({
       if (state === 'superseded') {
         console.warn(`[chat] turn superseded for chat=${id}; reply not stored`);
         return;
+      }
+
+      // Stopped: the calls still running are closed, and a reply that had
+      // shown nothing yet is marked, or it would be stored and never drawn.
+      if (isAborted) {
+        responseMessage.parts = markStopped(responseMessage.parts);
       }
 
       // The marker says the turn was cut short; why it was cut short is in

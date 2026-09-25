@@ -87,6 +87,9 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
   const searching = parts.some(
     part => part.state === 'input-streaming' || part.state === 'input-available'
   );
+  const found = parts.some(
+    part => part.state === 'output-available' && part.output?.status !== 'error'
+  );
   // Open while searching, so it can be watched, and closed once done — as
   // the reasoning is. The reader can open or close it either way.
   const [isExpanded, setIsExpanded] = useState(searching);
@@ -112,9 +115,11 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
           <>
             <Globe />
             <span>
-              {parts.length === 1
-                ? 'Searched the web'
-                : `Searched the web ${parts.length} times`}
+              {!found
+                ? 'Could not search the web'
+                : parts.length === 1
+                  ? 'Searched the web'
+                  : `Searched the web ${parts.length} times`}
             </span>
           </>
         )}
@@ -138,16 +143,22 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
                 const running =
                   part.state === 'input-streaming' ||
                   part.state === 'input-available';
+                // Failed, or stopped before it finished: the delegate says
+                // so in its output, a stopped call in its state.
+                const failed =
+                  part.state === 'output-error' ||
+                  (part.state === 'output-available' &&
+                    part.output?.status === 'error');
                 const query = queries[index];
+                const verb = running
+                  ? 'Searching'
+                  : failed
+                    ? 'Could not search'
+                    : 'Searched';
                 return (
                   <li key={part.toolCallId ?? index} className="truncate">
-                    {query
-                      ? running
-                        ? `Searching “${query}”…`
-                        : `Searched “${query}”`
-                      : running
-                        ? 'Searching…'
-                        : 'Searched'}
+                    {query ? `${verb} “${query}”` : verb}
+                    {running && '…'}
                   </li>
                 );
               })}

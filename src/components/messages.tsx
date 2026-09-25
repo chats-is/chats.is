@@ -1,6 +1,7 @@
 import { type UseChatHelpers } from '@ai-sdk/react';
 
 import { type Artifact, type ChatMessage } from '@/types';
+import { hasVisibleContent } from '@/lib/message-content';
 import { cn } from '@/lib/utils';
 import { Message } from '@/components/message';
 import { MessageActions } from '@/components/message-actions';
@@ -58,32 +59,8 @@ export function Messages({
     return null;
   }
 
-  const getReasoningText = (message: ChatMessage) =>
-    message.parts
-      .filter(part => part.type === 'reasoning')
-      .map(part => part.text || (part as any).reasoning || '')
-      .join('\n')
-      .trim();
-
-  const hasVisibleMessageContent = (message: ChatMessage) => {
-    return message.parts.some(part => {
-      if (part.type === 'text') {
-        return part.text.trim().length > 0 || part.state === 'streaming';
-      }
-
-      if (part.type === 'reasoning') {
-        return getReasoningText(message).length > 0;
-      }
-
-      // A refused turn's only part. Without this the message is dropped as
-      // empty and the refusal is stored but never seen.
-      if (part.type === 'data-error') {
-        return true;
-      }
-
-      return part.type === 'file';
-    });
-  };
+  const hasVisibleMessageContent = (message: ChatMessage) =>
+    hasVisibleContent(message.parts);
 
   const hasVisibleArtifactContent = (artifact: Artifact) => {
     if (artifact.type === 'image' || artifact.type === 'file') {
