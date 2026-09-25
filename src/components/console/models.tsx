@@ -803,7 +803,7 @@ export default function ModelsPage() {
                   {field => (
                     <field.TextareaField
                       label="System Prompt (optional)"
-                      placeholder="Instructions for this model, added after the app's own system prompt."
+                      placeholder="Instructions for this model alone, added after the app's own system prompt and the one set for every chat in Settings."
                       rows={4}
                     />
                   )}

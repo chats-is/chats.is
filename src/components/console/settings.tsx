@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Mic,
   PenLine,
+  ReceiptText,
   Search,
   Type,
   Video,
@@ -44,9 +45,10 @@ import { expand, readPath } from './settings-values';
 /**
  * Everything an admin sets about this installation, on one page.
  *
- * Seventeen settings in six groups, read down: what the installation calls
- * itself, which model does each job, the two switches, and last the prose
- * every chat is told. One form and one Save cover the lot.
+ * Seventeen settings in seven groups, read down: what the installation calls
+ * itself, the defaults the user's picks fall back on, what every chat is told
+ * and named by, then speech, web search and the quota. One form and one Save
+ * cover the lot.
  */
 
 // ---------------------------------------------------------------------------
@@ -79,16 +81,19 @@ type ModelRow = {
   can: (model: ModelLike) => boolean;
 };
 
-/** Nine settings that ask the same question in nine places, so they are one
- *  list of nine rows rather than a grid of selects. */
+/** The model that names a chat. Its own group: naming is a job of the app's,
+ *  not a default the user's choice falls back on. */
+const TITLE_MODEL_ROW: ModelRow = {
+  key: 'title.modelId',
+  label: 'Title Generation Model',
+  icon: Type,
+  hint: "The model used to generate a conversation's title.",
+  can: model => model.capability === 'chat'
+};
+
+/** Eight settings that ask the same question in eight places, so they are
+ *  one list of eight rows rather than a grid of selects. */
 const MODEL_ROWS: Array<ModelRow> = [
-  {
-    key: 'title.modelId',
-    label: 'Title Generation Model',
-    icon: Type,
-    hint: "The model used to generate a conversation's title.",
-    can: model => model.capability === 'chat'
-  },
   {
     key: 'default.chat.modelId',
     label: 'Default Chat Model',
@@ -168,12 +173,13 @@ const WEB_SEARCH_MODES = [
 /** Every key the page loads and saves: the ten model picks, then the seven
  *  fields that are not one. */
 const KEYS = [
+  TITLE_MODEL_ROW.key,
   ...MODEL_ROWS.map(row => row.key),
   WEB_SEARCH_MODEL_ROW.key,
   'app.name',
   'app.subtitle',
   'app.description',
-  'default.chat.systemPrompt',
+  'chat.systemPrompt',
   'speech.enabled',
   'webSearch.mode',
   'default.quotaId'
@@ -185,8 +191,8 @@ const KEYS = [
 
 /**
  * The order is what the installation is, then what it runs on: the app's own
- * fields first — its name, and the prose every chat is told — then the nine
- * model picks, then the two switches.
+ * fields first — its name — then the model picks and the chat's own settings,
+ * group by group, then the switches and the quota.
  */
 export function ConsoleSettings() {
   const { form, isHeld } = useSettingsForm(KEYS);
@@ -195,6 +201,7 @@ export function ConsoleSettings() {
     <SettingsForm form={form} isHeld={isHeld}>
       <ApplicationSettings form={form} />
       <ModelDefaults form={form} />
+      <ChatSettings form={form} />
       <SpeechSettings form={form} />
       <WebSearchSettings form={form} />
       <QuotaSettings form={form} />
@@ -202,8 +209,7 @@ export function ConsoleSettings() {
   );
 }
 
-/** What this installation calls itself, and what it says to every model
- *  before the user does. Both are the app's own words. */
+/** What this installation calls itself. */
 function ApplicationSettings({ form }: { form: SettingsFormApi }) {
   return (
     <div className="overflow-hidden rounded-lg border">
@@ -235,16 +241,6 @@ function ApplicationSettings({ form }: { form: SettingsFormApi }) {
               label="App Description"
               placeholder={DEFAULT_APP_DESCRIPTION}
               rows={3}
-              fieldClassName="md:col-span-2"
-            />
-          )}
-        </form.AppField>
-        <form.AppField name="default.chat.systemPrompt">
-          {field => (
-            <field.TextareaField
-              label="Chat System Prompt"
-              placeholder="Added to every chat, after the app's own system prompt and before the model's own."
-              rows={12}
               fieldClassName="md:col-span-2"
             />
           )}
@@ -294,7 +290,7 @@ function ModelDefaults({ form }: { form: SettingsFormApi }) {
 
   return (
     <SettingsList
-      title="Models"
+      title="Default Models"
       aside={
         <span className="text-sm font-normal text-muted-foreground">
           {set} of {MODEL_ROWS.length} set
@@ -399,6 +395,38 @@ function SpeechSettings({ form }: { form: SettingsFormApi }) {
           )}
         </form.Field>
       </SettingsRow>
+    </SettingsList>
+  );
+}
+
+/** What every chat is told before the user speaks, and the model that
+ *  names one. Both are about the conversation rather than any one model. */
+function ChatSettings({ form }: { form: SettingsFormApi }) {
+  const { data: models } = useQuery(modelQueries.forSelect());
+  const modelId = useStore(form.store, state =>
+    readPath(state.values, TITLE_MODEL_ROW.key)
+  );
+
+  return (
+    <SettingsList title="Chat">
+      <SettingsRow
+        icon={ReceiptText}
+        label="System Prompt"
+        htmlFor="chat.systemPrompt"
+        hint="Told to every chat model, after the app's own system prompt. A model's own system prompt follows it rather than replacing it."
+        settingKey="chat.systemPrompt"
+        stacked
+      >
+        <form.AppField name="chat.systemPrompt">
+          {field => <field.TextareaField rows={8} />}
+        </form.AppField>
+      </SettingsRow>
+      <ModelPickRow
+        form={form}
+        row={TITLE_MODEL_ROW}
+        state={statusOf(modelId, TITLE_MODEL_ROW, models)}
+        models={models}
+      />
     </SettingsList>
   );
 }
@@ -522,6 +550,7 @@ function SettingsRow({
   hint,
   settingKey,
   state = 'set',
+  stacked = false,
   children
 }: {
   /** Widened from lucide's own type so the skeleton can stand one in. */
@@ -533,12 +562,16 @@ function SettingsRow({
   /** The key this row writes, for whoever is reading the database. */
   settingKey: React.ReactNode;
   state?: RowState;
+  /** The control under the header at full width — for a block of text
+   *  rather than a pick. */
+  stacked?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        'grid grid-cols-1 items-center gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-6',
+        'grid grid-cols-1 items-center gap-3 p-4',
+        !stacked && 'sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-6',
         ROW_TINT[state]
       )}
     >
@@ -563,9 +596,16 @@ function SettingsRow({
         </div>
       </div>
 
-      <div className="flex min-w-0 justify-end sm:justify-self-end">
-        {children}
-      </div>
+      {/* The control: at the right for a pick or a switch, or under the
+          header for a block of text — starting where the label does, past
+          the icon, so the two read as one column. */}
+      {stacked ? (
+        <div className="flex min-w-0 flex-col pl-[30px]">{children}</div>
+      ) : (
+        <div className="flex min-w-0 justify-end sm:justify-self-end">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

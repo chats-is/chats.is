@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Globe, Loader2 } from 'lucide-react';
 
@@ -84,11 +84,15 @@ function queryOf(part: WebSearchUIPart): string | undefined {
  * where the text that cites them is.
  */
 export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
-  const [isExpanded, setIsExpanded] = useState(true);
-
   const searching = parts.some(
     part => part.state === 'input-streaming' || part.state === 'input-available'
   );
+  // Open while searching, so it can be watched, and closed once done — as
+  // the reasoning is. The reader can open or close it either way.
+  const [isExpanded, setIsExpanded] = useState(searching);
+  useEffect(() => {
+    setIsExpanded(searching);
+  }, [searching]);
   const queries = parts.map(queryOf);
 
   return (

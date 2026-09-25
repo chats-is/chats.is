@@ -54,8 +54,15 @@ export function MessageReasoning({
   part,
   reasonDuration
 }: MessageReasoningProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Open while the thinking is being written, so it can be watched, and
+  // closed once it is not: a page opened later shows the reply, with the
+  // thoughts behind a click. The reader can open or close it either way.
+  const [isExpanded, setIsExpanded] = useState(isLoading);
   const [liveDuration, setLiveDuration] = useState(reasonDuration ?? 0);
+
+  useEffect(() => {
+    setIsExpanded(isLoading);
+  }, [isLoading]);
 
   const variants = {
     collapsed: {

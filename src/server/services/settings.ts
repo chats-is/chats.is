@@ -161,8 +161,8 @@ export const getSystemPrompt = perRequest(
     // every model — how to format, what this app is — and a model that adds
     // instructions of its own should not thereby lose them. It comes first so
     // the model's own words, being the more specific, get the last say.
-    const values = await getSettings(['default.chat.systemPrompt']);
-    const parts = [values['default.chat.systemPrompt'], modelSystemPrompt]
+    const values = await getSettings(['chat.systemPrompt']);
+    const parts = [values['chat.systemPrompt'], modelSystemPrompt]
       .map(part => part?.trim())
       .filter((part): part is string => !!part);
     return parts.length > 0 ? parts.join('\n\n') : null;

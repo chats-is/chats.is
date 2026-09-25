@@ -14,7 +14,7 @@ const KEYS = [
   'app.subtitle',
   'app.description',
   'default.chat.modelId',
-  'default.chat.systemPrompt',
+  'chat.systemPrompt',
   'default.video.imageModelId',
   'default.quotaId',
   'speech.enabled',
