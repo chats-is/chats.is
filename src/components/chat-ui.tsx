@@ -216,7 +216,9 @@ export function ChatUI({
         stt: preferences.sttModelId
           ? { modelId: preferences.sttModelId }
           : undefined
-      }
+      },
+      // Off, the reply is written without any media tool.
+      mediaGeneration: preferences.mediaGeneration
     }),
     [
       currentModelId,
@@ -237,7 +239,8 @@ export function ChatUI({
       preferences.videoEditModelId,
       preferences.audioModelId,
       preferences.audioVoice,
-      preferences.sttModelId
+      preferences.sttModelId,
+      preferences.mediaGeneration
     ]
   );
   // The session outlives this component (see `@/lib/chat-session`), so what it

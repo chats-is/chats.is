@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,
   TooltipContent,
@@ -360,6 +361,10 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
   }
 
   const busy = status === 'submitted' || status === 'streaming';
+  // The switch covers every tool this menu configures. Off, their choices
+  // are kept, only not offered to the chat — so they come back as they were.
+  const generationOn = preferences.mediaGeneration;
+  const generationDisabled = busy || !generationOn;
 
   return (
     <DropdownMenu>
@@ -381,6 +386,31 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         <TooltipContent>Media generation settings</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start" className="w-88">
+        {/* An item of the menu, so the keys that move through it reach it
+            too; it toggles in place, and says so as a checkbox would. The
+            switch shows the state and takes no input of its own. */}
+        <DropdownMenuItem
+          role="menuitemcheckbox"
+          aria-checked={generationOn}
+          disabled={busy}
+          onSelect={event => {
+            event.preventDefault();
+            setPreference('mediaGeneration', !generationOn);
+          }}
+          className="justify-between font-medium"
+        >
+          <span className="flex items-center gap-2">
+            <Settings2 />
+            Media generation
+          </span>
+          <Switch
+            checked={generationOn}
+            tabIndex={-1}
+            aria-hidden
+            className="pointer-events-none"
+          />
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {hasImageModels && (
           <MediaKind
             icon={<ImageIcon />}
@@ -388,7 +418,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             models={imageModels}
             modelId={preferences.imageModelId}
             onModelChange={modelId => setPreference('imageModelId', modelId)}
-            disabled={busy}
+            disabled={generationDisabled}
             options={[
               {
                 key: 'size',
@@ -417,7 +447,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             onModelChange={modelId =>
               setPreference('imageEditModelId', modelId)
             }
-            disabled={busy}
+            disabled={generationDisabled}
           />
         )}
         {hasVideoModels && (
@@ -427,7 +457,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             models={videoModels}
             modelId={preferences.videoModelId}
             onModelChange={modelId => setPreference('videoModelId', modelId)}
-            disabled={busy}
+            disabled={generationDisabled}
             options={[
               {
                 key: 'size',
@@ -475,7 +505,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             onModelChange={modelId =>
               setPreference('videoImageModelId', modelId)
             }
-            disabled={busy}
+            disabled={generationDisabled}
           />
         )}
         {videoEditModels.length > 0 && (
@@ -487,7 +517,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             onModelChange={modelId =>
               setPreference('videoEditModelId', modelId)
             }
-            disabled={busy}
+            disabled={generationDisabled}
           />
         )}
         {hasTtsModels && (
@@ -497,7 +527,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             models={ttsModels}
             modelId={preferences.audioModelId}
             onModelChange={modelId => setPreference('audioModelId', modelId)}
-            disabled={busy}
+            disabled={generationDisabled}
             options={[
               {
                 key: 'voice',
@@ -514,7 +544,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
             models={sttModels}
             modelId={preferences.sttModelId}
             onModelChange={modelId => setPreference('sttModelId', modelId)}
-            disabled={busy}
+            disabled={generationDisabled}
           />
         )}
       </DropdownMenuContent>

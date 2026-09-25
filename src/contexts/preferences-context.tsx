@@ -35,6 +35,9 @@ export interface Preferences {
   audioVoice: string;
   // Transcription (STT)
   sttModelId: string;
+  /** Whether the chat is offered the media tools: images, video, speech and
+   *  transcription alike. */
+  mediaGeneration: boolean;
 }
 
 interface PreferencesContextValue {
@@ -135,7 +138,8 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       audioModelId: systemDefault(defaults.ttsModelId, ttsModels),
       audioVoice: '',
       // Transcription (STT)
-      sttModelId: systemDefault(defaults.sttModelId, sttModels)
+      sttModelId: systemDefault(defaults.sttModelId, sttModels),
+      mediaGeneration: true
     };
 
     const stored = getStoredPreferences();

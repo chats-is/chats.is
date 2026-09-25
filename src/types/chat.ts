@@ -72,7 +72,10 @@ export const chatRequestSchema = z.object({
   // Preferences out of the browser's storage, which outlive the versions that
   // wrote them. One that no longer parses is dropped — the server's defaults
   // apply — rather than refusing every turn until the user clears their data.
-  mediaOptions: mediaToolsOptionsSchema.optional().catch(undefined)
+  mediaOptions: mediaToolsOptionsSchema.optional().catch(undefined),
+  /** The user's switch for the media tools — every one of them. Absent
+   *  means on. */
+  mediaGeneration: z.boolean().optional()
 });
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;

@@ -41,6 +41,10 @@ interface AddFilesMenuProps {
   disabled?: boolean;
   /** An image can be taken: the chat model sees it, or a tool uses it. */
   canAttachImages: boolean;
+  /** An audio file can be taken: a model transcribes it. */
+  canAttachAudio: boolean;
+  /** A video can be taken: a model edits it. */
+  canAttachVideo: boolean;
   uploads: PendingUpload[];
   setUploads: Dispatch<SetStateAction<Array<PendingUpload>>>;
   attachments: Attachment[];
@@ -62,6 +66,8 @@ interface AddFilesMenuProps {
 export function AddFilesMenu({
   disabled,
   canAttachImages,
+  canAttachAudio,
+  canAttachVideo,
   uploads,
   setUploads,
   attachments,
@@ -72,16 +78,13 @@ export function AddFilesMenu({
   useEffect(() => setMounted(true), []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { sttModels, videoModels, defaults } = useSystemSettings();
+  const { sttModels, defaults } = useSystemSettings();
   // The upload goes straight to blob storage under this user's own path, which
   // the token route checks against the session before it signs anything.
   const { user } = useCurrentUser();
   const { preferences, setPreference } = usePreferences();
 
   const sttModelId = preferences.sttModelId || defaults.sttModelId || '';
-  const hasSttModels = !!sttModels?.length;
-  // A video is only worth taking when something can act on it.
-  const canEditVideo = !!videoModels?.some(model => model.supportsVideoEdit);
 
   // What already holds a place in the message: attached, or on its way. A
   // failed upload holds none.
@@ -206,8 +209,8 @@ export function AddFilesMenu({
 
   const accept = [
     ...(canAttachImages ? IMAGE_TYPES : []),
-    ...(hasSttModels ? AUDIO_TYPES : []),
-    ...(canEditVideo ? VIDEO_TYPES : [])
+    ...(canAttachAudio ? AUDIO_TYPES : []),
+    ...(canAttachVideo ? VIDEO_TYPES : [])
   ].join(',');
   // The button is the way into the menu, and the menu is more than uploading:
   // it stays, and offers an upload only when some kind of file can be taken.

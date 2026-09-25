@@ -149,8 +149,16 @@ async function POST({
     return Response.json({ error: 'Invalid request.' }, { status: 400 });
   }
 
-  const { id, modelId, isReasoning, effort, timeZone, language, mediaOptions } =
-    parsed.data;
+  const {
+    id,
+    modelId,
+    isReasoning,
+    effort,
+    timeZone,
+    language,
+    mediaOptions,
+    mediaGeneration
+  } = parsed.data;
   // The schema has settled the shape; the parts are typed by the tools and
   // data this app defines, which a wire schema cannot name one by one.
   const sent = parsed.data.userMessage as ChatMessage & { role: 'user' };
@@ -435,13 +443,17 @@ async function POST({
     // down (media tool resolution should not delay plain text chats).
     const [systemPromptContent, mediaTools] = await Promise.all([
       getSystemPrompt(dbModel.systemPrompt),
-      buildMediaTools({
-        userId: user.id,
-        chatId: id,
-        assistantMessageId,
-        mediaOptions,
-        chatMessages
-      })
+      // Switched off by the user: no media tool at all, and nothing in the
+      // prompt about them.
+      mediaGeneration === false
+        ? { tools: {}, systemPrompt: '' }
+        : buildMediaTools({
+            userId: user.id,
+            chatId: id,
+            assistantMessageId,
+            mediaOptions,
+            chatMessages
+          })
     ]);
     // Only the app's own part is a template. What an admin wrote, and what
     // the model carries, follow it verbatim.

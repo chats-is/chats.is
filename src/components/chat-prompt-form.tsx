@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
 import { AlertTriangle, ArrowUp, Square } from 'lucide-react';
@@ -53,7 +54,9 @@ export function ChatPromptForm({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
-  const { chatModels, imageModels, videoModels } = useSystemSettings();
+  const { chatModels, imageModels, videoModels, sttModels } =
+    useSystemSettings();
+  const { preferences } = usePreferences();
 
   // Two distinct dead ends, both of which make a submission fail:
   //   - no chat model is configured at all;
@@ -81,21 +84,31 @@ export function ChatPromptForm({
   // own: the chat model looking at it, or a tool working from it — editing it,
   // or animating it into a video. Whether the model itself sees an image stays
   // with `supportsVision`: without it, the server hands the model the image's
-  // address, which is what the tools take. Audio and video are offered by the
-  // menu on the same terms: when something can act on them.
+  // address, which is what the tools take. Audio and video are taken on the
+  // same terms: when a tool can act on them — transcribing audio, editing a
+  // video. With the media tools switched off, none of those is offered.
+  const toolsOn = preferences.mediaGeneration;
   const canAttachImages =
     !!modelOptions.supportsVision ||
-    !!imageModels?.some(model => model.supportsImageEdit) ||
-    !!videoModels?.some(model => model.supportsImageToVideo);
+    (toolsOn &&
+      (!!imageModels?.some(model => model.supportsImageEdit) ||
+        !!videoModels?.some(model => model.supportsImageToVideo)));
+  const canAttachAudio = toolsOn && !!sttModels?.length;
+  const canAttachVideo =
+    toolsOn && !!videoModels?.some(model => model.supportsVideoEdit);
 
-  // An image attached under another model still goes with the message. When
-  // neither this model nor any tool can do anything with it, that is said
-  // beside it, in the strip under the attachments.
-  const unusableImage =
+  // An attachment taken under other settings — another model, the media
+  // tools on — still goes with the message. For each kind nothing can now use,
+  // that is said beside it, in the strip under the attachments.
+  const attached = (prefix: string) =>
+    attachments.some(attachment => attachment.contentType?.startsWith(prefix));
+  const unusable = [
     !canAttachImages &&
-    attachments.some(attachment =>
-      attachment.contentType?.startsWith('image/')
-    );
+      attached('image/') &&
+      'The selected model can’t see images, and no tool can use them.',
+    !canAttachAudio && attached('audio/') && 'No tool can use the audio.',
+    !canAttachVideo && attached('video/') && 'No tool can use the video.'
+  ].filter((note): note is string => !!note);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -133,17 +146,15 @@ export function ChatPromptForm({
         attachments={attachments}
         setAttachments={setAttachments}
         // Room under the thumbnails for the notice that tucks over its edge.
-        className={unusableImage ? 'pb-6' : undefined}
+        className={unusable.length ? 'pb-6' : undefined}
       />
       {/* Under the attachments it is about, in a warning's own colours, and
           stacked the way they are: its rounded top laid over their lower edge,
           as they sit under the composer's. */}
-      {unusableImage && (
+      {unusable.length > 0 && (
         <div className="mx-3 -mt-3 flex items-center gap-2 rounded-t-xl border border-b-0 border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-md dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50">
           <AlertTriangle className="size-4 shrink-0" />
-          <span className="flex-1">
-            The selected model can’t see images, and no tool can use them.
-          </span>
+          <span className="flex-1">{unusable.join(' ')}</span>
         </div>
       )}
       <div className="w-full rounded-2xl border bg-background p-4 shadow-md">
@@ -192,6 +203,8 @@ export function ChatPromptForm({
             <AddFilesMenu
               disabled={status === 'submitted' || status === 'streaming'}
               canAttachImages={canAttachImages}
+              canAttachAudio={canAttachAudio}
+              canAttachVideo={canAttachVideo}
               uploads={uploads}
               setUploads={setUploads}
               attachments={attachments}
