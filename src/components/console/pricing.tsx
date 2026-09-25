@@ -128,6 +128,7 @@ type PricingForm = {
   cacheRead: string;
   cacheWrite: string;
   reasoning: string;
+  webSearch: string;
   image: string;
   video: string;
   videoSeconds: string;
@@ -145,6 +146,7 @@ const EMPTY_PRICING: PricingForm = {
   cacheRead: '',
   cacheWrite: '',
   reasoning: '',
+  webSearch: '',
   image: '',
   video: '',
   videoSeconds: '',
@@ -378,6 +380,7 @@ export default function PricingPage() {
       cacheRead: fromNum(row.pricing?.cacheRead),
       cacheWrite: fromNum(row.pricing?.cacheWrite),
       reasoning: fromNum(row.pricing?.reasoning),
+      webSearch: fromNum(row.pricing?.webSearch),
       image: fromNum(row.pricing?.image),
       video: fromNum(row.pricing?.video),
       videoSeconds: fromNum(row.pricing?.videoSeconds),
@@ -700,6 +703,10 @@ export default function PricingPage() {
                           name="reasoning"
                           label="Reasoning / 1M tokens"
                           placeholder="defaults to output rate"
+                        />
+                        <PriceField
+                          name="webSearch"
+                          label="Web search / search"
                         />
                       </>
                     )}

@@ -139,8 +139,8 @@ async function spent(cost: string, at = new Date(), capability = 'chat') {
 
 const call = { userId: 'u1', messageId: 'm1', providerId: 'prov1' };
 
-describe('价格设置', () => {
-  it('聊天模型的缓存读、缓存写留空保存时，存为 0', async () => {
+describe('setting prices', () => {
+  it('a chat model’s cache read and cache write left blank are stored as 0', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, {
       input: '3',
@@ -153,7 +153,7 @@ describe('价格设置', () => {
     expect(Number(row.cacheWrite)).toBe(0);
   });
 
-  it('推理价留空保存时为空，计费时按输出价计', async () => {
+  it('a reasoning rate left blank is stored empty and bills at the output rate', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, { input: '1', output: '10', reasoning: '' });
     expect((await priceRow('c1')).reasoning).toBeNull();
@@ -167,7 +167,7 @@ describe('价格设置', () => {
     expect(Number(row.cost)).toBeCloseTo(10, 10);
   });
 
-  it('价格可以设为 0：模型可以使用，费用记为 0', async () => {
+  it('a price may be 0: the model is usable and the cost is recorded as 0', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, { input: '0', output: '0' });
     await expect(requirePricing('c1', 'chat', 'c1')).resolves.toBeTruthy();
@@ -180,27 +180,27 @@ describe('价格设置', () => {
     expect(Number((await usageRows())[0].cost)).toBe(0);
   });
 
-  it('没有价格的模型，调用前被拒绝', async () => {
+  it('a model with no price is refused before the call', async () => {
     await addModel('chat', 'c1');
     await expect(requirePricing('c1', 'chat', 'c1')).rejects.toBeInstanceOf(
       PricingMissingError
     );
   });
 
-  it('保存价格时，聊天模型缺少输入价或输出价会被拒绝', async () => {
+  it('saving a chat model without an input or output rate is refused', async () => {
     const id = await addModel('chat', 'c1');
     await expect(savePrice(id, { input: '3' })).rejects.toThrow(/Output/);
     await expect(savePrice(id, { output: '15' })).rejects.toThrow(/Input/);
   });
 
-  it('图片模型不能同时设置按张价和按 token 价', async () => {
+  it('an image model cannot have both a per-image and a per-token rate', async () => {
     const id = await addModel('image', 'i1');
     await expect(
       savePrice(id, { image: '0.04', input: '5', output: '40' })
     ).rejects.toThrow(/either Per image OR token-based/);
   });
 
-  it('语音合成模型必须有每百万字符价，转写模型必须有每秒价', async () => {
+  it('a speech model needs a per-1M-characters rate, a transcription model a per-second rate', async () => {
     const tts = await addModel('audio', 'tts1');
     await expect(savePrice(tts, { audioSeconds: '0.01' })).rejects.toThrow(
       /Per 1M characters/
@@ -214,8 +214,8 @@ describe('价格设置', () => {
   });
 });
 
-describe('计费', () => {
-  it('聊天：缓存命中的 token 不按输入价计，按缓存价计', async () => {
+describe('billing', () => {
+  it('chat: cached tokens bill at the cache rate, not the input rate', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, { input: '10', output: '0', cacheRead: '1' });
 
@@ -233,7 +233,7 @@ describe('计费', () => {
     expect(Number(row.cost)).toBeCloseTo(0.0028, 10);
   });
 
-  it('聊天：推理 token 单独计，不重复计入输出', async () => {
+  it('chat: reasoning tokens bill on their own, not again as output', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, { input: '0', output: '10', reasoning: '20' });
 
@@ -250,7 +250,40 @@ describe('计费', () => {
     expect(Number(row.cost)).toBeCloseTo(0.017, 10);
   });
 
-  it('按调用时的价格计费；之后改价，已有记录不变', async () => {
+  it('chat: each web search is billed at the search rate, on top of the tokens', async () => {
+    const id = await addModel('chat', 'c1');
+    await savePrice(id, { input: '1', output: '0', webSearch: '0.01' });
+
+    // A step that searched twice: 2 × $0.01 on top of 1M × $1/1M.
+    await recordChatUsage({
+      ...call,
+      modelId: 'c1',
+      usage: { inputTokens: 1_000_000, webSearches: 2 }
+    });
+
+    const [row] = await usageRows();
+    expect(row.webSearches).toBe(2);
+    expect(row.webSearchPrice).toBe('0.0100000000');
+    expect(Number(row.cost)).toBeCloseTo(1.02, 10);
+  });
+
+  it('chat: a search rate left blank bills searches at 0', async () => {
+    const id = await addModel('chat', 'c1');
+    await savePrice(id, { input: '0', output: '0' });
+
+    await recordChatUsage({
+      ...call,
+      modelId: 'c1',
+      usage: { webSearches: 3 }
+    });
+
+    const [row] = await usageRows();
+    expect(row.webSearches).toBe(3);
+    expect(row.webSearchPrice).toBeNull();
+    expect(Number(row.cost)).toBe(0);
+  });
+
+  it('bills at the price at the time of the call; a later change leaves the record alone', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, { input: '1', output: '0' });
     await recordChatUsage({
@@ -276,7 +309,7 @@ describe('计费', () => {
     expect(Number(after?.cost)).toBeCloseTo(5, 10);
   });
 
-  it('图片：有按张价时按张数计，不看 token', async () => {
+  it('image: a per-image rate bills on the count, ignoring tokens', async () => {
     const id = await addModel('image', 'i1');
     await savePrice(id, { image: '0.04' });
     await recordImageUsage({
@@ -289,7 +322,7 @@ describe('计费', () => {
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.04, 10);
   });
 
-  it('图片：按 token 计价时，按输入、输出 token 计', async () => {
+  it('image: a per-token rate bills on input and output tokens', async () => {
     const id = await addModel('image', 'i1');
     await savePrice(id, { input: '5', output: '40' });
     await recordImageUsage({
@@ -303,7 +336,7 @@ describe('计费', () => {
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.165, 10);
   });
 
-  it('视频：按秒计价时，按秒数计', async () => {
+  it('video: a per-second rate bills on the seconds', async () => {
     const id = await addModel('video', 'v1');
     await savePrice(id, { videoSeconds: '0.1' });
     await recordVideoUsage({
@@ -315,7 +348,7 @@ describe('计费', () => {
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.8, 10);
   });
 
-  it('视频：按个计价时，按个数计，不看秒数', async () => {
+  it('video: a per-video rate bills on the count, ignoring seconds', async () => {
     const id = await addModel('video', 'v1');
     await savePrice(id, { video: '0.5' });
     await recordVideoUsage({
@@ -327,14 +360,14 @@ describe('计费', () => {
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.5, 10);
   });
 
-  it('语音合成：按字数 × 每百万字符价计', async () => {
+  it('speech: bills characters × the per-1M-characters rate', async () => {
     const id = await addModel('audio', 'tts1');
     await savePrice(id, { audioCharacters: '15' });
     await recordAudioUsage({ ...call, modelId: 'tts1', audioCharacters: 86 });
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.00129, 10);
   });
 
-  it('转写：按秒数 × 每秒价计', async () => {
+  it('transcription: bills seconds × the per-second rate', async () => {
     const id = await addModel('audio', 'stt1', {
       supportsTranscription: true
     });
@@ -348,30 +381,30 @@ describe('计费', () => {
   });
 });
 
-describe('额度', () => {
-  it('没有额度的用户，调用前被拒绝', async () => {
+describe('quota', () => {
+  it('a user with no quota is refused before the call', async () => {
     await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaMissingError);
   });
 
-  it('不限额的额度，不检查用量', async () => {
+  it('an unlimited quota does not check usage', async () => {
     await giveQuota(null, null, { isUnlimited: true });
     await spent('1000');
     await expect(assertQuota('u1')).resolves.toBeUndefined();
   });
 
-  it('已用低于上限就放行，不管这次调用要花多少', async () => {
+  it('usage below the limit is let through, whatever this call will cost', async () => {
     await giveQuota('3', '20');
     await spent('2.99');
     await expect(assertQuota('u1')).resolves.toBeUndefined();
   });
 
-  it('已用达到上限就拒绝', async () => {
+  it('usage at the limit is refused', async () => {
     await giveQuota('3', '20');
     await spent('3');
     await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaExceededError);
   });
 
-  it('超出上限的费用照常计入，之后的调用被拒绝，直到它移出 5 小时窗口', async () => {
+  it('a cost past the limit is recorded as usual, and later calls are refused until it leaves the 5-hour window', async () => {
     await giveQuota('3', '20');
     // Let through at $2.99, then a call that cost $5.
     await spent('2.99', new Date(Date.now() - 2 * HOUR));
@@ -386,7 +419,7 @@ describe('额度', () => {
     await expect(assertQuota('u1')).resolves.toBeUndefined();
   });
 
-  it('同时开始的调用都在记账前检查，互相看不到对方的费用：都会放行，合计超出上限', async () => {
+  it('calls that start together are checked before any is recorded, so none sees the others’ cost: all pass, and the sum exceeds the limit', async () => {
     await giveQuota('3', '20');
     await spent('2.99');
 
@@ -410,14 +443,14 @@ describe('额度', () => {
     await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaExceededError);
   });
 
-  it('5 小时额度和每周额度分别检查，任一达到上限就拒绝', async () => {
+  it('the 5-hour and weekly limits are checked separately; reaching either refuses', async () => {
     await giveQuota('3', '20');
     // Under the 5-hour cap now, but the week has reached its own.
     await spent('20', new Date(Date.now() - 24 * HOUR));
     await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaExceededError);
   });
 
-  it('聊天、图片、视频、语音、转写的费用计入同一个额度', async () => {
+  it('chat, image, video, speech and transcription all count against one quota', async () => {
     await giveQuota('3', '20');
     await spent('1', new Date(), 'image');
     await spent('1', new Date(), 'video');
@@ -425,7 +458,7 @@ describe('额度', () => {
     await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaExceededError);
   });
 
-  it('额度设了可用模型时，其他模型调用前被拒绝；没设时所有模型都可用', async () => {
+  it('a quota that names its models refuses the others before the call; one that names none allows all', async () => {
     await giveQuota('3', '20', { allowedModelIds: ['c1'] });
     await expect(assertModelAccess('u1', 'c1', 'c1')).resolves.toBeUndefined();
     await expect(assertModelAccess('u1', 'c2', 'c2')).rejects.toBeInstanceOf(

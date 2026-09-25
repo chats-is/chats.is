@@ -19,6 +19,12 @@ import { MessageMarkdown } from '@/components/message-markdown';
 import { MessageReasoning } from '@/components/message-reasoning';
 import { ModelIcon } from '@/components/model-icon';
 import { VideoPlayer } from '@/components/video-player';
+import {
+  collectSources,
+  isWebSearchPart,
+  MessageSources,
+  WebSearchBlock
+} from '@/components/web-search-part';
 
 export interface MessageProps extends Partial<
   Pick<UseChatHelpers<ChatMessage>, 'status'>
@@ -62,8 +68,17 @@ export function Message({
   const hasReasoningPart = reasoningParts.length > 0;
   const hasFilePart = message.parts.some(part => part.type === 'file');
   const hasMediaToolPart = message.parts.some(
-    part => isMediaToolPart(part) || isTranscribeToolPart(part)
+    part =>
+      isMediaToolPart(part) ||
+      isTranscribeToolPart(part) ||
+      isWebSearchPart(part)
   );
+  const sources = useMemo(() => collectSources(message.parts), [message.parts]);
+  // The searches are shown as one block, where the first of them was made —
+  // as the reasoning parts are, and for the same reason: several at once are
+  // one thing happening, not several.
+  const webSearchParts = message.parts.filter(isWebSearchPart);
+  const firstWebSearchIndex = message.parts.findIndex(isWebSearchPart);
   const firstReasoningIndex = message.parts.findIndex(
     part => part.type === 'reasoning'
   );
@@ -202,6 +217,12 @@ export function Message({
                 return <TranscribeToolPart key={index} part={part} />;
               }
 
+              if (isWebSearchPart(part)) {
+                return index === firstWebSearchIndex ? (
+                  <WebSearchBlock key={index} parts={webSearchParts} />
+                ) : null;
+              }
+
               // A turn that failed — refused before it began, or cut off part
               // way. The reason was shown while it happened; what is left in
               // the thread is that nothing came back.
@@ -307,6 +328,9 @@ export function Message({
                 {renderArtifactCard(artifact)}
               </React.Fragment>
             ))}
+            {message.role === 'assistant' && status !== 'streaming' && (
+              <MessageSources sources={sources} />
+            )}
             {status === 'streaming' &&
               isLastMessage &&
               !hasVisibleArtifacts &&

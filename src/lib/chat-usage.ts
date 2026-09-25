@@ -1,4 +1,5 @@
 import { type ChatUsage } from '@/types';
+import { providerWebSearchToolNames } from '@/lib/web-search';
 
 /**
  * The subset of the AI SDK's `LanguageModelUsage` (the `usage` object passed to
@@ -94,7 +95,8 @@ export function sumChatUsage(steps: ChatUsage[]): ChatUsage {
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
-    reasoningTokens: 0
+    reasoningTokens: 0,
+    webSearches: 0
   };
 
   for (const step of steps) {
@@ -103,7 +105,46 @@ export function sumChatUsage(steps: ChatUsage[]): ChatUsage {
     total.cacheReadTokens += step.cacheReadTokens ?? 0;
     total.cacheWriteTokens += step.cacheWriteTokens ?? 0;
     total.reasoningTokens += step.reasoningTokens ?? 0;
+    total.webSearches += step.webSearches ?? 0;
   }
 
   return total;
+}
+
+/**
+ * The shape of a finished step that the count below reads: what the model
+ * produced, and what the provider said beside it.
+ */
+export type SearchStepLike = {
+  content?: ReadonlyArray<{
+    type: string;
+    toolName?: string;
+    providerExecuted?: boolean;
+  }>;
+  providerMetadata?: Record<string, unknown> | undefined;
+};
+
+/**
+ * How many web searches a step made, as the provider bills them.
+ *
+ * OpenAI, Anthropic and xAI run their search as a tool call the step reports,
+ * and charge each one. Gemini grounds the whole step and charges the step —
+ * however many queries it ran — so a grounded step counts once.
+ */
+export function countWebSearches(step: SearchStepLike): number {
+  const calls = (step.content ?? []).filter(
+    part =>
+      part.type === 'tool-call' &&
+      part.providerExecuted === true &&
+      !!part.toolName &&
+      providerWebSearchToolNames.includes(part.toolName)
+  ).length;
+
+  const google = step.providerMetadata?.google as
+    | { groundingMetadata?: { webSearchQueries?: string[] | null } | null }
+    | undefined;
+  const grounded =
+    (google?.groundingMetadata?.webSearchQueries?.length ?? 0) > 0;
+
+  return calls + (grounded ? 1 : 0);
 }

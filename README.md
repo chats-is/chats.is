@@ -13,6 +13,9 @@ much they may spend.
   reasoning effort.
 - **Image, video and speech** — generation, editing, text-to-speech and
   transcription, as tools the model calls in the middle of a conversation.
+- **Web search** — a model with a search of its own uses it; any other asks
+  a designated search model. Billed per search, and the user can switch it
+  off per message.
 - **Artifacts** — code and documents open beside the conversation, with a live
   sandboxed preview for React, HTML and SVG.
 - **Branching conversations** — regenerate or edit a message without losing
@@ -38,7 +41,7 @@ Everything an operator manages lives at `/console`:
 | Plans / Quotas | Spending limits, assigned by plan, per user, or as the install's default                     |
 | Usage          | Every call, opening onto what it was billed for, item by item                                |
 | Users          | Accounts, roles, and each user's limits, spend and log                                       |
-| Settings       | Title generation, speech, and other install-wide options                                     |
+| Settings       | Title generation, speech, web search, and other install-wide options                         |
 
 ## Stack
 
@@ -157,5 +160,6 @@ src/
 
 A domain usually has a file in each of `types/`, `services/` and `functions/`
 under the same name. Image, video and speech generation are chat tools,
-registered in `server/services/chat-tools.ts`. Tests sit beside their subject
-as `foo.test.ts`.
+registered in `server/services/chat-tools.ts`; web search is set up in
+`server/services/web-search.ts`. Tests sit beside their subject as
+`foo.test.ts`.

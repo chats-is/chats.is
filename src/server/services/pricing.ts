@@ -25,6 +25,7 @@ const EMPTY_SNAPSHOT: PriceSnapshot = {
   cacheReadPrice: null,
   cacheWritePrice: null,
   reasoningPrice: null,
+  webSearchPrice: null,
   imagePrice: null,
   videoPrice: null,
   videoSecondsPrice: null,
@@ -236,13 +237,17 @@ export function calculateChatCost(
   const cacheReadTokens = usage.cacheReadTokens ?? 0;
   const cacheWriteTokens = usage.cacheWriteTokens ?? 0;
   const reasoningTokens = usage.reasoningTokens ?? 0;
+  // Searches are counted, not measured in tokens: each costs the search rate.
+  const webSearches = usage.webSearches ?? 0;
+  const webSearchRate = toNum(pricing.webSearch);
 
   const cost =
     (inputTokens * inputRate) / 1_000_000 +
     (cacheReadTokens * cacheReadRate) / 1_000_000 +
     (cacheWriteTokens * cacheWriteRate) / 1_000_000 +
     (outputTokens * outputRate) / 1_000_000 +
-    (reasoningTokens * reasoningRate) / 1_000_000;
+    (reasoningTokens * reasoningRate) / 1_000_000 +
+    webSearches * webSearchRate;
 
   return {
     cost: roundCost(cost),
@@ -252,7 +257,8 @@ export function calculateChatCost(
       outputPrice: numToStr(pricing.output),
       cacheReadPrice: numToStr(pricing.cacheRead),
       cacheWritePrice: numToStr(pricing.cacheWrite),
-      reasoningPrice: numToStr(reasoningRateStr)
+      reasoningPrice: numToStr(reasoningRateStr),
+      webSearchPrice: numToStr(pricing.webSearch)
     }
   };
 }
@@ -567,6 +573,7 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
     cacheWrite: cacheDefault(data.cacheWrite),
     // Reasoning stays null when not set — cost engine falls back to output.
     reasoning: data.reasoning,
+    webSearch: data.webSearch,
     image: data.image,
     video: data.video,
     videoSeconds: data.videoSeconds,

@@ -199,6 +199,24 @@ export const mediaToolNames = [
 
 export type MediaToolName = (typeof mediaToolNames)[number];
 
+export const webSearchInputSchema = z.object({
+  query: z
+    .string()
+    .min(1)
+    .describe('What to look up on the web, as a search query')
+});
+
+export type WebSearchInput = z.infer<typeof webSearchInputSchema>;
+
+/** A web search made on the chat's behalf: what was found, and where. */
+export type WebSearchToolOutput =
+  | {
+      status: 'done';
+      answer: string;
+      sources: Array<{ title: string; url: string }>;
+    }
+  | ToolErrorOutput;
+
 /** Tool map for `UIMessage`'s third generic — narrows `tool-*` part types. */
 export type ChatTools = {
   create_artifact: { input: CreateArtifactInput; output: { id: string } };
@@ -211,4 +229,5 @@ export type ChatTools = {
     input: TranscribeAudioInput;
     output: TranscribeToolOutput;
   };
+  web_search: { input: WebSearchInput; output: WebSearchToolOutput };
 };

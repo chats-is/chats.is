@@ -75,7 +75,9 @@ export const chatRequestSchema = z.object({
   mediaOptions: mediaToolsOptionsSchema.optional().catch(undefined),
   /** The user's switch for the media tools — every one of them. Absent
    *  means on. */
-  mediaGeneration: z.boolean().optional()
+  mediaGeneration: z.boolean().optional(),
+  /** The user's switch for searching the web. Absent means on. */
+  webSearch: z.boolean().optional()
 });
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;

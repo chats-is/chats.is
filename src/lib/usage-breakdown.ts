@@ -50,7 +50,7 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
     label: string,
     quantity: number,
     price: string | null | undefined,
-    unit: 'image' | 'video' | 's'
+    unit: 'image' | 'video' | 'search' | 's'
   ) => {
     if (quantity <= 0) return;
     items.push({
@@ -84,6 +84,7 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
         row.reasoningPrice,
         'token'
       );
+      perUnit('Web search', num(row.webSearches), row.webSearchPrice, 'search');
       break;
     case 'image':
       if (num(row.imagePrice) > 0) {

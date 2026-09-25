@@ -19,6 +19,7 @@ import {
   type ImageModel,
   type LanguageModel,
   type SpeechModel,
+  type Tool,
   type TranscriptionModel
 } from 'ai';
 
@@ -32,6 +33,7 @@ import {
 
 import { BedrockModels, VertexAIModels } from './constant';
 import { decrypt } from './crypto';
+import { hasOwnWebSearch } from './web-search';
 
 function getProviderBaseUrl(provider: ProviderConfig) {
   if (provider.baseUrl) {
@@ -167,6 +169,32 @@ export function getLanguageModel(
 ): LanguageModel {
   const sdk = createProviderSDK(provider);
   return sdk(resolveModelId(provider, modelId));
+}
+
+/**
+ * The provider's own web search, for a provider that has one (see
+ * `hasOwnWebSearch`): it runs on the provider's side, under the provider's
+ * tool name. Null where the provider has none.
+ */
+export function getProviderWebSearchTool(
+  provider: Candidate,
+  options: { alone: boolean }
+): Record<string, Tool> | null {
+  if (!hasOwnWebSearch(provider.type, options)) return null;
+  const sdk = createProviderSDK(provider);
+  switch (provider.type) {
+    case 'openai':
+      return { web_search: sdk.tools.webSearch({}) };
+    case 'anthropic':
+      return { web_search: sdk.tools.webSearch_20260209({ maxUses: 5 }) };
+    case 'xai':
+      return { web_search: sdk.tools.webSearch({}) };
+    case 'google':
+    case 'vertex':
+      return { google_search: sdk.tools.googleSearch({}) };
+    default:
+      return null;
+  }
 }
 
 /**

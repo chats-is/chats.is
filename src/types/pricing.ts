@@ -27,6 +27,8 @@ export type ChatUsage = {
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
   reasoningTokens?: number;
+  /** Web searches the call made, billed each at the model's search rate. */
+  webSearches?: number;
 };
 
 /** Subset of `model_pricing` rates this call actually used, snapshotted at
@@ -40,6 +42,7 @@ export type PriceSnapshot = {
   /** The rate actually charged for reasoning tokens — may differ from
    *  `pricing.reasoning` when fallback kicked in (defaults to output rate). */
   reasoningPrice: string | null;
+  webSearchPrice: string | null;
   imagePrice: string | null;
   videoPrice: string | null;
   videoSecondsPrice: string | null;
@@ -101,6 +104,7 @@ export const pricingUpsertSchema = z.object({
   cacheRead: priceNumberSchema,
   cacheWrite: priceNumberSchema,
   reasoning: priceNumberSchema,
+  webSearch: priceNumberSchema,
   image: priceNumberSchema,
   video: priceNumberSchema,
   videoSeconds: priceNumberSchema,

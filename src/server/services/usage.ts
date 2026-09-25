@@ -69,6 +69,7 @@ export async function recordChatUsage(
       cacheReadTokens: input.usage.cacheReadTokens ?? 0,
       cacheWriteTokens: input.usage.cacheWriteTokens ?? 0,
       reasoningTokens: input.usage.reasoningTokens ?? 0,
+      webSearches: input.usage.webSearches ?? 0,
       cost: cost.toString(),
       ...snapshot
     });
@@ -348,7 +349,8 @@ async function queryUsageRows(args: {
       outputTokens: usage.outputTokens,
       cacheReadTokens: usage.cacheReadTokens,
       cacheWriteTokens: usage.cacheWriteTokens,
-      reasoningTokens: usage.reasoningTokens
+      reasoningTokens: usage.reasoningTokens,
+      webSearches: usage.webSearches
     })
     .from(usage)
     // The provider that actually served the call, as the row recorded it —
@@ -369,7 +371,8 @@ async function queryUsageRows(args: {
     outputTokens: Number(r.outputTokens ?? 0),
     cacheReadTokens: Number(r.cacheReadTokens ?? 0),
     cacheWriteTokens: Number(r.cacheWriteTokens ?? 0),
-    reasoningTokens: Number(r.reasoningTokens ?? 0)
+    reasoningTokens: Number(r.reasoningTokens ?? 0),
+    webSearches: Number(r.webSearches ?? 0)
   }));
 }
 
@@ -469,6 +472,7 @@ export async function adminUsageLog(
       cacheReadTokens: usage.cacheReadTokens,
       cacheWriteTokens: usage.cacheWriteTokens,
       reasoningTokens: usage.reasoningTokens,
+      webSearches: usage.webSearches,
       imageCount: usage.imageCount,
       videoCount: usage.videoCount,
       videoSeconds: usage.videoSeconds,
@@ -481,6 +485,7 @@ export async function adminUsageLog(
       cacheReadPrice: usage.cacheReadPrice,
       cacheWritePrice: usage.cacheWritePrice,
       reasoningPrice: usage.reasoningPrice,
+      webSearchPrice: usage.webSearchPrice,
       imagePrice: usage.imagePrice,
       videoPrice: usage.videoPrice,
       videoSecondsPrice: usage.videoSecondsPrice,

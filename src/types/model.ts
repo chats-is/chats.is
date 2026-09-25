@@ -123,6 +123,8 @@ export type Model = {
   aliases?: string[] | null;
   supportsVision?: boolean | null;
   supportsReasoning?: boolean | null;
+  /** Chat models: the provider offers a web search tool for it. */
+  supportsWebSearch?: boolean | null;
   /** Image models: supports image editing (input images). */
   supportsImageEdit?: boolean | null;
   supportsImageToVideo?: boolean | null;
@@ -201,6 +203,7 @@ export const modelCreateSchema = z.object({
   aliases: z.array(z.string()).optional(),
   supportsVision: z.boolean().default(false),
   supportsReasoning: z.boolean().default(false),
+  supportsWebSearch: z.boolean().default(false),
   supportsImageEdit: z.boolean().default(false),
   supportsImageToVideo: z.boolean().default(false),
   supportsVideoEdit: z.boolean().default(false),
@@ -222,6 +225,7 @@ export const modelUpdateSchema = z.object({
   aliases: z.array(z.string()).optional(),
   supportsVision: z.boolean().optional(),
   supportsReasoning: z.boolean().optional(),
+  supportsWebSearch: z.boolean().optional(),
   supportsImageEdit: z.boolean().optional(),
   supportsImageToVideo: z.boolean().optional(),
   supportsVideoEdit: z.boolean().optional(),

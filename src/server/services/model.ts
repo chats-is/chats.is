@@ -290,6 +290,7 @@ export async function createModel(input: z.infer<typeof modelCreateSchema>) {
       supportsImageToVideo: input.supportsImageToVideo,
       supportsVideoEdit: input.supportsVideoEdit,
       supportsTranscription: input.supportsTranscription,
+      supportsWebSearch: input.supportsWebSearch,
       isEnabled: input.isEnabled,
       uiOptions: input.uiOptions,
       apiParams: input.apiParams,

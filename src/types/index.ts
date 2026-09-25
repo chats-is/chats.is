@@ -47,6 +47,7 @@ export {
   generateVideoInputSchema,
   textToSpeechInputSchema,
   transcribeAudioInputSchema,
+  webSearchInputSchema,
   mediaToolNames
 } from './chat-tools';
 export type {
@@ -56,7 +57,8 @@ export type {
   MediaToolOutput,
   MediaToolsOptions,
   ToolErrorOutput,
-  TranscribeToolOutput
+  TranscribeToolOutput,
+  WebSearchToolOutput
 } from './chat-tools';
 export type {
   PricingRecord,

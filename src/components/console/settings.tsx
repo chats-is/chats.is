@@ -6,11 +6,13 @@ import {
   Clapperboard,
   Film,
   Gauge,
+  Globe,
   Image,
   Loader2,
   MessageSquare,
   Mic,
   PenLine,
+  Search,
   Type,
   Video,
   Volume2,
@@ -42,7 +44,7 @@ import { expand, readPath } from './settings-values';
 /**
  * Everything an admin sets about this installation, on one page.
  *
- * Fifteen settings in five groups, read down: what the installation calls
+ * Seventeen settings in six groups, read down: what the installation calls
  * itself, which model does each job, the two switches, and last the prose
  * every chat is told. One form and one Save cover the lot.
  */
@@ -63,6 +65,7 @@ type ModelLike = {
   supportsImageToVideo?: boolean | null;
   supportsVideoEdit?: boolean | null;
   supportsTranscription?: boolean | null;
+  supportsWebSearch?: boolean | null;
 };
 
 /** One "pick a model for this job" setting. `can` is what the job asks of a
@@ -144,15 +147,35 @@ const MODEL_ROWS: Array<ModelRow> = [
   }
 ];
 
-/** Every key the page loads and saves: the nine model picks, then the six
+/** The model that answers a search for a chat model without one: a chat
+ *  model with search of its own. Beside the mode, not among the defaults —
+ *  the two are read together. */
+const WEB_SEARCH_MODEL_ROW: ModelRow = {
+  key: 'webSearch.modelId',
+  label: 'Web Search Model',
+  icon: Search,
+  hint: 'The model that searches for a chat model without a web search of its own. Its name is never shown to the user.',
+  can: model => model.capability === 'chat' && !!model.supportsWebSearch
+};
+
+/** Who searches. Each value names a source, so a third — a search service
+ *  of its own — is one more entry here. */
+const WEB_SEARCH_MODES = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'model', label: 'Model' }
+];
+
+/** Every key the page loads and saves: the ten model picks, then the seven
  *  fields that are not one. */
 const KEYS = [
   ...MODEL_ROWS.map(row => row.key),
+  WEB_SEARCH_MODEL_ROW.key,
   'app.name',
   'app.subtitle',
   'app.description',
   'default.chat.systemPrompt',
   'speech.enabled',
+  'webSearch.mode',
   'default.quotaId'
 ];
 
@@ -173,6 +196,7 @@ export function ConsoleSettings() {
       <ApplicationSettings form={form} />
       <ModelDefaults form={form} />
       <SpeechSettings form={form} />
+      <WebSearchSettings form={form} />
       <QuotaSettings form={form} />
     </SettingsForm>
   );
@@ -285,52 +309,69 @@ function ModelDefaults({ form }: { form: SettingsFormApi }) {
         </span>
       }
     >
-      {MODEL_ROWS.map((row, index) => {
-        const state = statuses[index];
-        // Every model the job could use, the ones that cannot answer today
-        // included: a model that is switched off is a thing the admin can go
-        // and switch on, and leaving it out only raises the question of where
-        // it went. The badge says which; it does not bar the choice.
-        const options = (models ?? [])
-          .filter(model => row.can(model))
-          .map(model => ({
-            value: model.modelId,
-            label: model.name,
-            node: (
-              <span className="flex items-center gap-2">
-                {model.name}
-                <ModelStatusBadge status={model.status} />
-              </span>
-            )
-          }));
-
-        return (
-          <SettingsRow
-            key={row.key}
-            icon={row.icon}
-            label={row.label}
-            htmlFor={row.key}
-            hint={row.hint}
-            settingKey={row.key}
-            state={state}
-          >
-            <form.AppField name={row.key}>
-              {field => (
-                <field.SelectField
-                  options={options}
-                  disabled={options.length === 0}
-                  placeholder={
-                    options.length === 0
-                      ? 'No available models'
-                      : 'Select model'
-                  }
-                />
-              )}
-            </form.AppField>
-          </SettingsRow>
-        );
-      })}
+      {MODEL_ROWS.map((row, index) => (
+        <ModelPickRow
+          key={row.key}
+          form={form}
+          row={row}
+          state={statuses[index]}
+          models={models}
+        />
+      ))}
     </SettingsList>
+  );
+}
+
+/** One "pick a model for this job" row. */
+function ModelPickRow({
+  form,
+  row,
+  state,
+  models
+}: {
+  form: SettingsFormApi;
+  row: ModelRow;
+  state: RowState;
+  models: Array<ModelLike> | undefined;
+}) {
+  // Every model the job could use, the ones that cannot answer today
+  // included: a model that is switched off is a thing the admin can go and
+  // switch on, and leaving it out only raises the question of where it went.
+  // The badge says which; it does not bar the choice.
+  const options = (models ?? [])
+    .filter(model => row.can(model))
+    .map(model => ({
+      value: model.modelId,
+      label: model.name,
+      node: (
+        <span className="flex items-center gap-2">
+          {model.name}
+          <ModelStatusBadge status={model.status} />
+        </span>
+      )
+    }));
+
+  return (
+    <SettingsRow
+      icon={row.icon}
+      label={row.label}
+      htmlFor={row.key}
+      hint={row.hint}
+      settingKey={row.key}
+      state={state}
+    >
+      <form.AppField name={row.key}>
+        {field => (
+          <field.SelectField
+            options={options}
+            disabled={options.length === 0}
+            placeholder={
+              options.length === 0 ? 'No available models' : 'Select model'
+            }
+          />
+        )}
+      </form.AppField>
+    </SettingsRow>
   );
 }
 
@@ -358,6 +399,37 @@ function SpeechSettings({ form }: { form: SettingsFormApi }) {
           )}
         </form.Field>
       </SettingsRow>
+    </SettingsList>
+  );
+}
+
+/** How a chat searches: the mode, and the model the mode falls back on or
+ *  always uses. Read together, so they sit together. */
+function WebSearchSettings({ form }: { form: SettingsFormApi }) {
+  const { data: models } = useQuery(modelQueries.forSelect());
+  const modelId = useStore(form.store, state =>
+    readPath(state.values, WEB_SEARCH_MODEL_ROW.key)
+  );
+
+  return (
+    <SettingsList title="Web search">
+      <SettingsRow
+        icon={Globe}
+        label="Search Mode"
+        htmlFor="webSearch.mode"
+        hint="Auto uses the chat model's own web search when it has one, and the web search model otherwise. Model always uses the web search model."
+        settingKey="webSearch.mode"
+      >
+        <form.AppField name="webSearch.mode">
+          {field => <field.SelectField options={WEB_SEARCH_MODES} />}
+        </form.AppField>
+      </SettingsRow>
+      <ModelPickRow
+        form={form}
+        row={WEB_SEARCH_MODEL_ROW}
+        state={statusOf(modelId, WEB_SEARCH_MODEL_ROW, models)}
+        models={models}
+      />
     </SettingsList>
   );
 }
@@ -586,6 +658,7 @@ function valuesOf(
   });
   // A switch needs a side even before anyone has picked one.
   flat['speech.enabled'] ||= 'false';
+  flat['webSearch.mode'] ||= 'auto';
   return expand(flat);
 }
 

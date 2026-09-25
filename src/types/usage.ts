@@ -68,6 +68,7 @@ export type UsageRow = {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   reasoningTokens: number;
+  webSearches: number;
 };
 
 /** Aggregated KPI tile values for the period — admin shape (with cost). */
@@ -90,6 +91,7 @@ export type UsageRowLike = {
   cacheReadTokens?: number | null;
   cacheWriteTokens?: number | null;
   reasoningTokens?: number | null;
+  webSearches?: number | null;
   imageCount?: number | null;
   videoCount?: number | null;
   videoSeconds?: string | number | null;
@@ -104,6 +106,7 @@ export type UsageRowLike = {
   cacheReadPrice?: string | null;
   cacheWritePrice?: string | null;
   reasoningPrice?: string | null;
+  webSearchPrice?: string | null;
   imagePrice?: string | null;
   videoPrice?: string | null;
   videoSecondsPrice?: string | null;

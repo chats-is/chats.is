@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeChatUsage, sumChatUsage } from './chat-usage';
+import {
+  countWebSearches,
+  normalizeChatUsage,
+  sumChatUsage
+} from './chat-usage';
 
 describe('normalizeChatUsage', () => {
   it('reads disjoint buckets from inputTokenDetails / outputTokenDetails', () => {
@@ -115,7 +119,48 @@ describe('sumChatUsage', () => {
       outputTokens: 60,
       cacheReadTokens: 5,
       cacheWriteTokens: 0,
-      reasoningTokens: 7
+      reasoningTokens: 7,
+      webSearches: 0
     });
+  });
+});
+
+describe('countWebSearches', () => {
+  it('counts each search the provider ran inside the step', () => {
+    // OpenAI, Anthropic and xAI report a search as a provider-executed
+    // tool call; a tool the app ran itself is not a search of theirs.
+    expect(
+      countWebSearches({
+        content: [
+          { type: 'text' },
+          { type: 'tool-call', toolName: 'web_search', providerExecuted: true },
+          { type: 'tool-call', toolName: 'web_search', providerExecuted: true },
+          { type: 'tool-call', toolName: 'web_search' },
+          { type: 'tool-call', toolName: 'generate_image' }
+        ]
+      })
+    ).toBe(2);
+  });
+
+  it('counts a Gemini-grounded step once, however many queries it ran', () => {
+    // Google bills the grounded prompt, not the queries behind it.
+    expect(
+      countWebSearches({
+        content: [{ type: 'text' }],
+        providerMetadata: {
+          google: { groundingMetadata: { webSearchQueries: ['a', 'b', 'c'] } }
+        }
+      })
+    ).toBe(1);
+  });
+
+  it('is zero for a step that did not search', () => {
+    expect(countWebSearches({ content: [{ type: 'text' }] })).toBe(0);
+    expect(
+      countWebSearches({
+        content: [],
+        providerMetadata: { google: { groundingMetadata: null } }
+      })
+    ).toBe(0);
   });
 });

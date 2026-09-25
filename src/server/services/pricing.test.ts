@@ -26,6 +26,7 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     cacheRead: null,
     cacheWrite: null,
     reasoning: null,
+    webSearch: null,
     image: null,
     video: null,
     videoSeconds: null,

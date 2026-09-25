@@ -428,6 +428,8 @@ export const models = createTable(
     aliases: jsonb('aliases').$type<Array<string>>(),
     supportsVision: boolean('supports_vision').default(false),
     supportsReasoning: boolean('supports_reasoning').default(false),
+    // Chat models: the provider offers a web search tool for it.
+    supportsWebSearch: boolean('supports_web_search').default(false),
     // Image models: can edit an existing image.
     supportsImageEdit: boolean('supports_image_edit').default(false),
     // Video models: can take an image as the opening frame.
@@ -649,6 +651,8 @@ export const modelPricings = createTable(
     // falls back to `output`. Some models (Qwen thinking variants) have a
     // distinct reasoning rate — set this column to override.
     reasoning: numeric('reasoning', { precision: 20, scale: 10 }),
+    // Chat models: what one web search costs, on top of the tokens.
+    webSearch: numeric('web_search', { precision: 20, scale: 10 }),
     image: numeric('image', { precision: 20, scale: 10 }),
     video: numeric('video', { precision: 20, scale: 10 }),
     videoSeconds: numeric('video_seconds', { precision: 20, scale: 10 }),
@@ -729,6 +733,7 @@ export const usage = createTable(
     cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
     cacheWriteTokens: integer('cache_write_tokens').notNull().default(0),
     reasoningTokens: integer('reasoning_tokens').notNull().default(0),
+    webSearches: integer('web_searches').notNull().default(0),
     imageCount: integer('image_count').notNull().default(0),
     videoCount: integer('video_count').notNull().default(0),
     videoSeconds: numeric('video_seconds', { precision: 12, scale: 3 })
@@ -747,6 +752,7 @@ export const usage = createTable(
     cacheReadPrice: numeric('cache_read_price', { precision: 20, scale: 10 }),
     cacheWritePrice: numeric('cache_write_price', { precision: 20, scale: 10 }),
     reasoningPrice: numeric('reasoning_price', { precision: 20, scale: 10 }),
+    webSearchPrice: numeric('web_search_price', { precision: 20, scale: 10 }),
     imagePrice: numeric('image_price', { precision: 20, scale: 10 }),
     videoPrice: numeric('video_price', { precision: 20, scale: 10 }),
     videoSecondsPrice: numeric('video_seconds_price', {

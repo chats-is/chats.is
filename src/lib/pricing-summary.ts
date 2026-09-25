@@ -8,6 +8,7 @@ export type PricingRates = {
   cacheRead?: string | null;
   cacheWrite?: string | null;
   reasoning?: string | null;
+  webSearch?: string | null;
   image?: string | null;
   video?: string | null;
   videoSeconds?: string | null;
@@ -64,6 +65,7 @@ export function summarizePricingRows(
       push(main, 'Reasoning', pricing.reasoning, '/1M');
       push(cache, 'Cache Read', pricing.cacheRead, '/1M');
       push(cache, 'Cache Write', pricing.cacheWrite, '/1M');
+      push(cache, 'Web Search', pricing.webSearch, '/search');
       break;
     }
     case 'image': {

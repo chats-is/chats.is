@@ -130,6 +130,30 @@ export const getTitleSettings = perRequest('getTitleSettings', async () => {
   };
 });
 
+/**
+ * Who searches the web for a chat. `model` is always the search model;
+ * `auto` lets a chat model that has its own search use it, and sends the
+ * rest to the search model. The search model is a chat model with search of
+ * its own. Each value names a source, so a search service of its own would
+ * be one more.
+ */
+export const getWebSearchSettings = perRequest(
+  'getWebSearchSettings',
+  async () => {
+    const values = await getSettings(['webSearch.mode', 'webSearch.modelId']);
+    const modelId = values['webSearch.modelId'];
+    const model = modelId ? await findModelByModelId(modelId, 'chat') : null;
+
+    return {
+      mode: values['webSearch.mode'] === 'model' ? 'model' : 'auto',
+      searchModel:
+        model && model.supportsWebSearch
+          ? { dbModel: model, candidates: usableCandidates(model) }
+          : null
+    } as const;
+  }
+);
+
 export const getSystemPrompt = perRequest(
   'getSystemPrompt',
   async (modelSystemPrompt?: string | null): Promise<string | null> => {

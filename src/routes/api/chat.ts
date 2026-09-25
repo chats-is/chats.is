@@ -33,7 +33,11 @@ import {
 } from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
-import { normalizeChatUsage, sumChatUsage } from '@/lib/chat-usage';
+import {
+  countWebSearches,
+  normalizeChatUsage,
+  sumChatUsage
+} from '@/lib/chat-usage';
 import { ArtifactSystemPrompt } from '@/lib/constant';
 import { fitToContext } from '@/lib/context-window';
 import { pickEffort } from '@/lib/media-options';
@@ -62,6 +66,7 @@ import { findModelByModelId, usableCandidates } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
 import { getSystemPrompt, getTitleSettings } from '@/server/services/settings';
 import { recordChatUsage } from '@/server/services/usage';
+import { setupWebSearch } from '@/server/services/web-search';
 
 export const Route = createFileRoute('/api/chat')({
   server: {
@@ -157,7 +162,8 @@ async function POST({
     timeZone,
     language,
     mediaOptions,
-    mediaGeneration
+    mediaGeneration,
+    webSearch
   } = parsed.data;
   // The schema has settled the shape; the parts are typed by the tools and
   // data this app defines, which a wire schema cannot name one by one.
@@ -441,7 +447,7 @@ async function POST({
 
     // Independent setup queries — run concurrently to keep time-to-first-token
     // down (media tool resolution should not delay plain text chats).
-    const [systemPromptContent, mediaTools] = await Promise.all([
+    const [systemPromptContent, mediaTools, search] = await Promise.all([
       getSystemPrompt(dbModel.systemPrompt),
       // Switched off by the user: no media tool at all, and nothing in the
       // prompt about them.
@@ -453,6 +459,16 @@ async function POST({
             assistantMessageId,
             mediaOptions,
             chatMessages
+          }),
+      // Unticked by the user: no search, however the install is set up.
+      webSearch === false
+        ? { toolsFor: () => ({}), systemPrompt: '' }
+        : setupWebSearch({
+            userId: user.id,
+            chatId: id,
+            assistantMessageId,
+            chatModel: dbModel,
+            candidates
           })
     ]);
     // Only the app's own part is a template. What an admin wrote, and what
@@ -895,7 +911,8 @@ async function POST({
         const instructions = [
           systemMessage,
           ArtifactSystemPrompt,
-          mediaTools.systemPrompt
+          mediaTools.systemPrompt,
+          search.systemPrompt
         ]
           .filter(Boolean)
           .join('\n\n');
@@ -935,7 +952,13 @@ async function POST({
             abortSignal: stopper.signal,
             instructions,
             messages: modelMessages,
-            tools: { ...artifactTools, ...mediaTools.tools },
+            tools: {
+              ...artifactTools,
+              ...mediaTools.tools,
+              // Which search a model gets depends on who serves it: its
+              // provider's own where it has one, else the delegate tool.
+              ...search.toolsFor(failoverProvider)
+            },
             ...(failoverProvider.apiOptions && {
               providerOptions: {
                 [failoverProvider.type]: failoverProvider.apiOptions
@@ -969,11 +992,16 @@ async function POST({
             // outer `onEnd`). The SDK's own total exists only for a turn that
             // ended well: a step that fails after others have answered leaves
             // it empty, and those steps were paid for.
-            onStepEnd: ({ warnings, usage }) => {
-              if (warnings) {
-                console.log('Warnings: ', warnings);
+            onStepEnd: step => {
+              if (step.warnings) {
+                console.log('Warnings: ', step.warnings);
               }
-              spent.push(normalizeChatUsage(usage));
+              // A search the provider ran inside the step is billed per
+              // search, on top of the step's tokens.
+              spent.push({
+                ...normalizeChatUsage(step.usage),
+                webSearches: countWebSearches(step)
+              });
               servedBy = failoverProvider;
             }
           });

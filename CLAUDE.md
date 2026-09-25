@@ -13,6 +13,8 @@ What it supports:
 - Streaming chat, with file attachments and per-model system prompts.
 - Image generation and editing, video generation and editing, speech synthesis and transcription — all
   as tools the model can call mid-conversation.
+- Web search: a chat model with a search of its own uses it; any other asks a designated search model
+  through a `web_search` tool. Each search is billed at the model's search rate.
 - An artifact panel: code and documents the model produces open beside the conversation, with a live
   sandboxed preview for React, HTML and SVG.
 - Conversations that branch, so a message can be regenerated or edited without losing the other reply.
@@ -133,6 +135,8 @@ and the console layout gates the whole admin tree.
 does. `lib/` is for technical utilities used by both sides, and business logic belongs in `services/`.
 
 **Generation is part of the chat stream.** Image, video and speech are tools the model can call during
-a conversation, registered in `services/chat-tools.ts`, so a new capability is added there.
+a conversation, registered in `services/chat-tools.ts`, so a new capability is added there. Web search
+is `services/web-search.ts`: it decides per provider whether the model searches for itself or through
+the search model, and `lib/chat-usage.ts` counts the searches a step made.
 
 Tests sit beside their subject as `foo.ts` and `foo.test.ts`.

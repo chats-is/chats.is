@@ -122,6 +122,7 @@ const modelSchema = z
     supportsImageToVideo: z.boolean(),
     supportsVideoEdit: z.boolean(),
     supportsTranscription: z.boolean(),
+    supportsWebSearch: z.boolean(),
     isEnabled: z.boolean(),
     systemPrompt: z.string(),
     uiOptions: jsonObject,
@@ -171,6 +172,7 @@ const EMPTY_FORM: ModelForm = {
   supportsImageToVideo: false,
   supportsVideoEdit: false,
   supportsTranscription: false,
+  supportsWebSearch: false,
   isEnabled: true,
   systemPrompt: '',
   uiOptions: '',
@@ -195,6 +197,11 @@ const apiParamsPlaceholderByCapability: Record<string, string> = {
 
 /** The capability switches that only apply to some kinds of model. */
 const CONDITIONAL_TOGGLES = [
+  {
+    name: 'supportsWebSearch',
+    label: 'Web search',
+    capability: 'chat'
+  },
   {
     name: 'supportsImageEdit',
     label: 'Image editing',
@@ -476,6 +483,7 @@ export default function ModelsPage() {
       supportsImageToVideo: model.supportsImageToVideo || false,
       supportsVideoEdit: model.supportsVideoEdit || false,
       supportsTranscription: model.supportsTranscription || false,
+      supportsWebSearch: model.supportsWebSearch || false,
       isEnabled: model.isEnabled,
       systemPrompt: model.systemPrompt || '',
       uiOptions: model.uiOptions

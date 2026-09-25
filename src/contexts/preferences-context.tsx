@@ -38,6 +38,8 @@ export interface Preferences {
   /** Whether the chat is offered the media tools: images, video, speech and
    *  transcription alike. */
   mediaGeneration: boolean;
+  /** Whether the chat may search the web. */
+  webSearch: boolean;
 }
 
 interface PreferencesContextValue {
@@ -139,7 +141,8 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       audioVoice: '',
       // Transcription (STT)
       sttModelId: systemDefault(defaults.sttModelId, sttModels),
-      mediaGeneration: true
+      mediaGeneration: true,
+      webSearch: true
     };
 
     const stored = getStoredPreferences();

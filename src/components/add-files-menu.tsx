@@ -9,19 +9,20 @@ import {
 } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { Camera, Paperclip, Plus } from 'lucide-react';
+import { Camera, Check, Globe, Paperclip, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type Attachment } from '@/types';
 import { uploadFile } from '@/lib/api';
 import { canCaptureScreen, captureScreenshot } from '@/lib/screenshot';
-import { generateUUID, modelMatchesId } from '@/lib/utils';
+import { cn, generateUUID, modelMatchesId } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -218,7 +219,6 @@ export function AddFilesMenu({
   // A screenshot is an image, so it goes where images may — and only where
   // the browser can capture the screen at all.
   const canScreenshot = canAttachImages && canCaptureScreen();
-  const hasItems = canUpload || canScreenshot;
 
   if (!mounted) {
     return <Skeleton className="size-9 rounded-full" />;
@@ -246,7 +246,7 @@ export function AddFilesMenu({
                 type="button"
                 variant="outline"
                 size="icon"
-                disabled={disabled || !hasItems}
+                disabled={disabled}
                 className="size-9 rounded-full text-muted-foreground shadow-none"
               >
                 <Plus className="size-4" />
@@ -275,6 +275,24 @@ export function AddFilesMenu({
               Take a screenshot
             </DropdownMenuItem>
           )}
+          {(canUpload || canScreenshot) && <DropdownMenuSeparator />}
+          {/* A setting, chosen like an action: one pick, and the menu
+              closes. Its icon sits where the other items' do, and the check
+              at the right, where a setting's state is read. */}
+          <DropdownMenuItem
+            role="menuitemcheckbox"
+            aria-checked={preferences.webSearch}
+            onSelect={() => setPreference('webSearch', !preferences.webSearch)}
+          >
+            <Globe className="size-4" />
+            Web search
+            <Check
+              className={cn(
+                'ml-auto size-4',
+                !preferences.webSearch && 'invisible'
+              )}
+            />
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </>
