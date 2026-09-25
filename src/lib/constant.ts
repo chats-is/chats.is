@@ -171,13 +171,40 @@ export function buildMediaToolsSystemPrompt(
   tools: ChatMediaToolName[]
 ): string {
   if (tools.length === 0) return '';
+  const has = (...names: ChatMediaToolName[]) =>
+    names.some(name => tools.includes(name));
+
+  // Each part is said only when a tool it speaks of is there: a prompt that
+  // talks of generated media with only transcription on offer has the model
+  // looking for tools it was never given.
+  const formats = has('generate_image', 'generate_video', 'text_to_speech');
+  const producesMedia = has(
+    'generate_image',
+    'edit_image',
+    'generate_video',
+    'edit_video',
+    'text_to_speech'
+  );
+  const transcribes = has('transcribe_audio');
+
+  const handling = [
+    producesMedia &&
+      'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result.',
+    transcribes &&
+      'A transcript is not displayed, so write it out yourself — quote what was said, then answer whatever was asked about it.',
+    'If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the media model that failed, or mention settings pages. Do not retry the tool on your own.'
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return [
     'You also have media tools; each says what it is for.',
-    '',
-    "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields. What you pass is a suggestion for what the user did not settle: anything they chose in the app's own settings is used instead, and where neither says anything the model's first listed value applies.",
-    '',
-    'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result. A transcript is not displayed, so write it out yourself — quote what was said, then answer whatever was asked about it. If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the media model that failed, or mention settings pages. Do not retry the tool on your own.'
-  ].join('\n');
+    formats &&
+      "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields. What you pass is a suggestion for what the user did not settle: anything they chose in the app's own settings is used instead, and where neither says anything the model's first listed value applies.",
+    handling
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export const ArtifactSystemPrompt = [
