@@ -22,6 +22,7 @@ import {
 import {
   assertModelAccess,
   assertQuota,
+  getUserUsageWindows,
   ModelAccessDeniedError,
   QuotaExceededError,
   QuotaMissingError
@@ -102,7 +103,7 @@ async function priceRow(modelId: string) {
   return row;
 }
 
-async function usageRows() {
+async function usageRows(): Promise<Array<typeof schema.usage.$inferSelect>> {
   return h.db.select().from(schema.usage).orderBy(schema.usage.createdAt);
 }
 
@@ -186,9 +187,10 @@ describe('价格设置', () => {
     );
   });
 
-  it('聊天模型缺少输入价或输出价，调用前被拒绝', async () => {
+  it('保存价格时，聊天模型缺少输入价或输出价会被拒绝', async () => {
     const id = await addModel('chat', 'c1');
     await expect(savePrice(id, { input: '3' })).rejects.toThrow(/Output/);
+    await expect(savePrice(id, { output: '15' })).rejects.toThrow(/Input/);
   });
 
   it('图片模型不能同时设置按张价和按 token 价', async () => {
@@ -199,7 +201,7 @@ describe('价格设置', () => {
   });
 
   it('语音合成模型必须有每百万字符价，转写模型必须有每秒价', async () => {
-    const tts = await addModel('audio', 'tts1', { supportsSpeech: true });
+    const tts = await addModel('audio', 'tts1');
     await expect(savePrice(tts, { audioSeconds: '0.01' })).rejects.toThrow(
       /Per 1M characters/
     );
@@ -264,10 +266,14 @@ describe('计费', () => {
       usage: { inputTokens: 1_000_000 }
     });
 
-    const [before, after] = await usageRows();
-    expect(Number(before.cost)).toBeCloseTo(1, 10);
-    expect(Number(before.inputPrice)).toBe(1);
-    expect(Number(after.cost)).toBeCloseTo(5, 10);
+    // Told apart by price rather than by order: the two can land in the
+    // same instant.
+    const rows = await usageRows();
+    const before = rows.find(r => Number(r.inputPrice) === 1);
+    const after = rows.find(r => Number(r.inputPrice) === 5);
+    expect(rows).toHaveLength(2);
+    expect(Number(before?.cost)).toBeCloseTo(1, 10);
+    expect(Number(after?.cost)).toBeCloseTo(5, 10);
   });
 
   it('图片：有按张价时按张数计，不看 token', async () => {
@@ -322,7 +328,7 @@ describe('计费', () => {
   });
 
   it('语音合成：按字数 × 每百万字符价计', async () => {
-    const id = await addModel('audio', 'tts1', { supportsSpeech: true });
+    const id = await addModel('audio', 'tts1');
     await savePrice(id, { audioCharacters: '15' });
     await recordAudioUsage({ ...call, modelId: 'tts1', audioCharacters: 86 });
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.00129, 10);
@@ -380,15 +386,28 @@ describe('额度', () => {
     await expect(assertQuota('u1')).resolves.toBeUndefined();
   });
 
-  it('同时开始的调用，检查时互相看不到对方的费用，都会放行', async () => {
+  it('同时开始的调用都在记账前检查，互相看不到对方的费用：都会放行，合计超出上限', async () => {
     await giveQuota('3', '20');
     await spent('2.99');
+
+    // Three calls start together; each is checked before any is charged.
     const checks = await Promise.allSettled([
       assertQuota('u1'),
       assertQuota('u1'),
       assertQuota('u1')
     ]);
     expect(checks.every(c => c.status === 'fulfilled')).toBe(true);
+
+    // Each is charged when it finishes, $1 apiece.
+    await spent('1');
+    await spent('1');
+    await spent('1');
+
+    expect((await getUserUsageWindows('u1')).fiveHour.used).toBeCloseTo(
+      5.99,
+      10
+    );
+    await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaExceededError);
   });
 
   it('5 小时额度和每周额度分别检查，任一达到上限就拒绝', async () => {
