@@ -1,6 +1,7 @@
 {
   "name": "chats.is",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "engines": {
     "node": ">=22.9"

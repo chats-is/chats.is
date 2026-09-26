@@ -163,3 +163,15 @@ under the same name. Image, video and speech generation are chat tools,
 registered in `server/services/chat-tools.ts`; web search is set up in
 `server/services/web-search.ts`. Tests sit beside their subject as
 `foo.test.ts`.
+
+## License
+
+Copyright (C) 2026 John.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3. It is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; see [LICENSE](LICENSE) for the full text.
+
+Running a modified version as a service for others counts as distribution
+under the AGPL: the modified source must be offered to those users.
