@@ -5,11 +5,18 @@ import {
   ArrowDown,
   ArrowUp,
   CircleCheck,
+  Eye,
+  Film,
+  Globe,
   Image as ImageIcon,
+  Lightbulb,
   Loader2,
+  Mic,
   Pencil,
   Plus,
-  Trash2
+  Scissors,
+  Trash2,
+  type LucideIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -19,6 +26,7 @@ import { modelCapabilitySchema } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { isPriced } from '@/lib/pricing-summary';
+import { cn } from '@/lib/utils';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
@@ -245,6 +253,77 @@ const JsonHint = ({ label, example }: { label: string; example: string }) => (
   </div>
 );
 
+/**
+ * What a model can do beyond its capability, as its switches say — the ones
+ * that are on, by name, so the table answers "which models can see images"
+ * without a form being opened for each.
+ */
+/**
+ * Drawn as the chat's model menu draws them — the same icon in the same
+ * tint — so what an admin switches on here is what a user sees there.
+ */
+const FEATURES: Array<{
+  flag: keyof Model;
+  label: string;
+  icon: LucideIcon;
+  /** The tinted square behind the icon, and the icon's own colour. */
+  tint: string;
+  tone: string;
+}> = [
+  {
+    flag: 'supportsVision',
+    label: 'Vision',
+    icon: Eye,
+    tint: 'bg-blue-100 dark:bg-blue-900/30',
+    tone: 'text-blue-600 dark:text-blue-400'
+  },
+  {
+    flag: 'supportsReasoning',
+    label: 'Reasoning',
+    icon: Lightbulb,
+    tint: 'bg-amber-100 dark:bg-amber-900/30',
+    tone: 'text-amber-600 dark:text-amber-400'
+  },
+  {
+    flag: 'supportsWebSearch',
+    label: 'Web search',
+    icon: Globe,
+    tint: 'bg-sky-100 dark:bg-sky-900/30',
+    tone: 'text-sky-600 dark:text-sky-400'
+  },
+  {
+    flag: 'supportsImageEdit',
+    label: 'Image editing',
+    icon: Pencil,
+    tint: 'bg-emerald-100 dark:bg-emerald-900/30',
+    tone: 'text-emerald-600 dark:text-emerald-400'
+  },
+  {
+    flag: 'supportsImageToVideo',
+    label: 'Image to video',
+    icon: Film,
+    tint: 'bg-teal-100 dark:bg-teal-900/30',
+    tone: 'text-teal-600 dark:text-teal-400'
+  },
+  {
+    flag: 'supportsVideoEdit',
+    label: 'Video editing',
+    icon: Scissors,
+    tint: 'bg-violet-100 dark:bg-violet-900/30',
+    tone: 'text-violet-600 dark:text-violet-400'
+  },
+  {
+    flag: 'supportsTranscription',
+    label: 'Transcription',
+    icon: Mic,
+    tint: 'bg-rose-100 dark:bg-rose-900/30',
+    tone: 'text-rose-600 dark:text-rose-400'
+  }
+];
+
+const featuresOf = (model: Model) =>
+  FEATURES.filter(feature => !!model[feature.flag]);
+
 const helper = createAppColumnHelper<Model>();
 
 const modelColumns = (actions: {
@@ -254,6 +333,39 @@ const modelColumns = (actions: {
 }) =>
   helper.columns([
     ...modelIdentityColumns(helper),
+    helper.accessor(
+      row =>
+        featuresOf(row)
+          .map(feature => feature.label)
+          .join(' '),
+      {
+        id: 'features',
+        header: 'Features',
+        meta: { cellClassName: 'whitespace-nowrap' },
+        cell: ({ row }) => {
+          const features = featuresOf(row.original);
+          return features.length > 0 ? (
+            <div className="flex items-center gap-1">
+              {features.map(feature => (
+                <Tooltip key={feature.flag}>
+                  <TooltipTrigger asChild>
+                    <span className={cn('rounded p-0.5', feature.tint)}>
+                      <feature.icon
+                        className={cn('size-3', feature.tone)}
+                        aria-label={feature.label}
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{feature.label}</TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          );
+        }
+      }
+    ),
     helper.accessor(row => isPriced(row.capability, row.pricing), {
       id: 'pricing',
       header: 'Pricing',
@@ -337,7 +449,7 @@ export function ModelsPending() {
   return (
     <ConsoleTableSkeleton
       columns={modelColumns({ toggle: noop, edit: noop, remove: noop })}
-      filters={1}
+      filters={2}
     />
   );
 }
@@ -346,6 +458,7 @@ export default function ModelsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [filterPriced, setFilterPriced] = useSearchFilter('priced', 'all');
   const [filterCapability, setFilterCapability] = useSearchFilter(
     'capability',
     'all'
@@ -356,7 +469,12 @@ export default function ModelsPage() {
   const queryClient = useQueryClient();
   const { data, isLoading, isPlaceholderData } = useQuery(
     modelQueries.list(
-      modelTableInput({ capability: filterCapability, q: search, page })
+      modelTableInput({
+        capability: filterCapability,
+        priced: filterPriced,
+        q: search,
+        page
+      })
     )
   );
   const { data: providers } = useQuery(providerQueries.forSelect());
@@ -564,6 +682,16 @@ export default function ModelsPage() {
                   {cap.label}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterPriced} onValueChange={setFilterPriced}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Models</SelectItem>
+              <SelectItem value="priced">Priced</SelectItem>
+              <SelectItem value="unpriced">Unpriced</SelectItem>
             </SelectContent>
           </Select>
         </ConsoleFilters>

@@ -186,8 +186,9 @@ const pricingColumns = (actions: {
     helper.display({
       id: 'pricing',
       header: 'Pricing',
+      // The one column left to take up the width, so the identity columns
+      // keep theirs and match the models table's.
       meta: {
-        headClassName: 'w-92',
         cellClassName: 'font-mono text-[11px] text-muted-foreground'
       },
       cell: ({ row }) => {
@@ -198,10 +199,15 @@ const pricingColumns = (actions: {
         if (rows.length === 0) return <UnpricedBadge />;
         return (
           <div className="space-y-0.5">
+            {/* A rate stays whole, and the row of them wraps: the column
+                takes what the held ones leave, which is not always a whole
+                line of rates. */}
             {rows.map(group => (
-              <div key={group[0]} className="flex gap-x-2 whitespace-nowrap">
+              <div key={group[0]} className="flex flex-wrap gap-x-2">
                 {group.map(line => (
-                  <span key={line}>{line}</span>
+                  <span key={line} className="whitespace-nowrap">
+                    {line}
+                  </span>
                 ))}
               </div>
             ))}
@@ -364,7 +370,7 @@ export function PricingPending() {
   return (
     <ConsoleTableSkeleton
       columns={pricingColumns({ edit: noop, remove: noop, sync: noop })}
-      filters={1}
+      filters={2}
     />
   );
 }
@@ -375,6 +381,7 @@ export default function PricingPage() {
     'capability',
     'all'
   );
+  const [filterPriced, setFilterPriced] = useSearchFilter('priced', 'all');
   const [search, setSearch] = useSearchFilter('q', '');
   const [edit, setEdit] = useState<EditTarget | null>(null);
 
@@ -389,7 +396,12 @@ export default function PricingPage() {
 
   const { data, isLoading, isPlaceholderData } = useQuery(
     pricingQueries.listWithModels(
-      pricingTableInput({ capability: filterCapability, q: search, page })
+      pricingTableInput({
+        capability: filterCapability,
+        priced: filterPriced,
+        q: search,
+        page
+      })
     )
   );
 
@@ -715,6 +727,16 @@ export default function PricingPage() {
                   {cap.label}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterPriced} onValueChange={setFilterPriced}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Models</SelectItem>
+              <SelectItem value="priced">Priced</SelectItem>
+              <SelectItem value="unpriced">Unpriced</SelectItem>
             </SelectContent>
           </Select>
         </ConsoleFilters>

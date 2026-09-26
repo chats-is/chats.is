@@ -34,7 +34,9 @@ export function modelIdentityColumns<T extends ModelLike>(
     helper.display({
       id: 'icon',
       header: '',
-      meta: { align: 'center', headClassName: 'w-16' },
+      // Held, not just asked for: the table lays itself out by content, and
+      // would take a few pixels from this column when the others run wide.
+      meta: { align: 'center', headClassName: 'w-16 min-w-16' },
       cell: ({ row }) =>
         row.original.image ? (
           <ModelIcon
@@ -48,7 +50,10 @@ export function modelIdentityColumns<T extends ModelLike>(
     helper.display({
       id: 'name',
       header: 'Model',
-      meta: { headClassName: 'w-80' },
+      // Held, so the models and the pricing tables line up: the two share
+      // these columns, and a reader moving between them should find the
+      // model in the same place.
+      meta: { headClassName: 'w-72 min-w-72' },
       cell: ({ row }) => (
         <>
           <div className="flex items-center gap-2">
@@ -64,7 +69,7 @@ export function modelIdentityColumns<T extends ModelLike>(
     helper.display({
       id: 'provider',
       header: 'Providers',
-      meta: { headClassName: 'w-60', cellClassName: 'text-sm' },
+      meta: { headClassName: 'w-48 min-w-48', cellClassName: 'text-sm' },
       cell: ({ row }) => (
         <ProviderBindings bindings={row.original.providers ?? []} />
       )

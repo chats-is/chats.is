@@ -25,17 +25,28 @@ const termOf = (q: string | undefined) => q?.trim() || undefined;
 const pageOf = (page: number | undefined) => page ?? 1;
 
 type CapabilitySearch = { capability?: string; q?: string; page?: number };
+/** A pricing filter beside the capability one: the models and the pricing
+ *  tables both take it. */
+type PricingSearch = CapabilitySearch & { priced?: string };
+
+/** A priced filter sitting at its default means "every model". */
+const pricedOf = (
+  priced: string | undefined
+): 'priced' | 'unpriced' | undefined =>
+  priced === 'priced' || priced === 'unpriced' ? priced : undefined;
 type SearchOnly = { q?: string; page?: number };
 type PageOnly = { page?: number };
 
-export const modelTableInput = (search: CapabilitySearch) => ({
+export const modelTableInput = (search: PricingSearch) => ({
   capability: capabilityOf(search.capability),
+  priced: pricedOf(search.priced),
   q: termOf(search.q),
   page: pageOf(search.page)
 });
 
-export const pricingTableInput = (search: CapabilitySearch) => ({
+export const pricingTableInput = (search: PricingSearch) => ({
   capability: capabilityOf(search.capability),
+  priced: pricedOf(search.priced),
   q: termOf(search.q),
   page: pageOf(search.page)
 });

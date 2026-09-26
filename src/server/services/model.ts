@@ -1,6 +1,15 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq, ilike, inArray, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  count,
+  eq,
+  ilike,
+  inArray,
+  notInArray,
+  or,
+  type SQL
+} from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -14,7 +23,7 @@ import { type Candidate } from '@/types/provider';
 import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { modelProviders, models, providers } from '@/db/schema';
+import { modelPricings, modelProviders, models, providers } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 type Provider = typeof providers.$inferSelect;
@@ -131,8 +140,17 @@ function boundTo(condition: SQL | undefined) {
 export async function listModels(filter: z.infer<typeof modelListSchema>) {
   const search = filter.q?.trim();
   const term = search ? `%${search}%` : null;
+  // A price is a row of its own, so having one is being named by that table.
+  const pricedModelIds = db
+    .select({ modelId: modelPricings.modelId })
+    .from(modelPricings);
   const where = and(
     filter.capability ? eq(models.capability, filter.capability) : undefined,
+    filter.priced === 'priced'
+      ? inArray(models.modelId, pricedModelIds)
+      : filter.priced === 'unpriced'
+        ? notInArray(models.modelId, pricedModelIds)
+        : undefined,
     term
       ? or(
           ilike(models.name, term),

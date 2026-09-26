@@ -5,6 +5,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 type Filters = {
   q: string;
   capability: string;
+  priced: string;
   model: string;
   user: string;
   days: number;

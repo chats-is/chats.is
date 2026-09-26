@@ -92,6 +92,8 @@ const priceNumberSchema = z
  *  narrowed, then cut to one page. */
 export const pricingListSchema = z.object({
   capability: modelCapabilitySchema.optional(),
+  /** Only the models with a price, or only those without one. */
+  priced: z.enum(['priced', 'unpriced']).optional(),
   /** Matches a model's name, its model id, or its provider's name. */
   q: z.string().optional(),
   ...paginationSchema.shape

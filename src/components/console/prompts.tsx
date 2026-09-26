@@ -120,7 +120,7 @@ const promptColumns = (ctx: {
     helper.display({
       id: 'image',
       header: '',
-      meta: { align: 'center', headClassName: 'w-16' },
+      meta: { align: 'center', headClassName: 'w-16 min-w-16' },
       cell: ({ row }) =>
         row.original.image ? (
           <img

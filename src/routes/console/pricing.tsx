@@ -12,6 +12,7 @@ import { pricingTableInput } from '@/components/console/table-filters';
  *  absent, which keeps an unfiltered page's URL clean. */
 const searchSchema = z.object({
   capability: z.string().optional(),
+  priced: z.string().optional(),
   q: z.string().optional(),
   page: pageSearchSchema
 });

@@ -188,6 +188,8 @@ const modelAPIParamsSchema = z
 /** The console's model table: narrowed, then cut to one page. */
 export const modelListSchema = z.object({
   capability: modelCapabilitySchema.optional(),
+  /** Only the models with a price, or only those without one. */
+  priced: z.enum(['priced', 'unpriced']).optional(),
   /** Matches a model's name, its model id, or the name of a provider it is
    *  bound to. */
   q: z.string().optional(),

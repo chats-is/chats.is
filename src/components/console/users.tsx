@@ -79,9 +79,6 @@ const userColumns = (ctx: {
     helper.display({
       id: 'avatar',
       header: '',
-      // Held at the width the other console tables give their icon column:
-      // this table is wide enough that the browser would otherwise take a
-      // pixel from it.
       meta: { align: 'center', headClassName: 'w-16 min-w-16' },
       cell: ({ row }) => {
         const user = row.original;
