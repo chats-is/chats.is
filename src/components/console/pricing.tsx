@@ -60,6 +60,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { useAppForm } from '@/components/app-form';
 import {
   createAppColumnHelper,
@@ -173,6 +178,8 @@ const helper = createAppColumnHelper<PricingRow>();
 const pricingColumns = (actions: {
   edit: (row: PricingRow) => void;
   remove: (row: PricingRow) => void;
+  /** Fetch this one model's prices from the sources chosen, to pick from. */
+  sync: (row: PricingRow, sources: PricingSource[]) => void;
 }) =>
   helper.columns([
     ...modelIdentityColumns(helper),
@@ -216,11 +223,14 @@ const pricingColumns = (actions: {
       header: 'Actions',
       meta: {
         align: 'right',
-        headClassName: 'w-24',
+        headClassName: 'w-32',
         cellClassName: 'whitespace-nowrap'
       },
       cell: ({ row }) => (
         <>
+          <RowSyncButton
+            onPreview={sources => actions.sync(row.original, sources)}
+          />
           <Button
             variant="ghost"
             size="sm"
@@ -243,6 +253,99 @@ const pricingColumns = (actions: {
     })
   ]);
 
+/**
+ * Which sources to fetch, then Preview. The same question at the top of the
+ * page and on a row: the top asks it of the whole catalogue, the row of one
+ * model.
+ */
+function SourcePicker({
+  selected,
+  onToggle,
+  onCancel,
+  onPreview
+}: {
+  selected: PricingSource[];
+  onToggle: (source: PricingSource, on: boolean) => void;
+  onCancel: () => void;
+  onPreview: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm">Choose sources to sync</Label>
+      <div className="space-y-2">
+        {ALL_SOURCES.map(src => (
+          <label
+            key={src}
+            className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-muted/50"
+          >
+            <Checkbox
+              checked={selected.includes(src)}
+              onCheckedChange={c => onToggle(src, c === true)}
+            />
+            <span className="font-mono text-sm">{src}</span>
+          </label>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2 border-t pt-3">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          disabled={selected.length === 0}
+          onClick={onPreview}
+        >
+          Preview
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** A row's sync button: asks which sources, then hands them up. Its choice
+ *  is its own, so it holds it — the columns are built once. */
+function RowSyncButton({
+  onPreview
+}: {
+  onPreview: (sources: PricingSource[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<PricingSource[]>(ALL_SOURCES);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <RefreshCw className="size-4" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Sync from a source</TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" className="w-64">
+        <SourcePicker
+          selected={selected}
+          onToggle={(source, on) =>
+            setSelected(prev =>
+              on
+                ? Array.from(new Set([...prev, source]))
+                : prev.filter(s => s !== source)
+            )
+          }
+          onCancel={() => setOpen(false)}
+          onPreview={() => {
+            setOpen(false);
+            onPreview(selected);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** Stands in for the row actions, which a placeholder row can never call. */
 const noop = () => {};
 
@@ -260,7 +363,7 @@ const noop = () => {};
 export function PricingPending() {
   return (
     <ConsoleTableSkeleton
-      columns={pricingColumns({ edit: noop, remove: noop })}
+      columns={pricingColumns({ edit: noop, remove: noop, sync: noop })}
       filters={1}
     />
   );
@@ -412,8 +515,79 @@ export default function PricingPage() {
     if (fresh) fill(fresh);
   };
 
+  /**
+   * Fetch the sources and open the preview. For the whole catalogue, from
+   * the sources the admin ticked; for one model, from every source, so the
+   * preview is the choice.
+   */
+  const compare = async (only?: {
+    sources: PricingSource[];
+    modelDbId: string;
+  }) => {
+    const sources = only ? only.sources : [...selectedSources];
+    if (sources.length === 0) return;
+    setPopoverOpen(false);
+    // The window first, then what goes in it: the fetch takes a moment, and
+    // a click that shows nothing until it is over reads as a click that did
+    // nothing.
+    setPreviewSources(sources);
+    setPreviewRows([]);
+    setPicks(new Map());
+    setPreviewSearch('');
+    setPreviewOpen(true);
+    try {
+      const results = await Promise.all(
+        sources.map(src => {
+          const m = src === 'models.dev' ? previewMd : previewLm;
+          return m
+            .mutateAsync({
+              source: src,
+              ...(only && { modelDbIds: [only.modelDbId] })
+            })
+            .then(rows => ({ source: src, rows }));
+        })
+      );
+      // Merge by model *and* provider: the two catalogues return the same
+      // lines, and a model with two providers has two of them.
+      const merged = new Map<string, PreviewRow>();
+      for (const { source, rows } of results) {
+        for (const r of rows) {
+          const key = `${r.modelDbId}:${r.providerType ?? ''}`;
+          const entry = merged.get(key) ?? {
+            key,
+            modelDbId: r.modelDbId,
+            modelId: r.modelId,
+            modelName: r.modelName,
+            providerType: r.providerType,
+            providerName: r.providerName,
+            current: r.current,
+            sources: {
+              'models.dev': { matched: false, remote: null },
+              'llm-metadata': { matched: false, remote: null }
+            }
+          };
+          entry.sources[source] = { matched: r.matched, remote: r.remote };
+          // Keep latest current (they should be the same).
+          entry.current = r.current;
+          merged.set(key, entry);
+        }
+      }
+      setPreviewRows(Array.from(merged.values()));
+    } catch (err) {
+      setPreviewOpen(false);
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to load remote prices'
+      );
+    }
+  };
+
   const columns = useMemo(
-    () => pricingColumns({ edit: openEdit, remove: setRemoving }),
+    () =>
+      pricingColumns({
+        edit: openEdit,
+        remove: setRemoving,
+        sync: (row, sources) => compare({ sources, modelDbId: row.id })
+      }),
     []
   );
 
@@ -464,56 +638,6 @@ export default function PricingPage() {
       if (on) return Array.from(new Set([...prev, src]));
       return prev.filter(s => s !== src);
     });
-  };
-
-  const compare = async () => {
-    if (selectedSources.length === 0) return;
-    const sources = [...selectedSources];
-    setPopoverOpen(false);
-    try {
-      const results = await Promise.all(
-        sources.map(src => {
-          const m = src === 'models.dev' ? previewMd : previewLm;
-          return m
-            .mutateAsync({ source: src })
-            .then(rows => ({ source: src, rows }));
-        })
-      );
-      // Merge by model *and* provider: the two catalogues return the same
-      // lines, and a model with two providers has two of them.
-      const merged = new Map<string, PreviewRow>();
-      for (const { source, rows } of results) {
-        for (const r of rows) {
-          const key = `${r.modelDbId}:${r.providerType ?? ''}`;
-          const entry = merged.get(key) ?? {
-            key,
-            modelDbId: r.modelDbId,
-            modelId: r.modelId,
-            modelName: r.modelName,
-            providerType: r.providerType,
-            providerName: r.providerName,
-            current: r.current,
-            sources: {
-              'models.dev': { matched: false, remote: null },
-              'llm-metadata': { matched: false, remote: null }
-            }
-          };
-          entry.sources[source] = { matched: r.matched, remote: r.remote };
-          // Keep latest current (they should be the same).
-          entry.current = r.current;
-          merged.set(key, entry);
-        }
-      }
-      setPreviewSources(sources);
-      setPreviewRows(Array.from(merged.values()));
-      setPicks(new Map());
-      setPreviewSearch('');
-      setPreviewOpen(true);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to load remote prices'
-      );
-    }
   };
 
   // For 1-source mode, a row is "picked" when picks has it set to the lone source.
@@ -600,53 +724,20 @@ export default function PricingPage() {
             <Button
               type="button"
               className="gap-2"
-              disabled={previewLoading || syncMutation.isPending}
+              disabled={syncMutation.isPending}
             >
-              {previewLoading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
+              <RefreshCw className="size-4" />
               Sync prices
               <ChevronDown className="size-3 opacity-70" />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64">
-            <div className="space-y-3">
-              <Label className="text-sm">Choose sources to sync</Label>
-              <div className="space-y-2">
-                {ALL_SOURCES.map(src => (
-                  <label
-                    key={src}
-                    className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-muted/50"
-                  >
-                    <Checkbox
-                      checked={selectedSources.includes(src)}
-                      onCheckedChange={c => toggleSource(src, c === true)}
-                    />
-                    <span className="font-mono text-sm">{src}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex justify-end gap-2 border-t pt-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPopoverOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={selectedSources.length === 0}
-                  onClick={compare}
-                >
-                  Preview
-                </Button>
-              </div>
-            </div>
+            <SourcePicker
+              selected={selectedSources}
+              onToggle={toggleSource}
+              onCancel={() => setPopoverOpen(false)}
+              onPreview={() => compare()}
+            />
           </PopoverContent>
         </Popover>
       </ConsoleToolbar>
@@ -851,7 +942,8 @@ export default function PricingPage() {
         setSearch={setPreviewSearch}
         picks={picks}
         setPicks={setPicks}
-        applyDisabled={applyDisabled}
+        loading={previewLoading}
+        applyDisabled={applyDisabled || previewLoading}
         applyPending={syncMutation.isPending}
         onApply={apply}
       />
@@ -903,6 +995,7 @@ function PreviewDialog({
   setSearch,
   picks,
   setPicks,
+  loading,
   applyDisabled,
   applyPending,
   onApply
@@ -911,6 +1004,8 @@ function PreviewDialog({
   onOpenChange: (open: boolean) => void;
   sources: PricingSource[];
   rows: PreviewRow[];
+  /** The sources are still being fetched; the rows are on their way. */
+  loading: boolean;
   search: string;
   setSearch: (v: string) => void;
   picks: Map<string, PricingSource>;
@@ -1183,9 +1278,16 @@ function PreviewDialog({
                       colSpan={1 + 2 + sources.length * 4}
                       className="p-6 text-center text-muted-foreground"
                     >
-                      {rows.length === 0
-                        ? 'Nothing to preview.'
-                        : 'No models match your search.'}
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="size-4 animate-spin" />
+                          Loading prices…
+                        </span>
+                      ) : rows.length === 0 ? (
+                        'Nothing to preview.'
+                      ) : (
+                        'No models match your search.'
+                      )}
                     </td>
                   </tr>
                 )}
