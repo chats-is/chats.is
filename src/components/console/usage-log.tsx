@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { ExternalLink } from 'lucide-react';
 
-import { describeMultiplier, effectiveMultiplier } from '@/lib/billing';
+import { effectiveMultiplier } from '@/lib/billing';
 import { usageBreakdown, usageSummary } from '@/lib/usage-breakdown';
 import { cn, formatUsd } from '@/lib/utils';
 import { type adminUsageLog } from '@/server/functions/usage';
@@ -44,7 +44,9 @@ export const usageLogColumns = ({
       header: 'Model',
       meta: { headClassName: 'w-96' },
       // One line: the model asked for — a filter, where the page has one — the id the provider was actually asked
-      // for when routed, and what kind of call it was.
+      // for when routed, what kind of call it was, and the tier its prices
+      // are at. A tier since deleted is named by its multiplier, which the
+      // row kept.
       cell: ({ row }) => (
         <div className="flex items-center gap-2 font-mono text-xs whitespace-nowrap">
           {onModelClick && row.original.modelId ? (
@@ -68,6 +70,11 @@ export const usageLogColumns = ({
           <Badge variant="secondary" className="font-sans">
             {row.original.capability}
           </Badge>
+          {tierLabel(row.original) && (
+            <Badge variant="secondary" className="font-sans">
+              {tierLabel(row.original)}
+            </Badge>
+          )}
         </div>
       )
     }),
@@ -96,6 +103,14 @@ export const usageLogColumns = ({
       cell: ({ row }) => formatUsd(row.original.cost)
     })
   ]);
+
+/** The tier a row's prices are at, as a badge: "Tier2 ×1.5". A tier since
+ *  deleted is named by its multiplier alone; no tier, nothing. */
+function tierLabel(row: UsageLogRow): string | null {
+  const multiplier = effectiveMultiplier(row.priceMultiplier);
+  if (row.tierName) return `${row.tierName} ×${multiplier}`;
+  return multiplier !== 1 ? `×${multiplier}` : null;
+}
 
 const userColumn = helper.accessor('userName', {
   header: 'User',
@@ -136,20 +151,11 @@ export function UsageItems({
 }) {
   const items = usageBreakdown(row);
   const cell = 'px-2 py-1.5 text-xs';
-  // Who served the call, and the tier its prices are at — its name and its
-  // multiplier as it then stood. A tier since deleted keeps the multiplier.
-  const multiplier = effectiveMultiplier(row.priceMultiplier);
-  const tier = row.tierName
-    ? `${row.tierName} × ${multiplier}`
-    : multiplier !== 1
-      ? describeMultiplier(row.priceMultiplier)
-      : null;
   const provider = (
     <TableCell
       className={cn(cell, 'text-muted-foreground', !withUser && 'pl-8')}
     >
       via {row.providerName ?? 'an unknown provider'}
-      {tier && ` · ${tier}`}
     </TableCell>
   );
   // The cells before the item's own: time, then user when there is one.
