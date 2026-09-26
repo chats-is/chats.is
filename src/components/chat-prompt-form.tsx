@@ -7,6 +7,7 @@ import Textarea from 'react-textarea-autosize';
 
 import { type Attachment, type ChatMessage } from '@/types';
 import { modelMatchesId } from '@/lib/utils';
+import { canSearchWeb } from '@/lib/web-search';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { Button } from '@/components/ui/button';
 import { AddFilesMenu } from '@/components/add-files-menu';
@@ -54,7 +55,7 @@ export function ChatPromptForm({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
-  const { chatModels, imageModels, videoModels, sttModels } =
+  const { chatModels, imageModels, videoModels, sttModels, webSearch } =
     useSystemSettings();
   const { preferences } = usePreferences();
 
@@ -96,6 +97,24 @@ export function ChatPromptForm({
   const canAttachAudio = toolsOn && !!sttModels?.length;
   const canAttachVideo =
     toolsOn && !!videoModels?.some(model => model.supportsVideoEdit);
+
+  // Whether this model can search at all — the server's own rule, so the
+  // switch is offered exactly when ticking it would do something.
+  const selectedModel = chatModels?.find(model =>
+    modelMatchesId(model, modelId)
+  );
+  const canSearch =
+    !!selectedModel &&
+    canSearchWeb({
+      ...webSearch,
+      model: {
+        modelId: selectedModel.modelId,
+        supportsWebSearch: selectedModel.supportsWebSearch,
+        providerTypes: (selectedModel.providers ?? [])
+          .filter(binding => binding.isEnabled && binding.provider?.isEnabled)
+          .map(binding => binding.provider!.type)
+      }
+    });
 
   // An attachment taken under other settings — another model, the media
   // tools on — still goes with the message. For each kind nothing can now use,
@@ -205,6 +224,7 @@ export function ChatPromptForm({
               canAttachImages={canAttachImages}
               canAttachAudio={canAttachAudio}
               canAttachVideo={canAttachVideo}
+              canSearchWeb={canSearch}
               uploads={uploads}
               setUploads={setUploads}
               attachments={attachments}

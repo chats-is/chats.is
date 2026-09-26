@@ -1,3 +1,5 @@
+import { type WebSearchMode } from '@/lib/web-search';
+
 import { type Model } from './model';
 
 export interface SystemDefaults {
@@ -19,4 +21,7 @@ export interface SystemSettings {
   ttsModels: Model[];
   sttModels: Model[];
   defaults: SystemDefaults;
+  /** How a chat searches, and the search model when one is set and can
+   *  answer — enough for the page to know whether to offer the switch. */
+  webSearch: { mode: WebSearchMode; searchModelId: string | null };
 }

@@ -16,7 +16,7 @@ import {
   resolveModelId,
   runWithProviderFailover
 } from '@/lib/provider';
-import { hasOwnWebSearch } from '@/lib/web-search';
+import { canSearchWeb, searchesForItself } from '@/lib/web-search';
 import { preflightCheck } from '@/server/services/preflight';
 import { getWebSearchSettings } from '@/server/services/settings';
 import { recordChatUsage } from '@/server/services/usage';
@@ -87,10 +87,10 @@ export async function setupWebSearch(args: {
 
   const searchable =
     searchModel && searchModel.candidates.length > 0 ? searchModel : null;
-  // The search model searching for itself is a pointless round trip: it
-  // searches on its own instead.
-  const selfServes =
-    !!searchable && searchable.dbModel.modelId === chatModel.modelId;
+  const rule = {
+    mode,
+    searchModelId: searchable?.dbModel.modelId ?? null
+  };
 
   let searches = 0;
 
@@ -200,12 +200,13 @@ export async function setupWebSearch(args: {
       }
     : null;
 
-  // Beside the artifact and media tools, so only a provider whose search can
-  // run beside function tools qualifies.
+  // Whether this provider's own search serves: the shared rule, asked of
+  // the one provider the stream is being handed to.
   const ownSearch = (candidate: Candidate) =>
-    (mode === 'auto' || selfServes) &&
-    !!chatModel.supportsWebSearch &&
-    hasOwnWebSearch(candidate.type, { alone: false });
+    searchesForItself({
+      ...rule,
+      model: { ...chatModel, providerTypes: [candidate.type] }
+    });
 
   const toolsFor = (candidate: Candidate): ToolSet =>
     (ownSearch(candidate)
@@ -216,8 +217,16 @@ export async function setupWebSearch(args: {
 
   // Which provider ends up serving the model is not known yet; the guidance
   // is given when any of them could search, and a model that then gets no
-  // tool has none to be tempted by.
-  if (!delegate && !candidates.some(ownSearch)) return nothing;
+  // tool has none to be tempted by. The same question the page asks before
+  // offering the switch.
+  const can = canSearchWeb({
+    ...rule,
+    model: {
+      ...chatModel,
+      providerTypes: candidates.map(candidate => candidate.type)
+    }
+  });
+  if (!can) return nothing;
 
   return { toolsFor, systemPrompt: WEB_SEARCH_GUIDANCE };
 }

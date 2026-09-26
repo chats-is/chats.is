@@ -227,7 +227,7 @@ function toClientModel(model: Model): Model {
 }
 
 export async function getSystemSettings() {
-  const [models, values] = await Promise.all([
+  const [models, values, webSearch] = await Promise.all([
     getAllModels(),
     getSettings([
       'speech.enabled',
@@ -239,7 +239,8 @@ export async function getSystemSettings() {
       'default.video.editModelId',
       'default.tts.modelId',
       'default.stt.modelId'
-    ])
+    ]),
+    getWebSearchSettings()
   ]);
   const allModels = models.map(toClientModel);
 
@@ -263,6 +264,13 @@ export async function getSystemSettings() {
       videoEditModelId: values['default.video.editModelId'],
       ttsModelId: values['default.tts.modelId'],
       sttModelId: values['default.stt.modelId']
+    },
+    webSearch: {
+      mode: webSearch.mode,
+      searchModelId:
+        webSearch.searchModel && webSearch.searchModel.candidates.length > 0
+          ? webSearch.searchModel.dbModel.modelId
+          : null
     }
   };
 }

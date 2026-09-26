@@ -46,6 +46,9 @@ interface AddFilesMenuProps {
   canAttachAudio: boolean;
   /** A video can be taken: a model edits it. */
   canAttachVideo: boolean;
+  /** Whether a search could happen on the current model; the switch is
+   *  offered only then. */
+  canSearchWeb: boolean;
   uploads: PendingUpload[];
   setUploads: Dispatch<SetStateAction<Array<PendingUpload>>>;
   attachments: Attachment[];
@@ -69,6 +72,7 @@ export function AddFilesMenu({
   canAttachImages,
   canAttachAudio,
   canAttachVideo,
+  canSearchWeb,
   uploads,
   setUploads,
   attachments,
@@ -275,24 +279,39 @@ export function AddFilesMenu({
               Take a screenshot
             </DropdownMenuItem>
           )}
-          {(canUpload || canScreenshot) && <DropdownMenuSeparator />}
+          {(canUpload || canScreenshot) && canSearchWeb && (
+            <DropdownMenuSeparator />
+          )}
+          {/* The button stays whatever the model can take, so the menu
+              says so rather than opening empty. */}
+          {!canUpload && !canScreenshot && !canSearchWeb && (
+            <DropdownMenuItem disabled>
+              Nothing to add for this model
+            </DropdownMenuItem>
+          )}
           {/* A setting, chosen like an action: one pick, and the menu
               closes. Its icon sits where the other items' do, and the check
-              at the right, where a setting's state is read. */}
-          <DropdownMenuItem
-            role="menuitemcheckbox"
-            aria-checked={preferences.webSearch}
-            onSelect={() => setPreference('webSearch', !preferences.webSearch)}
-          >
-            <Globe className="size-4" />
-            Web search
-            <Check
-              className={cn(
-                'ml-auto size-4',
-                !preferences.webSearch && 'invisible'
-              )}
-            />
-          </DropdownMenuItem>
+              at the right, where a setting's state is read. Offered only
+              when a search could happen: a switch that does nothing is worse
+              than none. */}
+          {canSearchWeb && (
+            <DropdownMenuItem
+              role="menuitemcheckbox"
+              aria-checked={preferences.webSearch}
+              onSelect={() =>
+                setPreference('webSearch', !preferences.webSearch)
+              }
+            >
+              <Globe className="size-4" />
+              Web search
+              <Check
+                className={cn(
+                  'ml-auto size-4',
+                  !preferences.webSearch && 'invisible'
+                )}
+              />
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>
