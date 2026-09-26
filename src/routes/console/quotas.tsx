@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
-import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import Quotas, { QuotasPending } from '@/components/console/quotas';
 import { quotaTableInput } from '@/components/console/table-filters';
@@ -29,7 +28,6 @@ export const Route = createFileRoute('/console/quotas')({
    * know them.
    */
   loader: ({ context }) => {
-    void context.queryClient.prefetchQuery(modelQueries.forSelect());
     return context.queryClient.ensureQueryData(
       quotaQueries.list(quotaTableInput({}))
     );

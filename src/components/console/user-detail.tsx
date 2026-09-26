@@ -1,13 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Link, useCanGoBack, useRouter } from '@tanstack/react-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
+import { type UserTier } from '@/types';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { describeMultiplier } from '@/lib/billing';
 import { CAPABILITIES } from '@/lib/constant';
+import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { quotaQueries } from '@/server/functions/quota';
+import { setUserTier, tierQueries } from '@/server/functions/tier';
 import { usageQueries } from '@/server/functions/usage';
 import { userQueries } from '@/server/functions/user';
 import { Badge } from '@/components/ui/badge';
@@ -166,6 +171,12 @@ export default function UserDetail({ userId }: { userId: string }) {
                     <span>·</span>
                   </>
                 )}
+                <span>
+                  {user.effectiveTier.tier
+                    ? `${user.effectiveTier.tier.name} (${describeMultiplier(user.effectiveTier.priceMultiplier)}), ${sourceLabel[user.effectiveTier.source] ?? user.effectiveTier.source}`
+                    : 'No tier'}
+                </span>
+                <span>·</span>
                 <span>{user.chatCount} chats</span>
                 <span>·</span>
                 <span>{user.messageCount} messages</span>
@@ -205,6 +216,11 @@ export default function UserDetail({ userId }: { userId: string }) {
                 Their quota sets no limits.
               </p>
             )}
+            <TierOverride
+              userId={userId}
+              own={user.tierId}
+              inForce={user.effectiveTier}
+            />
           </div>
         </CardContent>
       </Card>
@@ -233,6 +249,78 @@ export default function UserDetail({ userId }: { userId: string }) {
     </div>
   );
 }
+
+/**
+ * The user's own tier, over the plan's and the default's. "Follow the plan"
+ * is the choice of none, and says what then applies.
+ */
+function TierOverride({
+  userId,
+  own,
+  inForce
+}: {
+  userId: string;
+  own: string | null;
+  inForce: UserTier;
+}) {
+  const queryClient = useQueryClient();
+  const { data: tierOptions } = useQuery(tierQueries.listForSelect());
+
+  const save = useMutation({
+    mutationFn: mutating(setUserTier),
+    onSuccess: () => {
+      toast.success('Tier saved');
+      return queryClient.invalidateQueries({
+        queryKey: userQueries.detail({ id: userId }).queryKey
+      });
+    },
+    onError: e => toast.error(e.message)
+  });
+
+  // What applies with none of their own — the plan's or the default — so the
+  // choice of none is not a blank.
+  const followed =
+    inForce.source === 'override' || inForce.source === 'none'
+      ? 'No tier'
+      : `${inForce.tier?.name} (${describeMultiplier(inForce.priceMultiplier)}), ${sourceLabel[inForce.source]}`;
+
+  return (
+    <div className="space-y-2 border-t pt-4">
+      <div className="flex items-baseline justify-between gap-4 text-sm">
+        <span className="font-medium">Tier</span>
+        <span className="text-xs text-muted-foreground">
+          {own ? 'set on the user' : followed}
+        </span>
+      </div>
+      <Select
+        value={own ?? NO_TIER}
+        disabled={save.isPending || !tierOptions}
+        onValueChange={value =>
+          save.mutate({ id: userId, tierId: value === NO_TIER ? null : value })
+        }
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NO_TIER}>
+            {inForce.source === 'override' || inForce.source === 'none'
+              ? 'Follow the plan'
+              : `Follow the plan — ${followed}`}
+          </SelectItem>
+          {tierOptions?.map(tier => (
+            <SelectItem key={tier.id} value={tier.id}>
+              {tier.name} — {describeMultiplier(tier.priceMultiplier)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/** The select's value for a user on no tier of their own. */
+const NO_TIER = '__none__';
 
 /**
  * One window of the user's limits: its name and when it resets, over a bar of

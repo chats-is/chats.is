@@ -46,7 +46,7 @@ export function LimitsSkeleton() {
 
 /**
  * Skeleton placeholder mirroring `UsageModule`'s layout (KPI cards + chart),
- * shown while usage data loads. `isAdmin` adds the cost tile and chart.
+ * shown while usage data loads. `isAdmin` adds the spend tile and chart.
  */
 export function UsageModuleSkeleton({
   isAdmin = false
@@ -57,10 +57,10 @@ export function UsageModuleSkeleton({
     <div className="space-y-4">
       <div
         className={
-          isAdmin ? 'grid gap-4 md:grid-cols-3' : 'grid gap-4 md:grid-cols-2'
+          isAdmin ? 'grid gap-4 md:grid-cols-4' : 'grid gap-4 md:grid-cols-2'
         }
       >
-        {Array.from({ length: isAdmin ? 3 : 2 }).map((_, i) => (
+        {Array.from({ length: isAdmin ? 4 : 2 }).map((_, i) => (
           <Card key={i} className="py-0">
             <CardContent className="space-y-2 p-4">
               <Skeleton className="h-4 w-16" />
@@ -172,6 +172,7 @@ function bucketByLocalDay(rows: UsageRow[], groupBy: GroupBy): DailyDay[] {
       g = {
         key: groupKey,
         label: groupLabel,
+        spend: '0',
         cost: '0',
         requests: 0,
         inputTokens: 0,
@@ -182,8 +183,11 @@ function bucketByLocalDay(rows: UsageRow[], groupBy: GroupBy): DailyDay[] {
       };
       dayMap.set(groupKey, g);
     }
-    // r.cost is admin-only; user rows have no cost field — fall back to 0.
+    // Money is admin-only; user rows have no such fields — fall back to 0.
+    const rowSpend =
+      'spend' in r && r.spend !== undefined ? Number(r.spend) : 0;
     const rowCost = 'cost' in r && r.cost !== undefined ? Number(r.cost) : 0;
+    g.spend = (Number(g.spend) + rowSpend).toString();
     g.cost = (Number(g.cost) + rowCost).toString();
     g.requests += 1;
     g.inputTokens += Number(r.inputTokens ?? 0);
@@ -245,7 +249,7 @@ type ChartProps = {
 };
 
 /**
- * Daily stacked bar chart with explicit Y-axis (cost ticks) and X-axis (day labels).
+ * Daily stacked bar chart with explicit Y-axis (spend ticks) and X-axis (day labels).
  * Each day's bar is composed of segments colored by group key (model / provider / capability).
  */
 export function DailyStackedChart({
@@ -268,7 +272,7 @@ export function DailyStackedChart({
     const labels = new Map<string, string>();
     for (const d of daily) {
       for (const g of d.groups) {
-        totals.set(g.key, (totals.get(g.key) ?? 0) + Number(g.cost));
+        totals.set(g.key, (totals.get(g.key) ?? 0) + Number(g.spend));
         labels.set(g.key, g.label);
       }
     }
@@ -280,17 +284,17 @@ export function DailyStackedChart({
     return { color: cm, label: labels };
   }, [daily]);
 
-  const maxDailyCost = useMemo(() => {
+  const maxDailySpend = useMemo(() => {
     let max = 0;
     for (const d of continuous) {
-      const sum = d.groups.reduce((s, g) => s + Number(g.cost), 0);
+      const sum = d.groups.reduce((s, g) => s + Number(g.spend), 0);
       if (sum > max) max = sum;
     }
     return max;
   }, [continuous]);
 
   // 5 Y-axis ticks (top → bottom).
-  const yTicks = [1, 0.75, 0.5, 0.25, 0].map(f => maxDailyCost * f);
+  const yTicks = [1, 0.75, 0.5, 0.25, 0].map(f => maxDailySpend * f);
 
   return (
     <Card className="py-0">
@@ -321,11 +325,11 @@ export function DailyStackedChart({
                 <div className="flex h-40 items-end gap-3 border-b border-l">
                   {continuous.map(d => {
                     const dayTotal = d.groups.reduce(
-                      (s, g) => s + Number(g.cost),
+                      (s, g) => s + Number(g.spend),
                       0
                     );
                     const dayPct =
-                      maxDailyCost > 0 ? (dayTotal / maxDailyCost) * 100 : 0;
+                      maxDailySpend > 0 ? (dayTotal / maxDailySpend) * 100 : 0;
 
                     // Empty days render only the column slot — no bar, no hover.
                     if (dayTotal === 0) {
@@ -352,10 +356,12 @@ export function DailyStackedChart({
                             >
                               {d.groups
                                 .slice()
-                                .sort((a, b) => Number(b.cost) - Number(a.cost))
+                                .sort(
+                                  (a, b) => Number(b.spend) - Number(a.spend)
+                                )
                                 .map(g => {
                                   const segPct =
-                                    (Number(g.cost) / dayTotal) * 100;
+                                    (Number(g.spend) / dayTotal) * 100;
                                   return (
                                     <div
                                       key={g.key}
@@ -432,12 +438,12 @@ function DayTooltipContent({
   color: Map<string, string>;
   label: Map<string, string>;
 }) {
-  const dayTotal = day.groups.reduce((s, g) => s + Number(g.cost), 0);
+  const dayTotal = day.groups.reduce((s, g) => s + Number(g.spend), 0);
   // Match the visual bar order: bar uses flex-col-reverse + cost-desc, so the
   // smallest segment sits on top. Tooltip reads top→bottom = small→large.
   const sorted = day.groups
     .slice()
-    .sort((a, b) => Number(a.cost) - Number(b.cost));
+    .sort((a, b) => Number(a.spend) - Number(b.spend));
   return (
     <>
       <div className="flex items-center justify-between border-b pb-1.5 text-sm font-medium">
@@ -458,7 +464,7 @@ function DayTooltipContent({
                 <span className="truncate font-mono font-medium">
                   {label.get(g.key) ?? g.key}
                 </span>
-                <span className="ml-auto font-mono">{formatUsd(g.cost)}</span>
+                <span className="ml-auto font-mono">{formatUsd(g.spend)}</span>
               </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 pl-4 text-[11px]">
                 <dt className="text-muted-foreground">Requests</dt>
@@ -503,17 +509,17 @@ type Props = {
   chartTitle?: string;
 };
 
-/** KPI tiles + (admin only) the by-model daily cost chart.
- *  Auto-detects mode from the presence of `totalCost` in `kpi`. */
+/** KPI tiles + (admin only) the by-model daily spend chart.
+ *  Auto-detects mode from the presence of `totalSpend` in `kpi`. */
 export function UsageModule({
   kpi,
   rows,
   days,
   endDay,
-  chartTitle = 'Daily cost'
+  chartTitle = 'Daily spend'
 }: Props) {
   // User mode strips all cost-related UI. Detected by absence of totalCost.
-  const isAdmin = 'totalCost' in kpi;
+  const isAdmin = 'totalSpend' in kpi;
   // Every token the calls used. The buckets are stored apart — input is the
   // uncached part only, output the text only (see normalizeChatUsage) — so
   // the total is their sum, and matches what the usage log counts per row.
@@ -533,6 +539,7 @@ export function UsageModule({
       endDay
     );
     return daily.map(d => {
+      const spend = d.groups.reduce((sum, g) => sum + Number(g.spend ?? 0), 0);
       const cost = d.groups.reduce((sum, g) => sum + Number(g.cost ?? 0), 0);
       const requests = d.groups.reduce((sum, g) => sum + g.requests, 0);
       const inputTokens = d.groups.reduce((sum, g) => sum + g.inputTokens, 0);
@@ -551,6 +558,7 @@ export function UsageModule({
       );
       return {
         day: d.day,
+        spend,
         cost,
         requests,
         inputTokens,
@@ -573,9 +581,34 @@ export function UsageModule({
     <div className="space-y-4">
       <div
         className={
-          isAdmin ? 'grid gap-4 md:grid-cols-3' : 'grid gap-4 md:grid-cols-2'
+          isAdmin ? 'grid gap-4 md:grid-cols-4' : 'grid gap-4 md:grid-cols-2'
         }
       >
+        {isAdmin && (
+          <Card className="py-0">
+            <CardContent className="p-4">
+              <div className="text-sm font-medium text-muted-foreground">
+                Spend
+              </div>
+              <div className="text-2xl font-bold">
+                {formatUsd(kpi.totalSpend)}
+              </div>
+              <Sparkline
+                color="#3b82f6"
+                points={series.map(s => ({
+                  day: s.day,
+                  value: s.spend,
+                  tooltip: (
+                    <SparkTooltip
+                      day={s.day}
+                      items={[{ label: 'Spend', value: formatUsd(s.spend) }]}
+                    />
+                  )
+                }))}
+              />
+            </CardContent>
+          </Card>
+        )}
         {isAdmin && (
           <Card className="py-0">
             <CardContent className="p-4">
@@ -586,7 +619,7 @@ export function UsageModule({
                 {formatUsd(kpi.totalCost)}
               </div>
               <Sparkline
-                color="#3b82f6"
+                color="#64748b"
                 points={series.map(s => ({
                   day: s.day,
                   value: s.cost,

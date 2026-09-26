@@ -11,7 +11,7 @@ import {
 } from '@/types/plan';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { plans, quotas, users } from '@/db/schema';
+import { plans, quotas, tiers, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 /**
@@ -41,7 +41,7 @@ export async function listPlans(page: z.infer<typeof planListSchema>) {
       ...pageWindow(page),
       // `id` last so the order is total, which offset paging depends on.
       orderBy: (p, { asc }) => [asc(p.displayOrder), asc(p.name), asc(p.id)],
-      with: { quota: true }
+      with: { quota: true, tier: true }
     }),
     db.select({ count: count() }).from(plans),
     // Counted across every plan, not just this page: one grouped scan is
@@ -61,6 +61,14 @@ export async function listPlans(page: z.infer<typeof planListSchema>) {
   };
 }
 
+/** A tier is optional, but one that is named has to exist. */
+async function requireTierExists(tierId: string) {
+  const tier = await db.query.tiers.findFirst({
+    where: eq(tiers.id, tierId)
+  });
+  if (!tier) throw new PublicError('Tier not found');
+}
+
 /** A plan without a quota behind it means nothing, so both writes check the
  *  quota exists before they commit. */
 async function requireQuotaExists(quotaId: string) {
@@ -73,12 +81,14 @@ async function requireQuotaExists(quotaId: string) {
 export async function createPlan(input: z.infer<typeof planCreateSchema>) {
   const id = generateUUID();
   await requireQuotaExists(input.quotaId);
+  if (input.tierId) await requireTierExists(input.tierId);
 
   await db.insert(plans).values({
     id,
     name: input.name,
     description: input.description ?? null,
     quotaId: input.quotaId,
+    tierId: input.tierId ?? null,
     displayOrder: input.displayOrder
   });
 
@@ -89,7 +99,7 @@ export async function createPlan(input: z.infer<typeof planCreateSchema>) {
 export async function getPlan(id: string) {
   return await db.query.plans.findFirst({
     where: eq(plans.id, id),
-    with: { quota: true }
+    with: { quota: true, tier: true }
   });
 }
 
@@ -102,6 +112,10 @@ export async function updatePlan(input: z.infer<typeof planUpdateSchema>) {
   if (updates.quotaId !== undefined) {
     await requireQuotaExists(updates.quotaId);
     patch.quotaId = updates.quotaId;
+  }
+  if (updates.tierId !== undefined) {
+    if (updates.tierId) await requireTierExists(updates.tierId);
+    patch.tierId = updates.tierId ?? null;
   }
   if (updates.displayOrder !== undefined)
     patch.displayOrder = updates.displayOrder;

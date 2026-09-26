@@ -9,12 +9,14 @@ import {
   type RecordImageUsageInput,
   type RecordTranscriptionUsageInput,
   type RecordVideoUsageInput,
-  type UsageRow
+  type UsageRow,
+  type UserTier
 } from '@/types';
 import { type usageLogFilterSchema } from '@/types/usage';
+import { applyMultiplier } from '@/lib/billing';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
-import { providers, usage, users } from '@/db/schema';
+import { providers, tiers, usage, users } from '@/db/schema';
 import {
   calculateAudioCost,
   calculateChatCost,
@@ -23,6 +25,21 @@ import {
   calculateVideoCost,
   resolveModelByKey
 } from '@/server/services/pricing';
+import { getUserTier } from '@/server/services/tier';
+
+/**
+ * The money columns of a row: what the call cost, the tier the user was on
+ * and its multiplier, and what they spent — cost × multiplier. Quotas and
+ * every total count the spend.
+ */
+function spent(cost: number, tier: UserTier) {
+  return {
+    cost: cost.toString(),
+    tierId: tier.tier?.id ?? null,
+    priceMultiplier: tier.priceMultiplier.toString(),
+    spend: applyMultiplier(cost, tier.priceMultiplier).toString()
+  };
+}
 
 /**
  * Compute cost and insert a usage row for a chat completion.
@@ -54,6 +71,7 @@ export async function recordChatUsage(
       input.usage,
       lookup?.pricing ?? null
     );
+    const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
       id: generateUUID(),
@@ -70,7 +88,7 @@ export async function recordChatUsage(
       cacheWriteTokens: input.usage.cacheWriteTokens ?? 0,
       reasoningTokens: input.usage.reasoningTokens ?? 0,
       webSearches: input.usage.webSearches ?? 0,
-      cost: cost.toString(),
+      ...spent(cost, tier),
       ...snapshot
     });
   } catch (err) {
@@ -112,6 +130,7 @@ export async function recordImageUsage(
       },
       pricing
     );
+    const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
       id: generateUUID(),
@@ -125,7 +144,7 @@ export async function recordImageUsage(
       imageCount: input.imageCount,
       inputTokens: input.inputTokens ?? 0,
       outputTokens: input.outputTokens ?? 0,
-      cost: cost.toString(),
+      ...spent(cost, tier),
       ...snapshot
     });
   } catch (err) {
@@ -160,6 +179,7 @@ export async function recordVideoUsage(
       { videoCount: input.videoCount, videoSeconds: input.videoSeconds },
       pricing
     );
+    const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
       id: generateUUID(),
@@ -172,7 +192,7 @@ export async function recordVideoUsage(
       capability: 'video',
       videoCount: input.videoCount,
       videoSeconds: (input.videoSeconds ?? 0).toString(),
-      cost: cost.toString(),
+      ...spent(cost, tier),
       ...snapshot
     });
   } catch (err) {
@@ -205,6 +225,7 @@ export async function recordAudioUsage(
       { audioCharacters: input.audioCharacters },
       pricing
     );
+    const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
       id: generateUUID(),
@@ -218,7 +239,7 @@ export async function recordAudioUsage(
       audioCharacters: input.audioCharacters ?? 0,
       audioInputTokens: input.audioInputTokens ?? 0,
       audioOutputTokens: input.audioOutputTokens ?? 0,
-      cost: cost.toString(),
+      ...spent(cost, tier),
       ...snapshot
     });
   } catch (err) {
@@ -250,6 +271,7 @@ export async function recordTranscriptionUsage(
       { audioSeconds: input.audioSeconds },
       pricing
     );
+    const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
       id: generateUUID(),
@@ -261,7 +283,7 @@ export async function recordTranscriptionUsage(
       providerModelId: input.providerModelId ?? null,
       capability: 'audio',
       audioSeconds: (input.audioSeconds ?? 0).toString(),
-      cost: cost.toString(),
+      ...spent(cost, tier),
       ...snapshot
     });
   } catch (err) {
@@ -296,6 +318,7 @@ async function queryKpi(args: { since: Date; until?: Date; userId?: string }) {
   );
   const rows = await db
     .select({
+      totalSpend: sql<string>`coalesce(sum(${usage.spend}), 0)`,
       totalCost: sql<string>`coalesce(sum(${usage.cost}), 0)`,
       requests: sql<number>`count(*)`,
       inputTokens: sql<number>`coalesce(sum(${usage.inputTokens}), 0)`,
@@ -308,6 +331,7 @@ async function queryKpi(args: { since: Date; until?: Date; userId?: string }) {
     .where(baseWhere);
   const row = rows[0];
   return {
+    totalSpend: row?.totalSpend ?? '0',
     totalCost: row?.totalCost ?? '0',
     requests: Number(row?.requests ?? 0),
     inputTokens: Number(row?.inputTokens ?? 0),
@@ -345,6 +369,8 @@ async function queryUsageRows(args: {
       providerModelId: usage.providerModelId,
       capability: usage.capability,
       cost: usage.cost,
+      spend: usage.spend,
+      priceMultiplier: usage.priceMultiplier,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       cacheReadTokens: usage.cacheReadTokens,
@@ -367,6 +393,8 @@ async function queryUsageRows(args: {
     providerModelId: r.providerModelId,
     capability: r.capability,
     cost: r.cost ?? '0',
+    spend: r.spend ?? '0',
+    priceMultiplier: r.priceMultiplier ?? '1',
     inputTokens: Number(r.inputTokens ?? 0),
     outputTokens: Number(r.outputTokens ?? 0),
     cacheReadTokens: Number(r.cacheReadTokens ?? 0),
@@ -493,11 +521,16 @@ export async function adminUsageLog(
       audioOutputPrice: usage.audioOutputPrice,
       audioCharactersPrice: usage.audioCharactersPrice,
       audioSecondsPrice: usage.audioSecondsPrice,
-      cost: usage.cost
+      cost: usage.cost,
+      // The tier as it is named today; the multiplier as it stood then.
+      tierName: tiers.name,
+      priceMultiplier: usage.priceMultiplier,
+      spend: usage.spend
     })
     .from(usage)
     .leftJoin(users, eq(users.id, usage.userId))
     .leftJoin(providers, eq(providers.id, usage.providerId))
+    .leftJoin(tiers, eq(tiers.id, usage.tierId))
     .where(where)
     // `id` last so the order is total: rows recorded in the same instant would
     // otherwise sort arbitrarily, and offset paging over an order that leaves

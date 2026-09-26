@@ -3,12 +3,14 @@ import '@tanstack/react-start/server-only';
 import { type ChatErrorKind } from '@/types';
 import { PricingMissingError, requirePricing } from '@/server/services/pricing';
 import {
-  assertModelAccess,
   assertQuota,
-  ModelAccessDeniedError,
   QuotaExceededError,
   QuotaMissingError
 } from '@/server/services/quota';
+import {
+  assertModelAccess,
+  ModelAccessDeniedError
+} from '@/server/services/tier';
 
 export type PreflightResult =
   | { ok: true }
@@ -19,12 +21,12 @@ export type PreflightResult =
 /**
  * Run the standard pre-flight gates for any generation:
  *   1. Model must have a pricing row                 → 403
- *   2. User's resolved quota must allow this model   → 403
+ *   2. User's tier must allow this model             → 403
  *   3. User must be under their quota windows        → 429 (with resetAt)
  *
  * `modelKey` is the modelId string (e.g. "gpt-4o"); used for both the pricing
- * lookup and the quota model-whitelist check (quota.allowedModelIds stores
- * modelId strings, matching everywhere else in the system).
+ * lookup and the tier's model list (tier.modelIds stores modelId strings,
+ * matching everywhere else in the system).
  *
  * Transport-agnostic variant: returns a result object instead of an HTTP
  * response, so it can also gate in-stream tool calls (chat media tools).

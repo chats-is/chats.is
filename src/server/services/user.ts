@@ -13,6 +13,7 @@ import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
+import { getUserTier } from '@/server/services/tier';
 
 /**
  * The signed-in user's own row.
@@ -104,8 +105,9 @@ export async function updateUserPlan(id: string, planId: string | null) {
 }
 
 /**
- * One user with what the console's detail page shows: linked accounts, and
- * how much they have written. Throws when the id names nobody.
+ * One user with what the console's detail page shows: linked accounts, how
+ * much they have written, and the tier in force for them. Throws when the
+ * id names nobody.
  */
 export async function getUser(id: string) {
   const user = await db.select().from(users).where(eq(users.id, id));
@@ -136,7 +138,10 @@ export async function getUser(id: string) {
     ...user[0],
     accounts: linkedAccounts,
     chatCount: Number(chatCount[0]?.count || 0),
-    messageCount: Number(messageCount[0]?.count || 0)
+    messageCount: Number(messageCount[0]?.count || 0),
+    // The tier in force — their own, the plan's or the default — as
+    // distinct from `tierId`, which is only their own.
+    effectiveTier: await getUserTier(id)
   };
 }
 

@@ -68,6 +68,7 @@ export type {
   PricingSyncResult
 } from './pricing';
 export type { ResolvedSource, UserQuota } from './quota';
+export type { UserTier } from './tier';
 export type {
   RecordChatUsageInput,
   RecordImageUsageInput,

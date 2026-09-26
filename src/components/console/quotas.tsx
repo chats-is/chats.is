@@ -7,7 +7,6 @@ import { z } from 'zod';
 import { mutating } from '@/lib/mutation';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
-import { modelQueries } from '@/server/functions/model';
 import {
   createQuota,
   deleteQuota,
@@ -27,7 +26,6 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +47,6 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ModelStatusBadge } from '@/components/console/model-status';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { quotaTableInput } from '@/components/console/table-filters';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
@@ -100,8 +97,7 @@ const quotaSchema = z
     sevenDay: z.string(),
     // Editable only when role === 'custom'; derived from sevenDay otherwise.
     fiveHour: z.string(),
-    isUnlimited: z.boolean(),
-    allowedModelIds: z.array(z.string())
+    isUnlimited: z.boolean()
   })
   // The limits only have to make sense when the quota actually has limits, so
   // the rules sit here rather than on the two fields.
@@ -142,8 +138,7 @@ const emptyForm: QuotaForm = {
   role: 'standard',
   sevenDay: '',
   fiveHour: '',
-  isUnlimited: false,
-  allowedModelIds: []
+  isUnlimited: false
 };
 
 /** Detect which role matches the stored fiveHour/sevenDay ratio. Returns 'custom'
@@ -196,6 +191,9 @@ const quotaColumns = (actions: {
   helper.columns([
     helper.accessor('name', {
       header: 'Name',
+      // Held at one width across the quotas, plans and tiers tables, so the
+      // name sits in the same place on each.
+      meta: { headClassName: 'w-56 min-w-56' },
       cell: ({ row }) => (
         <>
           <div className="font-medium">{row.original.name}</div>
@@ -214,24 +212,15 @@ const quotaColumns = (actions: {
     }),
     helper.accessor('fiveHour', {
       header: '5h',
-      meta: { align: 'right', cellClassName: 'font-mono text-sm' },
+      meta: { cellClassName: 'font-mono text-sm' },
       cell: ({ row }) =>
         row.original.isUnlimited ? '∞' : fmtLimit(row.original.fiveHour)
     }),
     helper.accessor('sevenDay', {
       header: 'Weekly',
-      meta: { align: 'right', cellClassName: 'font-mono text-sm' },
+      meta: { cellClassName: 'font-mono text-sm' },
       cell: ({ row }) =>
         row.original.isUnlimited ? '∞' : fmtLimit(row.original.sevenDay)
-    }),
-    helper.accessor(row => row.allowedModelIds.length, {
-      id: 'models',
-      header: 'Models',
-      meta: { align: 'center', cellClassName: 'text-sm' },
-      cell: ({ row }) =>
-        row.original.allowedModelIds.length === 0
-          ? 'All'
-          : `${row.original.allowedModelIds.length}`
     }),
     helper.display({
       id: 'actions',
@@ -303,7 +292,6 @@ export default function QuotasPage() {
   const { data, isLoading, isPlaceholderData } = useQuery(
     quotaQueries.list(quotaTableInput({ page }))
   );
-  const { data: models } = useQuery(modelQueries.forSelect());
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -353,8 +341,7 @@ export default function QuotasPage() {
         description: value.description.trim() || null,
         fiveHour: value.isUnlimited ? null : fiveHourOf(value),
         sevenDay: value.isUnlimited ? null : amount(value.sevenDay),
-        isUnlimited: value.isUnlimited,
-        allowedModelIds: value.allowedModelIds
+        isUnlimited: value.isUnlimited
       };
 
       try {
@@ -379,8 +366,7 @@ export default function QuotasPage() {
           role: detectRole(quota.fiveHour, quota.sevenDay),
           sevenDay: fmtAmount(quota.sevenDay),
           fiveHour: fmtAmount(quota.fiveHour),
-          isUnlimited: quota.isUnlimited,
-          allowedModelIds: quota.allowedModelIds ?? []
+          isUnlimited: quota.isUnlimited
         }
       : emptyForm;
     setDefaults(values);
@@ -411,16 +397,6 @@ export default function QuotasPage() {
     []
   );
 
-  const modelsByCapability = useMemo(() => {
-    const groups: Record<string, NonNullable<typeof models>> = {};
-    (models ?? []).forEach(m => {
-      const cap = m.capability;
-      if (!groups[cap]) groups[cap] = [];
-      groups[cap].push(m);
-    });
-    return groups;
-  }, [models]);
-
   return (
     <div className="space-y-6">
       <ConsoleToolbar>
@@ -441,7 +417,8 @@ export default function QuotasPage() {
                 {editingId ? 'Edit Quota' : 'New Quota'}
               </DialogTitle>
               <DialogDescription>
-                Configure usage caps and allowed models for this quota.
+                Configure the usage caps for this quota. Which models a user may
+                use is set on their tier.
               </DialogDescription>
             </DialogHeader>
             <form
@@ -541,65 +518,6 @@ export default function QuotasPage() {
                     </div>
                   )}
                 </form.Subscribe>
-
-                <form.Field name="allowedModelIds" mode="array">
-                  {field => (
-                    <div className="space-y-2">
-                      <Label>
-                        Allowed Models
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          If unchecked, all models are allowed.
-                          {field.state.value.length > 0 &&
-                            ` · ${field.state.value.length} selected`}
-                        </span>
-                      </Label>
-                      <div className="max-h-64 overflow-auto rounded-md border p-3">
-                        {Object.keys(modelsByCapability).length === 0 ? (
-                          <div className="text-sm text-muted-foreground">
-                            No models configured.
-                          </div>
-                        ) : (
-                          Object.entries(modelsByCapability).map(
-                            ([cap, items]) => (
-                              <div key={cap} className="mb-3 last:mb-0">
-                                <div className="mb-1 text-xs font-semibold text-muted-foreground uppercase">
-                                  {cap}
-                                </div>
-                                <div className="grid grid-cols-2 gap-1">
-                                  {items.map(m => (
-                                    <label
-                                      key={m.id}
-                                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/40"
-                                    >
-                                      <Checkbox
-                                        checked={field.state.value.includes(
-                                          m.modelId
-                                        )}
-                                        onCheckedChange={() =>
-                                          field.handleChange(current =>
-                                            current.includes(m.modelId)
-                                              ? current.filter(
-                                                  id => id !== m.modelId
-                                                )
-                                              : [...current, m.modelId]
-                                          )
-                                        }
-                                      />
-                                      <span className="truncate font-mono text-xs">
-                                        {m.modelId}
-                                      </span>
-                                      <ModelStatusBadge status={m.status} />
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                            )
-                          )
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </form.Field>
               </fieldset>
               <DialogFooter>
                 <form.Subscribe selector={state => state.isSubmitting}>

@@ -4,6 +4,7 @@ import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { describeMultiplier } from '@/lib/billing';
 import { mutating } from '@/lib/mutation';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
@@ -16,6 +17,7 @@ import {
   type listPlans
 } from '@/server/functions/plan';
 import { quotaQueries } from '@/server/functions/quota';
+import { tierQueries } from '@/server/functions/tier';
 import { userQueries } from '@/server/functions/user';
 import {
   AlertDialog,
@@ -55,10 +57,14 @@ type Plan = Awaited<ReturnType<typeof listPlans>>['rows'][number];
 /** What the edit form is filled from: the plan as read when it opens. */
 type EditablePlan = NonNullable<Awaited<ReturnType<typeof getPlan>>>;
 
+/** The select's value for a plan on no tier: the cost price, every model. */
+const NO_TIER = '__none__';
+
 const planSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
   description: z.string().max(500),
   quotaId: z.string().min(1, 'Select a quota'),
+  tierId: z.string(),
   displayOrder: z.string()
 });
 
@@ -68,6 +74,7 @@ const emptyForm: PlanForm = {
   name: '',
   description: '',
   quotaId: '',
+  tierId: NO_TIER,
   displayOrder: '0'
 };
 
@@ -80,6 +87,9 @@ const planColumns = (actions: {
   helper.columns([
     helper.accessor('name', {
       header: 'Name',
+      // Held at one width across the quotas, plans and tiers tables, so the
+      // name sits in the same place on each.
+      meta: { headClassName: 'w-56 min-w-56' },
       cell: ({ row }) => (
         <>
           <div className="font-medium">{row.original.name}</div>
@@ -90,6 +100,21 @@ const planColumns = (actions: {
           )}
         </>
       )
+    }),
+    helper.accessor(row => row.tier?.name, {
+      id: 'tier',
+      header: 'Price',
+      cell: ({ row }) =>
+        row.original.tier ? (
+          <div className="text-sm">
+            <div className="font-medium">{row.original.tier.name}</div>
+            <div className="text-xs text-muted-foreground">
+              {describeMultiplier(row.original.tier.priceMultiplier)}
+            </div>
+          </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">No tier</span>
+        )
     }),
     helper.accessor(row => row.quota?.name, {
       id: 'quota',
@@ -179,6 +204,7 @@ export default function PlansPage() {
     planQueries.list(planTableInput({ page }))
   );
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
+  const { data: tierOptions } = useQuery(tierQueries.listForSelect());
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -220,6 +246,7 @@ export default function PlansPage() {
         name: value.name.trim(),
         description: value.description.trim() || null,
         quotaId: value.quotaId,
+        tierId: value.tierId === NO_TIER ? null : value.tierId,
         displayOrder: Number(value.displayOrder) || 0
       };
 
@@ -247,6 +274,7 @@ export default function PlansPage() {
           name: plan.name,
           description: plan.description ?? '',
           quotaId: plan.quotaId,
+          tierId: plan.tierId ?? NO_TIER,
           displayOrder: plan.displayOrder.toString()
         }
       : emptyForm;
@@ -281,6 +309,18 @@ export default function PlansPage() {
   const quotaSelectOptions = useMemo(
     () => (quotaOptions ?? []).map(q => ({ value: q.id, label: q.name })),
     [quotaOptions]
+  );
+  // No tier is a choice too — the cost price, every model — and is offered
+  // as one.
+  const tierSelectOptions = useMemo(
+    () => [
+      { value: NO_TIER, label: 'No tier' },
+      ...(tierOptions ?? []).map(t => ({
+        value: t.id,
+        label: `${t.name} — ${describeMultiplier(t.priceMultiplier)}`
+      }))
+    ],
+    [tierOptions]
   );
 
   return (
@@ -346,6 +386,17 @@ export default function PlansPage() {
                       label="Quota"
                       placeholder="Select a quota"
                       options={quotaSelectOptions}
+                    />
+                  )}
+                </form.AppField>
+                {/* A select has no empty value, so "no tier" is a value of
+                    its own, mapped back to none on the way out. */}
+                <form.AppField name="tierId">
+                  {field => (
+                    <field.SelectField
+                      label="Tier"
+                      options={tierSelectOptions}
+                      hint="What the plan's users get: the price multiplier they are charged at and the models they may use. A user put on a tier of their own gets that instead."
                     />
                   )}
                 </form.AppField>

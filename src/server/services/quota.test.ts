@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  assertModelAccess,
   assertQuota,
   getUserQuota,
-  ModelAccessDeniedError,
   QuotaExceededError,
   QuotaMissingError
 } from './quota';
@@ -102,7 +100,6 @@ describe('getUserQuota', () => {
     givenQuota({
       name: 'Pro',
       isUnlimited: false,
-      allowedModelIds: [],
       fiveHour: '10',
       sevenDay: '100'
     });
@@ -123,7 +120,6 @@ describe('getUserQuota', () => {
     givenQuota({
       name: 'Pro',
       isUnlimited: false,
-      allowedModelIds: [],
       fiveHour: '10',
       sevenDay: null
     });
@@ -139,7 +135,6 @@ describe('assertQuota', () => {
   it('returns immediately for unlimited quota (no usage query)', async () => {
     givenQuota({
       isUnlimited: true,
-      allowedModelIds: [],
       fiveHour: null,
       sevenDay: null
     });
@@ -160,7 +155,6 @@ describe('assertQuota', () => {
   it('passes a quota that sets no caps, without reading usage', async () => {
     givenQuota({
       isUnlimited: false,
-      allowedModelIds: [],
       fiveHour: null,
       sevenDay: null
     });
@@ -171,7 +165,6 @@ describe('assertQuota', () => {
   it('throws QuotaExceededError when 5-hour usage reaches the cap', async () => {
     givenQuota({
       isUnlimited: false,
-      allowedModelIds: [],
       fiveHour: '10',
       sevenDay: '100'
     });
@@ -186,7 +179,6 @@ describe('assertQuota', () => {
   it('throws on weekly cap when 5-hour is under but weekly is reached', async () => {
     givenQuota({
       isUnlimited: false,
-      allowedModelIds: [],
       fiveHour: '10',
       sevenDay: '100'
     });
@@ -200,34 +192,10 @@ describe('assertQuota', () => {
   it('does not throw when usage is below both caps', async () => {
     givenQuota({
       isUnlimited: false,
-      allowedModelIds: [],
       fiveHour: '10',
       sevenDay: '100'
     });
     givenUsage(9.99, 99);
     await expect(assertQuota('u1')).resolves.toBeUndefined();
-  });
-});
-
-describe('assertModelAccess', () => {
-  it('allows any model when allowedModelIds is empty (no restriction)', async () => {
-    givenQuota({ allowedModelIds: [] });
-    await expect(
-      assertModelAccess('u1', 'gpt-4o', 'GPT-4o')
-    ).resolves.toBeUndefined();
-  });
-
-  it('allows a model in the allowlist', async () => {
-    givenQuota({ allowedModelIds: ['gpt-4o'] });
-    await expect(
-      assertModelAccess('u1', 'gpt-4o', 'GPT-4o')
-    ).resolves.toBeUndefined();
-  });
-
-  it('denies a model not in the allowlist', async () => {
-    givenQuota({ allowedModelIds: ['gpt-4o'] });
-    await expect(
-      assertModelAccess('u1', 'claude-opus', 'Claude Opus')
-    ).rejects.toBeInstanceOf(ModelAccessDeniedError);
   });
 });

@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PricingMissingError, requirePricing } from '@/server/services/pricing';
 import {
-  assertModelAccess,
   assertQuota,
-  ModelAccessDeniedError,
   QuotaExceededError,
   QuotaMissingError
 } from '@/server/services/quota';
+import {
+  assertModelAccess,
+  ModelAccessDeniedError
+} from '@/server/services/tier';
 
 import { preflightCheck } from './preflight';
 
@@ -26,13 +28,16 @@ vi.mock('@/server/services/pricing', () => {
   }
   return { PricingMissingError, requirePricing: vi.fn() };
 });
-vi.mock('@/server/services/quota', () => {
+vi.mock('@/server/services/tier', () => {
   class ModelAccessDeniedError extends Error {
     constructor(modelLabel: string) {
       super(`${modelLabel} is not available.`);
       this.name = 'ModelAccessDeniedError';
     }
   }
+  return { ModelAccessDeniedError, assertModelAccess: vi.fn() };
+});
+vi.mock('@/server/services/quota', () => {
   class QuotaExceededError extends Error {
     public resetAt: Date | null;
     constructor(detail: { resetAt: Date | null }) {
@@ -47,13 +52,7 @@ vi.mock('@/server/services/quota', () => {
       this.name = 'QuotaMissingError';
     }
   }
-  return {
-    ModelAccessDeniedError,
-    QuotaExceededError,
-    QuotaMissingError,
-    assertModelAccess: vi.fn(),
-    assertQuota: vi.fn()
-  };
+  return { QuotaExceededError, QuotaMissingError, assertQuota: vi.fn() };
 });
 
 const mockRequirePricing = vi.mocked(requirePricing);

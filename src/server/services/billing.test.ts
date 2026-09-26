@@ -88,13 +88,14 @@ async function readUsageRow() {
   return rows[0];
 }
 
-/** Insert a chat usage row at a specific instant with a given cost. */
+/** Insert a chat usage row at a specific instant, spent at the cost price. */
 async function addUsage(createdAt: Date, cost: string) {
   await h.db.insert(schema.usage).values({
     id: randomUUID(),
     userId: 'u1',
     capability: 'chat',
     cost,
+    spend: cost,
     createdAt
   });
 }

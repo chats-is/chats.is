@@ -25,8 +25,10 @@ much they may spend.
   id can be routed to the id a provider knows it by.
 - **Resumable streams** — a reply keeps streaming through a reload or a dropped
   connection (with Redis).
-- **Billing** — per-model pricing, plans and quotas with 5-hour and weekly
-  limits, and every call recorded with what it cost.
+- **Billing** — per-model cost prices; tiers, each a price multiplier over
+  the cost price and the models allowed, that a plan or a user is put on;
+  plans and quotas with 5-hour and weekly limits; and every call recorded
+  with what it cost and what the user spent.
 
 ## The admin console
 
@@ -39,6 +41,7 @@ Everything an operator manages lives at `/console`:
 | Models         | The models users can pick, the providers behind each, and their options                      |
 | Pricing        | Per-model rates: tokens, images, video seconds, characters, audio seconds                    |
 | Plans / Quotas | Spending limits, assigned by plan, per user, or as the install's default                     |
+| Tiers          | A price multiplier over the cost price and the models allowed, chosen by a plan or a user    |
 | Usage          | Every call, opening onto what it was billed for, item by item                                |
 | Users          | Accounts, roles, and each user's limits, spend and log                                       |
 | Settings       | Title generation, speech, web search, and other install-wide options                         |

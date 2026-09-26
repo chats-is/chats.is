@@ -66,6 +66,17 @@ export const getDefaultQuotaId = perRequest(
   }
 );
 
+/** The install's default tier (setting `billing.tierId`), for a user whose
+ *  plan names none and who has none of their own. Null when unset: the cost
+ *  price, and every model. */
+export const getDefaultTierId = perRequest(
+  'getDefaultTierId',
+  async (): Promise<string | null> => {
+    const values = await getSettings(['billing.tierId']);
+    return values['billing.tierId'] || null;
+  }
+);
+
 /**
  * Reading a message aloud runs on the same text-to-speech model the chat tool
  * uses — one selection, not two. `speech.enabled` stays its own switch: the

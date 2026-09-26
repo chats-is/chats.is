@@ -13,6 +13,8 @@ export const planCreateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional().nullable(),
   quotaId: z.string().min(1),
+  /** The tier the plan's users are on; none is the cost price and every model. */
+  tierId: z.string().min(1).nullable().optional(),
   displayOrder: z.number().int().default(0)
 });
 
@@ -21,6 +23,7 @@ export const planUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional().nullable(),
   quotaId: z.string().min(1).optional(),
+  tierId: z.string().min(1).nullable().optional(),
   displayOrder: z.number().int().optional()
 });
 

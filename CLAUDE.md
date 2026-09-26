@@ -19,7 +19,10 @@ What it supports:
   sandboxed preview for React, HTML and SVG.
 - Conversations that branch, so a message can be regenerated or edited without losing the other reply.
 - Share links, a library of generated media, and saved prompts.
-- Plans, quotas and per-model pricing, with usage recorded for every generation.
+- Plans, quotas and per-model pricing, with usage recorded for every generation. Prices are cost
+  prices; a tier (the user's own, else the plan's, else the install's default; none is the cost
+  price and every model) holds the price multiplier a call is charged at and the models allowed,
+  and quotas count what was spent.
 - Several providers behind one model, with automatic failover, and streams that survive a reconnect.
 
 An admin runs the platform from `/console`: which providers exist and with which keys, which models
@@ -96,7 +99,7 @@ src/
 │   ├── _chat.tsx     pathless layout: the app shell and its providers
 │   ├── _chat/        chat, library, prompts
 │   ├── console.tsx   admin layout, with the admin gate
-│   ├── console/      providers, models, pricing, plans, quotas, users, usage, settings
+│   ├── console/      providers, models, pricing, plans, quotas, tiers, users, usage, settings
 │   └── api/          server routes: chat, speech, artifacts, files, auth
 ├── server/
 │   ├── functions/    RPC endpoints

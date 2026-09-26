@@ -27,12 +27,11 @@ describe('quota', () => {
     ).toBe(false);
   });
 
-  it('defaults a new quota to no limits and no model restriction', () => {
+  it('defaults a new quota to no limits', () => {
     const r = quotaCreateSchema.parse({ name: 'q' });
     expect(r.fiveHour).toBeNull();
     expect(r.sevenDay).toBeNull();
     expect(r.isUnlimited).toBe(false);
-    expect(r.allowedModelIds).toEqual([]);
   });
 
   it('leaves limits absent on update rather than defaulting them', () => {

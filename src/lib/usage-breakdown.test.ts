@@ -6,6 +6,25 @@ const total = (items: { subtotal: number }[]) =>
   items.reduce((sum, item) => sum + item.subtotal, 0);
 
 describe('usageBreakdown', () => {
+  it("shows the user's prices — the cost price at their tier's multiplier — adding up to the spend", () => {
+    // 1M input tokens at a $1 cost price, on a tier of 1.5: the price shown
+    // is $1.5, the item $1.5, and that is the spend.
+    const items = usageBreakdown({
+      capability: 'chat',
+      inputTokens: 1_000_000,
+      inputPrice: '1.0000000000',
+      priceMultiplier: '1.5000'
+    });
+    expect(items).toEqual([
+      {
+        label: 'Input',
+        quantity: '1,000,000 tokens',
+        rate: '$1.5 / 1M tokens',
+        subtotal: 1.5
+      }
+    ]);
+  });
+
   it('bills each chat bucket at its own rate, adding up to the cost', () => {
     // A recorded gpt-5.5 row, charged $0.017736.
     const row = {

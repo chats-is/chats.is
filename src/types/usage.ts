@@ -62,7 +62,11 @@ export type UsageRow = {
   providerName: string | null;
   providerModelId: string | null;
   capability: 'chat' | 'image' | 'video' | 'audio';
+  /** What the call cost. */
   cost: string | number;
+  /** What the user spent: `cost` × `priceMultiplier`. */
+  spend: string | number;
+  priceMultiplier: string | number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -73,6 +77,9 @@ export type UsageRow = {
 
 /** Aggregated KPI tile values for the period — admin shape (with cost). */
 export type UsageKpi = {
+  /** What users spent over the period. */
+  totalSpend: string;
+  /** What it cost; the difference is the margin. */
   totalCost: string;
   requests: number;
   inputTokens: number;
@@ -99,6 +106,9 @@ export type UsageRowLike = {
   audioOutputTokens?: number | null;
   audioCharacters?: number | null;
   audioSeconds?: string | number | null;
+  /** The multiplier the row's prices are read at: the tier's, as it stood.
+   *  The rates below are cost prices; what the user paid is each times this. */
+  priceMultiplier?: string | number | null;
   // Per-unit price snapshot (USD per unit at compute time). Optional — only
   // the admin log surfaces these for the "Unit Price" column.
   inputPrice?: string | null;
@@ -120,6 +130,7 @@ export type UsageRowLike = {
 export type DailyGroup = {
   key: string;
   label: string;
+  spend: string;
   cost: string;
   requests: number;
   inputTokens: number;

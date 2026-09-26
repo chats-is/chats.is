@@ -20,13 +20,15 @@ import {
   upsertPricing
 } from '@/server/services/pricing';
 import {
-  assertModelAccess,
   assertQuota,
   getUserUsageWindows,
-  ModelAccessDeniedError,
   QuotaExceededError,
   QuotaMissingError
 } from '@/server/services/quota';
+import {
+  assertModelAccess,
+  ModelAccessDeniedError
+} from '@/server/services/tier';
 import {
   recordAudioUsage,
   recordChatUsage,
@@ -68,7 +70,11 @@ beforeEach(async () => {
   await h.db.delete(schema.models);
   await h.db.delete(schema.providers);
   await h.db.delete(schema.users);
+  // Plans hold their quota and tier, so they go first.
+  await h.db.delete(schema.plans);
   await h.db.delete(schema.quotas);
+  await h.db.delete(schema.tiers);
+  await h.db.delete(schema.settings);
   await h.db
     .insert(schema.users)
     .values({ id: 'u1', name: 'u1', email: 'u1@test.com' });
@@ -127,12 +133,14 @@ async function giveQuota(
     .where(eq(schema.users.id, 'u1'));
 }
 
+/** A row spent at the cost price, as every row was before tiers. */
 async function spent(cost: string, at = new Date(), capability = 'chat') {
   await h.db.insert(schema.usage).values({
     id: randomUUID(),
     userId: 'u1',
     capability: capability as 'chat',
     cost,
+    spend: cost,
     createdAt: at
   });
 }
@@ -381,6 +389,131 @@ describe('billing', () => {
   });
 });
 
+describe('tier', () => {
+  /** The chat that costs $1 at the cost price: 1M input tokens at $1/1M. */
+  async function chatCostingOneDollar() {
+    const id = await addModel('chat', 'c1');
+    await savePrice(id, { input: '1', output: '0' });
+    await recordChatUsage({
+      ...call,
+      modelId: 'c1',
+      usage: { inputTokens: 1_000_000 }
+    });
+    const [row] = await usageRows();
+    return row;
+  }
+
+  async function addTier(
+    priceMultiplier: string,
+    modelIds: string[] = [],
+    modelRestrictionMode: 'allow' | 'deny' = 'allow'
+  ) {
+    const id = randomUUID();
+    await h.db.insert(schema.tiers).values({
+      id,
+      name: `t-${id}`,
+      priceMultiplier,
+      modelRestrictionMode,
+      modelIds
+    });
+    return id;
+  }
+
+  /** A plan for u1, on the tier given (or none). */
+  async function givePlan(tierId: string | null) {
+    const quotaId = randomUUID();
+    await h.db.insert(schema.quotas).values({
+      id: quotaId,
+      name: `q-${quotaId}`,
+      isUnlimited: true
+    });
+    const planId = randomUUID();
+    await h.db
+      .insert(schema.plans)
+      .values({ id: planId, name: `p-${planId}`, quotaId, tierId });
+    await h.db
+      .update(schema.users)
+      .set({ planId })
+      .where(eq(schema.users.id, 'u1'));
+  }
+
+  const putUserOn = (tierId: string | null) =>
+    h.db.update(schema.users).set({ tierId }).where(eq(schema.users.id, 'u1'));
+
+  it('on no tier, the spend is the cost', async () => {
+    const row = await chatCostingOneDollar();
+    expect(row.cost).toBe('1.0000000000');
+    expect(row.tierId).toBeNull();
+    expect(row.priceMultiplier).toBe('1.0000');
+    expect(row.spend).toBe('1.0000000000');
+  });
+
+  it("the spend is the cost times the plan's tier, and the row names the tier", async () => {
+    const tierId = await addTier('1.5');
+    await givePlan(tierId);
+    const row = await chatCostingOneDollar();
+    expect(row.cost).toBe('1.0000000000');
+    expect(row.tierId).toBe(tierId);
+    expect(row.priceMultiplier).toBe('1.5000');
+    expect(row.spend).toBe('1.5000000000');
+  });
+
+  it("the user's own tier counts over the plan's", async () => {
+    await givePlan(await addTier('1.5'));
+    await putUserOn(await addTier('0.8'));
+    const row = await chatCostingOneDollar();
+    expect(row.spend).toBe('0.8000000000');
+  });
+
+  it("the install's default tier counts when the plan is on none", async () => {
+    await h.db.insert(schema.settings).values({
+      id: randomUUID(),
+      key: 'billing.tierId',
+      value: await addTier('2')
+    });
+    await givePlan(null);
+    const row = await chatCostingOneDollar();
+    expect(row.priceMultiplier).toBe('2.0000');
+    expect(row.spend).toBe('2.0000000000');
+  });
+
+  it('a tier of 1 spends the cost', async () => {
+    await givePlan(await addTier('1'));
+    expect((await chatCostingOneDollar()).spend).toBe('1.0000000000');
+  });
+
+  it('a tier that names its models refuses the others before the call; one that names none allows all', async () => {
+    await givePlan(await addTier('1', ['c1']));
+    await expect(assertModelAccess('u1', 'c1', 'c1')).resolves.toBeUndefined();
+    await expect(assertModelAccess('u1', 'c2', 'c2')).rejects.toBeInstanceOf(
+      ModelAccessDeniedError
+    );
+
+    await putUserOn(await addTier('1'));
+    await expect(assertModelAccess('u1', 'c2', 'c2')).resolves.toBeUndefined();
+  });
+
+  it('a tier that keeps models out refuses those and allows the rest', async () => {
+    await givePlan(await addTier('1', ['c1'], 'deny'));
+    await expect(assertModelAccess('u1', 'c1', 'c1')).rejects.toBeInstanceOf(
+      ModelAccessDeniedError
+    );
+    await expect(assertModelAccess('u1', 'c2', 'c2')).resolves.toBeUndefined();
+  });
+
+  it('on no tier, every model is allowed', async () => {
+    await expect(assertModelAccess('u1', 'c2', 'c2')).resolves.toBeUndefined();
+  });
+
+  it('the quota counts the spend, not the cost', async () => {
+    await givePlan(await addTier('3'));
+    await h.db.update(schema.quotas).set({ isUnlimited: false, fiveHour: '2' });
+    await chatCostingOneDollar();
+    // $1 of cost, $3 spent: over a $2 limit.
+    await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaExceededError);
+  });
+});
+
 describe('quota', () => {
   it('a user with no quota is refused before the call', async () => {
     await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaMissingError);
@@ -456,16 +589,5 @@ describe('quota', () => {
     await spent('1', new Date(), 'video');
     await spent('1', new Date(), 'audio');
     await expect(assertQuota('u1')).rejects.toBeInstanceOf(QuotaExceededError);
-  });
-
-  it('a quota that names its models refuses the others before the call; one that names none allows all', async () => {
-    await giveQuota('3', '20', { allowedModelIds: ['c1'] });
-    await expect(assertModelAccess('u1', 'c1', 'c1')).resolves.toBeUndefined();
-    await expect(assertModelAccess('u1', 'c2', 'c2')).rejects.toBeInstanceOf(
-      ModelAccessDeniedError
-    );
-
-    await giveQuota('3', '20');
-    await expect(assertModelAccess('u1', 'c2', 'c2')).resolves.toBeUndefined();
   });
 });

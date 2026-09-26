@@ -71,6 +71,10 @@ export const planTableInput = (search: PageOnly) => ({
   page: pageOf(search.page)
 });
 
+export const tierTableInput = (search: PageOnly) => ({
+  page: pageOf(search.page)
+});
+
 export const quotaTableInput = (search: PageOnly) => ({
   page: pageOf(search.page)
 });

@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Mic,
   PenLine,
+  Percent,
   ReceiptText,
   Search,
   Type,
@@ -22,6 +23,7 @@ import {
 import { toast } from 'sonner';
 
 import { type ModelStatus } from '@/types/model';
+import { describeMultiplier } from '@/lib/billing';
 import {
   DEFAULT_APP_DESCRIPTION,
   DEFAULT_APP_NAME,
@@ -35,6 +37,7 @@ import {
   bulkUpdateSettings,
   settingsQueries
 } from '@/server/functions/settings';
+import { tierQueries } from '@/server/functions/tier';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useAppForm } from '@/components/app-form';
@@ -182,7 +185,8 @@ const KEYS = [
   'chat.systemPrompt',
   'speech.enabled',
   'webSearch.mode',
-  'default.quotaId'
+  'default.quotaId',
+  'billing.tierId'
 ];
 
 // ---------------------------------------------------------------------------
@@ -205,6 +209,7 @@ export function ConsoleSettings() {
       <SpeechSettings form={form} />
       <WebSearchSettings form={form} />
       <QuotaSettings form={form} />
+      <BillingSettings form={form} />
     </SettingsForm>
   );
 }
@@ -458,6 +463,44 @@ function WebSearchSettings({ form }: { form: SettingsFormApi }) {
         state={statusOf(modelId, WEB_SEARCH_MODEL_ROW, models)}
         models={models}
       />
+    </SettingsList>
+  );
+}
+
+/** What a user is charged when neither they nor their plan says. */
+function BillingSettings({ form }: { form: SettingsFormApi }) {
+  const { data: tierOptions } = useQuery(tierQueries.listForSelect());
+  const value = useStore(form.store, state =>
+    readPath(state.values, 'billing.tierId')
+  );
+
+  const tiers = (tierOptions ?? []).map(tier => ({
+    value: tier.id,
+    label: `${tier.name} — ${describeMultiplier(tier.priceMultiplier)}`
+  }));
+
+  return (
+    <SettingsList title="Billing">
+      <SettingsRow
+        icon={Percent}
+        label="Default Tier"
+        htmlFor="billing.tierId"
+        hint="The tier a user is on when neither they nor their plan names one: the price multiplier they are charged at and the models they may use. Unset, they are charged the cost price and may use every model."
+        settingKey="billing.tierId"
+        state={value ? 'set' : 'unset'}
+      >
+        <form.AppField name="billing.tierId">
+          {field => (
+            <field.SelectField
+              options={tiers}
+              disabled={tiers.length === 0}
+              placeholder={
+                tiers.length === 0 ? 'No tiers available' : 'No tier'
+              }
+            />
+          )}
+        </form.AppField>
+      </SettingsRow>
     </SettingsList>
   );
 }

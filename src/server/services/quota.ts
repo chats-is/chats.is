@@ -29,8 +29,8 @@ const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Resolve which quota row applies to a user, walking
- * override → plan → default → none. cache()-wrapped — preflight calls
- * `assertModelAccess` and `assertQuota` back-to-back; cache dedupes the
+ * override → plan → default → none. cache()-wrapped — a request asks for it
+ * more than once (the quota status and `assertQuota`); cache dedupes the
  * user/plan join to one DB round-trip.
  */
 export const getUserResolvedQuota = perRequest(
@@ -90,8 +90,10 @@ export async function getUserUsageWindows(userId: string): Promise<{
 
   const result = await db
     .select({
-      sumFiveHour: sql<string>`coalesce(sum(${usage.cost}) filter (where ${usage.createdAt} >= ${fiveHourSince}), 0)`,
-      sumSevenDay: sql<string>`coalesce(sum(${usage.cost}), 0)`,
+      // What was spent, not what it cost: a quota is a limit on the user's
+      // spending, and their tier's multiplier is part of that.
+      sumFiveHour: sql<string>`coalesce(sum(${usage.spend}) filter (where ${usage.createdAt} >= ${fiveHourSince}), 0)`,
+      sumSevenDay: sql<string>`coalesce(sum(${usage.spend}), 0)`,
       minFiveHour: sql<Date | null>`min(${usage.createdAt}) filter (where ${usage.createdAt} >= ${fiveHourSince})`,
       minSevenDay: sql<Date | null>`min(${usage.createdAt})`
     })
@@ -121,13 +123,12 @@ export async function getUserUsageWindows(userId: string): Promise<{
 
 /**
  * Shape the raw resolved-quota row into the structured form business logic
- * needs: caps + flags + meta. Internal helper; consumers use `getUserQuota`,
- * `assertQuota`, or `assertModelAccess` instead.
+ * needs: caps + flags + meta. Internal helper; consumers use `getUserQuota`
+ * or `assertQuota` instead.
  */
 async function getResolvedQuota(userId: string): Promise<{
   name: string | null;
   isUnlimited: boolean;
-  allowedModelIds: string[];
   fiveHour: number | null;
   sevenDay: number | null;
   source: ResolvedSource;
@@ -139,7 +140,6 @@ async function getResolvedQuota(userId: string): Promise<{
   return {
     name: q?.name ?? null,
     isUnlimited: q?.isUnlimited ?? false,
-    allowedModelIds: q?.allowedModelIds ?? [],
     fiveHour: parseNumber(q?.fiveHour),
     sevenDay: parseNumber(q?.sevenDay),
     source: resolved.source,
@@ -250,29 +250,6 @@ export async function assertQuota(userId: string): Promise<void> {
   }
 }
 
-export class ModelAccessDeniedError extends Error {
-  constructor(modelLabel: string) {
-    super(`${modelLabel} is not available.`);
-    this.name = 'ModelAccessDeniedError';
-  }
-}
-
-/**
- * Throw if the user's resolved quota does not allow `modelKey`
- * (the modelId string like "gpt-4o"). Empty allowedModelIds means "no restriction".
- */
-export async function assertModelAccess(
-  userId: string,
-  modelKey: string,
-  modelLabelForError: string
-): Promise<void> {
-  const resolved = await getResolvedQuota(userId);
-  if (resolved.allowedModelIds.length === 0) return;
-  if (!resolved.allowedModelIds.includes(modelKey)) {
-    throw new ModelAccessDeniedError(modelLabelForError);
-  }
-}
-
 // ============================================================================
 // Quota CRUD — a quota is an independent entity that users and plans point at
 // ============================================================================
@@ -335,8 +312,7 @@ export async function createQuota(input: z.infer<typeof quotaCreateSchema>) {
     description: input.description ?? null,
     fiveHour: input.isUnlimited ? null : limitToString(input.fiveHour),
     sevenDay: input.isUnlimited ? null : limitToString(input.sevenDay),
-    isUnlimited: input.isUnlimited,
-    allowedModelIds: input.allowedModelIds
+    isUnlimited: input.isUnlimited
   });
   return { id };
 }
@@ -358,8 +334,6 @@ export async function updateQuota(input: z.infer<typeof quotaUpdateSchema>) {
     patch.sevenDay = limitToString(updates.sevenDay);
   if (updates.isUnlimited !== undefined)
     patch.isUnlimited = updates.isUnlimited;
-  if (updates.allowedModelIds !== undefined)
-    patch.allowedModelIds = updates.allowedModelIds;
 
   // Validate the resulting limits state (existing values merged with patch).
   const existing = await db.query.quotas.findFirst({

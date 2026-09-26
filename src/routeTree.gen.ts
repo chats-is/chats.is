@@ -28,6 +28,7 @@ import { Route as ConsolePromptsRouteImport } from './routes/console/prompts'
 import { Route as ConsoleProvidersRouteImport } from './routes/console/providers'
 import { Route as ConsoleQuotasRouteImport } from './routes/console/quotas'
 import { Route as ConsoleSettingsRouteImport } from './routes/console/settings'
+import { Route as ConsoleTiersRouteImport } from './routes/console/tiers'
 import { Route as ConsoleUsageRouteImport } from './routes/console/usage'
 import { Route as ShareIdRouteImport } from './routes/share/$id'
 import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
@@ -131,6 +132,11 @@ const ConsoleSettingsRoute = ConsoleSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => ConsoleRoute,
 } as any)
+const ConsoleTiersRoute = ConsoleTiersRouteImport.update({
+  id: '/tiers',
+  path: '/tiers',
+  getParentRoute: () => ConsoleRoute,
+} as any)
 const ConsoleUsageRoute = ConsoleUsageRouteImport.update({
   id: '/usage',
   path: '/usage',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
   '/console/settings': typeof ConsoleSettingsRoute
+  '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/share/$id': typeof ShareIdRoute
   '/console/': typeof ConsoleIndexRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
   '/console/settings': typeof ConsoleSettingsRoute
+  '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/share/$id': typeof ShareIdRoute
   '/': typeof ChatIndexRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
   '/console/settings': typeof ConsoleSettingsRoute
+  '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/share/$id': typeof ShareIdRoute
   '/_chat/': typeof ChatIndexRoute
@@ -277,6 +286,7 @@ export interface FileRouteTypes {
     | '/console/providers'
     | '/console/quotas'
     | '/console/settings'
+    | '/console/tiers'
     | '/console/usage'
     | '/share/$id'
     | '/console/'
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/console/providers'
     | '/console/quotas'
     | '/console/settings'
+    | '/console/tiers'
     | '/console/usage'
     | '/share/$id'
     | '/'
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/console/providers'
     | '/console/quotas'
     | '/console/settings'
+    | '/console/tiers'
     | '/console/usage'
     | '/share/$id'
     | '/_chat/'
@@ -493,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleSettingsRouteImport
       parentRoute: typeof ConsoleRoute
     }
+    '/console/tiers': {
+      id: '/console/tiers'
+      path: '/tiers'
+      fullPath: '/console/tiers'
+      preLoaderRoute: typeof ConsoleTiersRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
     '/console/usage': {
       id: '/console/usage'
       path: '/usage'
@@ -576,6 +595,7 @@ interface ConsoleRouteChildren {
   ConsoleProvidersRoute: typeof ConsoleProvidersRoute
   ConsoleQuotasRoute: typeof ConsoleQuotasRoute
   ConsoleSettingsRoute: typeof ConsoleSettingsRoute
+  ConsoleTiersRoute: typeof ConsoleTiersRoute
   ConsoleUsageRoute: typeof ConsoleUsageRoute
   ConsoleIndexRoute: typeof ConsoleIndexRoute
   ConsoleUsersUserIdRoute: typeof ConsoleUsersUserIdRoute
@@ -590,6 +610,7 @@ const ConsoleRouteChildren: ConsoleRouteChildren = {
   ConsoleProvidersRoute: ConsoleProvidersRoute,
   ConsoleQuotasRoute: ConsoleQuotasRoute,
   ConsoleSettingsRoute: ConsoleSettingsRoute,
+  ConsoleTiersRoute: ConsoleTiersRoute,
   ConsoleUsageRoute: ConsoleUsageRoute,
   ConsoleIndexRoute: ConsoleIndexRoute,
   ConsoleUsersUserIdRoute: ConsoleUsersUserIdRoute,

@@ -1,4 +1,5 @@
 import { type UsageRowLike } from '@/types';
+import { effectiveMultiplier } from '@/lib/billing';
 import { formatNumber, formatUsd, parseNumber } from '@/lib/utils';
 
 /** One billed item of a usage row: how much, at what rate, for how much. */
@@ -26,10 +27,17 @@ const count = (n: number, one: string) =>
  * Follows the cost engine's rules (`services/pricing.ts`): an image or video
  * priced per unit bills on the count alone, otherwise on its tokens or
  * seconds; a chat's reasoning rate is stored already resolved. An item with no
- * quantity is left out.
+ * quantity is left out. Prices are the user's own — the cost price at their
+ * tier's multiplier — so the items add up to what they spent.
  */
 export function usageBreakdown(row: UsageRowLike): UsageItem[] {
   const items: UsageItem[] = [];
+  // The rates on the row are cost prices; the user's price for each is the
+  // rate times their tier's multiplier, and that is what is shown — the
+  // price they used, with nothing left for the reader to work out.
+  const multiplier = effectiveMultiplier(row.priceMultiplier);
+  const priced = (price: string | null | undefined) =>
+    price == null || price === '' ? null : num(price) * multiplier;
   /** Tokens or characters, priced per million. */
   const perMillion = (
     label: string,
@@ -38,11 +46,12 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
     unit: 'token' | 'char'
   ) => {
     if (quantity <= 0) return;
+    const rate = priced(price);
     items.push({
       label,
       quantity: count(quantity, unit),
-      rate: `${formatUsd(price)} / 1M ${unit}s`,
-      subtotal: round((quantity * num(price)) / 1_000_000)
+      rate: `${formatUsd(rate)} / 1M ${unit}s`,
+      subtotal: round((quantity * (rate ?? 0)) / 1_000_000)
     });
   };
   /** Images, videos or seconds, priced one by one. */
@@ -53,12 +62,13 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
     unit: 'image' | 'video' | 'search' | 's'
   ) => {
     if (quantity <= 0) return;
+    const rate = priced(price);
     items.push({
       label,
       quantity:
         unit === 's' ? `${formatNumber(quantity)} s` : count(quantity, unit),
-      rate: `${formatUsd(price)} / ${unit}`,
-      subtotal: round(quantity * num(price))
+      rate: `${formatUsd(rate)} / ${unit}`,
+      subtotal: round(quantity * (rate ?? 0))
     });
   };
 

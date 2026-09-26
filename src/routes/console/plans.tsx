@@ -5,6 +5,7 @@ import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
 import { planQueries } from '@/server/functions/plan';
 import { quotaQueries } from '@/server/functions/quota';
+import { tierQueries } from '@/server/functions/tier';
 import Plans, { PlansPending } from '@/components/console/plans';
 import { planTableInput } from '@/components/console/table-filters';
 
@@ -30,6 +31,7 @@ export const Route = createFileRoute('/console/plans')({
    */
   loader: ({ context }) => {
     void context.queryClient.prefetchQuery(quotaQueries.listForSelect());
+    void context.queryClient.prefetchQuery(tierQueries.listForSelect());
     return context.queryClient.ensureQueryData(
       planQueries.list(planTableInput({}))
     );

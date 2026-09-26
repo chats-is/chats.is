@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { ExternalLink } from 'lucide-react';
 
+import { describeMultiplier, effectiveMultiplier } from '@/lib/billing';
 import { usageBreakdown, usageSummary } from '@/lib/usage-breakdown';
 import { cn, formatUsd } from '@/lib/utils';
 import { type adminUsageLog } from '@/server/functions/usage';
@@ -76,12 +77,21 @@ export const usageLogColumns = ({
       meta: { align: 'right', cellClassName: 'whitespace-nowrap tabular-nums' },
       cell: ({ row }) => usageSummary(row.original)
     }),
+    helper.accessor('spend', {
+      header: 'Spend',
+      meta: {
+        align: 'right',
+        headClassName: 'w-36',
+        cellClassName: 'font-mono whitespace-nowrap'
+      },
+      cell: ({ row }) => formatUsd(row.original.spend)
+    }),
     helper.accessor('cost', {
       header: 'Cost',
       meta: {
         align: 'right',
         headClassName: 'w-36',
-        cellClassName: 'font-mono whitespace-nowrap'
+        cellClassName: 'font-mono whitespace-nowrap text-muted-foreground'
       },
       cell: ({ row }) => formatUsd(row.original.cost)
     })
@@ -112,8 +122,8 @@ const userColumn = helper.accessor('userName', {
 /**
  * What a record was billed for, a row per item under the record's own
  * columns: the item and its rate under Model, how much of it under Usage, what
- * it came to under Cost — so the quantities add up to the record's usage and
- * the subtotals to its cost, each right beneath the figure it makes up.
+ * it came to under Spend — so the quantities add up to the record's usage and
+ * the subtotals to its spend, each right beneath the figure it makes up.
  */
 export function UsageItems({
   row,
@@ -126,11 +136,20 @@ export function UsageItems({
 }) {
   const items = usageBreakdown(row);
   const cell = 'px-2 py-1.5 text-xs';
+  // Who served the call, and the tier its prices are at — its name and its
+  // multiplier as it then stood. A tier since deleted keeps the multiplier.
+  const multiplier = effectiveMultiplier(row.priceMultiplier);
+  const tier = row.tierName
+    ? `${row.tierName} × ${multiplier}`
+    : multiplier !== 1
+      ? describeMultiplier(row.priceMultiplier)
+      : null;
   const provider = (
     <TableCell
       className={cn(cell, 'text-muted-foreground', !withUser && 'pl-8')}
     >
       via {row.providerName ?? 'an unknown provider'}
+      {tier && ` · ${tier}`}
     </TableCell>
   );
   // The cells before the item's own: time, then user when there is one.
@@ -157,6 +176,7 @@ export function UsageItems({
     );
   }
 
+  // The items are at the user's own prices, and add up to the spend.
   return items.map((item, index) => (
     <TableRow
       key={item.label}

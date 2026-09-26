@@ -44,8 +44,7 @@ export const quotaCreateSchema = z.object({
   description: z.string().max(500).optional().nullable(),
   fiveHour: quotaLimitSchema.default(null),
   sevenDay: quotaLimitSchema.default(null),
-  isUnlimited: z.boolean().default(false),
-  allowedModelIds: z.array(z.string()).default([])
+  isUnlimited: z.boolean().default(false)
 });
 
 export const quotaUpdateSchema = z.object({
@@ -54,8 +53,7 @@ export const quotaUpdateSchema = z.object({
   description: z.string().max(500).optional().nullable(),
   fiveHour: quotaLimitSchema.optional(),
   sevenDay: quotaLimitSchema.optional(),
-  isUnlimited: z.boolean().optional(),
-  allowedModelIds: z.array(z.string()).optional()
+  isUnlimited: z.boolean().optional()
 });
 
 export const quotaIdSchema = z.object({ id: z.string().min(1) });

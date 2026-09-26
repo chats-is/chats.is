@@ -5,6 +5,7 @@ import {
   CreditCard,
   Gauge,
   LayoutGrid,
+  Percent,
   Settings,
   Sparkles,
   Users,
@@ -47,6 +48,11 @@ export const ConsoleNavigation = {
       title: 'Plans',
       url: '/console/plans',
       icon: CreditCard
+    },
+    {
+      title: 'Tiers',
+      url: '/console/tiers',
+      icon: Percent
     },
     {
       title: 'Usage',

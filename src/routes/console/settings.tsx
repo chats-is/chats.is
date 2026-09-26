@@ -4,6 +4,7 @@ import { pageTitle } from '@/lib/head';
 import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import { settingsQueries } from '@/server/functions/settings';
+import { tierQueries } from '@/server/functions/tier';
 import { ConsoleSettings } from '@/components/console/settings';
 
 export const Route = createFileRoute('/console/settings')({
@@ -19,7 +20,8 @@ export const Route = createFileRoute('/console/settings')({
     Promise.all([
       context.queryClient.ensureQueryData(settingsQueries.list()),
       context.queryClient.ensureQueryData(modelQueries.forSelect()),
-      context.queryClient.ensureQueryData(quotaQueries.listForSelect())
+      context.queryClient.ensureQueryData(quotaQueries.listForSelect()),
+      context.queryClient.ensureQueryData(tierQueries.listForSelect())
     ]),
   head: ({ matches }) => ({
     meta: [{ title: pageTitle(matches, 'Settings') }]

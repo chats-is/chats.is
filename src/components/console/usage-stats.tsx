@@ -15,7 +15,7 @@ import {
 } from '@/components/usage-module';
 
 /**
- * What the install spent over a window: the totals, and the day-by-day cost
+ * What the install spent over a window: the totals, and the day-by-day spend
  * by model, by provider and by capability. The overview's own section — the
  * usage page is the log of the calls behind these figures.
  */
@@ -72,21 +72,21 @@ export function UsageStats() {
               rows={data.rows}
               days={window.days}
               endDay={window.last}
-              chartTitle="Daily model cost"
+              chartTitle="Daily model spend"
             />
             <DailyStackedChart
               rows={data.rows}
               groupBy="provider"
               days={window.days}
               endDay={window.last}
-              title="Daily provider cost"
+              title="Daily provider spend"
             />
             <DailyStackedChart
               rows={data.rows}
               groupBy="capability"
               days={window.days}
               endDay={window.last}
-              title="Daily capability cost"
+              title="Daily capability spend"
             />
           </>
         )

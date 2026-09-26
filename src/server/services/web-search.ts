@@ -113,6 +113,9 @@ export async function setupWebSearch(args: {
               };
             }
 
+            // Gated like any model the user uses: priced, allowed by their
+            // tier, and within their quota. The operator picks the search
+            // model; whether this user may use it is the tier's to say.
             const pre = await preflightCheck({
               userId,
               modelKey: searchable.dbModel.modelId,

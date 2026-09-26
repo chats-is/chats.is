@@ -216,6 +216,11 @@ export const users = createTable(
       (): PgColumn => quotas.id,
       { onDelete: 'set null' }
     ),
+    // This user's own tier, over the plan's and the default's.
+    tierId: varchar('tier_id', { length: 255 }).references(
+      (): PgColumn => tiers.id,
+      { onDelete: 'restrict' }
+    ),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -232,7 +237,8 @@ export const users = createTable(
 export const usersRelations = relations(users, ({ one, many }) => ({
   accounts: many(accounts),
   plan: one(plans, { fields: [users.planId], references: [plans.id] }),
-  quota: one(quotas, { fields: [users.quotaId], references: [quotas.id] })
+  quota: one(quotas, { fields: [users.quotaId], references: [quotas.id] }),
+  tier: one(tiers, { fields: [users.tierId], references: [tiers.id] })
 }));
 
 export const accounts = createTable(
@@ -564,9 +570,7 @@ export const settings = createTable('setting', {
  *   - The system default (configured in `setting` under key `default.quotaId`,
  *     used for users with plan_id IS NULL — i.e. free users)
  *
- * allowedModelIds is a whitelist of `model.modelId` values (e.g. "gpt-4o"),
- * not `model.id` (UUID). An empty array means "no restriction" (all enabled
- * models allowed).
+ * Which models a user may use is the tier's business, not the quota's.
  */
 export const quotas = createTable('quota', {
   id: varchar('id', { length: 255 }).notNull().primaryKey(),
@@ -575,7 +579,43 @@ export const quotas = createTable('quota', {
   fiveHour: numeric('five_hour', { precision: 20, scale: 10 }),
   sevenDay: numeric('seven_day', { precision: 20, scale: 10 }),
   isUnlimited: boolean('is_unlimited').notNull().default(false),
-  allowedModelIds: jsonb('allowed_model_ids')
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow()
+});
+
+export const quotasRelations = relations(quotas, ({ many }) => ({
+  plans: many(plans),
+  users: many(users)
+}));
+
+/**
+ * Tier - what a user is entitled to: the price they are charged at, and the
+ * models they may use. Chosen by a plan, by a user (over their plan's), or
+ * as the install's default (setting `billing.tierId`); a user on none is
+ * charged the cost price and may use every model.
+ *
+ * `priceMultiplier` is what a call is charged as a multiple of the cost
+ * price the pricing table holds — 0.5 half price, 2 double — and is always
+ * above 0. `modelIds` are `model.modelId` values, not `model.id`, read by
+ * `modelRestrictionMode`: the only models allowed, or the only ones kept out; empty
+ * means every model either way.
+ */
+export const tiers = createTable('tier', {
+  id: varchar('id', { length: 255 }).notNull().primaryKey(),
+  name: varchar('name', { length: 100 }).notNull().unique(),
+  description: varchar('description', { length: 500 }),
+  priceMultiplier: numeric('price_multiplier', { precision: 10, scale: 4 })
+    .notNull()
+    .default('1'),
+  modelRestrictionMode: varchar('model_restriction_mode', { length: 8 })
+    .$type<'allow' | 'deny'>()
+    .notNull()
+    .default('allow'),
+  modelIds: jsonb('model_ids')
     .$type<Array<string>>()
     .notNull()
     .default(sql`'[]'::jsonb`),
@@ -587,7 +627,7 @@ export const quotas = createTable('quota', {
     .defaultNow()
 });
 
-export const quotasRelations = relations(quotas, ({ many }) => ({
+export const tiersRelations = relations(tiers, ({ many }) => ({
   plans: many(plans),
   users: many(users)
 }));
@@ -604,6 +644,10 @@ export const plans = createTable('plan', {
   quotaId: varchar('quota_id', { length: 255 })
     .notNull()
     .references(() => quotas.id, { onDelete: 'restrict' }),
+  // The tier the plan's users are on; none is the cost price and every model.
+  tierId: varchar('tier_id', { length: 255 }).references(() => tiers.id, {
+    onDelete: 'restrict'
+  }),
   displayOrder: integer('display_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
@@ -618,6 +662,7 @@ export const plansRelations = relations(plans, ({ one, many }) => ({
     fields: [plans.quotaId],
     references: [quotas.id]
   }),
+  tier: one(tiers, { fields: [plans.tierId], references: [tiers.id] }),
   users: many(users)
 }));
 
@@ -773,7 +818,22 @@ export const usage = createTable(
       scale: 10
     }),
 
+    // What the call cost: the quantities times the rates snapshotted above.
     cost: numeric('cost', { precision: 20, scale: 10 }).notNull().default('0'),
+    // The tier the user was on at the time, and its price multiplier as it
+    // then stood; what they spent is cost × price_multiplier. Quotas and
+    // totals count the spend. The tier is kept by id so the log can name
+    // it, and by multiplier so the row still adds up once the tier changes
+    // or goes.
+    tierId: varchar('tier_id', { length: 255 }).references(() => tiers.id, {
+      onDelete: 'set null'
+    }),
+    priceMultiplier: numeric('price_multiplier', { precision: 10, scale: 4 })
+      .notNull()
+      .default('1'),
+    spend: numeric('spend', { precision: 20, scale: 10 })
+      .notNull()
+      .default('0'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow()
