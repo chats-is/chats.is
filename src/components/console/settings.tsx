@@ -42,6 +42,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useAppForm } from '@/components/app-form';
 import { ModelStatusBadge } from '@/components/console/model-status';
+import { TierLabel } from '@/components/console/tier-label';
 
 import { expand, readPath } from './settings-values';
 
@@ -476,7 +477,8 @@ function BillingSettings({ form }: { form: SettingsFormApi }) {
 
   const tiers = (tierOptions ?? []).map(tier => ({
     value: tier.id,
-    label: `${tier.name} — ${describeMultiplier(tier.priceMultiplier)}`
+    label: `${tier.name} ${describeMultiplier(tier.priceMultiplier)}`,
+    node: <TierLabel name={tier.name} priceMultiplier={tier.priceMultiplier} />
   }));
 
   return (
@@ -485,7 +487,7 @@ function BillingSettings({ form }: { form: SettingsFormApi }) {
         icon={Percent}
         label="Default Tier"
         htmlFor="billing.tierId"
-        hint="The tier a user is on when neither they nor their plan names one: the price multiplier they are charged at and the models they may use. Unset, they are charged the cost price and may use every model."
+        hint="Used when neither the user nor their plan has a tier. Unset: the cost price and every model."
         settingKey="billing.tierId"
         state={value ? 'set' : 'unset'}
       >

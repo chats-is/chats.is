@@ -32,12 +32,10 @@ export function hasMultiplier(
   return Number.isFinite(n) && n > 0;
 }
 
-/** A tier's multiplier as the console names it: "× 1.5" — "× 1" for one
+/** A tier's multiplier as the console names it: "×1.5" — "×1" for one
  *  set to 1 — or the cost price where none is set. */
 export function describeMultiplier(
   value: string | number | null | undefined
 ): string {
-  return hasMultiplier(value)
-    ? `× ${effectiveMultiplier(value)}`
-    : 'Cost price';
+  return hasMultiplier(value) ? `×${effectiveMultiplier(value)}` : 'Cost price';
 }

@@ -118,8 +118,11 @@ const tierColumns = (actions: {
       )
     }),
     helper.accessor('priceMultiplier', {
-      header: 'Price',
-      meta: { headClassName: 'w-24', cellClassName: 'text-sm tabular-nums' },
+      header: 'Price multiplier',
+      meta: {
+        headClassName: 'w-36',
+        cellClassName: 'text-sm tabular-nums whitespace-nowrap'
+      },
       cell: ({ row }) => describeMultiplier(row.original.priceMultiplier)
     }),
     helper.accessor(row => describeModelList(row), {
@@ -356,9 +359,7 @@ export default function TiersPage() {
             <DialogHeader>
               <DialogTitle>{editingId ? 'Edit Tier' : 'New Tier'}</DialogTitle>
               <DialogDescription>
-                A tier is what plans and users are put on: the price they are
-                charged at — the cost price times the multiplier; the lower, the
-                cheaper, 0.5 is half price, 2 double — and the models they may
+                Set the price multiplier and which models users on this tier may
                 use.
               </DialogDescription>
             </DialogHeader>
@@ -393,7 +394,7 @@ export default function TiersPage() {
                       type="number"
                       min={0.01}
                       step="0.01"
-                      hint="Charged = cost price × multiplier. 0.5 is half price, 1 the cost price, 1.5 one and a half times, 2 double. Must be above 0: nothing is free."
+                      hint="Charged = cost price × multiplier. 1 charges the cost price as is; 0.5 is half price, 2 double. Must be above 0."
                     />
                   )}
                 </form.AppField>
@@ -402,7 +403,7 @@ export default function TiersPage() {
                     <field.SelectField
                       label="Models"
                       options={MODEL_RESTRICTION_MODES}
-                      hint="Allowed models: only the checked models can be used. Blocked models: the checked models cannot be used, every other one can. Nothing checked: every model can be used."
+                      hint="Allowed: only the checked models can be used. Blocked: every model but the checked ones can be used."
                     />
                   )}
                 </form.AppField>
@@ -491,7 +492,7 @@ export default function TiersPage() {
       <DataTable
         columns={columns}
         data={isLoading ? undefined : data?.rows}
-        empty="No tiers yet. A tier sets a price multiplier over the cost price — 0.5 is half price, 2 double — and the models allowed. Without one, every user is charged the cost price and may use every model."
+        empty="No tiers yet."
         pending={isPlaceholderData}
         pagination={
           data && {
@@ -511,8 +512,8 @@ export default function TiersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Tier</AlertDialogTitle>
             <AlertDialogDescription>
-              A tier still chosen by a plan or a user cannot be deleted.
-              Continue?
+              Delete this tier? A tier used by a plan, a user or as the default
+              cannot be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

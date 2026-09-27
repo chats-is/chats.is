@@ -37,7 +37,7 @@ describe('describeMultiplier', () => {
     expect(describeMultiplier(null)).toBe('Cost price');
     expect(describeMultiplier('')).toBe('Cost price');
     expect(describeMultiplier('0')).toBe('Cost price');
-    expect(describeMultiplier('1.0000')).toBe('× 1');
-    expect(describeMultiplier('1.5000')).toBe('× 1.5');
+    expect(describeMultiplier('1.0000')).toBe('×1');
+    expect(describeMultiplier('1.5000')).toBe('×1.5');
   });
 });

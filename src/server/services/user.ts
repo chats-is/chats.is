@@ -82,6 +82,13 @@ export async function listUsers(filter: z.infer<typeof userSearchSchema>) {
             name: true,
             isUnlimited: true
           }
+        },
+        tier: {
+          columns: {
+            id: true,
+            name: true,
+            priceMultiplier: true
+          }
         }
       }
     }),

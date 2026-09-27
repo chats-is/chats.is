@@ -5,7 +5,6 @@ import { pageSearchSchema } from '@/types/pagination';
 import { reportWindowSearchSchema } from '@/types/usage';
 import { pageTitle } from '@/lib/head';
 import { quotaQueries } from '@/server/functions/quota';
-import { tierQueries } from '@/server/functions/tier';
 import { usageQueries } from '@/server/functions/usage';
 import UserDetail, {
   UserDetailSkeleton
@@ -25,8 +24,6 @@ export const Route = createFileRoute('/console/users/$userId')({
   // Only what the route parameter alone decides. The usage figures are cut by
   // a window the page picks after it mounts, so they stay with the component.
   loader: ({ context, params }) => {
-    // The tiers fill a select on the page; nothing waits to know them.
-    void context.queryClient.prefetchQuery(tierQueries.listForSelect());
     return Promise.all([
       context.queryClient.ensureQueryData(
         quotaQueries.byUser({ userId: params.userId })

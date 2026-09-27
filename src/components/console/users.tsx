@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CircleCheck,
+  ExternalLink,
   Github,
   Loader2,
   Mail,
@@ -18,6 +19,7 @@ import {
   removeUserQuota,
   setUserQuota
 } from '@/server/functions/quota';
+import { setUserTier, tierQueries } from '@/server/functions/tier';
 import {
   updateUserRole,
   userQueries,
@@ -36,6 +38,7 @@ import {
 } from '@/components/console/data-table';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { userTableInput } from '@/components/console/table-filters';
+import { TierLabel } from '@/components/console/tier-label';
 import {
   ConsoleFilters,
   ConsoleSearch,
@@ -45,6 +48,11 @@ import { IconGoogle } from '@/components/icons';
 
 type User = Awaited<ReturnType<typeof listUsers>>['rows'][number];
 type QuotaOption = { id: string; name: string; isUnlimited: boolean };
+type TierOption = {
+  id: string;
+  name: string;
+  priceMultiplier: string | null;
+};
 
 const ProviderIcon = ({ provider }: { provider: string }) => {
   switch (provider.toLowerCase()) {
@@ -61,6 +69,7 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
 };
 
 const QUOTA_NONE = '__none__';
+const TIER_NONE = '__none__';
 
 const helper = createAppColumnHelper<User>();
 
@@ -70,10 +79,13 @@ const helper = createAppColumnHelper<User>();
  */
 const userColumns = (ctx: {
   quotaOptions: Array<QuotaOption> | undefined;
+  tierOptions: Array<TierOption> | undefined;
   updatingRoleUserId: string | null;
   updatingQuotaUserId: string | null;
+  updatingTierUserId: string | null;
   setRole: (user: User, role: 'user' | 'admin') => void;
   setQuota: (user: User, quotaId: string) => void;
+  setTier: (user: User, tierId: string) => void;
 }) =>
   helper.columns([
     helper.display({
@@ -106,36 +118,37 @@ const userColumns = (ctx: {
         );
       }
     }),
+    // The name, a link to the user, over the address — each cut short
+    // rather than wrapped.
     helper.accessor('name', {
-      header: 'Name',
-      // One line, cut short rather than wrapped or pushing the table wide:
-      // `max-w-0` lets the column give way below the width of its text.
-      meta: { headClassName: 'w-52', cellClassName: 'max-w-0' },
+      header: 'User',
+      meta: { headClassName: 'w-56', cellClassName: 'max-w-0' },
       cell: ({ row }) => {
         const user = row.original;
         return (
-          <Link
-            to="/console/users/$userId"
-            params={{ userId: user.id }}
-            title={user.name || undefined}
-            className="block truncate font-medium hover:text-primary"
-          >
-            {user.name || 'No name'}
-          </Link>
+          <div className="min-w-0">
+            {/* Styled as the usage log's user link: the name underlines on
+                hover, with the icon that says it opens the user. */}
+            <Link
+              to="/console/users/$userId"
+              params={{ userId: user.id }}
+              title={user.name || undefined}
+              className="group inline-flex max-w-full items-center gap-1 font-medium hover:text-primary"
+            >
+              <span className="truncate underline-offset-4 group-hover:underline">
+                {user.name || 'No name'}
+              </span>
+              <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+            </Link>
+            <div
+              className="truncate text-xs text-muted-foreground"
+              title={user.email}
+            >
+              {user.email}
+            </div>
+          </div>
         );
       }
-    }),
-    helper.accessor('email', {
-      header: 'Email',
-      meta: {
-        headClassName: 'w-76',
-        cellClassName: 'max-w-0 text-sm text-muted-foreground'
-      },
-      cell: ({ row }) => (
-        <div className="truncate" title={row.original.email}>
-          {row.original.email}
-        </div>
-      )
     }),
     helper.display({
       id: 'provider',
@@ -151,20 +164,6 @@ const userColumns = (ctx: {
             <span className="text-xs text-muted-foreground">-</span>
           )}
         </div>
-      )
-    }),
-    helper.accessor(row => row.plan?.name, {
-      id: 'plan',
-      header: 'Plan',
-      meta: {
-        align: 'center',
-        headClassName: 'w-24',
-        cellClassName: 'text-sm'
-      },
-      cell: ({ row }) => (
-        <span className={row.original.plan ? '' : 'text-muted-foreground'}>
-          {row.original.plan?.name ?? 'Free'}
-        </span>
       )
     }),
     helper.accessor('emailVerified', {
@@ -194,6 +193,20 @@ const userColumns = (ctx: {
         cellClassName: 'text-sm whitespace-nowrap'
       },
       cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
+    }),
+    helper.accessor(row => row.plan?.name, {
+      id: 'plan',
+      header: 'Plan',
+      meta: {
+        align: 'center',
+        headClassName: 'w-24',
+        cellClassName: 'text-sm'
+      },
+      cell: ({ row }) => (
+        <span className={row.original.plan ? '' : 'text-muted-foreground'}>
+          {row.original.plan?.name ?? 'No plan'}
+        </span>
+      )
     }),
     helper.accessor('role', {
       header: 'Role',
@@ -282,6 +295,46 @@ const userColumns = (ctx: {
           </div>
         );
       }
+    }),
+    // The user's own tier, over the plan's. None follows the plan.
+    helper.accessor(row => row.tier?.id, {
+      id: 'tier',
+      header: 'Tier',
+      meta: { align: 'center', headClassName: 'w-32' },
+      cell: ({ row }) => {
+        const user = row.original;
+        const saving = ctx.updatingTierUserId === user.id;
+        return (
+          <div className="flex justify-center">
+            <Select
+              value={user.tier?.id ?? TIER_NONE}
+              disabled={saving || !ctx.tierOptions?.length}
+              onValueChange={value => ctx.setTier(user, value)}
+            >
+              <SelectTrigger className="w-28">
+                {saving ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <SelectValue placeholder="None" />
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TIER_NONE}>
+                  <span className="text-muted-foreground">None</span>
+                </SelectItem>
+                {ctx.tierOptions?.map(t => (
+                  <SelectItem key={t.id} value={t.id}>
+                    <TierLabel
+                      name={t.name}
+                      priceMultiplier={t.priceMultiplier}
+                    />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      }
     })
   ]);
 
@@ -304,10 +357,13 @@ export function UsersPending() {
     <ConsoleTableSkeleton
       columns={userColumns({
         quotaOptions: undefined,
+        tierOptions: undefined,
         updatingRoleUserId: null,
         updatingQuotaUserId: null,
+        updatingTierUserId: null,
         setRole: noop,
-        setQuota: noop
+        setQuota: noop,
+        setTier: noop
       })}
       action="text"
     />
@@ -323,6 +379,9 @@ export default function UsersPage() {
   const [updatingQuotaUserId, setUpdatingQuotaUserId] = useState<string | null>(
     null
   );
+  const [updatingTierUserId, setUpdatingTierUserId] = useState<string | null>(
+    null
+  );
 
   const queryClient = useQueryClient();
   const { data, isLoading, isPlaceholderData } = useQuery(
@@ -330,6 +389,7 @@ export default function UsersPage() {
   );
   const { data: stats } = useQuery(userQueries.stats());
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
+  const { data: tierOptions } = useQuery(tierQueries.listForSelect());
 
   const updateRoleMutation = useMutation({
     mutationFn: mutating(updateUserRole),
@@ -378,12 +438,30 @@ export default function UsersPage() {
     }
   });
 
+  const setTierMutation = useMutation({
+    mutationFn: mutating(setUserTier),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
+      await queryClient.invalidateQueries({
+        queryKey: userQueries.key.detail()
+      });
+      setUpdatingTierUserId(null);
+      toast.success('Tier updated');
+    },
+    onError: error => {
+      setUpdatingTierUserId(null);
+      toast.error(error.message);
+    }
+  });
+
   const columns = useMemo(
     () =>
       userColumns({
         quotaOptions,
+        tierOptions,
         updatingRoleUserId,
         updatingQuotaUserId,
+        updatingTierUserId,
         setRole: (user, role) => {
           setUpdatingRoleUserId(user.id);
           updateRoleMutation.mutate({ id: user.id, role });
@@ -395,9 +473,22 @@ export default function UsersPage() {
           } else {
             setQuotaMutation.mutate({ userId: user.id, quotaId });
           }
+        },
+        setTier: (user, tierId) => {
+          setUpdatingTierUserId(user.id);
+          setTierMutation.mutate({
+            id: user.id,
+            tierId: tierId === TIER_NONE ? null : tierId
+          });
         }
       }),
-    [quotaOptions, updatingRoleUserId, updatingQuotaUserId]
+    [
+      quotaOptions,
+      tierOptions,
+      updatingRoleUserId,
+      updatingQuotaUserId,
+      updatingTierUserId
+    ]
   );
 
   return (

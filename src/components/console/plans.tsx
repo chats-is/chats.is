@@ -51,6 +51,7 @@ import {
 } from '@/components/console/data-table';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { planTableInput } from '@/components/console/table-filters';
+import { TierLabel } from '@/components/console/tier-label';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 
 type Plan = Awaited<ReturnType<typeof listPlans>>['rows'][number];
@@ -317,7 +318,8 @@ export default function PlansPage() {
       { value: NO_TIER, label: 'No tier' },
       ...(tierOptions ?? []).map(t => ({
         value: t.id,
-        label: `${t.name} — ${describeMultiplier(t.priceMultiplier)}`
+        label: `${t.name} ${describeMultiplier(t.priceMultiplier)}`,
+        node: <TierLabel name={t.name} priceMultiplier={t.priceMultiplier} />
       }))
     ],
     [tierOptions]
@@ -396,7 +398,7 @@ export default function PlansPage() {
                     <field.SelectField
                       label="Tier"
                       options={tierSelectOptions}
-                      hint="What the plan's users get: the price multiplier they are charged at and the models they may use. A user put on a tier of their own gets that instead."
+                      hint="The price multiplier and models for this plan's users. A user's own tier takes its place."
                     />
                   )}
                 </form.AppField>

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
 import { quotaQueries } from '@/server/functions/quota';
+import { tierQueries } from '@/server/functions/tier';
 import { userQueries } from '@/server/functions/user';
 import { userTableInput } from '@/components/console/table-filters';
 import Users, { UsersPending } from '@/components/console/users';
@@ -35,6 +36,7 @@ export const Route = createFileRoute('/console/users/')({
   loader: ({ context }) => {
     void context.queryClient.prefetchQuery(userQueries.stats());
     void context.queryClient.prefetchQuery(quotaQueries.listForSelect());
+    void context.queryClient.prefetchQuery(tierQueries.listForSelect());
     return context.queryClient.ensureQueryData(
       userQueries.list(userTableInput({}))
     );

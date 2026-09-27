@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Link, useCanGoBack, useRouter } from '@tanstack/react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  RefreshCw,
+  ShieldCheck,
+  User as UserIcon
+} from 'lucide-react';
 
-import { type UserTier } from '@/types';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { describeMultiplier } from '@/lib/billing';
 import { CAPABILITIES } from '@/lib/constant';
-import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { quotaQueries } from '@/server/functions/quota';
-import { setUserTier, tierQueries } from '@/server/functions/tier';
 import { usageQueries } from '@/server/functions/usage';
 import { userQueries } from '@/server/functions/user';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,11 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { DataTable } from '@/components/console/data-table';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
@@ -132,7 +138,7 @@ export default function UserDetail({ userId }: { userId: string }) {
 
       <Card className="py-0">
         <CardContent className="grid gap-6 p-5 md:grid-cols-2">
-          <div className="flex min-w-0 items-center gap-4">
+          <div className="flex min-w-0 items-start gap-4">
             <div className="size-14 shrink-0 overflow-hidden rounded-full border bg-muted">
               {user.image ? (
                 <img
@@ -153,37 +159,41 @@ export default function UserDetail({ userId }: { userId: string }) {
                 <h1 className="truncate text-xl font-semibold">
                   {user.name || 'No name'}
                 </h1>
-                <Badge variant="secondary">{user.role}</Badge>
+                {/* The same icon and word the users table shows for a role. */}
+                <Badge>
+                  {user.role === 'admin' ? <ShieldCheck /> : <UserIcon />}
+                  {user.role === 'admin' ? 'Admin' : 'User'}
+                </Badge>
               </div>
               <div className="truncate text-sm text-muted-foreground">
-                {user.email}
+                {user.email} · Joined{' '}
+                {new Date(user.createdAt).toLocaleString()}
               </div>
+              {/* What the user is on — plan, quota, tier — then what they
+                  have done. */}
               <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
                 {status && (
                   <>
-                    <span>{status.plan?.name ?? 'No plan'}</span>
+                    <Hint label="Plan">{status.plan?.name ?? 'No plan'}</Hint>
                     <span>·</span>
-                    <span>
+                    <Hint label="Quota — the spending limits">
                       {status.source === 'none'
                         ? 'No quota'
-                        : `Quota ${status.name ?? '—'}, ${sourceLabel[status.source] ?? status.source}`}
-                    </span>
+                        : `${status.name ?? '—'}, ${sourceLabel[status.source] ?? status.source}`}
+                    </Hint>
                     <span>·</span>
                   </>
                 )}
-                <span>
+                <Hint label="Tier — the price multiplier and the models allowed">
                   {user.effectiveTier.tier
-                    ? `${user.effectiveTier.tier.name} (${describeMultiplier(user.effectiveTier.priceMultiplier)}), ${sourceLabel[user.effectiveTier.source] ?? user.effectiveTier.source}`
+                    ? `${user.effectiveTier.tier.name} ${describeMultiplier(user.effectiveTier.priceMultiplier)}, ${sourceLabel[user.effectiveTier.source] ?? user.effectiveTier.source}`
                     : 'No tier'}
-                </span>
-                <span>·</span>
+                </Hint>
+              </div>
+              <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
                 <span>{user.chatCount} chats</span>
                 <span>·</span>
                 <span>{user.messageCount} messages</span>
-                <span>·</span>
-                <span>
-                  Joined {new Date(user.createdAt).toLocaleDateString()}
-                </span>
               </div>
             </div>
           </div>
@@ -216,11 +226,6 @@ export default function UserDetail({ userId }: { userId: string }) {
                 Their quota sets no limits.
               </p>
             )}
-            <TierOverride
-              userId={userId}
-              own={user.tierId}
-              inForce={user.effectiveTier}
-            />
           </div>
         </CardContent>
       </Card>
@@ -250,77 +255,24 @@ export default function UserDetail({ userId }: { userId: string }) {
   );
 }
 
-/**
- * The user's own tier, over the plan's and the default's. "Follow the plan"
- * is the choice of none, and says what then applies.
- */
-function TierOverride({
-  userId,
-  own,
-  inForce
+/** A fact in the header, with what it is on hover: the line names them by
+ *  value alone, and a plan, a quota and a tier can share a name. */
+function Hint({
+  label,
+  children
 }: {
-  userId: string;
-  own: string | null;
-  inForce: UserTier;
+  label: string;
+  children: React.ReactNode;
 }) {
-  const queryClient = useQueryClient();
-  const { data: tierOptions } = useQuery(tierQueries.listForSelect());
-
-  const save = useMutation({
-    mutationFn: mutating(setUserTier),
-    onSuccess: () => {
-      toast.success('Tier saved');
-      return queryClient.invalidateQueries({
-        queryKey: userQueries.detail({ id: userId }).queryKey
-      });
-    },
-    onError: e => toast.error(e.message)
-  });
-
-  // What applies with none of their own — the plan's or the default — so the
-  // choice of none is not a blank.
-  const followed =
-    inForce.source === 'override' || inForce.source === 'none'
-      ? 'No tier'
-      : `${inForce.tier?.name} (${describeMultiplier(inForce.priceMultiplier)}), ${sourceLabel[inForce.source]}`;
-
   return (
-    <div className="space-y-2 border-t pt-4">
-      <div className="flex items-baseline justify-between gap-4 text-sm">
-        <span className="font-medium">Tier</span>
-        <span className="text-xs text-muted-foreground">
-          {own ? 'set on the user' : followed}
-        </span>
-      </div>
-      <Select
-        value={own ?? NO_TIER}
-        disabled={save.isPending || !tierOptions}
-        onValueChange={value =>
-          save.mutate({ id: userId, tierId: value === NO_TIER ? null : value })
-        }
-      >
-        <SelectTrigger className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NO_TIER}>
-            {inForce.source === 'override' || inForce.source === 'none'
-              ? 'Follow the plan'
-              : `Follow the plan — ${followed}`}
-          </SelectItem>
-          {tierOptions?.map(tier => (
-            <SelectItem key={tier.id} value={tier.id}>
-              {tier.name} — {describeMultiplier(tier.priceMultiplier)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-default">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
-
-/** The select's value for a user on no tier of their own. */
-const NO_TIER = '__none__';
 
 /**
  * One window of the user's limits: its name and when it resets, over a bar of
@@ -481,7 +433,7 @@ export function UserDetailSkeleton() {
       </div>
       <Card className="py-0">
         <CardContent className="grid gap-6 p-5 md:grid-cols-2">
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-4">
             <Skeleton className="size-14 rounded-full" />
             <div className="space-y-2">
               <Skeleton className="h-6 w-40" />
