@@ -54,6 +54,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useAppForm } from '@/components/app-form';
 import { ModelStatusBadge } from '@/components/console/model-status';
+import { PaymentConfigurationButton } from '@/components/console/payment-configuration';
 import { TierLabel } from '@/components/console/tier-label';
 
 import { expand, readPath } from './settings-values';
@@ -551,7 +552,12 @@ function SubscriptionSettings({ form }: { form: SettingsFormApi }) {
     <SettingsList title="Subscriptions">
       <SettingsRow
         icon={CalendarCheck}
-        label="Enable Subscriptions"
+        label={
+          <span className="inline-flex items-center gap-1.5">
+            Enable Subscriptions
+            <PaymentConfigurationButton />
+          </span>
+        }
         htmlFor="subscriptions.enabled"
         hint="Whether subscriptions are available. Existing subscriptions keep running when it is off."
         settingKey="subscriptions.enabled"

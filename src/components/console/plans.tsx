@@ -63,6 +63,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { PaymentConfigurationAlert } from '@/components/console/payment-configuration';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { planTableInput } from '@/components/console/table-filters';
 import { TierLabel } from '@/components/console/tier-label';
@@ -626,6 +627,7 @@ export default function PlansPage() {
                   </form.AppField>
                 </div>
                 <div className="space-y-4 border-t pt-4">
+                  <PaymentConfigurationAlert processor={processor} />
                   <div className="grid grid-cols-2 gap-4">
                     <form.AppField name="billingType">
                       {field => (
