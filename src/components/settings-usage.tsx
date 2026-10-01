@@ -29,7 +29,16 @@ export function SettingsUsage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Usage</h1>
+          {/* The limits are the plan's: named beside the title, Free
+              without one, once known. */}
+          <h1 className="flex items-baseline gap-2 text-xl font-semibold">
+            Usage
+            {quota && (
+              <span className="text-sm font-normal text-muted-foreground">
+                {quota.plan?.name ?? 'Free'}
+              </span>
+            )}
+          </h1>
           <p className="text-sm text-muted-foreground">
             Your remaining limits.
           </p>

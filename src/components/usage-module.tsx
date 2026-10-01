@@ -47,21 +47,13 @@ export function LimitsSkeleton() {
 
 /**
  * Skeleton placeholder mirroring `UsageModule`'s layout (KPI cards + chart),
- * shown while usage data loads. `isAdmin` adds the spend tile and chart.
+ * shown while usage data loads.
  */
-export function UsageModuleSkeleton({
-  isAdmin = false
-}: {
-  isAdmin?: boolean;
-}) {
+export function UsageModuleSkeleton() {
   return (
     <div className="space-y-4">
-      <div
-        className={
-          isAdmin ? 'grid gap-4 md:grid-cols-4' : 'grid gap-4 md:grid-cols-2'
-        }
-      >
-        {Array.from({ length: isAdmin ? 4 : 2 }).map((_, i) => (
+      <div className="grid gap-4 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="py-0">
             <CardContent className="space-y-2 p-4">
               <Skeleton className="h-4 w-16" />
@@ -71,14 +63,12 @@ export function UsageModuleSkeleton({
           </Card>
         ))}
       </div>
-      {isAdmin && (
-        <Card className="py-0">
-          <CardContent className="space-y-3 p-4">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-40 w-full" />
-          </CardContent>
-        </Card>
-      )}
+      <Card className="py-0">
+        <CardContent className="space-y-3 p-4">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-40 w-full" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -177,12 +167,8 @@ function bucketByLocalDay(rows: UsageRow[], groupBy: GroupBy): DailyDay[] {
       };
       dayMap.set(groupKey, g);
     }
-    // Money is admin-only; user rows have no such fields — fall back to 0.
-    const rowSpend =
-      'spend' in r && r.spend !== undefined ? Number(r.spend) : 0;
-    const rowCost = 'cost' in r && r.cost !== undefined ? Number(r.cost) : 0;
-    g.spend = (Number(g.spend) + rowSpend).toString();
-    g.cost = (Number(g.cost) + rowCost).toString();
+    g.spend = (Number(g.spend) + Number(r.spend)).toString();
+    g.cost = (Number(g.cost) + Number(r.cost)).toString();
     g.requests += 1;
     g.inputTokens += Number(r.inputTokens ?? 0);
     g.outputTokens += Number(r.outputTokens ?? 0);
@@ -503,8 +489,7 @@ type Props = {
   chartTitle?: string;
 };
 
-/** KPI tiles + (admin only) the by-model daily spend chart.
- *  Auto-detects mode from the presence of `totalSpend` in `kpi`. */
+/** KPI tiles and the by-model daily spend chart. */
 export function UsageModule({
   kpi,
   rows,
@@ -512,8 +497,6 @@ export function UsageModule({
   endDay,
   chartTitle = 'Daily spend'
 }: Props) {
-  // User mode strips all cost-related UI. Detected by absence of totalCost.
-  const isAdmin = 'totalSpend' in kpi;
   // Every token the calls used. The buckets are stored apart — input is the
   // uncached part only, output the text only (see normalizeChatUsage) — so
   // the total is their sum, and matches what the usage log counts per row.
@@ -573,61 +556,51 @@ export function UsageModule({
 
   return (
     <div className="space-y-4">
-      <div
-        className={
-          isAdmin ? 'grid gap-4 md:grid-cols-4' : 'grid gap-4 md:grid-cols-2'
-        }
-      >
-        {isAdmin && (
-          <Card className="py-0">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium text-muted-foreground">
-                Spend
-              </div>
-              <div className="text-2xl font-bold">
-                {formatUsd(kpi.totalSpend)}
-              </div>
-              <Sparkline
-                color="#3b82f6"
-                points={series.map(s => ({
-                  day: s.day,
-                  value: s.spend,
-                  tooltip: (
-                    <SparkTooltip
-                      day={s.day}
-                      items={[{ label: 'Spend', value: formatUsd(s.spend) }]}
-                    />
-                  )
-                }))}
-              />
-            </CardContent>
-          </Card>
-        )}
-        {isAdmin && (
-          <Card className="py-0">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium text-muted-foreground">
-                Cost
-              </div>
-              <div className="text-2xl font-bold">
-                {formatUsd(kpi.totalCost)}
-              </div>
-              <Sparkline
-                color="#64748b"
-                points={series.map(s => ({
-                  day: s.day,
-                  value: s.cost,
-                  tooltip: (
-                    <SparkTooltip
-                      day={s.day}
-                      items={[{ label: 'Cost', value: formatUsd(s.cost) }]}
-                    />
-                  )
-                }))}
-              />
-            </CardContent>
-          </Card>
-        )}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="py-0">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-muted-foreground">
+              Spend
+            </div>
+            <div className="text-2xl font-bold">
+              {formatUsd(kpi.totalSpend)}
+            </div>
+            <Sparkline
+              color="#3b82f6"
+              points={series.map(s => ({
+                day: s.day,
+                value: s.spend,
+                tooltip: (
+                  <SparkTooltip
+                    day={s.day}
+                    items={[{ label: 'Spend', value: formatUsd(s.spend) }]}
+                  />
+                )
+              }))}
+            />
+          </CardContent>
+        </Card>
+        <Card className="py-0">
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-muted-foreground">
+              Cost
+            </div>
+            <div className="text-2xl font-bold">{formatUsd(kpi.totalCost)}</div>
+            <Sparkline
+              color="#64748b"
+              points={series.map(s => ({
+                day: s.day,
+                value: s.cost,
+                tooltip: (
+                  <SparkTooltip
+                    day={s.day}
+                    items={[{ label: 'Cost', value: formatUsd(s.cost) }]}
+                  />
+                )
+              }))}
+            />
+          </CardContent>
+        </Card>
         <Card className="py-0">
           <CardContent className="p-4">
             <div className="text-sm font-medium text-muted-foreground">
@@ -735,15 +708,13 @@ export function UsageModule({
         </Card>
       </div>
 
-      {isAdmin && (
-        <DailyStackedChart
-          rows={rows}
-          groupBy="model"
-          days={days}
-          endDay={endDay}
-          title={chartTitle}
-        />
-      )}
+      <DailyStackedChart
+        rows={rows}
+        groupBy="model"
+        days={days}
+        endDay={endDay}
+        title={chartTitle}
+      />
     </div>
   );
 }

@@ -256,7 +256,7 @@ export default function UserDetail({ userId }: { userId: string }) {
           endDay={window.last}
         />
       ) : (
-        <UsageModuleSkeleton isAdmin />
+        <UsageModuleSkeleton />
       )}
 
       <UserLogs userId={userId} from={window.start} to={until} />
@@ -481,7 +481,7 @@ export function UserDetailSkeleton() {
         </CardContent>
       </Card>
       <Skeleton className="h-9 w-36" />
-      <UsageModuleSkeleton isAdmin />
+      <UsageModuleSkeleton />
       <ConsoleTableSkeleton columns={4} search={false} filters={2} />
     </div>
   );

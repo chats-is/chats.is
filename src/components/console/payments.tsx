@@ -111,6 +111,24 @@ const paymentColumns = (act: (payment: Row) => void) =>
       cell: ({ row }) => <RefundedAmount payment={row.original} showSource />
     }),
     helper.display({
+      id: 'refundFee',
+      header: 'Refund Fee',
+      meta: { cellClassName: 'text-sm text-muted-foreground tabular-nums' },
+      // The rule a refund sent from here went by, and what it kept back:
+      // what was paid less what went back.
+      cell: ({ row }) => {
+        const { refundFee, amount, refundAmount } = row.original;
+        if (refundFee == null) return null;
+        const rule = refundFee === 'auto' ? 'Auto' : `${refundFee}%`;
+        const kept = Math.max(0, Number(amount) - Number(refundAmount));
+        return (
+          <span className="whitespace-nowrap">
+            {rule} · {formatPrice(kept)}
+          </span>
+        );
+      }
+    }),
+    helper.display({
       id: 'status',
       header: 'Status',
       cell: ({ row }) => <PaymentStatusBadge status={row.original.status} />

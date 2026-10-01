@@ -158,15 +158,20 @@ const planColumns = (actions: {
       // Held at one width across the quotas, plans and tiers tables, so the
       // name sits in the same place on each.
       meta: { headClassName: 'w-56 min-w-56' },
+      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>
+    }),
+    helper.display({
+      id: 'description',
+      header: 'Description',
+      meta: { cellClassName: 'max-w-72' },
+      // Its points one to a line, as the plan's card shows them.
       cell: ({ row }) => (
-        <>
-          <div className="font-medium">{row.original.name}</div>
-          {row.original.description && (
-            <div className="text-xs text-muted-foreground">
-              {row.original.description}
-            </div>
-          )}
-        </>
+        <div
+          className="line-clamp-2 text-sm whitespace-pre-line text-muted-foreground"
+          title={row.original.description ?? undefined}
+        >
+          {row.original.description}
+        </div>
       )
     }),
     helper.display({
@@ -556,7 +561,7 @@ export default function PlansPage() {
               New Plan
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingId ? 'Edit Plan' : 'New Plan'}</DialogTitle>
               <DialogDescription>
@@ -598,28 +603,29 @@ export default function PlansPage() {
                     />
                   )}
                 </form.AppField>
-                <form.AppField name="quotaId">
-                  {field => (
-                    <field.SelectField
-                      label="Quota"
-                      placeholder="Select a quota"
-                      options={quotaSelectOptions}
-                    />
-                  )}
-                </form.AppField>
-                {/* A select has no empty value, so "no tier" is a value of
-                    its own, mapped back to none on the way out. */}
-                <form.AppField name="tierId">
-                  {field => (
-                    <field.SelectField
-                      label="Tier"
-                      options={tierSelectOptions}
-                      hint="The price multiplier and models for this plan's users. A user's own tier takes its place."
-                    />
-                  )}
-                </form.AppField>
+                <div className="grid grid-cols-2 items-start gap-4">
+                  <form.AppField name="quotaId">
+                    {field => (
+                      <field.SelectField
+                        label="Quota"
+                        placeholder="Select a quota"
+                        options={quotaSelectOptions}
+                      />
+                    )}
+                  </form.AppField>
+                  {/* A select has no empty value, so "no tier" is a value of
+                      its own, mapped back to none on the way out. */}
+                  <form.AppField name="tierId">
+                    {field => (
+                      <field.SelectField
+                        label="Tier"
+                        options={tierSelectOptions}
+                        hint="The price multiplier and models for this plan's users. A user's own tier takes its place."
+                      />
+                    )}
+                  </form.AppField>
+                </div>
                 <div className="space-y-4 border-t pt-4">
-                  <div className="text-sm font-medium">Price</div>
                   <div className="grid grid-cols-2 gap-4">
                     <form.AppField name="billingType">
                       {field => (

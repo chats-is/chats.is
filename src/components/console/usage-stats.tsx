@@ -63,7 +63,7 @@ export function UsageStats() {
       </div>
 
       {isLoading ? (
-        <UsageModuleSkeleton isAdmin />
+        <UsageModuleSkeleton />
       ) : (
         data && (
           <>

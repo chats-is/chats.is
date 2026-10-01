@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useSystemSettingsIfLoaded } from '@/contexts/system-settings-context';
 import { useQuery } from '@tanstack/react-query';
 import {
+  ChevronsUpDown,
   CreditCard,
   ExternalLink,
   LayoutDashboard,
@@ -11,7 +12,6 @@ import {
 } from 'lucide-react';
 
 import { authClient } from '@/lib/auth-client';
-import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { subscriptionQueries } from '@/server/functions/subscription';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar
@@ -82,9 +81,7 @@ export function UserMenu() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              // The sidebar makes room for a menu action by padding the
-              // button; the room here is kept by the name instead.
-              className="group-has-data-[sidebar=menu-action]/menu-item:pr-2 group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="size-6 rounded-full">
                 <AvatarImage src={user.image || ''} alt={user.name || ''} />
@@ -96,20 +93,35 @@ export function UserMenu() {
               </Avatar>
               {/* The name and the plan on one line; the name gives way when
                   it is long, the plan never does. */}
-              <div
-                className={cn(
-                  'flex min-w-0 flex-1 items-baseline gap-2 text-left text-sm leading-tight',
-                  // Room for the upgrade button laid over the right end.
-                  offerUpgrade && 'pr-[4.5rem]'
-                )}
-              >
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{user.name}</span>
                 {planName && (
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {planName}
                   </span>
                 )}
+                {offerUpgrade && (
+                  // Right after the plan. Inside the menu's button, which
+                  // cannot hold another, so a pill that takes the press for
+                  // itself; the menu's own "Upgrade plan" is the way for
+                  // the keyboard.
+                  <span
+                    aria-hidden
+                    onPointerDown={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      openPlans?.();
+                    }}
+                    className="shrink-0 cursor-pointer rounded-full border bg-background px-2 py-0.5 text-xs font-medium hover:bg-accent"
+                  >
+                    Upgrade
+                  </span>
+                )}
               </div>
+              <ChevronsUpDown className="ml-auto size-4 shrink-0" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -198,17 +210,6 @@ export function UserMenu() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {offerUpgrade && (
-          // Beside the menu's button, not inside it: a button cannot hold
-          // another. Placed from the item's edge, so a pixel further in for
-          // the button's border: as far inside it as the avatar is.
-          <SidebarMenuAction
-            onClick={() => openPlans?.()}
-            className="top-1/2! right-[calc(0.5rem+1px)] aspect-auto h-6 w-auto -translate-y-1/2 rounded-full border bg-background px-2.5 text-xs font-medium hover:bg-accent"
-          >
-            Upgrade
-          </SidebarMenuAction>
-        )}
       </SidebarMenuItem>
     </SidebarMenu>
   );

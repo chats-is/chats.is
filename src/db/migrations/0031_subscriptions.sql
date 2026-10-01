@@ -9,17 +9,19 @@ CREATE TABLE "payment" (
 	"external_id" varchar(255) NOT NULL,
 	"transaction_id" varchar(255),
 	"amount" numeric(12, 2) NOT NULL,
-	"amount_refunded" numeric(12, 2) DEFAULT '0' NOT NULL,
-	"refunded_by" varchar(255),
+	"refund_amount" numeric(12, 2) DEFAULT '0' NOT NULL,
+	"refund_by" varchar(255),
 	"refund_request_id" varchar(255),
+	"refund_fee" varchar(8),
+	"refund_at" timestamp with time zone,
 	"fee" numeric(12, 2),
 	"tax" numeric(12, 2),
 	"status" varchar(32) NOT NULL,
 	"invoice_url" text,
 	"billed_at" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "payment_refunded_check" CHECK ("payment"."amount_refunded" <= "payment"."amount"),
-	CONSTRAINT "payment_refund_request_check" CHECK ("payment"."refund_request_id" is null or "payment"."refunded_by" is not null)
+	CONSTRAINT "payment_refunded_check" CHECK ("payment"."refund_amount" <= "payment"."amount"),
+	CONSTRAINT "payment_refund_request_check" CHECK ("payment"."refund_request_id" is null or "payment"."refund_by" is not null)
 );
 --> statement-breakpoint
 CREATE TABLE "refund_request" (
@@ -60,7 +62,7 @@ ALTER TABLE "plan" ADD COLUMN "is_enabled" boolean DEFAULT false NOT NULL;--> st
 ALTER TABLE "payment" ADD CONSTRAINT "payment_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment" ADD CONSTRAINT "payment_subscription_id_subscription_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscription"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment" ADD CONSTRAINT "payment_plan_id_plan_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."plan"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "payment" ADD CONSTRAINT "payment_refunded_by_user_id_fk" FOREIGN KEY ("refunded_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "payment" ADD CONSTRAINT "payment_refund_by_user_id_fk" FOREIGN KEY ("refund_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment" ADD CONSTRAINT "payment_refund_request_id_refund_request_id_fk" FOREIGN KEY ("refund_request_id") REFERENCES "public"."refund_request"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refund_request" ADD CONSTRAINT "refund_request_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refund_request" ADD CONSTRAINT "refund_request_subscription_id_subscription_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscription"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

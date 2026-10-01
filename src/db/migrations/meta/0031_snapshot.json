@@ -1,5 +1,5 @@
 {
-  "id": "e1305133-3ac5-48e4-bf63-cbd5df310286",
+  "id": "0c614fc4-a39b-48cc-a156-9808cbabf711",
   "prevId": "6e62c63e-6fb9-423d-82e5-3d561b077dea",
   "version": "7",
   "dialect": "postgresql",
@@ -1245,15 +1245,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "amount_refunded": {
-          "name": "amount_refunded",
+        "refund_amount": {
+          "name": "refund_amount",
           "type": "numeric(12, 2)",
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
         },
-        "refunded_by": {
-          "name": "refunded_by",
+        "refund_by": {
+          "name": "refund_by",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
@@ -1261,6 +1261,18 @@
         "refund_request_id": {
           "name": "refund_request_id",
           "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refund_fee": {
+          "name": "refund_fee",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refund_at": {
+          "name": "refund_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -1431,12 +1443,12 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "payment_refunded_by_user_id_fk": {
-          "name": "payment_refunded_by_user_id_fk",
+        "payment_refund_by_user_id_fk": {
+          "name": "payment_refund_by_user_id_fk",
           "tableFrom": "payment",
           "tableTo": "user",
           "columnsFrom": [
-            "refunded_by"
+            "refund_by"
           ],
           "columnsTo": [
             "id"
@@ -1464,11 +1476,11 @@
       "checkConstraints": {
         "payment_refunded_check": {
           "name": "payment_refunded_check",
-          "value": "\"payment\".\"amount_refunded\" <= \"payment\".\"amount\""
+          "value": "\"payment\".\"refund_amount\" <= \"payment\".\"amount\""
         },
         "payment_refund_request_check": {
           "name": "payment_refund_request_check",
-          "value": "\"payment\".\"refund_request_id\" is null or \"payment\".\"refunded_by\" is not null"
+          "value": "\"payment\".\"refund_request_id\" is null or \"payment\".\"refund_by\" is not null"
         }
       },
       "isRLSEnabled": false
