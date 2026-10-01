@@ -77,13 +77,19 @@ const privatePages = createMiddleware({ type: 'request' }).server(
  *
  * The server routes under /api that act on the session are the same kind of
  * endpoint — a chat turn, a speech request, a deleted file — so they are held
- * to it too. Two are not. The OAuth providers return through /api/auth/* from
+ * to it too. Three are not. The OAuth providers return through /api/auth/* from
  * their own origin, which is cross-site by definition, and better-auth does
  * its own checking there. And blob storage reports a finished upload to
  * /api/files/upload from its servers, with no origin to check at all; that
- * route signs nothing without a session.
+ * route signs nothing without a session. A payment processor's webhook is
+ * the same: called from its servers, with no origin and no cookies, and
+ * acting only on a body the processor signed.
  */
 const UNCHECKED_API = ['/api/auth/', '/api/files/upload'];
+
+/** `/api/payments/{processor}/webhook`. */
+const isPaymentWebhook = (pathname: string) =>
+  /^\/api\/payments\/[^/]+\/webhook$/.test(pathname);
 
 const csrf = createCsrfMiddleware({
   filter: ctx => {
@@ -94,7 +100,8 @@ const csrf = createCsrfMiddleware({
       pathname.startsWith('/api/') &&
       // Reads change nothing, and a resumed stream is one of them.
       ctx.request.method !== 'GET' &&
-      !UNCHECKED_API.some(path => pathname.startsWith(path))
+      !UNCHECKED_API.some(path => pathname.startsWith(path)) &&
+      !isPaymentWebhook(pathname)
     );
   }
 });

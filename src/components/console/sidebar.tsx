@@ -1,7 +1,9 @@
 import * as React from 'react';
 import { Link, useLocation } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 
 import { ConsoleNavigation } from '@/lib/console-navigation';
+import { subscriptionQueries } from '@/server/functions/subscription';
 import {
   SidebarContent,
   SidebarFooter,
@@ -10,18 +12,25 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   Sidebar as SidebarPrimitive,
   SidebarRail,
   SidebarTrigger
 } from '@/components/ui/sidebar';
+import { refundRequestTableInput } from '@/components/console/table-filters';
 import { UserMenu } from '@/components/user-menu';
 
 export function Sidebar({
   ...props
 }: React.ComponentProps<typeof SidebarPrimitive>) {
   const pathname = useLocation({ select: l => l.pathname });
+  // Refund requests waiting on an admin, beside their page.
+  const { data: requests } = useQuery(
+    subscriptionQueries.refundRequests(refundRequestTableInput({}))
+  );
+  const pendingRequests = requests?.pendingApproval ?? 0;
 
   return (
     <SidebarPrimitive collapsible="icon" {...props}>
@@ -69,6 +78,10 @@ export function Sidebar({
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
+                    {item.url === '/console/refund-requests' &&
+                      pendingRequests > 0 && (
+                        <SidebarMenuBadge>{pendingRequests}</SidebarMenuBadge>
+                      )}
                   </SidebarMenuItem>
                 );
               })}

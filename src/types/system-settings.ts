@@ -15,6 +15,8 @@ export interface SystemDefaults {
 
 export interface SystemSettings {
   speechEnabled: boolean;
+  /** Whether users can buy a plan. */
+  subscriptionsEnabled: boolean;
   chatModels: Model[];
   imageModels: Model[];
   videoModels: Model[];

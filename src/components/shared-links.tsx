@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
 import { Link, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -7,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useSharedLinks } from '@/hooks/use-shared-links';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { LocalTime } from '@/components/local-time';
 import { LocalTablePagination } from '@/components/table-pagination';
 
 /** Shorter than the console's tables: this one sits in a dialog, where a long
@@ -114,7 +114,7 @@ export function SharedLinks() {
                       </a>
                     </td>
                     <td className="p-3">
-                      {format(sharedLink.createdAt, 'MMMM d, yyyy')}
+                      <LocalTime value={sharedLink.createdAt} />
                     </td>
                     <td className="p-3 text-right">
                       <Button

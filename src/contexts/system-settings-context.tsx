@@ -41,3 +41,12 @@ export function useSystemSettings() {
   }
   return context;
 }
+
+/**
+ * The system settings where they have arrived, or null. For a component that
+ * also renders in a shell still waiting for them — the user menu — and
+ * leaves out what depends on them until they come.
+ */
+export function useSystemSettingsIfLoaded(): SystemSettings | null {
+  return useContext(SystemSettingsContext);
+}

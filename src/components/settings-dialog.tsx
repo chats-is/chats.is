@@ -1,8 +1,18 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import { useSystemSettings } from '@/contexts/system-settings-context';
-import { BarChart3, Link2, Settings, User, Volume2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  BarChart3,
+  CreditCard,
+  Link2,
+  Settings,
+  User,
+  Volume2
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { paymentQueries } from '@/server/functions/payment';
+import { subscriptionQueries } from '@/server/functions/subscription';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import { SettingsBilling } from '@/components/settings-billing';
 import { SettingsGeneral } from '@/components/settings-general';
 import { SettingsProfile } from '@/components/settings-profile';
 import { SettingsSpeech } from '@/components/settings-speech';
@@ -34,6 +45,7 @@ const PANELS = [
   { value: 'general', label: 'General', icon: Settings },
   { value: 'speech', label: 'Speech', icon: Volume2 },
   { value: 'profile', label: 'Profile', icon: User },
+  { value: 'billing', label: 'Billing', icon: CreditCard },
   { value: 'usage', label: 'Usage', icon: BarChart3 },
   { value: 'shared-links', label: 'Shared Links', icon: Link2 }
 ] as const;
@@ -50,6 +62,8 @@ function PanelBody({ panel }: { panel: Panel }) {
       return <SettingsSpeech />;
     case 'usage':
       return <SettingsUsage />;
+    case 'billing':
+      return <SettingsBilling />;
     case 'shared-links':
       return <SharedLinks />;
   }
@@ -57,19 +71,37 @@ function PanelBody({ panel }: { panel: Panel }) {
 
 function SettingsDialog({
   open,
-  onOpenChange
+  onOpenChange,
+  panel,
+  setPanel
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  panel: Panel;
+  setPanel: (panel: Panel) => void;
 }) {
-  const { ttsModels, speechEnabled } = useSystemSettings();
+  const { ttsModels, speechEnabled, subscriptionsEnabled } =
+    useSystemSettings();
   const isSpeechAvailable = (ttsModels?.length ?? 0) > 0 && speechEnabled;
+  // Offered while subscriptions are on, and whether or not they are to
+  // anyone with a subscription to manage or payments to look back on.
+  const { data: subscription } = useQuery({
+    ...subscriptionQueries.mine(),
+    enabled: open && !subscriptionsEnabled
+  });
+  const { data: payments } = useQuery({
+    ...paymentQueries.mine(),
+    enabled: open && !subscriptionsEnabled
+  });
+  const isBillingShown =
+    subscriptionsEnabled || !!subscription || !!payments?.length;
 
   const panels = PANELS.filter(
-    panel => panel.value !== 'speech' || isSpeechAvailable
+    panel =>
+      (panel.value !== 'speech' || isSpeechAvailable) &&
+      (panel.value !== 'billing' || isBillingShown)
   );
 
-  const [panel, setPanel] = useState<Panel>('general');
   // Speech can disappear while the dialog is shut — an admin turning it off —
   // which would otherwise leave the dialog open on a tab that is no longer
   // offered.
@@ -115,7 +147,11 @@ function SettingsDialog({
 
           {/* Keyed by panel so a switch starts the new one at the top rather
               than inheriting the scroll position of the one before it. */}
-          <div key={current} className="min-w-0 flex-1 overflow-y-auto p-5">
+          <div
+            key={current}
+            // Every panel's buttons are pills.
+            className="min-w-0 flex-1 overflow-y-auto p-5 [&_[data-slot=button]]:rounded-full"
+          >
             <PanelBody panel={current} />
           </div>
         </div>
@@ -124,7 +160,12 @@ function SettingsDialog({
   );
 }
 
-const OpenSettings = createContext<(() => void) | null>(null);
+const OpenSettings = createContext<((panel?: Panel) => void) | null>(null);
+
+const CloseSettings = createContext<(() => void) | null>(null);
+
+const isPanel = (value: unknown): value is Panel =>
+  PANELS.some(panel => panel.value === value);
 
 /**
  * Holds the settings dialog, and hands out the way to open it.
@@ -140,12 +181,24 @@ export function SettingsDialogProvider({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const openSettings = useCallback(() => setOpen(true), []);
+  const [panel, setPanel] = useState<Panel>('general');
+  const openSettings = useCallback((panel?: Panel) => {
+    if (isPanel(panel)) setPanel(panel);
+    setOpen(true);
+  }, []);
+  const closeSettings = useCallback(() => setOpen(false), []);
 
   return (
     <OpenSettings.Provider value={openSettings}>
-      {children}
-      <SettingsDialog open={open} onOpenChange={setOpen} />
+      <CloseSettings.Provider value={closeSettings}>
+        {children}
+        <SettingsDialog
+          open={open}
+          onOpenChange={setOpen}
+          panel={panel}
+          setPanel={setPanel}
+        />
+      </CloseSettings.Provider>
     </OpenSettings.Provider>
   );
 }
@@ -157,4 +210,10 @@ export function SettingsDialogProvider({
  */
 export function useOpenSettings() {
   return useContext(OpenSettings);
+}
+
+/** Close the settings — for a panel that hands the user on to another
+ *  dialog, which should not open on top of this one. */
+export function useCloseSettings() {
+  return useContext(CloseSettings);
 }

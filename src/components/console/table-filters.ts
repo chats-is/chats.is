@@ -78,3 +78,45 @@ export const tierTableInput = (search: PageOnly) => ({
 export const quotaTableInput = (search: PageOnly) => ({
   page: pageOf(search.page)
 });
+
+/** Subscriptions narrow by status and processor beside the search; either
+ *  at `all` is no filter. */
+type SubscriptionSearch = SearchOnly & { status?: string; processor?: string };
+const STATUSES = ['active', 'canceled'] as const;
+const PROCESSORS = ['stripe', 'paddle', 'lemonsqueezy'] as const;
+const oneOf = <T extends string>(options: readonly T[], value?: string) =>
+  options.includes(value as T) ? (value as T) : undefined;
+
+export const subscriptionTableInput = (search: SubscriptionSearch) => ({
+  status: oneOf(STATUSES, search.status),
+  processor: oneOf(PROCESSORS, search.processor),
+  q: termOf(search.q),
+  page: pageOf(search.page)
+});
+
+/** Payments narrow by status and processor beside the search; either at
+ *  `all` is no filter. */
+const PAYMENT_STATUSES = [
+  'paid',
+  'failed',
+  'refund_pending',
+  'refunded',
+  'disputed'
+] as const;
+export const paymentTableInput = (search: SubscriptionSearch) => ({
+  status: oneOf(PAYMENT_STATUSES, search.status),
+  processor: oneOf(PROCESSORS, search.processor),
+  q: termOf(search.q),
+  page: pageOf(search.page)
+});
+
+/** Refund requests narrow by status beside the search; `all` is no
+ *  filter. */
+const REQUEST_STATUSES = ['pending_approval', 'approved', 'rejected'] as const;
+export const refundRequestTableInput = (
+  search: SearchOnly & { status?: string }
+) => ({
+  status: oneOf(REQUEST_STATUSES, search.status),
+  q: termOf(search.q),
+  page: pageOf(search.page)
+});

@@ -17,7 +17,7 @@ vi.mock('@/db', () => ({
 }));
 vi.mock('@/lib/env', () => ({ env: {} }));
 
-const { getSystemSettings } = await import('./settings');
+const { bulkUpdateSettings, getSystemSettings } = await import('./settings');
 
 let client: { close?: () => Promise<void> } | undefined;
 
@@ -77,5 +77,74 @@ describe('getSystemSettings', () => {
     ]) {
       expect(wire).not.toContain(secret);
     }
+  });
+});
+
+describe('bulkUpdateSettings', () => {
+  const read = async () =>
+    Object.fromEntries(
+      (
+        await h.db.query.settings.findMany({
+          where: (t: typeof schema.settings, { like }: any) =>
+            like(t.key, 'bulk.%')
+        })
+      ).map((row: { key: string; value: string | null }) => [
+        row.key,
+        row.value
+      ])
+    );
+
+  it('writes keys that have a row and makes the ones that have none', async () => {
+    await h.db
+      .insert(schema.settings)
+      .values({ id: 's-old', key: 'bulk.a', value: 'before' });
+
+    await bulkUpdateSettings([
+      { key: 'bulk.a', value: 'after' },
+      { key: 'bulk.b', value: 'new' },
+      { key: 'bulk.c', value: null }
+    ]);
+
+    expect(await read()).toEqual({
+      'bulk.a': 'after',
+      'bulk.b': 'new',
+      'bulk.c': null
+    });
+    // The existing row is written in place, not replaced.
+    const row = await h.db.query.settings.findFirst({
+      where: (t: typeof schema.settings, { eq }: any) => eq(t.key, 'bulk.a')
+    });
+    expect(row?.id).toBe('s-old');
+  });
+
+  it('keeps the last value of a key named twice', async () => {
+    await bulkUpdateSettings([
+      { key: 'bulk.d', value: 'first' },
+      { key: 'bulk.d', value: 'last' }
+    ]);
+    expect((await read())['bulk.d']).toBe('last');
+  });
+
+  it('refuses a value its setting cannot hold, and takes an empty one', async () => {
+    await expect(
+      bulkUpdateSettings([{ key: 'refunds.days', value: '16' }])
+    ).rejects.toThrow('From 1 to 15 days');
+    await expect(
+      bulkUpdateSettings([{ key: 'refunds.fee', value: '12' }])
+    ).rejects.toThrow('percentages offered');
+    await expect(
+      bulkUpdateSettings([{ key: 'refunds.maxRequests', value: '8' }])
+    ).rejects.toThrow('numbers offered');
+    await expect(
+      bulkUpdateSettings([
+        { key: 'refunds.fee', value: '10' },
+        { key: 'refunds.days', value: null },
+        { key: 'refunds.maxRequests', value: null }
+      ])
+    ).resolves.toBeUndefined();
+  });
+
+  it('does nothing when given nothing', async () => {
+    await expect(bulkUpdateSettings([])).resolves.toBeUndefined();
   });
 });

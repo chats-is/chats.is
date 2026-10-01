@@ -34,7 +34,7 @@ import { TablePaginationSkeleton } from '@/components/table-pagination';
  * that has not mounted yet, so each page states it: `search` for the box it
  * opens with — Plans and Quotas have none — `filters` for the selects beside
  * it, and `action` for what closes the row on the right, a button on most
- * pages and a line of counts on Users. A toolbar that stands in with more
+ * pages, a line of counts on Users, nothing on Payments and Subscriptions. A toolbar that stands in with more
  * controls than the page has is a toolbar that moves when the page arrives.
  */
 function ToolbarSkeleton({
@@ -54,17 +54,14 @@ function ToolbarSkeleton({
           <Skeleton key={i} className="h-9 w-40 shrink-0" />
         ))}
       </div>
-      {action === 'button' ? (
-        <Skeleton className="h-9 w-28" />
-      ) : (
-        <Skeleton className="h-4 w-44" />
-      )}
+      {action === 'button' && <Skeleton className="h-9 w-28" />}
+      {action === 'text' && <Skeleton className="h-4 w-44" />}
     </div>
   );
 }
 
 /** What sits at the right end of a console toolbar. */
-type ToolbarAction = 'button' | 'text';
+type ToolbarAction = 'button' | 'text' | 'none';
 
 /**
  * A console table, waiting for its first page.

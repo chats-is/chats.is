@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router';
+import { useSystemSettingsIfLoaded } from '@/contexts/system-settings-context';
+import { useQuery } from '@tanstack/react-query';
 import {
-  ChevronsUpDown,
+  CreditCard,
   ExternalLink,
-  Github,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -10,7 +11,9 @@ import {
 } from 'lucide-react';
 
 import { authClient } from '@/lib/auth-client';
+import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { subscriptionQueries } from '@/server/functions/subscription';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -21,11 +24,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { IconGitHub } from '@/components/icons';
+import { useOpenPlans } from '@/components/plans-dialog';
 import { useOpenSettings } from '@/components/settings-dialog';
 
 export function UserMenu() {
@@ -33,6 +39,20 @@ export function UserMenu() {
   const { isMobile, state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const openSettings = useOpenSettings();
+  const openPlans = useOpenPlans();
+  const subscriptionsEnabled =
+    useSystemSettingsIfLoaded()?.subscriptionsEnabled ?? false;
+  // The plan the user is on, beside their name: that of their subscription,
+  // which every change to it refreshes — Free without one. Shown once
+  // known, so it does not flick from Free to the plan.
+  const { data: subscription, isSuccess } = useQuery({
+    ...subscriptionQueries.mine(),
+    enabled: !!user
+  });
+  const planName = isSuccess ? (subscription?.planName ?? 'Free') : null;
+  // On Free, the way up sits beside it, while plans are sold.
+  const offerUpgrade =
+    isSuccess && !subscription && subscriptionsEnabled && !!openPlans;
 
   if (isLoading) {
     return (
@@ -42,7 +62,7 @@ export function UserMenu() {
             size="lg"
             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
-            <Skeleton className="size-8 rounded-full" />
+            <Skeleton className="size-6 rounded-full" />
             <div className="grid flex-1 gap-1 text-left text-sm leading-tight">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3 w-32" />
@@ -62,21 +82,34 @@ export function UserMenu() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              // The sidebar makes room for a menu action by padding the
+              // button; the room here is kept by the name instead.
+              className="group-has-data-[sidebar=menu-action]/menu-item:pr-2 group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="size-8 rounded-full border">
+              <Avatar className="size-6 rounded-full">
                 <AvatarImage src={user.image || ''} alt={user.name || ''} />
-                <AvatarFallback className="rounded-full">
+                <AvatarFallback className="rounded-full text-[10px]">
                   {user.name
                     ? user.name.slice(0, 2).toUpperCase()
                     : (user.email?.[0] || '?').toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              {/* The name and the plan on one line; the name gives way when
+                  it is long, the plan never does. */}
+              <div
+                className={cn(
+                  'flex min-w-0 flex-1 items-baseline gap-2 text-left text-sm leading-tight',
+                  // Room for the upgrade button laid over the right end.
+                  offerUpgrade && 'pr-[4.5rem]'
+                )}
+              >
                 <span className="truncate font-semibold">{user.name}</span>
-                <span className="truncate text-xs">{user.email}</span>
+                {planName && (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {planName}
+                  </span>
+                )}
               </div>
-              <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -87,11 +120,21 @@ export function UserMenu() {
           >
             {openSettings && (
               <DropdownMenuItem
-                onClick={openSettings}
+                onClick={() => openSettings()}
                 className="flex items-center gap-2"
               >
                 <Settings className="size-4" />
                 Settings
+              </DropdownMenuItem>
+            )}
+            {/* Once subscribed, upgrading is done from Billing. */}
+            {offerUpgrade && (
+              <DropdownMenuItem
+                onClick={() => openPlans?.()}
+                className="flex items-center gap-2"
+              >
+                <CreditCard className="size-4" />
+                Upgrade plan
               </DropdownMenuItem>
             )}
             {user.admin && (
@@ -135,7 +178,7 @@ export function UserMenu() {
                 className="flex w-full items-center justify-between"
               >
                 <div className="flex items-center gap-2">
-                  <Github className="size-4" />
+                  <IconGitHub className="size-4" />
                   GitHub
                 </div>
                 <ExternalLink className="size-4" />
@@ -155,6 +198,17 @@ export function UserMenu() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {offerUpgrade && (
+          // Beside the menu's button, not inside it: a button cannot hold
+          // another. Placed from the item's edge, so a pixel further in for
+          // the button's border: as far inside it as the avatar is.
+          <SidebarMenuAction
+            onClick={() => openPlans?.()}
+            className="top-1/2! right-[calc(0.5rem+1px)] aspect-auto h-6 w-auto -translate-y-1/2 rounded-full border bg-background px-2.5 text-xs font-medium hover:bg-accent"
+          >
+            Upgrade
+          </SidebarMenuAction>
+        )}
       </SidebarMenuItem>
     </SidebarMenu>
   );

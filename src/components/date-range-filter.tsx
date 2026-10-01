@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { type DateRange } from 'react-day-picker';
 
+import { formatDate } from '@/lib/format-date';
 import { cn, reportWindowStart } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -152,8 +153,8 @@ export function DateRangeFilter({
           {preset
             ? preset.label
             : start.getTime() === last.getTime()
-              ? format(start, 'LLL d, y')
-              : `${format(start, 'LLL d, y')} – ${format(last, 'LLL d, y')}`}
+              ? formatDate(start)
+              : `${formatDate(start)} – ${formatDate(last)}`}
         </Button>
       </PopoverTrigger>
       <PopoverContent

@@ -13,6 +13,7 @@ import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
+import { hasActiveSubscription } from '@/server/services/subscription';
 import { getUserTier } from '@/server/services/tier';
 
 /**
@@ -103,14 +104,6 @@ export async function listUsers(filter: z.infer<typeof userSearchSchema>) {
   };
 }
 
-/** Pass planId=null to clear it; the user falls back to the default. */
-export async function updateUserPlan(id: string, planId: string | null) {
-  await db
-    .update(users)
-    .set({ planId, updatedAt: new Date() })
-    .where(eq(users.id, id));
-}
-
 /**
  * One user with what the console's detail page shows: linked accounts, how
  * much they have written, and the tier in force for them. Throws when the
@@ -184,6 +177,13 @@ export async function deleteUser(actingUserId: string, id: string) {
 
   if (user[0]?.role === 'admin') {
     throw new PublicError('Cannot delete admin accounts');
+  }
+
+  // Deleting the account would not stop the processor charging for it.
+  if (await hasActiveSubscription(id)) {
+    throw new PublicError(
+      'This user has an active subscription, so the account cannot be deleted.'
+    );
   }
 
   // Everything the account owns goes with the row. Its files are not rows,

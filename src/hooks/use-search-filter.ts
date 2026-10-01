@@ -8,6 +8,8 @@ type Filters = {
   priced: string;
   model: string;
   user: string;
+  status: string;
+  processor: string;
   days: number;
   page: number;
 };

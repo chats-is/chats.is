@@ -1,10 +1,11 @@
 import '@tanstack/react-start/server-only';
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { type Model } from '@/types';
-import { type settingSchema } from '@/types/settings';
+import { refundDaysOf, refundFeeOf, refundRequestsOf } from '@/types/payment';
+import { SETTING_VALUE_SCHEMAS, type settingSchema } from '@/types/settings';
 import {
   DEFAULT_APP_DESCRIPTION,
   DEFAULT_APP_NAME,
@@ -14,6 +15,7 @@ import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { settings } from '@/db/schema';
+import { PublicError } from '@/server/public-error';
 import {
   findModelByModelId,
   getAllModels,
@@ -76,6 +78,42 @@ export const getDefaultTierId = perRequest(
     return values['billing.tierId'] || null;
   }
 );
+
+/**
+ * Whether users can buy a plan (setting `subscriptions.enabled`). Only the
+ * selling: a subscription already bought keeps running, and its webhooks
+ * are handled, either way.
+ */
+export const getSubscriptionsEnabled = perRequest(
+  'getSubscriptionsEnabled',
+  async (): Promise<boolean> => {
+    const values = await getSettings(['subscriptions.enabled']);
+    return values['subscriptions.enabled'] === 'true';
+  }
+);
+
+/**
+ * Refunds (`refunds.*`): whether users refund their own subscription
+ * (`enabled`), what a refund keeps back — the processor's fee, or a
+ * percentage of the payment (`fee`) — for how many days after a payment
+ * (`days`), and how many requests one subscription can have
+ * (`maxRequests`, null for no limit). An admin refunds from the console whatever the switch says,
+ * starting from the same amount.
+ */
+export const getRefundPolicy = perRequest('getRefundPolicy', async () => {
+  const values = await getSettings([
+    'refunds.enabled',
+    'refunds.fee',
+    'refunds.days',
+    'refunds.maxRequests'
+  ]);
+  return {
+    enabled: values['refunds.enabled'] === 'true',
+    refundFee: refundFeeOf(values['refunds.fee']),
+    days: refundDaysOf(values['refunds.days']),
+    maxRequests: refundRequestsOf(values['refunds.maxRequests'])
+  };
+});
 
 /**
  * Reading a message aloud runs on the same text-to-speech model the chat tool
@@ -242,6 +280,7 @@ export async function getSystemSettings() {
     getAllModels(),
     getSettings([
       'speech.enabled',
+      'subscriptions.enabled',
       'default.chat.modelId',
       'default.image.modelId',
       'default.image.editModelId',
@@ -257,6 +296,7 @@ export async function getSystemSettings() {
 
   return {
     speechEnabled: values['speech.enabled'] === 'true',
+    subscriptionsEnabled: values['subscriptions.enabled'] === 'true',
     chatModels: allModels.filter(m => m.capability === 'chat'),
     imageModels: allModels.filter(m => m.capability === 'image'),
     videoModels: allModels.filter(m => m.capability === 'video'),
@@ -290,6 +330,18 @@ export async function getSystemSettings() {
 // Admin writes
 // ============================================================================
 
+/** Refuse a value its setting cannot hold; empty is its default. */
+function requireValidValue({ key, value }: z.infer<typeof settingSchema>) {
+  const schema = SETTING_VALUE_SCHEMAS[key];
+  if (!schema || value == null || value === '') return;
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    throw new PublicError(
+      `${key}: ${parsed.error.issues[0]?.message ?? 'Not a valid value.'}`
+    );
+  }
+}
+
 export async function listSettings() {
   return await db.query.settings.findMany();
 }
@@ -302,6 +354,7 @@ export async function listSettings() {
  * to reach for.
  */
 export async function updateSetting(input: z.infer<typeof settingSchema>) {
+  requireValidValue(input);
   const existing = await db.query.settings.findFirst({
     where: eq(settings.key, input.key)
   });
@@ -320,14 +373,30 @@ export async function updateSetting(input: z.infer<typeof settingSchema>) {
   }
 }
 
-/** One after another rather than in a transaction, as it was: the console
- *  saves a form's worth of independent keys, not one atomic change. */
+/**
+ * A form's worth of settings in one statement: each key's row is written, or
+ * made when it has none. One round trip rather than a read and a write per
+ * key — against a database across the network, that was the difference
+ * between a save that is instant and one that took over ten seconds.
+ */
 export async function bulkUpdateSettings(
   input: z.infer<typeof settingSchema>[]
 ) {
-  for (const item of input) {
-    await updateSetting(item);
-  }
+  // The last of a key named twice is the one kept, as writing them in turn
+  // would have left it; Postgres refuses one statement touching a row twice.
+  input.forEach(requireValidValue);
+  const byKey = new Map(input.map(item => [item.key, item.value]));
+  if (byKey.size === 0) return;
+
+  await db
+    .insert(settings)
+    .values(
+      [...byKey].map(([key, value]) => ({ id: generateUUID(), key, value }))
+    )
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: { value: sql`excluded.value`, updatedAt: new Date() }
+    });
 }
 
 export async function deleteSetting(key: string) {

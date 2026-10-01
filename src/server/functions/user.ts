@@ -5,7 +5,6 @@ import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   profileUpdateSchema,
   userIdSchema,
-  userPlanSchema,
   userRoleSchema,
   userSearchSchema
 } from '@/types/user';
@@ -35,14 +34,6 @@ export const listUsers = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(userSearchSchema)
   .handler(({ data }) => users.listUsers(data));
-
-/**
- * Admin: change a user's plan. Pass planId=null to clear (fall back to default).
- */
-export const updateUserPlan = createServerFn({ method: 'POST' })
-  .middleware([adminMiddleware])
-  .validator(userPlanSchema)
-  .handler(({ data }) => users.updateUserPlan(data.id, data.planId));
 
 export const getUser = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])

@@ -8,6 +8,7 @@ import { type adminUsageLog } from '@/server/functions/usage';
 import { Badge } from '@/components/ui/badge';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { createAppColumnHelper } from '@/components/console/data-table';
+import { LocalTime } from '@/components/local-time';
 
 /**
  * The usage log, as the console shows it wherever it shows one: a line per
@@ -32,12 +33,12 @@ export const usageLogColumns = ({
 }) =>
   helper.columns([
     helper.accessor('createdAt', {
-      header: 'Time',
+      header: 'Created',
       meta: {
         headClassName: 'w-52',
         cellClassName: 'text-xs whitespace-nowrap text-muted-foreground'
       },
-      cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
+      cell: ({ row }) => <LocalTime value={row.original.createdAt} />
     }),
     ...(withUser ? [userColumn] : []),
     helper.accessor('modelId', {

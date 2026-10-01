@@ -22,14 +22,18 @@ import { Route as ApiFilesRouteRouteImport } from './routes/api/files/route'
 import { Route as ApiSpeechRouteImport } from './routes/api/speech'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
 import { Route as ConsoleModelsRouteImport } from './routes/console/models'
+import { Route as ConsolePaymentsRouteImport } from './routes/console/payments'
 import { Route as ConsolePlansRouteImport } from './routes/console/plans'
 import { Route as ConsolePricingRouteImport } from './routes/console/pricing'
 import { Route as ConsolePromptsRouteImport } from './routes/console/prompts'
 import { Route as ConsoleProvidersRouteImport } from './routes/console/providers'
 import { Route as ConsoleQuotasRouteImport } from './routes/console/quotas'
+import { Route as ConsoleRefundRequestsRouteImport } from './routes/console/refund-requests'
 import { Route as ConsoleSettingsRouteImport } from './routes/console/settings'
+import { Route as ConsoleSubscriptionsRouteImport } from './routes/console/subscriptions'
 import { Route as ConsoleTiersRouteImport } from './routes/console/tiers'
 import { Route as ConsoleUsageRouteImport } from './routes/console/usage'
+import { Route as PayPaddleRouteImport } from './routes/pay/paddle'
 import { Route as ShareIdRouteImport } from './routes/share/$id'
 import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
 import { Route as ApiArtifactsPreviewRouteImport } from './routes/api/artifacts/preview'
@@ -37,6 +41,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiFilesUploadRouteImport } from './routes/api/files/upload'
 import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users/index'
 import { Route as ConsoleUsersUserIdRouteImport } from './routes/console/users/$userId'
+import { Route as ApiPaymentsProcessorWebhookRouteImport } from './routes/api/payments/$processor/webhook'
 
 const ChatRoute = ChatRouteImport.update({
   id: '/_chat',
@@ -102,6 +107,11 @@ const ConsoleModelsRoute = ConsoleModelsRouteImport.update({
   path: '/models',
   getParentRoute: () => ConsoleRoute,
 } as any)
+const ConsolePaymentsRoute = ConsolePaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => ConsoleRoute,
+} as any)
 const ConsolePlansRoute = ConsolePlansRouteImport.update({
   id: '/plans',
   path: '/plans',
@@ -127,9 +137,19 @@ const ConsoleQuotasRoute = ConsoleQuotasRouteImport.update({
   path: '/quotas',
   getParentRoute: () => ConsoleRoute,
 } as any)
+const ConsoleRefundRequestsRoute = ConsoleRefundRequestsRouteImport.update({
+  id: '/refund-requests',
+  path: '/refund-requests',
+  getParentRoute: () => ConsoleRoute,
+} as any)
 const ConsoleSettingsRoute = ConsoleSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleSubscriptionsRoute = ConsoleSubscriptionsRouteImport.update({
+  id: '/subscriptions',
+  path: '/subscriptions',
   getParentRoute: () => ConsoleRoute,
 } as any)
 const ConsoleTiersRoute = ConsoleTiersRouteImport.update({
@@ -141,6 +161,11 @@ const ConsoleUsageRoute = ConsoleUsageRouteImport.update({
   id: '/usage',
   path: '/usage',
   getParentRoute: () => ConsoleRoute,
+} as any)
+const PayPaddleRoute = PayPaddleRouteImport.update({
+  id: '/pay/paddle',
+  path: '/pay/paddle',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ShareIdRoute = ShareIdRouteImport.update({
   id: '/share/$id',
@@ -177,6 +202,12 @@ const ConsoleUsersUserIdRoute = ConsoleUsersUserIdRouteImport.update({
   path: '/users/$userId',
   getParentRoute: () => ConsoleRoute,
 } as any)
+const ApiPaymentsProcessorWebhookRoute =
+  ApiPaymentsProcessorWebhookRouteImport.update({
+    id: '/api/payments/$processor/webhook',
+    path: '/api/payments/$processor/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
@@ -190,14 +221,18 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
+  '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
   '/console/pricing': typeof ConsolePricingRoute
   '/console/prompts': typeof ConsolePromptsRoute
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
+  '/console/refund-requests': typeof ConsoleRefundRequestsRoute
   '/console/settings': typeof ConsoleSettingsRoute
+  '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
+  '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/console/': typeof ConsoleIndexRoute
   '/chat/$chatId': typeof ChatChatChatIdRoute
@@ -206,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
+  '/api/payments/$processor/webhook': typeof ApiPaymentsProcessorWebhookRoute
 }
 export interface FileRoutesByTo {
   '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
@@ -217,14 +253,18 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
+  '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
   '/console/pricing': typeof ConsolePricingRoute
   '/console/prompts': typeof ConsolePromptsRoute
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
+  '/console/refund-requests': typeof ConsoleRefundRequestsRoute
   '/console/settings': typeof ConsoleSettingsRoute
+  '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
+  '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/': typeof ChatIndexRoute
   '/console': typeof ConsoleIndexRoute
@@ -234,6 +274,7 @@ export interface FileRoutesByTo {
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users': typeof ConsoleUsersIndexRoute
+  '/api/payments/$processor/webhook': typeof ApiPaymentsProcessorWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -248,14 +289,18 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
+  '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
   '/console/pricing': typeof ConsolePricingRoute
   '/console/prompts': typeof ConsolePromptsRoute
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
+  '/console/refund-requests': typeof ConsoleRefundRequestsRoute
   '/console/settings': typeof ConsoleSettingsRoute
+  '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
+  '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/_chat/': typeof ChatIndexRoute
   '/console/': typeof ConsoleIndexRoute
@@ -265,6 +310,7 @@ export interface FileRoutesById {
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
+  '/api/payments/$processor/webhook': typeof ApiPaymentsProcessorWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -280,14 +326,18 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/speech'
     | '/console/models'
+    | '/console/payments'
     | '/console/plans'
     | '/console/pricing'
     | '/console/prompts'
     | '/console/providers'
     | '/console/quotas'
+    | '/console/refund-requests'
     | '/console/settings'
+    | '/console/subscriptions'
     | '/console/tiers'
     | '/console/usage'
+    | '/pay/paddle'
     | '/share/$id'
     | '/console/'
     | '/chat/$chatId'
@@ -296,6 +346,7 @@ export interface FileRouteTypes {
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users/'
+    | '/api/payments/$processor/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/artifact-preview-frame'
@@ -307,14 +358,18 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/speech'
     | '/console/models'
+    | '/console/payments'
     | '/console/plans'
     | '/console/pricing'
     | '/console/prompts'
     | '/console/providers'
     | '/console/quotas'
+    | '/console/refund-requests'
     | '/console/settings'
+    | '/console/subscriptions'
     | '/console/tiers'
     | '/console/usage'
+    | '/pay/paddle'
     | '/share/$id'
     | '/'
     | '/console'
@@ -324,6 +379,7 @@ export interface FileRouteTypes {
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users'
+    | '/api/payments/$processor/webhook'
   id:
     | '__root__'
     | '/_chat'
@@ -337,14 +393,18 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/speech'
     | '/console/models'
+    | '/console/payments'
     | '/console/plans'
     | '/console/pricing'
     | '/console/prompts'
     | '/console/providers'
     | '/console/quotas'
+    | '/console/refund-requests'
     | '/console/settings'
+    | '/console/subscriptions'
     | '/console/tiers'
     | '/console/usage'
+    | '/pay/paddle'
     | '/share/$id'
     | '/_chat/'
     | '/console/'
@@ -354,6 +414,7 @@ export interface FileRouteTypes {
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users/'
+    | '/api/payments/$processor/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -365,9 +426,11 @@ export interface RootRouteChildren {
   ApiFilesRouteRoute: typeof ApiFilesRouteRouteWithChildren
   ApiChatRoute: typeof ApiChatRoute
   ApiSpeechRoute: typeof ApiSpeechRoute
+  PayPaddleRoute: typeof PayPaddleRoute
   ShareIdRoute: typeof ShareIdRoute
   ApiArtifactsPreviewRoute: typeof ApiArtifactsPreviewRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiPaymentsProcessorWebhookRoute: typeof ApiPaymentsProcessorWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -463,6 +526,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleModelsRouteImport
       parentRoute: typeof ConsoleRoute
     }
+    '/console/payments': {
+      id: '/console/payments'
+      path: '/payments'
+      fullPath: '/console/payments'
+      preLoaderRoute: typeof ConsolePaymentsRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
     '/console/plans': {
       id: '/console/plans'
       path: '/plans'
@@ -498,11 +568,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleQuotasRouteImport
       parentRoute: typeof ConsoleRoute
     }
+    '/console/refund-requests': {
+      id: '/console/refund-requests'
+      path: '/refund-requests'
+      fullPath: '/console/refund-requests'
+      preLoaderRoute: typeof ConsoleRefundRequestsRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
     '/console/settings': {
       id: '/console/settings'
       path: '/settings'
       fullPath: '/console/settings'
       preLoaderRoute: typeof ConsoleSettingsRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/subscriptions': {
+      id: '/console/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/console/subscriptions'
+      preLoaderRoute: typeof ConsoleSubscriptionsRouteImport
       parentRoute: typeof ConsoleRoute
     }
     '/console/tiers': {
@@ -518,6 +602,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/console/usage'
       preLoaderRoute: typeof ConsoleUsageRouteImport
       parentRoute: typeof ConsoleRoute
+    }
+    '/pay/paddle': {
+      id: '/pay/paddle'
+      path: '/pay/paddle'
+      fullPath: '/pay/paddle'
+      preLoaderRoute: typeof PayPaddleRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/share/$id': {
       id: '/share/$id'
@@ -568,6 +659,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleUsersUserIdRouteImport
       parentRoute: typeof ConsoleRoute
     }
+    '/api/payments/$processor/webhook': {
+      id: '/api/payments/$processor/webhook'
+      path: '/api/payments/$processor/webhook'
+      fullPath: '/api/payments/$processor/webhook'
+      preLoaderRoute: typeof ApiPaymentsProcessorWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -589,12 +687,15 @@ const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface ConsoleRouteChildren {
   ConsoleModelsRoute: typeof ConsoleModelsRoute
+  ConsolePaymentsRoute: typeof ConsolePaymentsRoute
   ConsolePlansRoute: typeof ConsolePlansRoute
   ConsolePricingRoute: typeof ConsolePricingRoute
   ConsolePromptsRoute: typeof ConsolePromptsRoute
   ConsoleProvidersRoute: typeof ConsoleProvidersRoute
   ConsoleQuotasRoute: typeof ConsoleQuotasRoute
+  ConsoleRefundRequestsRoute: typeof ConsoleRefundRequestsRoute
   ConsoleSettingsRoute: typeof ConsoleSettingsRoute
+  ConsoleSubscriptionsRoute: typeof ConsoleSubscriptionsRoute
   ConsoleTiersRoute: typeof ConsoleTiersRoute
   ConsoleUsageRoute: typeof ConsoleUsageRoute
   ConsoleIndexRoute: typeof ConsoleIndexRoute
@@ -604,12 +705,15 @@ interface ConsoleRouteChildren {
 
 const ConsoleRouteChildren: ConsoleRouteChildren = {
   ConsoleModelsRoute: ConsoleModelsRoute,
+  ConsolePaymentsRoute: ConsolePaymentsRoute,
   ConsolePlansRoute: ConsolePlansRoute,
   ConsolePricingRoute: ConsolePricingRoute,
   ConsolePromptsRoute: ConsolePromptsRoute,
   ConsoleProvidersRoute: ConsoleProvidersRoute,
   ConsoleQuotasRoute: ConsoleQuotasRoute,
+  ConsoleRefundRequestsRoute: ConsoleRefundRequestsRoute,
   ConsoleSettingsRoute: ConsoleSettingsRoute,
+  ConsoleSubscriptionsRoute: ConsoleSubscriptionsRoute,
   ConsoleTiersRoute: ConsoleTiersRoute,
   ConsoleUsageRoute: ConsoleUsageRoute,
   ConsoleIndexRoute: ConsoleIndexRoute,
@@ -641,9 +745,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesRouteRoute: ApiFilesRouteRouteWithChildren,
   ApiChatRoute: ApiChatRoute,
   ApiSpeechRoute: ApiSpeechRoute,
+  PayPaddleRoute: PayPaddleRoute,
   ShareIdRoute: ShareIdRoute,
   ApiArtifactsPreviewRoute: ApiArtifactsPreviewRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiPaymentsProcessorWebhookRoute: ApiPaymentsProcessorWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

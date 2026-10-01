@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useSystemSettingsIfLoaded } from '@/contexts/system-settings-context';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Ban } from 'lucide-react';
 
+import { canUpgrade } from '@/types/payment';
 import { quotaQueries } from '@/server/functions/quota';
+import { subscriptionQueries } from '@/server/functions/subscription';
+import { Button } from '@/components/ui/button';
+import { useOpenPlans } from '@/components/plans-dialog';
 
 /**
  * Inline alert shown above a generation input. Warns the user as their usage
@@ -12,22 +17,24 @@ import { quotaQueries } from '@/server/functions/quota';
  * Shows nothing unless enforcement applies AND remaining drops below 20%.
  * No dollar amounts are ever displayed — only a remaining-% gauge and a
  * countdown to reset (server returns just those two values).
+ *
+ * Where a bigger plan is to be had, it offers the way to it: a plan to
+ * subscribe to, or one to upgrade to from the plan the user is on.
  */
 export function UsageLimitAlert() {
   const { data, isLoading } = useQuery(quotaQueries.me());
 
-  if (isLoading || !data) return null;
-
   // Pick the most-restrictive window (lowest remainingPct) for the banner.
-  const candidates = [data.fiveHour, data.sevenDay].filter(
-    (w): w is NonNullable<typeof w> => !!w
-  );
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => a.remainingPct - b.remainingPct);
+  const candidates = [data?.fiveHour, data?.sevenDay]
+    .filter((w): w is NonNullable<typeof w> => !!w)
+    .sort((a, b) => a.remainingPct - b.remainingPct);
   const worst = candidates[0];
-  const remainingPct = worst.remainingPct;
-  if (remainingPct >= 20) return null;
+  const shown = !isLoading && !!worst && worst.remainingPct < 20;
 
+  const upgrade = useUpgradeOffer(shown);
+
+  if (!shown) return null;
+  const remainingPct = worst.remainingPct;
   const exhausted = remainingPct <= 0;
   const Icon = exhausted ? Ban : AlertTriangle;
 
@@ -54,8 +61,60 @@ export function UsageLimitAlert() {
           </>
         )}
       </span>
+      {upgrade && (
+        <Button
+          size="sm"
+          variant={exhausted ? 'destructive' : 'outline'}
+          className="h-7 shrink-0 px-2.5 text-xs"
+          onClick={upgrade}
+        >
+          Upgrade plan
+        </Button>
+      )}
     </div>
   );
+}
+
+/**
+ * How to open the plans, when there is a bigger plan to go to — or null.
+ * Asked only once the alert shows, so a user well within their limits
+ * costs nothing: without a subscription, any plan for sale will do; with
+ * one, a plan that costs more at the same interval, through the same
+ * processor — the only change made in place.
+ */
+function useUpgradeOffer(wanted: boolean): (() => void) | null {
+  const settings = useSystemSettingsIfLoaded();
+  const openPlans = useOpenPlans();
+  const enabled = wanted && !!settings?.subscriptionsEnabled && !!openPlans;
+  const { data: plans } = useQuery({
+    ...subscriptionQueries.plans(),
+    enabled
+  });
+  const { data: mine, isSuccess } = useQuery({
+    ...subscriptionQueries.mine(),
+    enabled
+  });
+  if (!enabled || !plans || !isSuccess) return null;
+
+  const available = mine
+    ? plans.some(plan => {
+        const price = mine.interval ? plan.prices[mine.interval] : null;
+        return (
+          price != null &&
+          mine.price != null &&
+          mine.interval != null &&
+          canUpgrade(
+            {
+              price: mine.price,
+              interval: mine.interval,
+              processor: mine.processor
+            },
+            { price, interval: mine.interval, processor: plan.processor }
+          )
+        );
+      })
+    : plans.length > 0;
+  return available ? openPlans : null;
 }
 
 /**

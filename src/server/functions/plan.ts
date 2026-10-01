@@ -2,14 +2,17 @@ import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { processorPriceLookupSchema } from '@/types/payment';
 import {
   planCreateSchema,
+  planEnabledSchema,
   planIdSchema,
   planListSchema,
   planUpdateSchema
 } from '@/types/plan';
 import { adminMiddleware } from '@/server/middleware';
 import * as plans from '@/server/services/plan';
+import { lookupProcessorPrice } from '@/server/services/subscription';
 
 /** Public list — no quota amounts. */
 export const listPublicPlans = createServerFn({ method: 'GET' }).handler(() =>
@@ -37,6 +40,18 @@ export const updatePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(planUpdateSchema)
   .handler(({ data }) => plans.updatePlan(data));
+
+/** Open a plan to new subscriptions, or close it. */
+export const setPlanEnabled = createServerFn({ method: 'POST' })
+  .middleware([adminMiddleware])
+  .validator(planEnabledSchema)
+  .handler(({ data }) => plans.setPlanEnabled(data.id, data.isEnabled));
+
+/** A processor's price, read for the plan form to offer its amount. */
+export const lookupPlanPrice = createServerFn({ method: 'POST' })
+  .middleware([adminMiddleware])
+  .validator(processorPriceLookupSchema)
+  .handler(({ data }) => lookupProcessorPrice(data.processor, data.priceId));
 
 export const deletePlan = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])

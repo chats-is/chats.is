@@ -8,6 +8,7 @@ import { chatQueries } from '@/server/functions/chat';
 import { settingsQueries } from '@/server/functions/settings';
 import { userQueries } from '@/server/functions/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { PlansDialogProvider } from '@/components/plans-dialog';
 import { RoutePending } from '@/components/route-pending';
 import { SettingsDialogProvider } from '@/components/settings-dialog';
 import { Sidebar } from '@/components/sidebar';
@@ -59,14 +60,16 @@ function ChatLayout() {
     <SystemSettingsProvider settings={settings}>
       <PreferencesProvider>
         <ArtifactProvider>
-          <SettingsDialogProvider>
-            <SidebarProvider className="h-svh overflow-hidden">
-              <Sidebar />
-              <SidebarInset className="h-full overflow-hidden">
-                <Outlet />
-              </SidebarInset>
-            </SidebarProvider>
-          </SettingsDialogProvider>
+          <PlansDialogProvider>
+            <SettingsDialogProvider>
+              <SidebarProvider className="h-svh overflow-hidden">
+                <Sidebar />
+                <SidebarInset className="h-full overflow-hidden">
+                  <Outlet />
+                </SidebarInset>
+              </SidebarProvider>
+            </SettingsDialogProvider>
+          </PlansDialogProvider>
         </ArtifactProvider>
       </PreferencesProvider>
     </SystemSettingsProvider>

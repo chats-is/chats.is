@@ -1,5 +1,7 @@
 import {
+  Banknote,
   BarChart3,
+  CalendarCheck,
   CircleDollarSign,
   Cpu,
   CreditCard,
@@ -8,6 +10,7 @@ import {
   Percent,
   Settings,
   Sparkles,
+  Tickets,
   Users,
   Zap
 } from 'lucide-react';
@@ -53,6 +56,21 @@ export const ConsoleNavigation = {
       title: 'Tiers',
       url: '/console/tiers',
       icon: Percent
+    },
+    {
+      title: 'Subscriptions',
+      url: '/console/subscriptions',
+      icon: CalendarCheck
+    },
+    {
+      title: 'Payments',
+      url: '/console/payments',
+      icon: Banknote
+    },
+    {
+      title: 'Refund requests',
+      url: '/console/refund-requests',
+      icon: Tickets
     },
     {
       title: 'Usage',

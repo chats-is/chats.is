@@ -23,6 +23,7 @@ What it supports:
   prices; a tier (the user's own, else the plan's, else the install's default; none is the cost
   price and every model) holds the price multiplier a call is charged at and the models allowed,
   and quotas count what was spent.
+- Subscriptions: a plan billed monthly, yearly or either, at prices of its own, through the payment processor it names, with the plan set by webhook.
 - Several providers behind one model, with automatic failover, and streams that survive a reconnect.
 
 An admin runs the platform from `/console`: which providers exist and with which keys, which models
@@ -59,7 +60,8 @@ A single test file is `pnpm vitest run src/types/quota.test.ts`, and `-t 'name'`
 Configuration is a local `.env`, and `.env.example` lists every variable. Four are required:
 `DATABASE_URL`, `AUTH_SECRET`, `APP_SECRET` (it encrypts provider keys at rest) and
 `BLOB_READ_WRITE_TOKEN`. The rest are optional — `REDIS_URL` turns on resumable streams, and each login
-method stays off until enabled. Variables the browser reads are prefixed `VITE_` and declared
+method stays off until enabled. The payment processors' keys (`STRIPE_*`, `PADDLE_*`, `LEMONSQUEEZY_*`) are only keys:
+the subscriptions feature is switched by the console setting `subscriptions.enabled`, never an environment variable. Variables the browser reads are prefixed `VITE_` and declared
 separately in `src/lib/env.public.ts`, apart from the server schema in `src/lib/env.ts`; today that is
 `VITE_UPLOAD_PATH`, the blob prefix uploads are written under, which defaults to `uploads`. A fresh install has no providers, models or quotas, so the first account, which
 becomes an admin, has to add them in `/console` before anything can answer — and a
@@ -141,5 +143,21 @@ does. `lib/` is for technical utilities used by both sides, and business logic b
 a conversation, registered in `services/chat-tools.ts`, so a new capability is added there. Web search
 is `services/web-search.ts`: it decides per provider whether the model searches for itself or through
 the search model, and `lib/chat-usage.ts` counts the searches a step made.
+
+**A plan is the product; payment is taking the money.** A plan is billed monthly, yearly or either,
+through the one payment processor it names, with a price of its own in US dollars and the processor's
+price ID for each interval — kept on the plan only, and fixed once anyone has subscribed.
+`services/subscription.ts` holds the one subscription flow every processor shares: a subscription is
+`active` (with `canceled_at` set to `expires_at` once cancelled to stop then) or `canceled`, with
+`cancel_reason` saying why; a user has at most one `active`, and it gives them its plan; the only
+change in place is an upgrade to a dearer plan at the same interval. It reaches a processor only
+through the interface in `services/payment-processor.ts`; Stripe, Paddle and Lemon Squeezy are
+adapters beside it (`services/payment-*.ts`), and a new processor is another. Webhooks arrive at
+`/api/payments/$processor/webhook` and are applied by reading the processor's current state, so a
+webhook sent twice changes nothing; Paddle's checkout opens on `/pay/paddle`. A payment keeps what
+was refunded of it (`amount_refunded`, `refund_pending` while a refund waits, and who sent the
+latest), and is kept when its user is deleted; a user's refund request is a `refund_request` row an
+admin approves or rejects. Work on one user's subscriptions, or one payment, runs under `withLock`
+(`services/db-lock.ts`), since processors send several webhooks about one thing at once.
 
 Tests sit beside their subject as `foo.ts` and `foo.test.ts`.

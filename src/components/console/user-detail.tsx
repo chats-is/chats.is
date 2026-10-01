@@ -14,6 +14,7 @@ import { CAPABILITIES } from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { quotaQueries } from '@/server/functions/quota';
+import { subscriptionQueries } from '@/server/functions/subscription';
 import { usageQueries } from '@/server/functions/usage';
 import { userQueries } from '@/server/functions/user';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,7 @@ import {
   DateRangeFilter,
   useReportWindow
 } from '@/components/date-range-filter';
+import { LocalTime } from '@/components/local-time';
 import { Countdown } from '@/components/usage-limit-alert';
 import { UsageModule, UsageModuleSkeleton } from '@/components/usage-module';
 
@@ -69,6 +71,7 @@ export default function UserDetail({ userId }: { userId: string }) {
   const { data: usage } = useQuery(
     usageQueries.byUser({ userId, from: window.start, to: until })
   );
+  const { data: subscription } = useQuery(subscriptionQueries.user(userId));
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -80,6 +83,9 @@ export default function UserDetail({ userId }: { userId: string }) {
         }),
         queryClient.invalidateQueries({
           queryKey: userQueries.detail({ id: userId }).queryKey
+        }),
+        queryClient.invalidateQueries({
+          queryKey: subscriptionQueries.user(userId).queryKey
         })
       ]);
     } finally {
@@ -166,15 +172,18 @@ export default function UserDetail({ userId }: { userId: string }) {
                 </Badge>
               </div>
               <div className="truncate text-sm text-muted-foreground">
-                {user.email} · Joined{' '}
-                {new Date(user.createdAt).toLocaleString()}
+                {user.email} · Joined <LocalTime value={user.createdAt} />
               </div>
               {/* What the user is on — plan, quota, tier — then what they
                   have done. */}
               <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
                 {status && (
                   <>
-                    <Hint label="Plan">{status.plan?.name ?? 'No plan'}</Hint>
+                    <Hint label="Plan — from their subscription">
+                      {describeSubscription(subscription) ??
+                        status.plan?.name ??
+                        'No plan'}
+                    </Hint>
                     <span>·</span>
                     <Hint label="Quota — the spending limits">
                       {status.source === 'none'
@@ -252,6 +261,30 @@ export default function UserDetail({ userId }: { userId: string }) {
 
       <UserLogs userId={userId} from={window.start} to={until} />
     </div>
+  );
+}
+
+/** The plan as the subscription behind it has it: "Pro, monthly, renews
+ *  on Oct 1, 2026", or the day it will be canceled once it is set to. */
+function describeSubscription(
+  sub:
+    | {
+        planName: string | null;
+        interval: string | null;
+        expiresAt: Date | string;
+        canceledAt: Date | string | null;
+      }
+    | null
+    | undefined
+): React.ReactNode {
+  if (!sub) return null;
+  const parts = [sub.planName ?? 'Unknown plan'];
+  if (sub.interval) parts.push(sub.interval === 'year' ? 'yearly' : 'monthly');
+  return (
+    <>
+      {parts.join(', ')}, {sub.canceledAt ? 'will be canceled on' : 'renews on'}{' '}
+      <LocalTime value={sub.canceledAt ?? sub.expiresAt} precision="day" />
+    </>
   );
 }
 

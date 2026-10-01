@@ -1,0 +1,1794 @@
+import { makeTestDb } from '@/test-utils/pg';
+import { eq } from 'drizzle-orm';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi
+} from 'vitest';
+
+import { type ProcessorPrice } from '@/types/payment';
+import { planCreateSchema } from '@/types/plan';
+import * as schema from '@/db/schema';
+import { PublicError } from '@/server/public-error';
+import {
+  WebhookSignatureError,
+  type PaymentProcessor,
+  type ProcessorPayment,
+  type ProcessorSubscription,
+  type WebhookAction
+} from '@/server/services/payment-processor';
+
+/**
+ * Plans, subscriptions, payments and refunds against a real Postgres, with
+ * the payment processor stood in by one that keeps its prices,
+ * subscriptions and invoices in memory. What the processor reports reaches
+ * the app as it does in production: through a webhook. Each test is one
+ * rule of the one flow every processor shares.
+ */
+
+const h = vi.hoisted(() => ({
+  db: undefined as any,
+  selling: true,
+  // Set for each test in `beforeEach`; null is `auto`, and no limit.
+  refunds: {
+    enabled: true,
+    refundFee: null as number | null,
+    days: 7,
+    maxRequests: null as number | null
+  },
+  processor: undefined as any
+}));
+
+vi.mock('@/db', () => ({
+  get db() {
+    return h.db;
+  }
+}));
+vi.mock('@/server/services/settings', () => ({
+  getSubscriptionsEnabled: async () => h.selling,
+  getRefundPolicy: async () => h.refunds
+}));
+vi.mock('@/server/services/model', () => ({
+  getAllModels: async () => [
+    { modelId: 'cheap', name: 'Cheap', capability: 'chat' },
+    { modelId: 'big', name: 'Big', capability: 'chat' }
+  ]
+}));
+vi.mock('@/lib/env', () => ({ env: {} }));
+vi.mock('@/server/services/payment-processor', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/server/services/payment-processor')
+  >()),
+  getPaymentProcessor: async () => h.processor
+}));
+
+const {
+  adminCancelSubscription,
+  approveRefundRequest,
+  cancelSubscription,
+  getMyRefundRequest,
+  getMySubscription,
+  getRefundDetails,
+  getRefundRequest,
+  getSubscriptionDetail,
+  handleWebhook,
+  listPlansForSale,
+  listRefundRequests,
+  listSubscriptions,
+  lookupProcessorPrice,
+  refundPayment,
+  rejectRefundRequest,
+  resubscribe,
+  startCheckout,
+  submitRefundRequest,
+  upgradePlan
+} = await import('@/server/services/subscription');
+const { listMyPayments, listPayments, listSubscriptionPayments } =
+  await import('@/server/services/payment');
+const { createPlan, deletePlan, setPlanEnabled, updatePlan } =
+  await import('@/server/services/plan');
+const { deleteUser } = await import('@/server/services/user');
+
+let client: { close?: () => Promise<void> } | undefined;
+
+beforeAll(async () => {
+  const t = await makeTestDb();
+  h.db = t.db;
+  client = t.client;
+});
+
+afterAll(async () => {
+  await client?.close?.();
+});
+
+// ---------------------------------------------------------------------------
+// The stand-in processor
+// ---------------------------------------------------------------------------
+
+const DAY = 24 * 60 * 60 * 1000;
+const daysAgo = (n: number) => new Date(Date.now() - n * DAY);
+const inDays = (n: number) => new Date(Date.now() + n * DAY);
+
+/** The processor's prices, as it would report them. */
+const PROCESSOR_PRICES: Record<string, ProcessorPrice> = Object.fromEntries(
+  (
+    [
+      ['price_basic_m', 10, 'month'],
+      ['price_basic_y', 100, 'year'],
+      ['price_pro_m', 20, 'month'],
+      ['price_pro_y', 200, 'year'],
+      ['price_max_m', 50, 'month'],
+      ['price_twin_m', 20, 'month'],
+      ['price_yearly_y', 300, 'year'],
+      ['price_old', 5, 'month']
+    ] as const
+  ).map(([priceId, amount, interval]) => [
+    priceId,
+    {
+      priceId,
+      amount,
+      interval,
+      currency: 'usd',
+      active: true,
+      metered: false,
+      maxQuantity: null
+    }
+  ])
+);
+
+function fakeProcessor() {
+  const subs = new Map<string, ProcessorSubscription>();
+  const invoices = new Map<string, ProcessorPayment>();
+  const prices = structuredClone(PROCESSOR_PRICES);
+  let next: WebhookAction | Error = { kind: 'ignore' };
+
+  const processor = {
+    id: 'stripe',
+    subs,
+    invoices,
+    prices,
+    willSend(action: WebhookAction | Error) {
+      next = action;
+    },
+    getPrice: vi.fn(async (priceId: string) => {
+      const price = prices[priceId];
+      if (!price) throw new Error(`no price ${priceId}`);
+      return price;
+    }),
+    createCheckout: vi.fn(async () => 'https://pay.example/checkout'),
+    paymentMethodsUrl: vi.fn(async () => 'https://pay.example/portal'),
+    getSubscription: vi.fn(async (id: string) => {
+      const sub = subs.get(id);
+      if (!sub) throw new Error(`no subscription ${id}`);
+      return { ...sub };
+    }),
+    changeNow: vi.fn(
+      async (id: string, target: { priceId: string; planId: string }) => {
+        Object.assign(subs.get(id)!, {
+          priceId: target.priceId,
+          planId: target.planId,
+          cancelAtPeriodEnd: false
+        });
+      }
+    ),
+    cancelAtPeriodEnd: vi.fn(async (id: string) => {
+      subs.get(id)!.cancelAtPeriodEnd = true;
+    }),
+    resume: vi.fn(async (id: string) => {
+      subs.get(id)!.cancelAtPeriodEnd = false;
+    }),
+    cancelNow: vi.fn(async (id: string) => {
+      const sub = subs.get(id);
+      // Canceled, no payment is retried any more.
+      if (sub) Object.assign(sub, { status: 'canceled', paymentFailed: false });
+    }),
+    refundPayment: vi.fn(async () => {}),
+    dashboardUrl: vi.fn(async (id: string) => `https://pay.example/subs/${id}`),
+    getPayment: vi.fn(async (id: string) => invoices.get(id) ?? null),
+    parseWebhook: vi.fn(async () => {
+      if (next instanceof Error) throw next;
+      return { id: 'evt', type: 'event', action: next };
+    })
+  };
+  return processor as unknown as PaymentProcessor & typeof processor;
+}
+
+/** Send one webhook, as the processor would. */
+async function webhook(action: WebhookAction) {
+  h.processor.willSend(action);
+  await handleWebhook('stripe', '{}', new Headers());
+}
+
+const EXPIRES = new Date('2030-10-01T00:00:00Z');
+
+/** A subscription in the processor, as checkout would leave it. */
+function processorSubscription(
+  overrides: Partial<ProcessorSubscription> = {}
+): ProcessorSubscription {
+  const sub: ProcessorSubscription = {
+    externalId: 'sub_1',
+    customerId: 'cus_u1',
+    userId: 'u1',
+    planId: 'basic',
+    priceId: 'price_basic_m',
+    status: 'active',
+    cancelAtPeriodEnd: false,
+    paymentFailed: false,
+    expiresAt: EXPIRES,
+    ...overrides
+  };
+  h.processor.subs.set(sub.externalId, sub);
+  return sub;
+}
+
+/** The processor has a subscription as given, and says so. */
+async function report(overrides: Partial<ProcessorSubscription> = {}) {
+  const sub = processorSubscription({
+    ...h.processor.subs.get(overrides.externalId ?? 'sub_1'),
+    ...overrides
+  });
+  await webhook({ kind: 'subscription', externalId: sub.externalId });
+  return sub;
+}
+
+/** An invoice in the processor. */
+function invoice(overrides: Partial<ProcessorPayment> = {}) {
+  const payment: ProcessorPayment = {
+    externalId: 'in_1',
+    customerId: 'cus_u1',
+    subscriptionExternalId: 'sub_1',
+    transactionId: 'pi_1',
+    amount: 10,
+    kind: 'initial',
+    fee: 1,
+    tax: null,
+    currency: 'usd',
+    paid: true,
+    invoiceUrl: 'https://pay.example/in_1',
+    billedAt: daysAgo(1),
+    ...overrides
+  };
+  h.processor.invoices.set(payment.externalId, payment);
+  return payment;
+}
+
+/** The processor took a payment, and says so. */
+async function pay(overrides: Partial<ProcessorPayment> = {}) {
+  const payment = invoice(overrides);
+  await webhook({ kind: 'payment', externalId: payment.externalId });
+  return payment;
+}
+
+/** Subscribed and paid for, as a checkout leaves it. */
+async function subscribe(
+  overrides: Partial<ProcessorSubscription> = {},
+  payment: Partial<ProcessorPayment> = {}
+) {
+  await report(overrides);
+  await pay({
+    subscriptionExternalId: overrides.externalId ?? 'sub_1',
+    ...payment
+  });
+}
+
+const planOf = async (userId: string) =>
+  (
+    await h.db.query.users.findFirst({
+      where: eq(schema.users.id, userId),
+      columns: { planId: true }
+    })
+  )?.planId ?? null;
+
+const planRow = async (id: string) =>
+  await h.db.query.plans.findFirst({ where: eq(schema.plans.id, id) });
+
+const rowOf = async (externalId = 'sub_1') =>
+  await h.db.query.subscriptions.findFirst({
+    where: eq(schema.subscriptions.externalId, externalId)
+  });
+
+const paymentOf = async (externalId = 'in_1') =>
+  await h.db.query.payments.findFirst({
+    where: eq(schema.payments.externalId, externalId)
+  });
+
+const listSubscriptionPaymentsOf = async () =>
+  await listSubscriptionPayments((await rowOf())!.id);
+
+const requestId = async () =>
+  (await h.db.query.refundRequests.findFirst({
+    where: eq(schema.refundRequests.status, 'pending_approval')
+  }))!.id;
+
+const request = new Request('https://app.example/');
+const user = { id: 'u1', email: 'u1@test.com', name: 'U1' };
+
+/** A plan as sold through Stripe, enabled, at the intervals given. */
+const plan = (
+  id: string,
+  prices: { month?: [number, string]; year?: [number, string] },
+  extra: Record<string, unknown> = {}
+) => ({
+  id,
+  name: id,
+  quotaId: 'q1',
+  billingType:
+    prices.month && prices.year ? 'both' : prices.month ? 'month' : 'year',
+  processor: 'stripe' as const,
+  monthlyPrice: prices.month?.[0].toFixed(2) ?? null,
+  monthlyPriceId: prices.month?.[1] ?? null,
+  yearlyPrice: prices.year?.[0].toFixed(2) ?? null,
+  yearlyPriceId: prices.year?.[1] ?? null,
+  isEnabled: true,
+  ...extra
+});
+
+beforeEach(async () => {
+  h.selling = true;
+  h.refunds = { enabled: true, refundFee: 20, days: 7, maxRequests: null };
+  h.processor = fakeProcessor();
+
+  await h.db.delete(schema.payments);
+  await h.db.delete(schema.refundRequests);
+  await h.db.delete(schema.subscriptions);
+  await h.db.delete(schema.users);
+  await h.db.delete(schema.plans);
+  await h.db.delete(schema.tiers);
+  await h.db.delete(schema.quotas);
+
+  await h.db.insert(schema.quotas).values([
+    { id: 'q1', name: 'q1', isUnlimited: true },
+    { id: 'q2', name: 'q2', isUnlimited: true }
+  ]);
+  await h.db.insert(schema.tiers).values({
+    id: 't-cheap',
+    name: 'Cheap only',
+    modelRestrictionMode: 'allow',
+    modelIds: ['cheap']
+  });
+  await h.db.insert(schema.plans).values([
+    plan(
+      'basic',
+      { month: [10, 'price_basic_m'], year: [100, 'price_basic_y'] },
+      { tierId: 't-cheap', displayOrder: 1 }
+    ),
+    plan(
+      'pro',
+      { month: [20, 'price_pro_m'], year: [200, 'price_pro_y'] },
+      { displayOrder: 2 }
+    ),
+    plan('max', { month: [50, 'price_max_m'] }, { displayOrder: 3 }),
+    plan('twin', { month: [20, 'price_twin_m'] }, { displayOrder: 4 }),
+    plan('yearly', { year: [300, 'price_yearly_y'] }, { displayOrder: 5 }),
+    plan('closed', { month: [5, 'price_old'] }, { isEnabled: false }),
+    // A plan from before plans were sold: no billing at all.
+    { id: 'legacy', name: 'legacy', quotaId: 'q1', isEnabled: false }
+  ]);
+  await h.db.insert(schema.users).values([
+    { id: 'u1', name: 'U1', email: 'u1@test.com' },
+    { id: 'u2', name: 'U2', email: 'u2@test.com' },
+    { id: 'admin', name: 'Admin', email: 'a@test.com', role: 'admin' }
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// Plans
+// ---------------------------------------------------------------------------
+
+describe('a plan', () => {
+  const input = {
+    name: 'New',
+    quotaId: 'q1',
+    displayOrder: 0,
+    billingType: 'both' as const,
+    processor: 'stripe' as const,
+    monthlyPrice: 15,
+    monthlyPriceId: 'price_new_m',
+    yearlyPrice: 150,
+    yearlyPriceId: 'price_new_y'
+  };
+
+  it('needs a price and price ID for each interval its billing sells at', () => {
+    expect(
+      planCreateSchema.safeParse({
+        ...input,
+        yearlyPrice: null,
+        yearlyPriceId: null
+      }).success
+    ).toBe(false);
+    expect(
+      planCreateSchema.safeParse({
+        ...input,
+        billingType: 'month',
+        yearlyPrice: null,
+        yearlyPriceId: null
+      }).success
+    ).toBe(true);
+  });
+
+  it('is made closed, keeping only the prices its billing sells at', async () => {
+    const { id } = await createPlan(
+      planCreateSchema.parse({ ...input, billingType: 'month' })
+    );
+    expect(await planRow(id)).toMatchObject({
+      billingType: 'month',
+      processor: 'stripe',
+      monthlyPrice: '15.00',
+      monthlyPriceId: 'price_new_m',
+      yearlyPrice: null,
+      yearlyPriceId: null,
+      isEnabled: false
+    });
+  });
+
+  it('cannot share a price ID with another plan, or use one for both intervals', async () => {
+    await expect(
+      createPlan(
+        planCreateSchema.parse({ ...input, yearlyPriceId: 'price_pro_m' })
+      )
+    ).rejects.toThrow('already uses this price ID');
+    await expect(
+      createPlan(
+        planCreateSchema.parse({ ...input, yearlyPriceId: 'price_new_m' })
+      )
+    ).rejects.toThrow('must differ');
+  });
+
+  it('keeps its billing, prices, processor and price IDs once subscribed to, even when canceled', async () => {
+    await subscribe();
+    await report({ status: 'canceled' });
+    for (const change of [
+      { monthlyPrice: 12 },
+      { billingType: 'month' as const },
+      { yearlyPriceId: 'price_other' },
+      { processor: 'paddle' as const }
+    ]) {
+      await expect(updatePlan({ id: 'basic', ...change })).rejects.toThrow(
+        'cannot change'
+      );
+    }
+    await updatePlan({ id: 'basic', quotaId: 'q2', name: 'Basic Plus' });
+    expect(await planRow('basic')).toMatchObject({
+      quotaId: 'q2',
+      name: 'Basic Plus'
+    });
+  });
+
+  it('cannot be deleted once subscribed to', async () => {
+    await subscribe();
+    await expect(deletePlan('basic')).rejects.toThrow('Disable it instead');
+    await expect(deletePlan('pro')).resolves.toBeUndefined();
+  });
+
+  it('opens only with its prices', async () => {
+    await expect(setPlanEnabled('legacy', true)).rejects.toThrow(
+      'billing, payment processor, prices and price IDs'
+    );
+    await setPlanEnabled('closed', true);
+    expect((await planRow('closed'))?.isEnabled).toBe(true);
+  });
+});
+
+describe("a processor's price, read for a plan", () => {
+  it('gives the amount and interval of a dollar price', async () => {
+    expect(await lookupProcessorPrice('stripe', 'price_pro_y')).toEqual({
+      price: 200,
+      interval: 'year'
+    });
+  });
+
+  it.each([
+    ['not in dollars', { currency: 'eur' }, 'not in US dollars'],
+    ['archived', { active: false }, 'archived'],
+    ['billed by usage', { metered: true }, 'billed by usage'],
+    ['not recurring', { interval: null }, 'not billed monthly or yearly'],
+    ['sold by the dozen', { maxQuantity: 12 }, 'maximum quantity to 1']
+  ])('is refused %s', async (_, change, message) => {
+    Object.assign(h.processor.prices.price_pro_m, change);
+    await expect(lookupProcessorPrice('stripe', 'price_pro_m')).rejects.toThrow(
+      message
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Subscribing
+// ---------------------------------------------------------------------------
+
+describe('subscribing', () => {
+  it('lists enabled plans with their price at each interval, and no price IDs', async () => {
+    const plans = await listPlansForSale();
+    expect(plans.map(p => p.id)).toEqual([
+      'basic',
+      'pro',
+      'max',
+      'twin',
+      'yearly'
+    ]);
+    expect(plans[0]).toMatchObject({ prices: { month: 10, year: 100 } });
+    expect(JSON.stringify(plans)).not.toContain('price_');
+  });
+
+  it("opens the processor's checkout for the interval chosen, with no customer the first time", async () => {
+    const { url } = await startCheckout(
+      user,
+      { planId: 'pro', interval: 'year' },
+      request
+    );
+    expect(url).toBe('https://pay.example/checkout');
+    expect(h.processor.createCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerId: null,
+        email: 'u1@test.com',
+        priceId: 'price_pro_y',
+        userId: 'u1',
+        planId: 'pro',
+        successUrl: 'https://app.example/?checkout=success',
+        cancelUrl: 'https://app.example/?checkout=canceled'
+      })
+    );
+  });
+
+  it('checks out as the customer the user already is, once canceled', async () => {
+    await subscribe();
+    await report({ status: 'canceled' });
+    await startCheckout(user, { planId: 'pro', interval: 'month' }, request);
+    expect(h.processor.createCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'cus_u1' })
+    );
+  });
+
+  it('tells the user plainly when the processor cannot open a checkout', async () => {
+    h.processor.createCheckout.mockRejectedValueOnce(
+      new Error('checkout.url domain is not approved')
+    );
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+    ).rejects.toThrow('Checkout could not be opened. Please try again.');
+    // Not set up: the admin's words are not the user's.
+    h.processor.createCheckout.mockRejectedValueOnce(
+      new PublicError('Paddle is not configured.')
+    );
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+    ).rejects.toThrow('Checkout could not be opened. Please try again.');
+    h.processor.getPrice.mockRejectedValueOnce(
+      new PublicError('Paddle is not configured.')
+    );
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+    ).rejects.toThrow('This plan cannot be bought right now.');
+  });
+
+  it('refuses an interval the plan is not billed at, a closed plan, and one with no billing', async () => {
+    await expect(
+      startCheckout(user, { planId: 'max', interval: 'year' }, request)
+    ).rejects.toThrow('not available yearly');
+    for (const planId of ['closed', 'legacy']) {
+      await expect(
+        startCheckout(user, { planId, interval: 'month' }, request)
+      ).rejects.toThrow('not available');
+    }
+  });
+
+  it("refuses when the processor's price does not match the plan", async () => {
+    h.processor.prices.price_pro_m.amount = 25;
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+    ).rejects.toThrow('cannot be bought right now');
+    expect(h.processor.createCheckout).not.toHaveBeenCalled();
+  });
+
+  it('is refused while the feature is off', async () => {
+    h.selling = false;
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+    ).rejects.toThrow('not available');
+  });
+
+  it('refuses a second subscription while one is active — set to cancel or not — but not once canceled', async () => {
+    await subscribe();
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'year' }, request)
+    ).rejects.toThrow('already have a subscription');
+    await cancelSubscription('u1');
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'year' }, request)
+    ).rejects.toThrow('already have a subscription');
+    await report({ status: 'canceled' });
+    await expect(
+      startCheckout(user, { planId: 'pro', interval: 'year' }, request)
+    ).resolves.toEqual({ url: 'https://pay.example/checkout' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A subscription, from start to cancellation
+// ---------------------------------------------------------------------------
+
+describe('a subscription', () => {
+  it('is active once the processor has it, and gives its plan', async () => {
+    await subscribe();
+    expect(await rowOf()).toMatchObject({
+      userId: 'u1',
+      planId: 'basic',
+      interval: 'month',
+      processor: 'stripe',
+      externalId: 'sub_1',
+      customerId: 'cus_u1',
+      status: 'active',
+      expiresAt: EXPIRES,
+      canceledAt: null,
+      cancelReason: null
+    });
+    expect(await planOf('u1')).toBe('basic');
+    expect(await getMySubscription('u1')).toMatchObject({
+      planName: 'basic',
+      interval: 'month',
+      price: 10,
+      status: 'active',
+      canceledAt: null
+    });
+  });
+
+  it('is not kept until it has been paid for', async () => {
+    await report({ status: 'incomplete' });
+    expect(await rowOf()).toBeUndefined();
+    expect(await planOf('u1')).toBeNull();
+  });
+
+  it('stays active when it renews, its expiry moving on', async () => {
+    await subscribe();
+    const next = new Date('2030-11-01T00:00:00Z');
+    await report({ expiresAt: next });
+    expect(await rowOf()).toMatchObject({ status: 'active', expiresAt: next });
+  });
+
+  it('cancelled by the user stays active until it expires, set to cancel then', async () => {
+    await subscribe();
+    await cancelSubscription('u1');
+    expect(h.processor.cancelAtPeriodEnd).toHaveBeenCalledWith('sub_1');
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      canceledAt: EXPIRES,
+      cancelReason: 'canceled_by_customer'
+    });
+    expect(await planOf('u1')).toBe('basic');
+    // The processor's webhook about it changes nothing.
+    await report();
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      canceledAt: EXPIRES,
+      cancelReason: 'canceled_by_customer'
+    });
+  });
+
+  it('cancelled by an admin is the same, with its own reason', async () => {
+    await subscribe();
+    await adminCancelSubscription((await rowOf())!.id);
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      canceledAt: EXPIRES,
+      cancelReason: 'canceled_by_admin'
+    });
+  });
+
+  it('cannot be cancelled twice', async () => {
+    await subscribe();
+    await cancelSubscription('u1');
+    await expect(cancelSubscription('u1')).rejects.toThrow('already set');
+  });
+
+  it('resubscribed clears the cancellation, nothing charged', async () => {
+    await subscribe();
+    await cancelSubscription('u1');
+    await resubscribe('u1');
+    expect(h.processor.resume).toHaveBeenCalledWith('sub_1');
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      canceledAt: null,
+      cancelReason: null
+    });
+  });
+
+  it('can only be resubscribed when set to cancel', async () => {
+    await subscribe();
+    await expect(resubscribe('u1')).rejects.toThrow('set to cancel');
+  });
+
+  it('is canceled when it expires set to cancel, keeping when and why', async () => {
+    await subscribe();
+    await cancelSubscription('u1');
+    await report({ status: 'canceled' });
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      canceledAt: EXPIRES,
+      cancelReason: 'canceled_by_customer'
+    });
+    expect(await planOf('u1')).toBeNull();
+    expect(await getMySubscription('u1')).toBeNull();
+  });
+
+  it('is canceled at once when a renewal fails, and in the processor too', async () => {
+    await subscribe();
+    await report({ status: 'canceled', paymentFailed: true });
+    const row = await rowOf();
+    expect(row).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'payment_failed'
+    });
+    expect(row!.canceledAt!.getTime()).toBeGreaterThan(Date.now() - 60_000);
+    expect(h.processor.cancelNow).toHaveBeenCalledWith('sub_1');
+    expect(await planOf('u1')).toBeNull();
+  });
+
+  it('a failed renewal not cancelled in the processor is payment_failed_error, and the webhook fails; resent, cancelled there', async () => {
+    await subscribe();
+    h.processor.cancelNow.mockRejectedValueOnce(
+      Object.assign(new Error('refused'), { status: 400 })
+    );
+    await expect(
+      report({ status: 'canceled', paymentFailed: true })
+    ).rejects.toThrow('refused');
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'payment_failed_error'
+    });
+    // No plan meanwhile: nothing used free.
+    expect(await planOf('u1')).toBeNull();
+    // Sent again: cancelled in the processor, and resolved.
+    await report();
+    expect(h.processor.cancelNow).toHaveBeenCalledTimes(2);
+    expect(await rowOf()).toMatchObject({ cancelReason: 'payment_failed' });
+    // Once more, nothing is asked of the processor.
+    await report();
+    expect(h.processor.cancelNow).toHaveBeenCalledTimes(2);
+  });
+
+  it('set to cancel in the processor is set to cancel here, cancelled there', async () => {
+    await subscribe();
+    await report({ cancelAtPeriodEnd: true });
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      canceledAt: EXPIRES,
+      cancelReason: 'canceled_in_processor'
+    });
+    await report({ cancelAtPeriodEnd: false });
+    expect(await rowOf()).toMatchObject({ canceledAt: null });
+  });
+
+  it('cancelled at once in the processor is canceled now, cancelled there', async () => {
+    await subscribe();
+    await report({ status: 'canceled' });
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'canceled_in_processor'
+    });
+  });
+
+  it('paused in the processor is canceled, and in effect again once resumed there', async () => {
+    await subscribe();
+    await report({ status: 'canceled', paused: true });
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'paused_in_processor'
+    });
+    expect(await planOf('u1')).toBeNull();
+    await report({ status: 'active', paused: false });
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      canceledAt: null,
+      cancelReason: null
+    });
+    expect(await planOf('u1')).toBe('basic');
+  });
+
+  it('stays canceled whatever the processor says after', async () => {
+    await subscribe();
+    await report({ status: 'canceled' });
+    await report({ status: 'active' });
+    expect(await rowOf()).toMatchObject({ status: 'canceled' });
+    expect(await planOf('u1')).toBeNull();
+  });
+
+  it('bought beside another is a duplicate: canceled, cancelled in the processor, its payment refunded in full', async () => {
+    await subscribe();
+    await subscribe(
+      { externalId: 'sub_2' },
+      { externalId: 'in_2', transactionId: 'pi_2' }
+    );
+    expect(await rowOf('sub_2')).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'duplicate'
+    });
+    expect(h.processor.cancelNow).toHaveBeenCalledWith('sub_2');
+    // In full, whatever the refund fee (20% here), by no admin.
+    expect(h.processor.refundPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ externalId: 'in_2' }),
+      { cents: 1000, whole: true }
+    );
+    expect(await paymentOf('in_2')).toMatchObject({
+      status: 'refund_pending',
+      refundAmount: '10.00',
+      refundFee: '0',
+      refundBy: null
+    });
+    expect(await rowOf('sub_1')).toMatchObject({ status: 'active' });
+    expect(await planOf('u1')).toBe('basic');
+  });
+
+  it('changes nothing when the processor refuses a change', async () => {
+    await subscribe();
+    h.processor.cancelAtPeriodEnd.mockRejectedValueOnce(new Error('down'));
+    await expect(cancelSubscription('u1')).rejects.toThrow('down');
+    expect(await rowOf()).toMatchObject({ canceledAt: null });
+  });
+
+  it('is applied as the processor has it once the lock is held, not as first read', async () => {
+    await subscribe();
+    // Read before an upgrade was made: still on the old price.
+    const stale = { ...h.processor.subs.get('sub_1')! };
+    await upgradePlan('u1', { planId: 'pro' });
+    h.processor.getSubscription.mockResolvedValueOnce(stale);
+    await webhook({ kind: 'subscription', externalId: 'sub_1' });
+    expect(await rowOf()).toMatchObject({ planId: 'pro' });
+  });
+});
+
+describe("the user's plan", () => {
+  it('follows the price the processor bills at', async () => {
+    await subscribe({ priceId: 'price_pro_y' });
+    expect(await rowOf()).toMatchObject({ planId: 'pro', interval: 'year' });
+    expect(await planOf('u1')).toBe('pro');
+  });
+
+  it('keeps renewing on a plan that has since been closed', async () => {
+    await subscribe();
+    await setPlanEnabled('basic', false);
+    await report({ expiresAt: new Date('2030-11-01T00:00:00Z') });
+    expect(await planOf('u1')).toBe('basic');
+  });
+
+  it('is found by the webhook, or by the customer, when the subscription names no user', async () => {
+    processorSubscription({ userId: null });
+    await webhook({
+      kind: 'subscription',
+      externalId: 'sub_1',
+      hints: { userId: 'u1', planId: 'basic' }
+    });
+    expect(await planOf('u1')).toBe('basic');
+    await report({ status: 'canceled' });
+    // A later subscription, from the same customer, naming no one.
+    await report({ externalId: 'sub_2', userId: null });
+    expect(await rowOf('sub_2')).toMatchObject({ userId: 'u1' });
+  });
+
+  it('is not given for a subscription that names no user yet: the webhook is to be sent again', async () => {
+    processorSubscription({ userId: null, customerId: 'cus_new' });
+    await expect(
+      webhook({ kind: 'subscription', externalId: 'sub_1' })
+    ).rejects.toThrow('has no user yet');
+    expect(await rowOf()).toBeUndefined();
+  });
+});
+
+describe('upgrading', () => {
+  it('moves up to a dearer plan at the same interval, now', async () => {
+    await subscribe();
+    await upgradePlan('u1', { planId: 'pro' });
+    expect(h.processor.changeNow).toHaveBeenCalledWith('sub_1', {
+      priceId: 'price_pro_m',
+      planId: 'pro'
+    });
+    expect(await rowOf()).toMatchObject({ status: 'active', planId: 'pro' });
+    expect(await planOf('u1')).toBe('pro');
+  });
+
+  it('clears a cancellation waiting', async () => {
+    await subscribe();
+    await cancelSubscription('u1');
+    await upgradePlan('u1', { planId: 'pro' });
+    expect(await rowOf()).toMatchObject({
+      planId: 'pro',
+      canceledAt: null,
+      cancelReason: null
+    });
+  });
+
+  it('keeps the interval the subscription is billed at', async () => {
+    await subscribe({ priceId: 'price_basic_y' });
+    await upgradePlan('u1', { planId: 'pro' });
+    expect(h.processor.changeNow).toHaveBeenCalledWith('sub_1', {
+      priceId: 'price_pro_y',
+      planId: 'pro'
+    });
+  });
+
+  it('refuses a plan that costs the same or less, or is not billed at the interval', async () => {
+    await subscribe({ priceId: 'price_pro_m' });
+    for (const planId of ['twin', 'basic']) {
+      await expect(upgradePlan('u1', { planId })).rejects.toThrow(
+        'cannot be switched to in place'
+      );
+    }
+    await expect(upgradePlan('u1', { planId: 'yearly' })).rejects.toThrow(
+      'not available monthly'
+    );
+  });
+
+  it('changes nothing when the charge fails', async () => {
+    await subscribe();
+    h.processor.changeNow.mockRejectedValueOnce(new Error('declined'));
+    await expect(upgradePlan('u1', { planId: 'pro' })).rejects.toThrow(
+      'declined'
+    );
+    expect(await rowOf()).toMatchObject({ planId: 'basic' });
+  });
+
+  it('is refused while the feature is off', async () => {
+    await subscribe();
+    h.selling = false;
+    await expect(upgradePlan('u1', { planId: 'pro' })).rejects.toThrow(
+      'not available'
+    );
+  });
+});
+
+describe('a webhook', () => {
+  it('with a bad signature is refused', async () => {
+    h.processor.willSend(new WebhookSignatureError('bad'));
+    await expect(
+      handleWebhook('stripe', '{}', new Headers())
+    ).rejects.toBeInstanceOf(WebhookSignatureError);
+  });
+
+  it('sent twice changes nothing the second time', async () => {
+    await subscribe();
+    await pay();
+    await report();
+    expect(await h.db.query.subscriptions.findMany()).toHaveLength(1);
+    expect(await h.db.query.payments.findMany()).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+describe('a payment', () => {
+  it('is kept against its subscription and plan, with the email it was paid under', async () => {
+    await subscribe();
+    expect(await paymentOf()).toMatchObject({
+      userId: 'u1',
+      userEmail: 'u1@test.com',
+      subscriptionId: (await rowOf())!.id,
+      planId: 'basic',
+      processor: 'stripe',
+      kind: 'initial',
+      externalId: 'in_1',
+      transactionId: 'pi_1',
+      amount: '10.00',
+      refundAmount: '0.00',
+      fee: '1.00',
+      status: 'paid',
+      invoiceUrl: 'https://pay.example/in_1',
+      refundBy: null,
+      refundRequestId: null
+    });
+  });
+
+  it('reported before its subscription has the subscription read first', async () => {
+    processorSubscription();
+    await pay();
+    expect(await rowOf()).toMatchObject({ status: 'active' });
+    expect(await paymentOf()).toMatchObject({ status: 'paid' });
+  });
+
+  it('that failed is kept failed, and cancels its subscription', async () => {
+    await subscribe();
+    h.processor.subs.get('sub_1')!.status = 'canceled';
+    h.processor.subs.get('sub_1')!.paymentFailed = true;
+    await pay({ externalId: 'in_2', kind: 'renewal', paid: false });
+    expect(await paymentOf('in_2')).toMatchObject({ status: 'failed' });
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'payment_failed'
+    });
+  });
+
+  it('of an upgrade is on the plan it paid for, even when it arrives first', async () => {
+    await subscribe();
+    Object.assign(h.processor.subs.get('sub_1'), {
+      priceId: 'price_pro_m',
+      planId: 'pro'
+    });
+    await pay({ externalId: 'in_up', kind: 'upgrade', transactionId: 'pi_up' });
+    expect(await paymentOf('in_up')).toMatchObject({
+      planId: 'pro',
+      kind: 'upgrade'
+    });
+  });
+
+  it('disputed is kept so, and cancels its subscription', async () => {
+    await subscribe();
+    await webhook({ kind: 'dispute', transactionId: 'pi_1' });
+    expect(await paymentOf()).toMatchObject({ status: 'disputed' });
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'payment_disputed'
+    });
+  });
+
+  it("is the user's own to see, newest first", async () => {
+    await subscribe();
+    await pay({ externalId: 'in_2', kind: 'renewal', billedAt: new Date() });
+    const mine = await listMyPayments('u1');
+    expect(mine.map(p => p.kind)).toEqual(['renewal', 'initial']);
+    expect(await listMyPayments('u2')).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Refunds
+// ---------------------------------------------------------------------------
+
+describe('from a payment, an admin', () => {
+  it('refunds all that is left and cancels the subscription now: Refunded', async () => {
+    await subscribe();
+    const payment = (await paymentOf())!;
+    await refundPayment(
+      { paymentId: payment.id, cancelSubscription: true },
+      'admin'
+    );
+    expect(h.processor.refundPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ externalId: 'in_1', transactionId: 'pi_1' }),
+      { cents: 800, whole: false }
+    );
+    // What was sent is kept from the start, waiting for the processor, and
+    // the refund fee it was reckoned by.
+    expect(await paymentOf()).toMatchObject({
+      status: 'refund_pending',
+      refundAmount: '8.00',
+      refundBy: 'admin',
+      refundRequestId: null,
+      refundFee: '20',
+      refundAt: expect.any(Date)
+    });
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'refunded'
+    });
+    expect(h.processor.cancelNow).toHaveBeenCalledWith('sub_1');
+    expect(await planOf('u1')).toBeNull();
+  });
+
+  it('otherwise cancels the subscription when it expires, usable until then: Refunded', async () => {
+    await subscribe();
+    await refundPayment(
+      { paymentId: (await paymentOf())!.id, cancelSubscription: false },
+      'admin'
+    );
+    expect(await paymentOf()).toMatchObject({ status: 'refund_pending' });
+    // Its row shows what was sent, waiting for the processor.
+    const [row] = await listSubscriptionPaymentsOf();
+    expect(row).toMatchObject({ refundAmount: '8.00', leftToRefund: 0 });
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      canceledAt: EXPIRES,
+      cancelReason: 'refunded'
+    });
+    expect(h.processor.cancelAtPeriodEnd).toHaveBeenCalledWith('sub_1');
+    expect(h.processor.cancelNow).not.toHaveBeenCalled();
+    expect(await planOf('u1')).not.toBeNull();
+  });
+
+  it('leaves a subscription already set to cancel as it is', async () => {
+    await subscribe();
+    await cancelSubscription('u1');
+    await refundPayment(
+      { paymentId: (await paymentOf())!.id, cancelSubscription: false },
+      'admin'
+    );
+    expect(await rowOf()).toMatchObject({
+      status: 'active',
+      cancelReason: 'canceled_by_customer'
+    });
+  });
+
+  it('refunds what the refund fee leaves: once that has gone back, nothing is left', async () => {
+    await subscribe();
+    const id = (await paymentOf())!.id;
+    await refundPayment({ paymentId: id, cancelSubscription: false }, 'admin');
+    await webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 8 });
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '8.00'
+    });
+    expect(await getRefundDetails(id)).toMatchObject({
+      payment: { left: 0 }
+    });
+    const [row] = await listSubscriptionPaymentsOf();
+    expect(row.leftToRefund).toBe(0);
+    await expect(
+      refundPayment({ paymentId: id, cancelSubscription: false }, 'admin')
+    ).rejects.toThrow('cannot be refunded');
+  });
+
+  it("on auto, leaves the processor's fee", async () => {
+    h.refunds.refundFee = null;
+    await subscribe();
+    const id = (await paymentOf())!.id;
+    expect(await getRefundDetails(id)).toMatchObject({
+      payment: { left: 9 }
+    });
+    await refundPayment({ paymentId: id, cancelSubscription: true }, 'admin');
+    expect(h.processor.refundPayment).toHaveBeenCalledWith(expect.anything(), {
+      cents: 900,
+      whole: false
+    });
+    expect(await paymentOf()).toMatchObject({ refundFee: 'auto' });
+  });
+
+  it('cannot refund while a refund is pending, or a failed payment', async () => {
+    await subscribe();
+    const id = (await paymentOf())!.id;
+    await refundPayment({ paymentId: id, cancelSubscription: false }, 'admin');
+    await expect(
+      refundPayment({ paymentId: id, cancelSubscription: false }, 'admin')
+    ).rejects.toThrow();
+
+    await pay({ externalId: 'in_f', transactionId: 'pi_f', paid: false });
+    await expect(
+      refundPayment(
+        { paymentId: (await paymentOf('in_f'))!.id, cancelSubscription: false },
+        'admin'
+      )
+    ).rejects.toThrow();
+  });
+
+  it('leaves the payment and the subscription as they were when the processor refuses the refund', async () => {
+    await subscribe();
+    h.processor.refundPayment.mockRejectedValueOnce(new Error('refused'));
+    await expect(
+      refundPayment(
+        { paymentId: (await paymentOf())!.id, cancelSubscription: true },
+        'admin'
+      )
+    ).rejects.toThrow('refused');
+    expect(await paymentOf()).toMatchObject({
+      status: 'paid',
+      refundAmount: '0.00',
+      refundBy: null,
+      refundFee: null,
+      refundAt: null
+    });
+    expect(await rowOf()).toMatchObject({ status: 'active', canceledAt: null });
+  });
+
+  it('sees what was paid, the fee, and what is left to refund', async () => {
+    await subscribe();
+    expect(await getRefundDetails((await paymentOf())!.id)).toMatchObject({
+      payment: {
+        planName: 'basic',
+        kind: 'initial',
+        status: 'paid',
+        paid: 10,
+        paymentFee: 1,
+        refunded: 0,
+        left: 8
+      },
+      refundFee: 20,
+      subscription: { planName: 'basic', status: 'active' }
+    });
+  });
+});
+
+describe('a refund, as the processor confirms it', () => {
+  const refundPart = async () => {
+    await subscribe();
+    await refundPayment(
+      {
+        paymentId: (await paymentOf())!.id,
+        cancelSubscription: false
+      },
+      'admin'
+    );
+  };
+
+  it('sent from here: refunded, still naming who sent it', async () => {
+    await refundPart();
+    await webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 3 });
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '3.00',
+      refundBy: 'admin'
+    });
+  });
+
+  it('of all of it: refunded', async () => {
+    await refundPart();
+    await webhook({
+      kind: 'refund',
+      transactionId: 'pi_1',
+      refundAmount: 10
+    });
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '10.00'
+    });
+  });
+
+  it('confirmed twice changes nothing the second time', async () => {
+    await refundPart();
+    const confirm = () =>
+      webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 3 });
+    await confirm();
+    await confirm();
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '3.00',
+      refundBy: 'admin'
+    });
+  });
+
+  it('refused puts the payment back as it was, still naming who sent it', async () => {
+    await refundPart();
+    await webhook({ kind: 'refund_failed', transactionId: 'pi_1' });
+    expect(await paymentOf()).toMatchObject({
+      status: 'paid',
+      refundAmount: '0.00',
+      refundBy: 'admin'
+    });
+  });
+
+  it('reported before its payment fails, and is applied when sent again', async () => {
+    await report();
+    const refund = () =>
+      webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 3 });
+    await expect(refund()).rejects.toThrow('not kept yet');
+    await expect(
+      webhook({ kind: 'dispute', transactionId: 'pi_1' })
+    ).rejects.toThrow('not kept yet');
+    await pay();
+    await refund();
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '3.00'
+    });
+  });
+
+  it('reported refunded and then failed is back to paid, nothing refunded', async () => {
+    await refundPart();
+    await webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 8 });
+    await webhook({ kind: 'refund_failed', transactionId: 'pi_1' });
+    expect(await paymentOf()).toMatchObject({
+      status: 'paid',
+      refundAmount: '0.00'
+    });
+  });
+
+  it('made in the processor itself is kept, and clears who refunded before', async () => {
+    await refundPart();
+    await webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 3 });
+    await webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 5 });
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '5.00',
+      refundBy: null,
+      refundRequestId: null,
+      refundFee: null,
+      refundAt: expect.any(Date)
+    });
+  });
+});
+
+describe('a duplicate subscription', () => {
+  /** A refusal: not tried again. */
+  const refused = (message: string) =>
+    Object.assign(new Error(message), { status: 400 });
+  const duplicate = () => rowOf('sub_2');
+  const reportDuplicate = () => report({ externalId: 'sub_2' });
+  const payDuplicate = () =>
+    pay({
+      externalId: 'in_2',
+      transactionId: 'pi_2',
+      subscriptionExternalId: 'sub_2'
+    });
+
+  it('is kept as a duplicate when its payment is reported first', async () => {
+    await subscribe();
+    processorSubscription({ externalId: 'sub_2' });
+    await payDuplicate();
+    expect(await duplicate()).toMatchObject({ cancelReason: 'duplicate' });
+    expect(await paymentOf('in_2')).toMatchObject({
+      status: 'refund_pending'
+    });
+    expect(await planOf('u1')).toBe('basic');
+  });
+
+  it('tries a request that fails for a while again, and is done', async () => {
+    await subscribe();
+    h.processor.cancelNow.mockRejectedValueOnce(new Error('network'));
+    await reportDuplicate();
+    expect(h.processor.cancelNow).toHaveBeenCalledTimes(2);
+    expect(await duplicate()).toMatchObject({ cancelReason: 'duplicate' });
+  });
+
+  it('not cancelled: duplicate_error and the webhook fails; resent, cancelled, and resolved once refunded', async () => {
+    await subscribe();
+    h.processor.cancelNow.mockRejectedValueOnce(refused('refused'));
+    await expect(reportDuplicate()).rejects.toThrow('refused');
+    expect(await duplicate()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'duplicate_error'
+    });
+    // Refunded, but still running in the processor: still in error.
+    await payDuplicate();
+    expect(await duplicate()).toMatchObject({
+      cancelReason: 'duplicate_error'
+    });
+    // Sent again: only the cancelling is left, and it is done.
+    await reportDuplicate();
+    expect(h.processor.subs.get('sub_2')!.status).toBe('canceled');
+    expect(await duplicate()).toMatchObject({ cancelReason: 'duplicate' });
+    expect(h.processor.refundPayment).toHaveBeenCalledTimes(1);
+  });
+
+  it('not refunded: duplicate_error and the webhook fails; resent, refunded and resolved', async () => {
+    await subscribe();
+    await reportDuplicate();
+    h.processor.refundPayment.mockRejectedValueOnce(refused('declined'));
+    await expect(payDuplicate()).rejects.toThrow('declined');
+    expect(await paymentOf('in_2')).toMatchObject({ status: 'paid' });
+    expect(await duplicate()).toMatchObject({
+      cancelReason: 'duplicate_error'
+    });
+    await payDuplicate();
+    expect(await paymentOf('in_2')).toMatchObject({
+      status: 'refund_pending'
+    });
+    expect(await duplicate()).toMatchObject({ cancelReason: 'duplicate' });
+    // Sent once more, nothing more is done.
+    await payDuplicate();
+    expect(h.processor.refundPayment).toHaveBeenCalledTimes(2);
+  });
+
+  it('a refund the processor fails later is duplicate_error; an admin refunds it in full, and it is resolved', async () => {
+    await subscribe();
+    await reportDuplicate();
+    await payDuplicate();
+    await webhook({ kind: 'refund_failed', transactionId: 'pi_2' });
+    expect(await paymentOf('in_2')).toMatchObject({ status: 'paid' });
+    expect(await duplicate()).toMatchObject({
+      cancelReason: 'duplicate_error'
+    });
+    const payment = (await paymentOf('in_2'))!;
+    expect(await getRefundDetails(payment.id)).toMatchObject({
+      payment: { left: 10, duplicate: true }
+    });
+    await refundPayment(
+      { paymentId: payment.id, cancelSubscription: true },
+      'admin'
+    );
+    expect(await paymentOf('in_2')).toMatchObject({
+      status: 'refund_pending',
+      refundAmount: '10.00',
+      refundBy: 'admin'
+    });
+    expect(await duplicate()).toMatchObject({ cancelReason: 'duplicate' });
+  });
+
+  it('confirmed refunded by the processor', async () => {
+    await subscribe();
+    await reportDuplicate();
+    await payDuplicate();
+    await webhook({ kind: 'refund', transactionId: 'pi_2', refundAmount: 10 });
+    expect(await paymentOf('in_2')).toMatchObject({
+      status: 'refunded',
+      refundAmount: '10.00'
+    });
+  });
+});
+
+describe('a refund request', () => {
+  it('shows the rules and an estimate: the refund fee off each payment in the window', async () => {
+    h.refunds.refundFee = 10;
+    h.refunds.maxRequests = 2;
+    await subscribe({}, { billedAt: daysAgo(3) });
+    await pay({
+      externalId: 'in_up',
+      transactionId: 'pi_up',
+      kind: 'upgrade',
+      amount: 20,
+      billedAt: daysAgo(1)
+    });
+    const offer = await getMyRefundRequest('u1');
+    expect(offer).toMatchObject({
+      canRequest: true,
+      unavailable: null,
+      latest: null,
+      rules: {
+        enabled: true,
+        days: 7,
+        refundFee: 10,
+        requestsLeft: 2,
+        planName: 'basic'
+      },
+      estimate: 27
+    });
+    expect(offer!.payments.map(p => [p.kind, p.estimate])).toEqual([
+      ['initial', 9],
+      ['upgrade', 18]
+    ]);
+  });
+
+  it("estimates all but the processor's fee on auto", async () => {
+    h.refunds.refundFee = null;
+    await subscribe();
+    expect((await getMyRefundRequest('u1'))!.estimate).toBe(9);
+  });
+
+  it('cannot be made while refunds are off, or with no payment in the window', async () => {
+    await subscribe({}, { billedAt: daysAgo(8) });
+    expect(await getMyRefundRequest('u1')).toMatchObject({
+      canRequest: false,
+      unavailable: 'Refunds can be requested within 7 days of a payment.'
+    });
+    h.refunds.enabled = false;
+    expect(await getMyRefundRequest('u1')).toMatchObject({
+      canRequest: false,
+      unavailable: 'Refunds are not available.'
+    });
+    await expect(submitRefundRequest('u1', {})).rejects.toThrow(
+      'not available'
+    );
+  });
+
+  it('is made with no amount, pending approval, and leaves the subscription as it is', async () => {
+    await subscribe();
+    await submitRefundRequest('u1', { reason: 'Not for me' });
+    expect(await h.db.query.refundRequests.findFirst()).toMatchObject({
+      userId: 'u1',
+      subscriptionId: (await rowOf())!.id,
+      status: 'pending_approval',
+      reason: 'Not for me',
+      rejectionReason: null
+    });
+    expect(await rowOf()).toMatchObject({ status: 'active', canceledAt: null });
+    expect(await paymentOf()).toMatchObject({ status: 'paid' });
+    expect(await getMyRefundRequest('u1')).toMatchObject({
+      canRequest: false,
+      unavailable: 'Your refund request is being reviewed.',
+      latest: { status: 'pending_approval' }
+    });
+  });
+
+  it('cannot be made twice while one is pending approval', async () => {
+    await subscribe();
+    await submitRefundRequest('u1', {});
+    await expect(submitRefundRequest('u1', {})).rejects.toThrow(
+      'being reviewed'
+    );
+  });
+
+  it('shows the admin the payments it covers as they were when asked', async () => {
+    await subscribe({}, { billedAt: daysAgo(6) });
+    await submitRefundRequest('u1', {});
+    // Days later, past the window: the request still covers them.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(inDays(5));
+    try {
+      const detail = await getRefundRequest(await requestId());
+      expect(detail).toMatchObject({
+        status: 'pending_approval',
+        user: { id: 'u1' },
+        subscription: { status: 'active', planName: 'basic' },
+        refundFee: 20
+      });
+      expect(detail.payments).toEqual([
+        expect.objectContaining({
+          kind: 'initial',
+          paid: 10,
+          paymentFee: 1,
+          refunded: 0,
+          left: 8
+        })
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe('approved', () => {
+    it('refunds what is left of its payments and cancels the subscription now: Refunded', async () => {
+      await subscribe();
+      await submitRefundRequest('u1', {});
+      const id = await requestId();
+      await approveRefundRequest({ id, cancelSubscription: true }, 'admin');
+      expect(h.processor.refundPayment).toHaveBeenCalledWith(
+        expect.anything(),
+        { cents: 800, whole: false }
+      );
+      expect(await h.db.query.refundRequests.findFirst()).toMatchObject({
+        status: 'approved'
+      });
+      expect(await paymentOf()).toMatchObject({
+        status: 'refund_pending',
+        refundBy: 'admin',
+        refundRequestId: id
+      });
+      expect(await rowOf()).toMatchObject({
+        status: 'canceled',
+        cancelReason: 'refunded'
+      });
+      expect(await planOf('u1')).toBeNull();
+      // The processor confirms: the payment names the request still.
+      await webhook({
+        kind: 'refund',
+        transactionId: 'pi_1',
+        refundAmount: 8
+      });
+      expect(await paymentOf()).toMatchObject({
+        status: 'refunded',
+        refundAmount: '8.00',
+        refundRequestId: id
+      });
+    });
+
+    it('otherwise cancels the subscription when it expires, usable until then: Refunded', async () => {
+      await subscribe();
+      await submitRefundRequest('u1', {});
+      await approveRefundRequest(
+        { id: await requestId(), cancelSubscription: false },
+        'admin'
+      );
+      expect(await paymentOf()).toMatchObject({ status: 'refund_pending' });
+      expect(await rowOf()).toMatchObject({
+        status: 'active',
+        canceledAt: EXPIRES,
+        cancelReason: 'refunded'
+      });
+      expect(await planOf('u1')).not.toBeNull();
+    });
+
+    it('is left pending when no refund goes out', async () => {
+      await subscribe();
+      await submitRefundRequest('u1', {});
+      h.processor.refundPayment.mockRejectedValueOnce(new Error('refused'));
+      await expect(
+        approveRefundRequest(
+          { id: await requestId(), cancelSubscription: true },
+          'admin'
+        )
+      ).rejects.toThrow('refused');
+      expect(await h.db.query.refundRequests.findFirst()).toMatchObject({
+        status: 'pending_approval'
+      });
+      expect(await rowOf()).toMatchObject({ status: 'active' });
+    });
+
+    it('refunded already from Payments, is approved with nothing more sent', async () => {
+      await subscribe();
+      await submitRefundRequest('u1', {});
+      const id = await requestId();
+      await refundPayment(
+        { paymentId: (await paymentOf())!.id, cancelSubscription: false },
+        'admin'
+      );
+      await approveRefundRequest({ id, cancelSubscription: true }, 'admin');
+      expect(await h.db.query.refundRequests.findFirst()).toMatchObject({
+        status: 'approved'
+      });
+      expect(h.processor.refundPayment).toHaveBeenCalledTimes(1);
+      // The subscription as the refund from Payments left it.
+      expect(await rowOf()).toMatchObject({
+        status: 'active',
+        cancelReason: 'refunded'
+      });
+    });
+
+    it('is decided once', async () => {
+      await subscribe();
+      await submitRefundRequest('u1', {});
+      const id = await requestId();
+      await approveRefundRequest({ id, cancelSubscription: false }, 'admin');
+      await expect(
+        approveRefundRequest({ id, cancelSubscription: false }, 'admin')
+      ).rejects.toThrow('already been decided');
+    });
+  });
+
+  it('rejected leaves the subscription as it is, with the reason', async () => {
+    await subscribe();
+    await submitRefundRequest('u1', {});
+    await rejectRefundRequest({
+      id: await requestId(),
+      reason: 'Past the fair-use limit'
+    });
+    expect(await h.db.query.refundRequests.findFirst()).toMatchObject({
+      status: 'rejected',
+      rejectionReason: 'Past the fair-use limit'
+    });
+    expect(await rowOf()).toMatchObject({ status: 'active' });
+    expect(h.processor.refundPayment).not.toHaveBeenCalled();
+  });
+
+  it('can be made as many times as the setting allows, rejected ones counted', async () => {
+    h.refunds.maxRequests = 2;
+    await subscribe();
+    await submitRefundRequest('u1', {});
+    await rejectRefundRequest({ id: await requestId() });
+    expect(await getMyRefundRequest('u1')).toMatchObject({
+      canRequest: true,
+      rules: { requestsLeft: 1 }
+    });
+    await submitRefundRequest('u1', {});
+    await rejectRefundRequest({ id: await requestId() });
+    const used =
+      'Your refund request was rejected, and no more can be made for this subscription.';
+    expect(await getMyRefundRequest('u1')).toMatchObject({
+      canRequest: false,
+      unavailable: used,
+      latest: { status: 'rejected' },
+      rules: { requestsLeft: 0 }
+    });
+    await expect(submitRefundRequest('u1', {})).rejects.toThrow(used);
+  });
+
+  it('can be made again and again with no limit set', async () => {
+    await subscribe();
+    for (let i = 0; i < 3; i++) {
+      await submitRefundRequest('u1', {});
+      await rejectRefundRequest({ id: await requestId() });
+    }
+    expect(await getMyRefundRequest('u1')).toMatchObject({
+      canRequest: true,
+      rules: { requestsLeft: null }
+    });
+  });
+
+  it('counts per subscription: a new one starts again', async () => {
+    h.refunds.maxRequests = 1;
+    await subscribe();
+    await submitRefundRequest('u1', {});
+    await rejectRefundRequest({ id: await requestId() });
+    expect((await getMyRefundRequest('u1'))!.canRequest).toBe(false);
+    await report({ status: 'canceled' });
+    await subscribe(
+      { externalId: 'sub_2' },
+      { externalId: 'in_2', transactionId: 'pi_2' }
+    );
+    expect(await getMyRefundRequest('u1')).toMatchObject({
+      canRequest: true,
+      rules: { requestsLeft: 1 }
+    });
+  });
+
+  it('is listed for the console with how many wait to be decided', async () => {
+    await subscribe();
+    await submitRefundRequest('u1', {});
+    const list = await listRefundRequests({ page: 1, pageSize: 20 });
+    expect(list).toMatchObject({ total: 1, pendingApproval: 1 });
+    expect(list.rows[0]).toMatchObject({
+      status: 'pending_approval',
+      user: { id: 'u1' },
+      subscription: { status: 'active', plan: { name: 'basic' } }
+    });
+    for (const [q, total] of [
+      ['u1@test', 1],
+      ['U1', 1],
+      ['nobody', 0]
+    ] as const) {
+      expect(
+        (await listRefundRequests({ page: 1, pageSize: 20, q })).total
+      ).toBe(total);
+    }
+  });
+});
+
+describe('the console’s payments', () => {
+  it('filter by status, processor and user — a deleted one by the email kept', async () => {
+    await subscribe();
+    const all = { page: 1, pageSize: 20 };
+    for (const [filter, total] of [
+      [{}, 1],
+      [{ status: 'paid' as const }, 1],
+      [{ status: 'refunded' as const }, 0],
+      [{ processor: 'stripe' as const }, 1],
+      [{ processor: 'paddle' as const }, 0],
+      [{ q: 'u1@test' }, 1],
+      [{ q: 'U1' }, 1],
+      [{ q: 'nobody' }, 0]
+    ] as const) {
+      expect((await listPayments({ ...all, ...filter })).total).toBe(total);
+    }
+    await h.db
+      .update(schema.users)
+      .set({ email: 'moved@test.com' })
+      .where(eq(schema.users.id, 'u1'));
+    // The email the payment kept still finds it.
+    expect((await listPayments({ ...all, q: 'u1@test' })).total).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The console, and deleting a user
+// ---------------------------------------------------------------------------
+
+describe('the console', () => {
+  it('lists subscriptions by status, processor and user, with what each paid and had back', async () => {
+    await subscribe();
+    await refundPayment(
+      {
+        paymentId: (await paymentOf())!.id,
+        cancelSubscription: false
+      },
+      'admin'
+    );
+    await webhook({ kind: 'refund', transactionId: 'pi_1', refundAmount: 3 });
+
+    const all = await listSubscriptions({ page: 1, pageSize: 20 });
+    expect(all.rows[0]).toMatchObject({
+      planName: 'basic',
+      price: 10,
+      status: 'active',
+      expiresAt: EXPIRES,
+      processor: 'stripe',
+      paid: 10
+    });
+    for (const [filter, total] of [
+      [{ status: 'canceled' as const }, 0],
+      [{ processor: 'paddle' as const }, 0],
+      [{ q: 'u1@test' }, 1],
+      [{ q: 'nobody' }, 0]
+    ] as const) {
+      expect(
+        (await listSubscriptions({ page: 1, pageSize: 20, ...filter })).total
+      ).toBe(total);
+    }
+  });
+
+  it('opens one whole: its next charge, payments, refund requests and link', async () => {
+    await subscribe();
+    await submitRefundRequest('u1', { reason: 'why' });
+    const detail = await getSubscriptionDetail((await rowOf())!.id);
+    expect(detail).toMatchObject({
+      status: 'active',
+      nextCharge: { at: EXPIRES, amount: 10 },
+      customerId: 'cus_u1',
+      dashboardUrl: 'https://pay.example/subs/sub_1'
+    });
+    expect(detail.payments).toHaveLength(1);
+    expect(detail.refundRequests[0]).toMatchObject({ reason: 'why' });
+  });
+});
+
+describe('deleting a user', () => {
+  it('is refused while their subscription is active, even set to cancel', async () => {
+    await subscribe();
+    await cancelSubscription('u1');
+    await expect(deleteUser('admin', 'u1')).rejects.toThrow(
+      'active subscription'
+    );
+  });
+
+  it('goes ahead once it is canceled, keeping the payments with the email paid under', async () => {
+    await subscribe();
+    await report({ status: 'canceled' });
+    await expect(deleteUser('admin', 'u1')).resolves.toEqual({
+      success: true
+    });
+    expect(await rowOf()).toBeUndefined();
+    expect(await paymentOf()).toMatchObject({
+      userId: null,
+      subscriptionId: null,
+      userEmail: 'u1@test.com',
+      planId: 'basic',
+      amount: '10.00'
+    });
+  });
+});

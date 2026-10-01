@@ -3,10 +3,13 @@ import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AudioLines,
+  CalendarCheck,
+  CalendarClock,
   Clapperboard,
   Film,
   Gauge,
   Globe,
+  Hash,
   Image,
   Loader2,
   MessageSquare,
@@ -15,6 +18,8 @@ import {
   Percent,
   ReceiptText,
   Search,
+  TicketPercent,
+  Tickets,
   Type,
   Video,
   Volume2,
@@ -23,6 +28,13 @@ import {
 import { toast } from 'sonner';
 
 import { type ModelStatus } from '@/types/model';
+import {
+  REFUND_DAYS_CHOICES,
+  REFUND_DAYS_DEFAULT,
+  REFUND_FEE_DEFAULT,
+  REFUND_FEE_OPTIONS,
+  REFUND_REQUESTS_CHOICES
+} from '@/types/payment';
 import { describeMultiplier } from '@/lib/billing';
 import {
   DEFAULT_APP_DESCRIPTION,
@@ -174,7 +186,20 @@ const WEB_SEARCH_MODES = [
   { value: 'model', label: 'Model' }
 ];
 
-/** Every key the page loads and saves: the ten model picks, then the seven
+const REFUND_DAYS_OPTIONS = REFUND_DAYS_CHOICES.map(n => ({
+  value: n,
+  label: n === '1' ? '1 day' : `${n} days`
+}));
+
+/** Refund Requests' choice for no limit, which is saved as no value: a
+ *  select cannot offer an empty one. */
+const UNLIMITED = 'unlimited';
+const REFUND_REQUESTS_OPTIONS = [
+  { value: UNLIMITED, label: 'Unlimited' },
+  ...REFUND_REQUESTS_CHOICES.map(n => ({ value: n, label: n }))
+];
+
+/** Every key the page loads and saves: the ten model picks, then the
  *  fields that are not one. */
 const KEYS = [
   TITLE_MODEL_ROW.key,
@@ -185,6 +210,11 @@ const KEYS = [
   'app.description',
   'chat.systemPrompt',
   'speech.enabled',
+  'subscriptions.enabled',
+  'refunds.enabled',
+  'refunds.fee',
+  'refunds.days',
+  'refunds.maxRequests',
   'webSearch.mode',
   'default.quotaId',
   'billing.tierId'
@@ -211,6 +241,7 @@ export function ConsoleSettings() {
       <WebSearchSettings form={form} />
       <QuotaSettings form={form} />
       <BillingSettings form={form} />
+      <SubscriptionSettings form={form} />
     </SettingsForm>
   );
 }
@@ -507,6 +538,100 @@ function BillingSettings({ form }: { form: SettingsFormApi }) {
   );
 }
 
+/**
+ * The subscriptions feature, on or off — a subscription already bought keeps
+ * running either way, and its user can still manage it — and the refunds a
+ * user makes themselves: on or off, the share of a payment that goes back,
+ * and for how long after it. The two switches are apart: a refund is of
+ * money already paid, so it does not follow whether plans are still sold.
+ * An admin refunds from Payments whatever the refund switch says.
+ */
+function SubscriptionSettings({ form }: { form: SettingsFormApi }) {
+  return (
+    <SettingsList title="Subscriptions">
+      <SettingsRow
+        icon={CalendarCheck}
+        label="Enable Subscriptions"
+        htmlFor="subscriptions.enabled"
+        hint="Whether subscriptions are available. Existing subscriptions keep running when it is off."
+        settingKey="subscriptions.enabled"
+      >
+        <form.Field name="subscriptions.enabled">
+          {field => (
+            <Switch
+              id="subscriptions.enabled"
+              checked={field.state.value === 'true'}
+              onCheckedChange={checked => field.handleChange(String(checked))}
+            />
+          )}
+        </form.Field>
+      </SettingsRow>
+      <SettingsRow
+        icon={Tickets}
+        label="Enable Refunds"
+        htmlFor="refunds.enabled"
+        hint="Whether users can request a refund."
+        settingKey="refunds.enabled"
+      >
+        <form.Field name="refunds.enabled">
+          {field => (
+            <Switch
+              id="refunds.enabled"
+              checked={field.state.value === 'true'}
+              onCheckedChange={checked => field.handleChange(String(checked))}
+            />
+          )}
+        </form.Field>
+      </SettingsRow>
+      <SettingsRow
+        icon={TicketPercent}
+        label="Refund Fee"
+        htmlFor="refunds.fee"
+        hint="What is kept back from a refund. Auto: the fee the payment processor charged on the payment, or nothing where it does not say its fee. A percentage: that share of what was paid."
+        settingKey="refunds.fee"
+      >
+        <form.AppField name="refunds.fee">
+          {field => (
+            <field.SelectField
+              options={[...REFUND_FEE_OPTIONS]}
+              className="w-28"
+            />
+          )}
+        </form.AppField>
+      </SettingsRow>
+      <SettingsRow
+        icon={CalendarClock}
+        label="Refund Window"
+        htmlFor="refunds.days"
+        hint="How many days after a payment the user can still request a refund of it."
+        settingKey="refunds.days"
+      >
+        <form.AppField name="refunds.days">
+          {field => (
+            <field.SelectField options={REFUND_DAYS_OPTIONS} className="w-28" />
+          )}
+        </form.AppField>
+      </SettingsRow>
+      <SettingsRow
+        icon={Hash}
+        label="Refund Requests"
+        htmlFor="refunds.maxRequests"
+        hint="How many times a user can request a refund for one subscription. A rejected request counts; once they are used up, no more can be made."
+        settingKey="refunds.maxRequests"
+      >
+        <form.AppField name="refunds.maxRequests">
+          {field => (
+            <field.SelectField
+              options={REFUND_REQUESTS_OPTIONS}
+              className="w-28"
+            />
+          )}
+        </form.AppField>
+      </SettingsRow>
+    </SettingsList>
+  );
+}
+
 /** What a user may spend when nothing else has said. */
 function QuotaSettings({ form }: { form: SettingsFormApi }) {
   const { data: quotaOptions } = useQuery(quotaQueries.listForSelect());
@@ -693,8 +818,21 @@ function useSettingsForm(keys: readonly string[]) {
     // never run and the page would have rendered a placeholder instead.
     defaultValues: valuesOf(settings),
     onSubmit: async ({ value }) => {
-      await mutation.mutateAsync(
-        keys.map(key => ({ key, value: readPath(value, key) || null }))
+      const saved = keys.map(key => ({
+        key,
+        value:
+          key === 'refunds.maxRequests' && readPath(value, key) === UNLIMITED
+            ? null
+            : readPath(value, key) || null
+      }));
+      await mutation.mutateAsync(saved);
+      // The cache first, then the form. The form is handed the cached rows
+      // as its defaults on every render, and takes new defaults over values
+      // nobody has touched — so reset against the rows as they were, it
+      // would show them again until the refetch came back: a switch just
+      // turned on would flick off, then on.
+      queryClient.setQueryData(settingsQueries.list().queryKey, rows =>
+        rows ? withSaved(rows, saved) : rows
       );
       // The values just saved become the ones "no changes" is measured from,
       // so the Save button settles rather than staying lit.
@@ -733,6 +871,24 @@ function useSettingsForm(keys: readonly string[]) {
   return { form, isHeld };
 }
 
+/** The cached rows with a save applied: each key's value replaced, and a key
+ *  that had no row given one, as the server has just done. */
+function withSaved<TRow extends { key: string; value: string | null }>(
+  rows: TRow[],
+  saved: Array<{ key: string; value: string | null }>
+): TRow[] {
+  const values = new Map(saved.map(s => [s.key, s.value]));
+  const next = rows.map(row =>
+    values.has(row.key) ? { ...row, value: values.get(row.key) ?? null } : row
+  );
+  for (const { key, value } of saved) {
+    if (!rows.some(row => row.key === key)) {
+      next.push({ ...rows[0], id: key, key, value });
+    }
+  }
+  return next;
+}
+
 /** The rows as the form holds them: dotted keys expanded into an object. */
 function valuesOf(
   settings: Array<{ key: string; value: string | null }> | undefined
@@ -743,6 +899,11 @@ function valuesOf(
   });
   // A switch needs a side even before anyone has picked one.
   flat['speech.enabled'] ||= 'false';
+  flat['subscriptions.enabled'] ||= 'false';
+  flat['refunds.enabled'] ||= 'false';
+  flat['refunds.fee'] ||= REFUND_FEE_DEFAULT;
+  flat['refunds.days'] ||= String(REFUND_DAYS_DEFAULT);
+  flat['refunds.maxRequests'] ||= UNLIMITED;
   flat['webSearch.mode'] ||= 'auto';
   return expand(flat);
 }

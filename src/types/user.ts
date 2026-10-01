@@ -28,12 +28,6 @@ export const userSearchSchema = z.object({
 
 export const userIdSchema = z.object({ id: z.string() });
 
-/** Pass planId=null to clear it; the user falls back to the default. */
-export const userPlanSchema = z.object({
-  id: z.string().min(1),
-  planId: z.string().nullable()
-});
-
 export const userRoleSchema = z.object({
   id: z.string(),
   role: z.enum(['user', 'admin'])

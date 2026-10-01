@@ -9,6 +9,7 @@ import { userQueries } from '@/server/functions/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ConsoleHeader } from '@/components/console/header';
 import { Sidebar } from '@/components/console/sidebar';
+import { PlansDialogProvider } from '@/components/plans-dialog';
 import { RoutePending } from '@/components/route-pending';
 import { SettingsDialogProvider } from '@/components/settings-dialog';
 
@@ -44,23 +45,25 @@ function ConsoleLayout() {
   return (
     <SystemSettingsProvider settings={settings}>
       <PreferencesProvider>
-        <SettingsDialogProvider>
-          <SidebarProvider>
-            <Sidebar />
-            {/* Exactly one viewport tall, and it says so: the header is meant to
+        <PlansDialogProvider>
+          <SettingsDialogProvider>
+            <SidebarProvider>
+              <Sidebar />
+              {/* Exactly one viewport tall, and it says so: the header is meant to
                 sit still while the page under it scrolls, so nothing inside is
                 allowed to push this box taller than the screen. Without the
                 clip a tall page scrolls the whole console — header included —
                 and the reader gets a second scrollbar beside the one that is
                 supposed to be there. */}
-            <SidebarInset className="h-svh overflow-hidden">
-              <ConsoleHeader />
-              <div className="min-h-0 flex-1 overflow-y-auto p-6">
-                <Outlet />
-              </div>
-            </SidebarInset>
-          </SidebarProvider>
-        </SettingsDialogProvider>
+              <SidebarInset className="h-svh overflow-hidden">
+                <ConsoleHeader />
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                  <Outlet />
+                </div>
+              </SidebarInset>
+            </SidebarProvider>
+          </SettingsDialogProvider>
+        </PlansDialogProvider>
       </PreferencesProvider>
     </SystemSettingsProvider>
   );

@@ -6,6 +6,7 @@ import {
   type UsageKpi,
   type UsageRow
 } from '@/types';
+import { formatDate, formatShortDate } from '@/lib/format-date';
 import { formatNumber, formatUsd } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -113,27 +114,20 @@ const toLocalDateKey = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
-/** Short day label — `May 05` (used on chart axes). */
+/** Short day label — `May 5` (used on chart axes). */
 const fmtDay = (s: string) => {
   try {
-    return parseLocalDate(s).toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit'
-    });
+    return formatShortDate(parseLocalDate(s));
   } catch {
     return s;
   }
 };
 
-/** Long day label — `May 05, 2026` (used in hover tooltips so the year is
+/** Long day label — `May 5, 2026` (used in hover tooltips so the year is
  *  explicit when ranges span across years). */
 const fmtDayLong = (s: string) => {
   try {
-    return parseLocalDate(s).toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric'
-    });
+    return formatDate(parseLocalDate(s));
   } catch {
     return s;
   }

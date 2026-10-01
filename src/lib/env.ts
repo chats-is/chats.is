@@ -62,7 +62,25 @@ export const env = createEnv({
 
     // Analytics
     UMAMI_SCRIPT_URL: z.string().optional(),
-    UMAMI_WEBSITE_ID: z.string().optional()
+    UMAMI_WEBSITE_ID: z.string().optional(),
+
+    // Stripe's keys. Only credentials: the subscriptions feature is switched
+    // in the console, and without these a Stripe call fails and says why.
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
+    // Paddle's keys, the same: credentials only. The client-side token is
+    // what Paddle.js opens its checkout with, on the app's own page; a
+    // sandbox token (`test_…`) puts both on Paddle's sandbox.
+    PADDLE_API_KEY: z.string().optional(),
+    PADDLE_WEBHOOK_SECRET: z.string().optional(),
+    PADDLE_CLIENT_TOKEN: z.string().optional(),
+
+    // Lemon Squeezy's keys, and the store its prices are sold from. Test
+    // mode is the key's own: a test-mode key works on test-mode data.
+    LEMONSQUEEZY_API_KEY: z.string().optional(),
+    LEMONSQUEEZY_WEBHOOK_SECRET: z.string().optional(),
+    LEMONSQUEEZY_STORE_ID: z.string().optional()
   },
   // process.env is what the server, drizzle-kit and the deployed function all
   // see, so one schema serves the three.
@@ -101,7 +119,15 @@ export const env = createEnv({
 
     // Analytics
     UMAMI_SCRIPT_URL: process.env.UMAMI_SCRIPT_URL,
-    UMAMI_WEBSITE_ID: process.env.UMAMI_WEBSITE_ID
+    UMAMI_WEBSITE_ID: process.env.UMAMI_WEBSITE_ID,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    PADDLE_API_KEY: process.env.PADDLE_API_KEY,
+    PADDLE_WEBHOOK_SECRET: process.env.PADDLE_WEBHOOK_SECRET,
+    PADDLE_CLIENT_TOKEN: process.env.PADDLE_CLIENT_TOKEN,
+    LEMONSQUEEZY_API_KEY: process.env.LEMONSQUEEZY_API_KEY,
+    LEMONSQUEEZY_WEBHOOK_SECRET: process.env.LEMONSQUEEZY_WEBHOOK_SECRET,
+    LEMONSQUEEZY_STORE_ID: process.env.LEMONSQUEEZY_STORE_ID
   },
   // `.env.example` lists every name with nothing after it, and a copy of it
   // leaves most that way. Empty means unset, not an invalid value.

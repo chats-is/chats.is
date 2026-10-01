@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+import {
+  refundDaysSchema,
+  refundFeeSchema,
+  refundRequestsSchema
+} from './payment';
+
 /**
  * What the settings server functions accept.
  *
@@ -15,3 +21,13 @@ export const settingSchema = z.object({
 export const settingsBulkSchema = z.array(settingSchema);
 
 export const settingKeySchema = z.object({ key: z.string().min(1) });
+
+/**
+ * The settings whose value is more than any string, each with what it must
+ * be. An empty value is always allowed: the setting's default.
+ */
+export const SETTING_VALUE_SCHEMAS: Record<string, z.ZodType> = {
+  'refunds.fee': refundFeeSchema,
+  'refunds.days': refundDaysSchema,
+  'refunds.maxRequests': refundRequestsSchema
+};

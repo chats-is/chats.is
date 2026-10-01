@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CircleCheck,
   ExternalLink,
-  Github,
   Loader2,
   Mail,
   ShieldCheck,
@@ -44,7 +43,8 @@ import {
   ConsoleSearch,
   ConsoleToolbar
 } from '@/components/console/toolbar';
-import { IconGoogle } from '@/components/icons';
+import { IconGitHub, IconGoogle } from '@/components/icons';
+import { LocalTime } from '@/components/local-time';
 
 type User = Awaited<ReturnType<typeof listUsers>>['rows'][number];
 type QuotaOption = { id: string; name: string; isUnlimited: boolean };
@@ -57,7 +57,7 @@ type TierOption = {
 const ProviderIcon = ({ provider }: { provider: string }) => {
   switch (provider.toLowerCase()) {
     case 'github':
-      return <Github className="size-4" />;
+      return <IconGitHub className="size-4" />;
     case 'google':
       return <IconGoogle className="size-4" />;
     case 'email-code':
@@ -192,7 +192,7 @@ const userColumns = (ctx: {
         headClassName: 'w-40',
         cellClassName: 'text-sm whitespace-nowrap'
       },
-      cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
+      cell: ({ row }) => <LocalTime value={row.original.createdAt} />
     }),
     helper.accessor(row => row.plan?.name, {
       id: 'plan',

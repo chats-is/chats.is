@@ -2,6 +2,7 @@ import { type JSONValue } from 'ai';
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -20,6 +21,16 @@ import {
   type ProviderType,
   type ReasoningEffort
 } from '@/types';
+import {
+  type BillingInterval,
+  type BillingType,
+  type CancelReason,
+  type PaymentKind,
+  type PaymentProcessorId,
+  type PaymentStatus,
+  type RefundRequestStatus,
+  type SubscriptionStatus
+} from '@/types/payment';
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -637,25 +648,58 @@ export const tiersRelations = relations(tiers, ({ many }) => ({
  * via quotaId. Users without a planId are "Free" and use the system default
  * quota (configured under setting key `default.quotaId`).
  */
-export const plans = createTable('plan', {
-  id: varchar('id', { length: 255 }).notNull().primaryKey(),
-  name: varchar('name', { length: 100 }).notNull().unique(),
-  description: varchar('description', { length: 500 }),
-  quotaId: varchar('quota_id', { length: 255 })
-    .notNull()
-    .references(() => quotas.id, { onDelete: 'restrict' }),
-  // The tier the plan's users are on; none is the cost price and every model.
-  tierId: varchar('tier_id', { length: 255 }).references(() => tiers.id, {
-    onDelete: 'restrict'
-  }),
-  displayOrder: integer('display_order').notNull().default(0),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow()
-});
+export const plans = createTable(
+  'plan',
+  {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    name: varchar('name', { length: 100 }).notNull().unique(),
+    description: varchar('description', { length: 500 }),
+    quotaId: varchar('quota_id', { length: 255 })
+      .notNull()
+      .references(() => quotas.id, { onDelete: 'restrict' }),
+    // The tier the plan's users are on; none is the cost price and every model.
+    tierId: varchar('tier_id', { length: 255 }).references(() => tiers.id, {
+      onDelete: 'restrict'
+    }),
+    displayOrder: integer('display_order').notNull().default(0),
+    // What the plan sells for. It is billed monthly, yearly or either, as the
+    // user chooses — each with a price of its own and the ID its payment
+    // processor knows that price by — through one processor. The price IDs
+    // are kept here only. Null only on plans made before plans were sold,
+    // and on the interval a plan is not billed at. Once anyone has subscribed
+    // they are fixed: the processor goes on charging against them.
+    billingType: varchar('billing_type', { length: 8 }).$type<BillingType>(),
+    processor: varchar('processor', {
+      length: 32
+    }).$type<PaymentProcessorId>(),
+    monthlyPrice: numeric('monthly_price', { precision: 12, scale: 2 }),
+    monthlyPriceId: varchar('monthly_price_id', { length: 255 }),
+    yearlyPrice: numeric('yearly_price', { precision: 12, scale: 2 }),
+    yearlyPriceId: varchar('yearly_price_id', { length: 255 }),
+    // Open to new subscriptions. Closed, it is not offered, and those already
+    // on it go on renewing.
+    isEnabled: boolean('is_enabled').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  table => [
+    // A processor's price names one plan and interval, so a webhook can tell
+    // which. (The service also keeps a monthly ID from being another plan's
+    // yearly one.)
+    uniqueIndex('plan_processor_monthly_price_idx').on(
+      table.processor,
+      table.monthlyPriceId
+    ),
+    uniqueIndex('plan_processor_yearly_price_idx').on(
+      table.processor,
+      table.yearlyPriceId
+    )
+  ]
+);
 
 export const plansRelations = relations(plans, ({ one, many }) => ({
   quota: one(quotas, {
@@ -665,6 +709,233 @@ export const plansRelations = relations(plans, ({ one, many }) => ({
   tier: one(tiers, { fields: [plans.tierId], references: [tiers.id] }),
   users: many(users)
 }));
+
+/**
+ * A user's subscription to a plan, as its payment processor has it. It is
+ * `active` while it renews — and still `active`, with `canceledAt` set to
+ * `expiresAt`, once cancelled to stop at the end of what was paid for — and
+ * `canceled` once it has stopped, when `canceledAt` says when and
+ * `cancelReason` why. A user has at most one `active` subscription; buying
+ * again after one is cancelled is a new subscription.
+ */
+export const subscriptions = createTable(
+  'subscription',
+  {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    userId: varchar('user_id', { length: 255 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    planId: varchar('plan_id', { length: 255 })
+      .notNull()
+      .references(() => plans.id, { onDelete: 'restrict' }),
+    interval: varchar('interval', { length: 8 })
+      .$type<BillingInterval>()
+      .notNull(),
+    processor: varchar('processor', { length: 32 })
+      .$type<PaymentProcessorId>()
+      .notNull(),
+    // The subscription and the customer in the payment processor.
+    externalId: varchar('external_id', { length: 255 }).notNull(),
+    customerId: varchar('customer_id', { length: 255 }).notNull(),
+    status: varchar('status', { length: 16 })
+      .$type<SubscriptionStatus>()
+      .notNull(),
+    // Paid up to here: it renews, or is cancelled, then.
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    cancelReason: varchar('cancel_reason', {
+      length: 32
+    }).$type<CancelReason>(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  table => [
+    uniqueIndex('subscription_processor_external_idx').on(
+      table.processor,
+      table.externalId
+    ),
+    uniqueIndex('subscription_user_active_idx')
+      .on(table.userId)
+      .where(sql`${table.status} = 'active'`),
+    index('subscription_user_id_idx').on(table.userId),
+    index('subscription_status_created_idx').on(table.status, table.createdAt),
+    check(
+      'subscription_canceled_check',
+      sql`${table.status} <> 'canceled' or (${table.canceledAt} is not null and ${table.cancelReason} is not null)`
+    ),
+    check(
+      'subscription_cancel_pair_check',
+      sql`(${table.canceledAt} is null) = (${table.cancelReason} is null)`
+    )
+  ]
+);
+
+export const subscriptionsRelations = relations(
+  subscriptions,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [subscriptions.userId],
+      references: [users.id]
+    }),
+    plan: one(plans, {
+      fields: [subscriptions.planId],
+      references: [plans.id]
+    }),
+    payments: many(payments),
+    refundRequests: many(refundRequests)
+  })
+);
+
+/**
+ * One charge of a subscription, paid or failed, with what has been refunded
+ * of it. A record of what was paid: kept when its user is deleted, with the
+ * email they paid under. `refundBy` and `refundRequestId` describe the
+ * latest refund only; a refund made in the processor itself clears them.
+ */
+export const payments = createTable(
+  'payment',
+  {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    userId: varchar('user_id', { length: 255 }).references(() => users.id, {
+      onDelete: 'set null'
+    }),
+    userEmail: varchar('user_email', { length: 255 }).notNull(),
+    subscriptionId: varchar('subscription_id', { length: 255 }).references(
+      () => subscriptions.id,
+      { onDelete: 'set null' }
+    ),
+    // The plan it paid for, as it was then.
+    planId: varchar('plan_id', { length: 255 })
+      .notNull()
+      .references(() => plans.id, { onDelete: 'restrict' }),
+    processor: varchar('processor', { length: 32 })
+      .$type<PaymentProcessorId>()
+      .notNull(),
+    kind: varchar('kind', { length: 16 }).$type<PaymentKind>().notNull(),
+    // The invoice in the processor, and the transaction that took the money,
+    // which refunds and disputes name.
+    externalId: varchar('external_id', { length: 255 }).notNull(),
+    transactionId: varchar('transaction_id', { length: 255 }),
+    amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+    refundAmount: numeric('refund_amount', { precision: 12, scale: 2 })
+      .notNull()
+      .default('0'),
+    refundBy: varchar('refund_by', { length: 255 }).references(() => users.id, {
+      onDelete: 'set null'
+    }),
+    refundRequestId: varchar('refund_request_id', { length: 255 }).references(
+      (): PgColumn => refundRequests.id,
+      { onDelete: 'set null' }
+    ),
+    // The refund fee the latest refund sent from here was reckoned by, as the
+    // setting had it then: `auto`, or the percentage kept. Null with none,
+    // or when the latest was made in the processor itself.
+    refundFee: varchar('refund_fee', { length: 8 }),
+    // When the latest refund was made: sent from here, or made in the
+    // processor itself. Null with none.
+    refundAt: timestamp('refund_at', { withTimezone: true }),
+    // What the processor kept as its fee, and the tax in the amount. Null
+    // where it does not say.
+    fee: numeric('fee', { precision: 12, scale: 2 }),
+    tax: numeric('tax', { precision: 12, scale: 2 }),
+    status: varchar('status', { length: 32 }).$type<PaymentStatus>().notNull(),
+    invoiceUrl: text('invoice_url'),
+    // When the processor charged it.
+    billedAt: timestamp('billed_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  table => [
+    uniqueIndex('payment_processor_external_idx').on(
+      table.processor,
+      table.externalId
+    ),
+    index('payment_user_id_idx').on(table.userId),
+    index('payment_transaction_idx').on(table.processor, table.transactionId),
+    index('payment_refund_request_idx').on(table.refundRequestId),
+    index('payment_billed_at_idx').on(table.billedAt),
+    check(
+      'payment_refunded_check',
+      sql`${table.refundAmount} <= ${table.amount}`
+    ),
+    check(
+      'payment_refund_request_check',
+      sql`${table.refundRequestId} is null or ${table.refundBy} is not null`
+    )
+  ]
+);
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  user: one(users, { fields: [payments.userId], references: [users.id] }),
+  plan: one(plans, { fields: [payments.planId], references: [plans.id] }),
+  subscription: one(subscriptions, {
+    fields: [payments.subscriptionId],
+    references: [subscriptions.id]
+  }),
+  refundByUser: one(users, {
+    fields: [payments.refundBy],
+    references: [users.id],
+    relationName: 'refundBy'
+  }),
+  refundRequest: one(refundRequests, {
+    fields: [payments.refundRequestId],
+    references: [refundRequests.id]
+  })
+}));
+
+/**
+ * A user's request for a refund of their subscription. It carries no
+ * amount: an admin approves it, refunding what they choose of its payments
+ * and cancelling the subscription, or rejects it. It counts towards
+ * `refunds.maxRequests`.
+ */
+export const refundRequests = createTable(
+  'refund_request',
+  {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    userId: varchar('user_id', { length: 255 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    subscriptionId: varchar('subscription_id', { length: 255 })
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 32 })
+      .$type<RefundRequestStatus>()
+      .notNull(),
+    reason: text('reason'),
+    rejectionReason: text('rejection_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  table => [
+    uniqueIndex('refund_request_pending_idx')
+      .on(table.subscriptionId)
+      .where(sql`${table.status} = 'pending_approval'`),
+    index('refund_request_user_id_idx').on(table.userId),
+    index('refund_request_status_idx').on(table.status, table.createdAt)
+  ]
+);
+
+export const refundRequestsRelations = relations(
+  refundRequests,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [refundRequests.userId],
+      references: [users.id]
+    }),
+    subscription: one(subscriptions, {
+      fields: [refundRequests.subscriptionId],
+      references: [subscriptions.id]
+    }),
+    payments: many(payments)
+  })
+);
 
 /**
  * Model Pricing - Per-model price entries.
