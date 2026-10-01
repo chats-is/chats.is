@@ -61,12 +61,13 @@ const subscriptionColumns = (
     helper.display({
       id: 'user',
       header: 'User',
-      meta: { headClassName: 'w-52', cellClassName: 'max-w-0' },
+      meta: { headClassName: 'w-52 min-w-52', cellClassName: 'max-w-0' },
       cell: ({ row }) => <UserCell user={row.original.user} />
     }),
     helper.display({
       id: 'plan',
       header: 'Plan',
+      meta: { headClassName: 'w-32 min-w-32' },
       cell: ({ row }) => (
         <span className="text-sm">{row.original.planName}</span>
       )

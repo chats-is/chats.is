@@ -65,7 +65,7 @@ const paymentColumns = (act: (payment: Row) => void) =>
     helper.display({
       id: 'user',
       header: 'User',
-      meta: { headClassName: 'w-52', cellClassName: 'max-w-0' },
+      meta: { headClassName: 'w-52 min-w-52', cellClassName: 'max-w-0' },
       cell: ({ row }) => (
         <UserCell user={row.original.user} email={row.original.userEmail} />
       )
@@ -73,6 +73,7 @@ const paymentColumns = (act: (payment: Row) => void) =>
     helper.display({
       id: 'plan',
       header: 'Plan',
+      meta: { headClassName: 'w-32 min-w-32' },
       cell: ({ row }) => (
         <span className="text-sm">{row.original.plan.name}</span>
       )
@@ -156,6 +157,7 @@ const paymentColumns = (act: (payment: Row) => void) =>
       header: 'Actions',
       meta: {
         align: 'right',
+        sticky: true,
         headClassName: 'w-24',
         cellClassName: 'whitespace-nowrap'
       },

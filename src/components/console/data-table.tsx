@@ -47,6 +47,13 @@ export const CELL_WIDTHS = [
   'max-w-16'
 ];
 
+/** A pinned column is opaque, in the shade its row would have, so what
+ *  scrolls under it does not show through. */
+const STICKY_HEAD =
+  'sticky right-0 z-10 bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]';
+const STICKY_CELL =
+  'sticky right-0 z-10 bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))]';
+
 /** Per-column presentation. Read here so a column def carries its own layout. */
 export type ConsoleColumnMeta = {
   /** Column alignment. Applies to the header and the body cells alike. */
@@ -55,6 +62,8 @@ export type ConsoleColumnMeta = {
   headClassName?: string;
   /** Extra classes for the body cells. */
   cellClassName?: string;
+  /** Pinned to the right edge while a wide table scrolls under it. */
+  sticky?: boolean;
 };
 
 /**
@@ -213,6 +222,7 @@ export function DataTable<TData extends RowData>({
                         // Past the chevron, so the heading sits over the text.
                         expandable && index === 0 && (dense ? 'pl-8' : 'pl-9'),
                         alignOf(meta),
+                        meta?.sticky && STICKY_HEAD,
                         meta?.headClassName
                       )}
                     >
@@ -239,6 +249,7 @@ export function DataTable<TData extends RowData>({
                         'whitespace-normal',
                         dense ? 'p-2' : 'p-3',
                         alignOf(column.columnDef.meta),
+                        column.columnDef.meta?.sticky && STICKY_CELL,
                         column.columnDef.meta?.cellClassName
                       )}
                     >
@@ -265,7 +276,7 @@ export function DataTable<TData extends RowData>({
                   <Fragment key={row.id}>
                     <TableRow
                       className={cn(
-                        'hover:bg-muted/30',
+                        'group/row hover:bg-muted/30',
                         expandable && 'cursor-pointer',
                         // No rule between a row and the rows it opens onto.
                         isOpen && 'border-b-0'
@@ -295,6 +306,7 @@ export function DataTable<TData extends RowData>({
                               'whitespace-normal',
                               dense ? 'p-2' : 'p-3',
                               alignOf(meta),
+                              meta?.sticky && STICKY_CELL,
                               meta?.cellClassName
                             )}
                           >
