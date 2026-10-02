@@ -10,11 +10,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { canUpgrade, type BillingInterval } from '@/types/payment';
+import {
+  canUpgrade,
+  paymentProcessorSchema,
+  type BillingInterval,
+  type PaymentProcessorId
+} from '@/types/payment';
 import { formatPrice } from '@/lib/format-amount';
 import { cn } from '@/lib/utils';
 import { quotaQueries } from '@/server/functions/quota';
 import {
+  confirmCheckout,
+  previewUpgrade,
   resubscribe,
   startCheckout,
   subscriptionQueries,
@@ -69,12 +76,15 @@ const ADVERB = { month: 'monthly', year: 'yearly' } as const;
 function PlansDialog({
   open,
   onOpenChange,
-  returning
+  returning,
+  returned
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Back from paying, and waiting for the subscription to arrive. */
   returning: boolean;
+  /** The checkout come back from, to ask its processor about. */
+  returned: Returned | null;
 }) {
   const queryClient = useQueryClient();
   const { data: plans, isLoading } = useQuery({
@@ -88,8 +98,30 @@ function PlansDialog({
     refetchInterval: query => (returning && !query.state.data ? 2000 : false)
   });
 
+  // Its webhook may be late, or lost: the processor is asked as well, until
+  // the subscription is here.
+  useQuery({
+    queryKey: [...subscriptionQueries.all(), 'confirm', returned] as const,
+    queryFn: async () => {
+      await confirmCheckout({ data: returned! });
+      await queryClient.invalidateQueries({
+        queryKey: subscriptionQueries.key.mine()
+      });
+      return null;
+    },
+    enabled: returning && !mine && !!returned,
+    refetchInterval: 8000
+  });
+
   const shown = plans ?? [];
   const [upgradeTo, setUpgradeTo] = useState<PlanForSale | null>(null);
+  // What the upgrade charges today, asked of the processor for the dialog.
+  const preview = useQuery({
+    queryKey: [...subscriptionQueries.all(), 'preview', upgradeTo?.id] as const,
+    queryFn: () => previewUpgrade({ data: { planId: upgradeTo!.id } }),
+    enabled: !!upgradeTo,
+    staleTime: 0
+  });
 
   const checkout = useMutation({
     mutationFn: (data: { planId: string; interval: BillingInterval }) =>
@@ -213,13 +245,17 @@ function PlansDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Upgrade to {upgradeTo?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              It starts now. You are charged the difference for the rest of this
-              period today.
+              {preview.isLoading
+                ? 'It starts now. Working out what you are charged today…'
+                : preview.data?.amount != null
+                  ? `It starts now. You are charged ${formatPrice(preview.data.amount)} today, the difference for the rest of this period.`
+                  : 'It starts now. You are charged the difference for the rest of this period today.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={preview.isLoading}
               onClick={() => upgradeTo && upgrade.mutate(upgradeTo.id)}
             >
               Upgrade
@@ -334,7 +370,7 @@ function PlanCard({
         Subscribe
       </Button>
     );
-  } else if (isCurrent && mine.canceledAt) {
+  } else if (isCurrent && mine.canResume) {
     // Canceled, and still in effect: the same plan, renewing again.
     button = (
       <Button className="w-full" disabled={busy} onClick={onResubscribe}>
@@ -350,6 +386,7 @@ function PlanCard({
       </Button>
     );
   } else if (
+    mine.canUpgrade &&
     mine.price != null &&
     mine.interval &&
     canUpgrade(
@@ -422,6 +459,9 @@ function PlanCard({
   );
 }
 
+/** A checkout come back from: its processor, and what the return carried. */
+type Returned = { via: PaymentProcessorId; ref: string | null };
+
 const OpenPlans = createContext<(() => void) | null>(null);
 
 /**
@@ -438,19 +478,35 @@ export function PlansDialogProvider({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const checkout = (location.search as { checkout?: string }).checkout;
+  const { checkout, via, ref } = location.search as {
+    checkout?: string;
+    via?: string;
+    ref?: string;
+  };
   const [open, setOpen] = useState(false);
   const [returning, setReturning] = useState(false);
+  const [returned, setReturned] = useState<Returned | null>(null);
   const openPlans = useCallback(() => setOpen(true), []);
 
   useEffect(() => {
     if (checkout !== 'success' && checkout !== 'canceled') return;
     setOpen(true);
     setReturning(checkout === 'success');
+    const processor = paymentProcessorSchema.safeParse(via);
+    setReturned(
+      checkout === 'success' && processor.success
+        ? { via: processor.data, ref: ref ? String(ref) : null }
+        : null
+    );
     // Out of the address, so a refresh does not answer the return again.
-    const { checkout: _, ...rest } = location.search as Record<string, unknown>;
+    const {
+      checkout: _,
+      via: _via,
+      ref: _ref,
+      ...rest
+    } = location.search as Record<string, unknown>;
     void navigate({ to: location.pathname, search: rest, replace: true });
-  }, [checkout, location.pathname, location.search, navigate]);
+  }, [checkout, via, ref, location.pathname, location.search, navigate]);
 
   const { data: mine } = useQuery({
     ...subscriptionQueries.mine(),
@@ -474,6 +530,7 @@ export function PlansDialogProvider({
           if (!next) setReturning(false);
         }}
         returning={returning}
+        returned={returned}
       />
     </OpenPlans.Provider>
   );

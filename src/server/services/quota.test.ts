@@ -25,6 +25,11 @@ const h = vi.hoisted(() => ({
   usageQueried: false
 }));
 
+// The subscription behind the plan is another module's, with tests of its own.
+vi.mock('@/server/services/subscription', () => ({
+  refreshIfExpired: async () => {}
+}));
+
 vi.mock('@/db', () => ({
   db: {
     query: {

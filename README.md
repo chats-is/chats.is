@@ -114,13 +114,23 @@ Webhook addresses are under `{BETTER_AUTH_URL}`. The events to send:
 
 - **Stripe:** `checkout.session.completed`, `customer.subscription.created`,
   `.updated`, `.deleted`, `.paused` and `.resumed`, `invoice.paid`,
-  `invoice.payment_failed`, `charge.refunded`, `charge.dispute.created`.
+  `invoice.payment_failed`, `charge.refunded`, `refund.failed`,
+  `charge.dispute.created`, `charge.dispute.funds_withdrawn`,
+  `charge.dispute.funds_reinstated`, `charge.dispute.closed`.
 - **Paddle:** every `subscription.*` event, `transaction.completed`,
   `transaction.payment_failed`, `adjustment.created`, `adjustment.updated`.
   Set the default payment link to `{BETTER_AUTH_URL}/pay/paddle` — the page
   that opens Paddle's checkout — and approve its domain.
 - **Lemon Squeezy:** every `subscription_*` event, including
   `subscription_payment_success`, `_failed`, `_recovered` and `_refunded`.
+
+A webhook can fail to arrive. The app makes up for it by asking the
+processor itself: for a subscription past its expiry when the user's plan is
+next read, for a checkout the user has come back from, and — once a day,
+from the scheduled job at `/api/cron/reconcile` — for the refunds and
+disputes of recent payments. Set `CRON_SECRET` to turn the job on; on Vercel
+`vercel.json` schedules it, and elsewhere anything that calls the address
+daily with `Authorization: Bearer {CRON_SECRET}` does.
 
 Then:
 

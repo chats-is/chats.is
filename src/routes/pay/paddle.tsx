@@ -46,6 +46,10 @@ function PaddleCheckout() {
   useEffect(() => {
     if (!config || !hasTransaction) return;
     const origin = window.location.origin;
+    // The transaction goes back with the user, so the app can ask Paddle
+    // for the subscription it made if the webhook is late.
+    const transaction =
+      new URLSearchParams(window.location.search).get('_ptxn') ?? '';
     const script = document.createElement('script');
     script.src = PADDLE_JS;
     script.async = true;
@@ -58,7 +62,7 @@ function PaddleCheckout() {
         checkout: {
           settings: {
             displayMode: 'overlay',
-            successUrl: `${origin}/?checkout=success`
+            successUrl: `${origin}/?checkout=success&via=paddle&ref=${encodeURIComponent(transaction)}`
           }
         },
         eventCallback: event => {

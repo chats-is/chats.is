@@ -38,6 +38,7 @@ import { Route as ShareIdRouteImport } from './routes/share/$id'
 import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
 import { Route as ApiArtifactsPreviewRouteImport } from './routes/api/artifacts/preview'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiCronReconcileRouteImport } from './routes/api/cron/reconcile'
 import { Route as ApiFilesUploadRouteImport } from './routes/api/files/upload'
 import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users/index'
 import { Route as ConsoleUsersUserIdRouteImport } from './routes/console/users/$userId'
@@ -187,6 +188,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronReconcileRoute = ApiCronReconcileRouteImport.update({
+  id: '/api/cron/reconcile',
+  path: '/api/cron/reconcile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFilesUploadRoute = ApiFilesUploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/chat/$chatId': typeof ChatChatChatIdRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/reconcile': typeof ApiCronReconcileRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
@@ -271,6 +278,7 @@ export interface FileRoutesByTo {
   '/chat/$chatId': typeof ChatChatChatIdRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/reconcile': typeof ApiCronReconcileRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users': typeof ConsoleUsersIndexRoute
@@ -307,6 +315,7 @@ export interface FileRoutesById {
   '/_chat/chat/$chatId': typeof ChatChatChatIdRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/reconcile': typeof ApiCronReconcileRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
@@ -343,6 +352,7 @@ export interface FileRouteTypes {
     | '/chat/$chatId'
     | '/api/artifacts/preview'
     | '/api/auth/$'
+    | '/api/cron/reconcile'
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users/'
@@ -376,6 +386,7 @@ export interface FileRouteTypes {
     | '/chat/$chatId'
     | '/api/artifacts/preview'
     | '/api/auth/$'
+    | '/api/cron/reconcile'
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users'
@@ -411,6 +422,7 @@ export interface FileRouteTypes {
     | '/_chat/chat/$chatId'
     | '/api/artifacts/preview'
     | '/api/auth/$'
+    | '/api/cron/reconcile'
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users/'
@@ -430,6 +442,7 @@ export interface RootRouteChildren {
   ShareIdRoute: typeof ShareIdRoute
   ApiArtifactsPreviewRoute: typeof ApiArtifactsPreviewRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiCronReconcileRoute: typeof ApiCronReconcileRoute
   ApiPaymentsProcessorWebhookRoute: typeof ApiPaymentsProcessorWebhookRoute
 }
 
@@ -638,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/reconcile': {
+      id: '/api/cron/reconcile'
+      path: '/api/cron/reconcile'
+      fullPath: '/api/cron/reconcile'
+      preLoaderRoute: typeof ApiCronReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/files/upload': {
       id: '/api/files/upload'
       path: '/upload'
@@ -749,6 +769,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShareIdRoute: ShareIdRoute,
   ApiArtifactsPreviewRoute: ApiArtifactsPreviewRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiCronReconcileRoute: ApiCronReconcileRoute,
   ApiPaymentsProcessorWebhookRoute: ApiPaymentsProcessorWebhookRoute,
 }
 export const routeTree = rootRouteImport

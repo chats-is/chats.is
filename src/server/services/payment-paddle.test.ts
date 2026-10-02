@@ -442,7 +442,26 @@ describe('Paddle webhooks', () => {
     [
       'adjustment.created',
       { action: 'chargeback', status: 'approved', transaction_id: 'txn_1' },
-      { kind: 'dispute', transactionId: 'txn_1' }
+      { kind: 'dispute', transactionId: 'txn_1', withdrawn: true }
+    ],
+    [
+      // Paddle's own refund to head off a chargeback: the money has left.
+      'adjustment.created',
+      {
+        action: 'chargeback_warning',
+        status: 'approved',
+        transaction_id: 'txn_1'
+      },
+      { kind: 'dispute', transactionId: 'txn_1', withdrawn: true }
+    ],
+    [
+      'adjustment.created',
+      {
+        action: 'chargeback_reverse',
+        status: 'approved',
+        transaction_id: 'txn_1'
+      },
+      { kind: 'dispute_won', transactionId: 'txn_1' }
     ],
     [
       'adjustment.updated',
@@ -680,5 +699,95 @@ describe('a Paddle payment method', () => {
 
   it('is none without a transaction', () => {
     expect(__test.methodOf(undefined)).toBeNull();
+  });
+});
+
+describe('asking Paddle, for a webhook that never came', () => {
+  const adjustment = (action: string, status: string, total = '0') => ({
+    id: `adj_${action}`,
+    action,
+    status,
+    transaction_id: 'txn_1',
+    items: [],
+    totals: { total }
+  });
+
+  it('where a payment stands: its approved refunds, one still waiting, and its chargebacks', async () => {
+    const state = async (adjustments: unknown[]) => {
+      replies.push(
+        { body: { data: { id: 'txn_1', currency_code: 'USD' } } },
+        { body: { data: adjustments } }
+      );
+      return await paddle.getPaymentState({
+        externalId: 'txn_1',
+        transactionId: 'txn_1'
+      });
+    };
+    expect(
+      await state([
+        adjustment('refund', 'approved', '800'),
+        adjustment('refund', 'pending_approval', '100'),
+        adjustment('refund', 'rejected', '50')
+      ])
+    ).toEqual({ refunded: 8, refundPending: true, dispute: 'none' });
+    expect(calls.at(-1)!.url).toContain('/adjustments?transaction_id=txn_1');
+    expect(
+      (await state([adjustment('chargeback_warning', 'approved')])).dispute
+    ).toBe('withdrawn');
+    expect(
+      (
+        await state([
+          adjustment('chargeback', 'approved'),
+          adjustment('chargeback_reverse', 'approved')
+        ])
+      ).dispute
+    ).toBe('won');
+  });
+
+  it('the subscription a checkout made, only for the user it was made for', async () => {
+    const transaction = {
+      id: 'txn_1',
+      subscription_id: 'sub_1',
+      custom_data: { userId: 'u1' }
+    };
+    replies.push({ body: { data: transaction } });
+    expect(
+      await paddle.findSubscriptions({
+        ref: 'txn_1',
+        userId: 'u1',
+        email: 'u1@test.com'
+      })
+    ).toEqual(['sub_1']);
+    replies.push({ body: { data: transaction } });
+    expect(
+      await paddle.findSubscriptions({
+        ref: 'txn_1',
+        userId: 'u2',
+        email: 'u2@test.com'
+      })
+    ).toEqual([]);
+  });
+
+  it('what an upgrade charges today', async () => {
+    replies.push({
+      body: {
+        data: {
+          immediate_transaction: {
+            details: { totals: { grand_total: '750', currency_code: 'USD' } }
+          }
+        }
+      }
+    });
+    expect(await paddle.previewChange('sub_1', { priceId: 'pri_pro' })).toBe(
+      7.5
+    );
+    expect(calls.at(-1)).toMatchObject({
+      method: 'PATCH',
+      body: {
+        items: [{ price_id: 'pri_pro', quantity: 1 }],
+        proration_billing_mode: 'prorated_immediately'
+      }
+    });
+    expect(calls.at(-1)!.url).toContain('/subscriptions/sub_1/preview');
   });
 });

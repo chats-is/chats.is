@@ -175,12 +175,41 @@ export async function markDisputed(
   processor: PaymentProcessorId,
   transactionId: string
 ) {
-  const row = await requirePayment(processor, transactionId);
-  await db
-    .update(payments)
-    .set({ status: 'disputed', updatedAt: new Date() })
-    .where(eq(payments.id, row.id));
-  return row;
+  const found = await requirePayment(processor, transactionId);
+  await withLock(lockKey(processor, found.externalId), async tx => {
+    await tx
+      .update(payments)
+      .set({ status: 'disputed', updatedAt: new Date() })
+      .where(eq(payments.id, found.id));
+  });
+  return found;
+}
+
+/**
+ * A dispute closed in the seller's favour: the payment is as it was before
+ * it — paid, or refunded by what has gone back. Returns the payment, or
+ * null when it is not kept or was not disputed.
+ */
+export async function markUndisputed(
+  processor: PaymentProcessorId,
+  transactionId: string
+) {
+  const found = await paymentByTransaction(processor, transactionId);
+  if (!found) return null;
+  return await withLock(lockKey(processor, found.externalId), async tx => {
+    const row = await tx.query.payments.findFirst({
+      where: eq(payments.id, found.id)
+    });
+    if (row?.status !== 'disputed') return null;
+    await tx
+      .update(payments)
+      .set({
+        status: refundedStatus(toCents(row.refundAmount)),
+        updatedAt: new Date()
+      })
+      .where(eq(payments.id, row.id));
+    return row;
+  });
 }
 
 // ============================================================================
@@ -228,6 +257,11 @@ export async function startRefund(
     requestId?: string | null;
     /** Try the processor again when it fails for a while. */
     retry?: boolean;
+    /** What the refund owes the subscription once it is confirmed: canceled
+     *  at once, or when it expires. None for a refund that cancels nothing. */
+    cancelSubscription?: boolean | null;
+    /** All of it, whatever the refund fee: it bought nothing. */
+    full?: boolean;
   },
   /** The refund fee, read by the caller already — with the processor's fee
    *  kept on the payment by then — not to be read again. */
@@ -257,7 +291,7 @@ export async function startRefund(
         throw new PublicError('This payment cannot be refunded.');
       }
       // A duplicate's payment goes back whole: it bought nothing.
-      const whole = await ofDuplicate(row.subscriptionId, tx);
+      const whole = by.full || (await ofDuplicate(row.subscriptionId, tx));
       const left = whole
         ? leftToRefundCents(row, 0)
         : leftToRefundCents(row, refundFee);
@@ -277,6 +311,7 @@ export async function startRefund(
           refundAmount: toDollars(toCents(row.refundAmount) + cents).toFixed(2),
           refundBy: by.adminId,
           refundRequestId: by.requestId ?? null,
+          refundCancelSubscription: by.cancelSubscription ?? null,
           refundFee: whole
             ? '0'
             : refundFee == null
@@ -309,6 +344,7 @@ export async function startRefund(
         refundRequestId: before.refundRequestId,
         refundFee: before.refundFee,
         refundAt: before.refundAt,
+        refundCancelSubscription: before.refundCancelSubscription,
         updatedAt: new Date()
       })
       .where(
@@ -323,51 +359,93 @@ export async function startRefund(
  * that was `refund_pending` had its refund sent from here, and keeps who
  * sent it; any other refund was made in the processor itself, and clears
  * that. Nothing new — a webhook sent again — changes nothing.
+ *
+ * Money that went back ends what it paid for, wherever the refund was made:
+ * `cancelSubscription` is what the subscription is still owed for it — canceled at
+ * once, or when it expires — and null when nothing is. A refund sent from
+ * here owes what the admin chose; one made in the processor, at once when
+ * all of it went back, else when it expires. It is owed until
+ * `clearRefundCancel` says it is done, so a webhook sent again does it.
  */
 export async function applyRefund(
   processor: PaymentProcessorId,
   transactionId: string,
   refundAmount: number
-): Promise<{ subscriptionId: string | null } | null> {
+): Promise<{
+  paymentId: string;
+  subscriptionId: string | null;
+  cancelSubscription: boolean | null;
+}> {
   const found = await requirePayment(processor, transactionId);
-  await withLock(lockKey(processor, found.externalId), async tx => {
-    const row = await tx.query.payments.findFirst({
-      where: eq(payments.id, found.id)
-    });
-    if (!row) return;
-    const cents = Math.round(refundAmount * 100);
-    // A refund sent from here, confirmed: what the processor says went
-    // back, whatever was sent. Otherwise only more than is known is news —
-    // a refund made in the processor itself.
-    const ours = row.status === 'refund_pending';
-    if (!ours && cents <= toCents(row.refundAmount)) return;
-    await tx
-      .update(payments)
-      .set({
-        refundAmount: toDollars(cents).toFixed(2),
-        status: row.status === 'disputed' ? 'disputed' : refundedStatus(cents),
-        ...(ours
-          ? {}
-          : {
-              refundBy: null,
-              refundRequestId: null,
-              refundFee: null,
-              refundAt: new Date()
-            }),
-        updatedAt: new Date()
-      })
-      .where(eq(payments.id, row.id));
-  });
-  return { subscriptionId: found.subscriptionId };
+  const cancelSubscription = await withLock(
+    lockKey(processor, found.externalId),
+    async tx => {
+      const row = await tx.query.payments.findFirst({
+        where: eq(payments.id, found.id)
+      });
+      if (!row) return null;
+      const cents = Math.round(refundAmount * 100);
+      // A refund sent from here, confirmed: what the processor says went
+      // back, whatever was sent. Otherwise only more than is known is news —
+      // a refund made in the processor itself.
+      const ours = row.status === 'refund_pending';
+      if (!ours && cents <= toCents(row.refundAmount)) {
+        return row.refundCancelSubscription;
+      }
+      // A disputed payment's subscription is the dispute's to end.
+      const owed =
+        cents === 0 || row.status === 'disputed'
+          ? null
+          : ours
+            ? row.refundCancelSubscription
+            : cents >= toCents(row.amount);
+      await tx
+        .update(payments)
+        .set({
+          refundAmount: toDollars(cents).toFixed(2),
+          status:
+            row.status === 'disputed' ? 'disputed' : refundedStatus(cents),
+          refundCancelSubscription: owed,
+          ...(ours
+            ? {}
+            : {
+                refundBy: null,
+                refundRequestId: null,
+                refundFee: null,
+                refundAt: new Date()
+              }),
+          updatedAt: new Date()
+        })
+        .where(eq(payments.id, row.id));
+      return owed;
+    }
+  );
+  return {
+    paymentId: found.id,
+    subscriptionId: found.subscriptionId,
+    cancelSubscription
+  };
+}
+
+/** What a refund owed its subscription has been done. */
+export async function clearRefundCancel(paymentId: string) {
+  await db
+    .update(payments)
+    .set({ refundCancelSubscription: null })
+    .where(eq(payments.id, paymentId));
 }
 
 /** The processor refused a refund sent from here, or failed one it had
  *  reported: the payment is as it was before it, and still names who sent
- *  it. */
+ *  it — and the request it was approved for, which is returned to be
+ *  decided again. */
 export async function failRefund(
   processor: PaymentProcessorId,
   transactionId: string
-): Promise<{ subscriptionId: string | null } | null> {
+): Promise<{
+  subscriptionId: string | null;
+  refundRequestId: string | null;
+} | null> {
   const found = await paymentByTransaction(processor, transactionId);
   if (!found) return null;
   const failed = await withLock(
@@ -382,17 +460,22 @@ export async function failRefund(
       const ours =
         row?.status === 'refund_pending' ||
         (row?.status === 'refunded' && row.refundFee != null);
-      if (!row || !ours) return false;
+      if (!row || !ours) return null;
       // Only a paid payment is refunded from here, so it was paid, with
       // nothing refunded, before.
       await tx
         .update(payments)
-        .set({ status: 'paid', refundAmount: '0.00', updatedAt: new Date() })
+        .set({
+          status: 'paid',
+          refundAmount: '0.00',
+          refundCancelSubscription: null,
+          updatedAt: new Date()
+        })
         .where(eq(payments.id, row.id));
-      return true;
+      return { refundRequestId: row.refundRequestId };
     }
   );
-  return failed ? { subscriptionId: found.subscriptionId } : null;
+  return failed ? { subscriptionId: found.subscriptionId, ...failed } : null;
 }
 
 /**

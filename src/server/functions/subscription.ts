@@ -8,6 +8,7 @@ import {
   approveRefundRequestSchema,
   changePlanSchema,
   checkoutSchema,
+  confirmCheckoutSchema,
   refundRequestListSchema,
   refundRequestSchema,
   rejectRefundRequestSchema,
@@ -34,6 +35,22 @@ export const startCheckout = createServerFn({ method: 'POST' })
   .validator(checkoutSchema)
   .handler(({ data, context }) =>
     subscription.startCheckout(context.user, data, getRequest())
+  );
+
+/** Back from a checkout with no subscription yet: ask its processor. */
+export const confirmCheckout = createServerFn({ method: 'POST' })
+  .middleware([authedMiddleware])
+  .validator(confirmCheckoutSchema)
+  .handler(({ data, context }) =>
+    subscription.confirmCheckout(context.user, data)
+  );
+
+/** What an upgrade to a plan would charge today. */
+export const previewUpgrade = createServerFn({ method: 'POST' })
+  .middleware([authedMiddleware])
+  .validator(changePlanSchema)
+  .handler(({ data, context }) =>
+    subscription.previewUpgrade(context.user.id, data)
   );
 
 /** Move up to a plan that costs more, at the same interval; charged now. */
@@ -108,7 +125,9 @@ export const getSubscriptionDetail = createServerFn({ method: 'GET' })
 export const adminCancelSubscription = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(subscriptionIdSchema)
-  .handler(({ data }) => subscription.adminCancelSubscription(data.id));
+  .handler(({ data, context }) =>
+    subscription.adminCancelSubscription(data.id, context.user.id)
+  );
 
 /** Admin: refund requests, one page at a time. */
 export const listRefundRequests = createServerFn({ method: 'GET' })

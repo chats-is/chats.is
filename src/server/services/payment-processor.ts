@@ -63,6 +63,19 @@ export type ProcessorPayment = {
 };
 
 /**
+ * Where a payment's refunds and disputes stand in the processor now — read
+ * to make up for a webhook that never came.
+ */
+export type ProcessorPaymentState = {
+  /** All refunded of it so far, in the currency's main unit. */
+  refunded: number;
+  /** A refund of it is still being processed there. */
+  refundPending: boolean;
+  /** `inquiry` has taken no money; `withdrawn` has; `won` gave it back. */
+  dispute: 'none' | 'inquiry' | 'withdrawn' | 'won';
+};
+
+/**
  * How a subscription is paid for, as the user's Billing shows it: a card's
  * brand, last four digits and expiry, or the kind of method it is — PayPal,
  * say — where it is not a card. Read from the processor when shown.
@@ -97,7 +110,18 @@ export type WebhookAction =
       kind: 'refund_failed';
       transactionId: string;
     }
-  | { kind: 'dispute'; transactionId: string }
+  | {
+      kind: 'dispute';
+      transactionId: string;
+      /** Whether the money has left: a chargeback, or the processor's own
+       *  refund to avoid one. False while it is only an inquiry. */
+      withdrawn: boolean;
+    }
+  | {
+      /** A dispute closed in the seller's favour: the money is back. */
+      kind: 'dispute_won';
+      transactionId: string;
+    }
   | { kind: 'ignore' };
 
 export type WebhookEvent = { id: string; type: string; action: WebhookAction };
@@ -159,6 +183,25 @@ export interface PaymentProcessor {
 
   getSubscription: (externalId: string) => Promise<ProcessorSubscription>;
 
+  /**
+   * The subscriptions a checkout the user came back from made, for when its
+   * webhook has not arrived: by what the checkout's return carries (`ref`),
+   * or, where it carries nothing, by the email it was paid under. Only the
+   * user's own.
+   */
+  findSubscriptions: (checkout: {
+    ref: string | null;
+    userId: string;
+    email: string;
+  }) => Promise<string[]>;
+
+  /** What moving to `priceId` now would charge today, in dollars; null
+   *  where the processor cannot say beforehand. */
+  previewChange: (
+    externalId: string,
+    target: { priceId: string }
+  ) => Promise<number | null>;
+
   /** Move up to a dearer price now, charging the difference. Throws when
    *  the charge fails, and then nothing has changed. */
   changeNow: (
@@ -187,6 +230,12 @@ export interface PaymentProcessor {
   ) => Promise<void>;
 
   getPayment: (externalId: string) => Promise<ProcessorPayment | null>;
+
+  /** A payment's refunds and disputes as the processor has them now. */
+  getPaymentState: (payment: {
+    externalId: string;
+    transactionId: string | null;
+  }) => Promise<ProcessorPaymentState>;
 
   /** A link to a payment's invoice, made when asked — for a processor whose
    *  invoice links do not last, so none is kept on the payment. */

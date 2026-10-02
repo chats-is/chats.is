@@ -80,7 +80,11 @@ export const env = createEnv({
     // mode is the key's own: a test-mode key works on test-mode data.
     LEMONSQUEEZY_API_KEY: z.string().optional(),
     LEMONSQUEEZY_WEBHOOK_SECRET: z.string().optional(),
-    LEMONSQUEEZY_STORE_ID: z.string().optional()
+    LEMONSQUEEZY_STORE_ID: z.string().optional(),
+
+    // What the scheduled job at /api/cron/reconcile is called with, as a
+    // bearer token. Unset, the job is off.
+    CRON_SECRET: z.string().optional()
   },
   // process.env is what the server, drizzle-kit and the deployed function all
   // see, so one schema serves the three.
@@ -127,7 +131,8 @@ export const env = createEnv({
     PADDLE_CLIENT_TOKEN: process.env.PADDLE_CLIENT_TOKEN,
     LEMONSQUEEZY_API_KEY: process.env.LEMONSQUEEZY_API_KEY,
     LEMONSQUEEZY_WEBHOOK_SECRET: process.env.LEMONSQUEEZY_WEBHOOK_SECRET,
-    LEMONSQUEEZY_STORE_ID: process.env.LEMONSQUEEZY_STORE_ID
+    LEMONSQUEEZY_STORE_ID: process.env.LEMONSQUEEZY_STORE_ID,
+    CRON_SECRET: process.env.CRON_SECRET
   },
   // `.env.example` lists every name with nothing after it, and a copy of it
   // leaves most that way. Empty means unset, not an invalid value.

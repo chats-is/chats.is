@@ -746,6 +746,14 @@ export const subscriptions = createTable(
     cancelReason: varchar('cancel_reason', {
       length: 32
     }).$type<CancelReason>(),
+    // Who set it to cancel: the user themselves, or an admin — by
+    // cancelling it, or by the refund that did. Null when no one here did:
+    // the processor, a dispute, a failed payment. Only what its own user
+    // set to cancel is theirs to resume.
+    canceledBy: varchar('canceled_by', { length: 255 }).references(
+      () => users.id,
+      { onDelete: 'set null' }
+    ),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -838,6 +846,13 @@ export const payments = createTable(
     // When the latest refund was made: sent from here, or made in the
     // processor itself. Null with none.
     refundAt: timestamp('refund_at', { withTimezone: true }),
+    // What a refund of it still owes its subscription once the processor
+    // confirms the money went back: canceled at once (true), or when it
+    // expires (false). Null with nothing owed — none sent, or done.
+    refundCancelSubscription: boolean('refund_cancel_subscription'),
+    // When its refunds and disputes were last read from the processor, by
+    // the job that makes up for webhooks that never came.
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
     // What the processor kept as its fee, and the tax in the amount. Null
     // where it does not say.
     fee: numeric('fee', { precision: 12, scale: 2 }),

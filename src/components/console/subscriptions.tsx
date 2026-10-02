@@ -252,6 +252,7 @@ export default function Subscriptions() {
           onOpenChange={open => !open && setCanceling(null)}
           planName={canceling.planName}
           expiresAt={canceling.expiresAt}
+          byAdmin
           onConfirm={() => cancel.mutate({ id: canceling.id })}
         />
       )}

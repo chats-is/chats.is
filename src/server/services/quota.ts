@@ -17,6 +17,7 @@ import { db } from '@/db';
 import { quotas, usage, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { getDefaultQuotaId } from '@/server/services/settings';
+import { refreshIfExpired } from '@/server/services/subscription';
 
 type QuotaRow = typeof quotas.$inferSelect;
 
@@ -42,6 +43,8 @@ export const getUserResolvedQuota = perRequest(
     plan: { id: string; name: string } | null;
     source: ResolvedSource;
   }> => {
+    // The plan is the subscription's: one past its expiry is checked first.
+    await refreshIfExpired(userId);
     const userRow = await db.query.users.findFirst({
       where: eq(users.id, userId),
       with: {

@@ -225,6 +225,13 @@
       "when": 1790754745641,
       "tag": "0031_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790951935914,
+      "tag": "0032_refund_cancel",
+      "breakpoints": true
     }
   ]
 }

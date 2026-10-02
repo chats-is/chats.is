@@ -43,7 +43,8 @@ import { useCloseSettings } from '@/components/settings-dialog';
  *
  * - Renewing: upgrade, change how they pay, cancel, request a refund.
  * - Set to cancel: resubscribe, upgrade, change how they pay, request a
- *   refund.
+ *   refund — unless an admin, a refund or a dispute set it to cancel, which
+ *   the user cannot undo.
  *
  * A refund request is asked for beside Cancel, and once asked, where it
  * stands shows there in its place.
@@ -137,7 +138,7 @@ export function SettingsBilling() {
                 </span>
               )}
             </div>
-            {subscriptionsEnabled && (
+            {subscriptionsEnabled && sub.canUpgrade && (
               <Button variant="outline" size="sm" onClick={showPlans}>
                 Upgrade plan
               </Button>
@@ -152,7 +153,7 @@ export function SettingsBilling() {
               </span>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {sub.canceledAt && (
+              {sub.canResume && (
                 <Button
                   variant="outline"
                   size="sm"

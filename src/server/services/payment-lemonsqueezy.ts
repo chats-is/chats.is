@@ -391,6 +391,26 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
       return toSubscription(await getSubscription(externalId));
     },
 
+    async findSubscriptions({ email }) {
+      // The return carries nothing: found by the email the checkout was
+      // made for, among those still running.
+      const subs = await lemon<LemonSubscription[]>(
+        'GET',
+        `/subscriptions?filter[store_id]=${await requireStoreId()}&filter[user_email]=${encodeURIComponent(email)}`
+      );
+      return subs
+        .filter(
+          s =>
+            s.attributes.status === 'active' ||
+            s.attributes.status === 'on_trial'
+        )
+        .map(s => s.id);
+    },
+
+    async previewChange() {
+      return null;
+    },
+
     // Lemon Squeezy switches the plan whether or not the charge for it goes
     // through, so its subscriptions are not upgraded in place.
     async changeNow() {
@@ -435,6 +455,21 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
 
     async dashboardUrl(externalId) {
       return `https://app.lemonsqueezy.com/subscriptions/${externalId}`;
+    },
+
+    async getPaymentState(payment) {
+      // Lemon Squeezy says what was refunded of an invoice, and nothing of
+      // disputes: it settles those itself, as refunds.
+      const invoice = await lemon<LemonInvoice>(
+        'GET',
+        `/subscription-invoices/${payment.externalId}`
+      );
+      const a = invoice.attributes;
+      return {
+        refunded: toMajorUnits(a.refunded_amount ?? 0, a.currency),
+        refundPending: false,
+        dispute: 'none'
+      };
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {

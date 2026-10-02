@@ -11,21 +11,25 @@ import {
 import { LocalTime } from '@/components/local-time';
 
 /**
- * The confirmation before a subscription is cancelled, one and the same
- * for the user and for an admin: the plan stays until what was paid for
- * runs out, and the subscription is canceled then.
+ * The confirmation before a subscription is cancelled, for the user and for
+ * an admin: the plan stays until what was paid for runs out, and the
+ * subscription is canceled then. The user can resubscribe until then; what
+ * an admin cancels, the user cannot.
  */
 export function CancelSubscriptionDialog({
   open,
   onOpenChange,
   planName,
   expiresAt,
+  byAdmin = false,
   onConfirm
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   planName: string;
   expiresAt: Date | string;
+  /** Cancelled by an admin, which the user cannot undo. */
+  byAdmin?: boolean;
   onConfirm: () => void;
 }) {
   return (
@@ -36,8 +40,10 @@ export function CancelSubscriptionDialog({
           <AlertDialogDescription>
             {planName} stays active until{' '}
             <LocalTime value={expiresAt} precision="day" />, then the
-            subscription is canceled. It does not renew and is not charged
-            again, and can be resubscribed until then.
+            subscription is canceled. It does not renew and is not charged again
+            {byAdmin
+              ? ', and the user cannot resubscribe it.'
+              : ', and can be resubscribed until then.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

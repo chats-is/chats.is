@@ -196,6 +196,12 @@ export const checkoutSchema = z.object({
   interval: billingIntervalSchema
 });
 
+/** Back from a checkout: which processor, and what its return carried. */
+export const confirmCheckoutSchema = z.object({
+  via: paymentProcessorSchema,
+  ref: z.string().max(255).nullable().optional()
+});
+
 /** An upgrade keeps the interval the subscription is billed at. */
 export const changePlanSchema = z.object({ planId: z.string().min(1) });
 

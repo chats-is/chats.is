@@ -161,3 +161,93 @@ admin approves or rejects. Work on one user's subscriptions, or one payment, run
 (`services/db-lock.ts`), since processors send several webhooks about one thing at once.
 
 Tests sit beside their subject as `foo.ts` and `foo.test.ts`.
+
+## Testing the payment flow
+
+`pnpm test` is the unit tests, against a stand-in processor. A payment flow test is something else:
+the running app, driven as a user and an admin would, against a processor's sandbox, with its real
+webhooks arriving. When asked to test payments, subscriptions or refunds, that is what is meant — and
+it is done without asking the user to sign in or click for you.
+
+**Two dev servers and a tunnel.** A processor cannot call `localhost`, so its webhooks come through a
+tunnel to a second dev server:
+
+```bash
+pnpm dev                                                   # :3000 — everyday use
+cloudflared tunnel --no-autoupdate --url http://localhost:3001   # prints a *.trycloudflare.com address
+BETTER_AUTH_URL=<tunnel address> __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.trycloudflare.com \
+  pnpm vite dev --port 3001 --strictPort                   # :3001 — the one the processors call
+```
+
+Check what is already listening before starting anything; do not start a third. A quick tunnel gets a
+new address every time it restarts. Then `:3001` is restarted with it, and each processor is told
+through its API:
+
+- **Paddle** — the webhook: `PATCH /notification-settings/{id}` with
+  `destination: <tunnel address>/api/payments/paddle/webhook`. And the checkout domain: Paddle opens
+  its checkout on the app's own `/pay/paddle`, and refuses a domain it has not approved —
+  `POST /checkout-domains` with `{ "domain": "<tunnel host>" }` approves it at once in the sandbox.
+- **Lemon Squeezy** — the webhook: `PATCH /v1/webhooks/{id}` with the new `url`.
+
+**Which address the browser is driven at** depends on the processor. Paddle's checkout runs on the
+app's own page, so for Paddle everything is driven at the tunnel address — sign in there too; its
+cookies are `__Secure-` ones and must be set `secure`. Through the tunnel a page takes about half a
+minute before React has taken it over: wait for that (a button carrying a `__react…` property)
+rather than for a fixed time, and keep a browser profile directory between runs so the modules are
+cached. Lemon Squeezy's checkout is its own hosted page, so for Lemon Squeezy the browser can be
+driven at `http://localhost:3000`, which is far quicker.
+
+**Signing in is yours to do.** Test accounts exist, plus-aliases of the owner's address ending
+`+claude-test` (an admin), `+claude-test2` and `+claude-test3` (users); find them in the `user`
+table. A user with an active subscription cannot buy another, so pick one without. For any of them:
+
+1. `POST /api/auth/email-otp/send-verification-otp` with `{ email, type: 'sign-in' }` and an `Origin`
+   header of the address being driven.
+2. Read the code from the `verification` table — the row whose `identifier` is
+   `sign-in-otp-<email>`; its `value` is `<code>:<attempts>`. Use `Pool` from
+   `@neondatabase/serverless` with `DATABASE_URL`, as the app does.
+3. `POST /api/auth/sign-in/email-otp` with `{ email, otp }`, and put the cookies it sets into the
+   browser.
+
+**Driving it is yours to do.** Install `puppeteer` in the session's scratchpad directory, never in
+the project, and write the scripts there: one small library — sign in, open a page with the cookies
+set, click by visible text, read the toasts and dialogs — and one script per flow. The plans dialog
+opens from the Upgrade pill for a user with no subscription, and from Settings → Billing → Upgrade
+plan for one who has. Pay with the sandbox test card `4242 4242 4242 4242`:
+
+- **Paddle** — an overlay in a frame from `sandbox-buy.paddle.com/checkout`: the postcode first, then
+  `#cardNumber`, `#cardHolder`, `#expiry`, `#cvv`.
+- **Lemon Squeezy** — its hosted page, with the card fields inside a Stripe iframe.
+
+After each step print the `subscription`, `payment` and `refund_request` rows and what the processor
+itself says of the subscription, then again once the webhooks have come. A purchase or a cancel
+arrives within seconds; a refund in Paddle's sandbox is approved only by a job that runs about every
+ten minutes, so wait for the payment to leave `refund_pending` rather than for a fixed time. The
+sandbox never rejects a refund and cannot make a real chargeback: those paths have only unit tests.
+
+**The daily job** at `/api/cron/reconcile` is off without `CRON_SECRET`. To run it once without
+touching `.env` or the running servers, start a short-lived server with the secret given inline
+(`CRON_SECRET=… pnpm vite dev --port 3003 --strictPort`), call it with
+`Authorization: Bearer <secret>`, and stop that server again.
+
+**Before the first purchase.** The plans under test must exist in `/console/plans`, each with its
+processor and that processor's price IDs, and be enabled; `subscriptions.enabled` must be on, and
+`refunds.enabled` for refund requests. A processor's prices must be in US dollars. Which processors
+can be tested is which have keys in `.env`.
+
+**What to walk through**, checking after each step the rows, the user's plan, and that the
+processor's side agrees:
+
+1. Subscribe: plans dialog → checkout → back in the app with the plan.
+2. Cancel, then Resubscribe — only what the user cancelled themselves can be resumed.
+3. Upgrade to a dearer plan (Stripe, Paddle): the dialog shows the charge first.
+4. An admin cancels: the user has no Resubscribe.
+5. The user asks for a refund; an admin approves it, cancelling now or at expiry, or rejects it. The
+   subscription only stops renewing until the processor confirms the money went back; a refund the
+   processor rejects puts it back, and the request waits to be decided again.
+6. An admin refunds a payment from Payments, cancelling now or at expiry.
+7. A second subscription bought beside the first: cancelled, and refunded in full.
+8. A refund made in the processor's own dashboard ends the subscription too.
+9. A dispute, where the sandbox can make one.
+
+Say plainly which steps were run and which could not be, and why.

@@ -8,6 +8,8 @@ import {
   gte,
   ilike,
   inArray,
+  lt,
+  ne,
   or,
   sql,
   type SQL
@@ -34,6 +36,7 @@ import {
   type rejectRefundRequestSchema,
   type subscriptionListSchema
 } from '@/types/payment';
+import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import {
@@ -47,10 +50,12 @@ import { PublicError } from '@/server/public-error';
 import { withLock, type Executor, type Tx } from '@/server/services/db-lock';
 import {
   applyRefund,
+  clearRefundCancel,
   failRefund,
   leftToRefundCents,
   listSubscriptionPayments,
   markDisputed,
+  markUndisputed,
   recordPayment,
   refundableCents,
   startRefund,
@@ -78,22 +83,25 @@ import {
  * - Subscribing makes it `active`; each renewal keeps it so and moves
  *   `expires_at` on.
  * - Cancelling — by the user or an admin — keeps it `active` with
- *   `canceled_at` set to `expires_at`: it will be cancelled then. The user
- *   can resubscribe until then, which clears it.
+ *   `canceled_at` set to `expires_at`: it will be cancelled then. What the
+ *   user cancelled they can resubscribe until then, which clears it; what
+ *   an admin, a refund or a dispute set to cancel is not theirs to undo.
  * - Upgrading — to a plan that costs more, at the same interval, through
  *   the same processor — starts now and charges the difference; it also
- *   clears a cancellation waiting.
- * - A failed renewal, a dispute, a refund approved, an admin cancelling
- *   from a payment, a second subscription bought beside the first: it is
- *   `canceled` at once, with the reason kept.
- * - A user asks for a refund; an admin approves it — how much of which
- *   payment goes back is theirs to say, and the subscription is cancelled —
- *   or rejects it. An admin can also refund a payment, cancel its
- *   subscription, or both.
+ *   clears a cancellation of the user's own.
+ * - A failed renewal, a dispute that took the money back, a second
+ *   subscription bought beside the first: it is `canceled` at once, with
+ *   the reason kept.
+ * - A user asks for a refund; an admin approves it, or rejects it. An admin
+ *   can also refund a payment. A refund ends the subscription once the
+ *   money has gone back — wherever the refund was made — at once or when
+ *   it expires; while the processor has not confirmed it the subscription
+ *   only stops renewing, and a refund that fails puts it back.
  *
  * The processor's webhooks are applied by reading the subscription or the
  * payment from the processor as it is now, so a webhook sent twice changes
- * nothing the second time.
+ * nothing the second time. A webhook that never comes is made up for by
+ * asking: a subscription past its expiry, and a checkout come back from.
  */
 
 // ============================================================================
@@ -294,6 +302,7 @@ export async function getMySubscription(userId: string) {
     with: { plan: true }
   });
   if (!sub) return null;
+  const mine = await isOwnToResume(sub);
   return {
     id: sub.id,
     planId: sub.planId,
@@ -303,8 +312,35 @@ export async function getMySubscription(userId: string) {
     processor: sub.processor,
     status: sub.status,
     expiresAt: sub.expiresAt,
-    canceledAt: sub.canceledAt
+    canceledAt: sub.canceledAt,
+    // Whether the cancellation waiting is the user's own to undo.
+    canResume: !!sub.canceledAt && mine,
+    canUpgrade: mine
   };
+}
+
+/** Whether money has gone back, or is on its way back, of any payment of a
+ *  subscription. */
+async function refundedOf(subscriptionId: string, ex: Executor = db) {
+  const row = await ex.query.payments.findFirst({
+    where: and(
+      eq(payments.subscriptionId, subscriptionId),
+      inArray(payments.status, ['refund_pending', 'refunded'])
+    ),
+    columns: { id: true }
+  });
+  return !!row;
+}
+
+/**
+ * Whether a subscription is its user's own to resume or upgrade: nothing of
+ * it has been refunded, and it renews — or it was they who set it to
+ * cancel. What an admin, a refund, a dispute or the processor set to cancel
+ * is not theirs to undo.
+ */
+async function isOwnToResume(row: SubscriptionRow, ex: Executor = db) {
+  if (row.canceledAt && row.canceledBy !== row.userId) return false;
+  return !(await refundedOf(row.id, ex));
 }
 
 /** Where the processor sends the user back to. */
@@ -358,8 +394,9 @@ export async function startCheckout(
       userId: user.id,
       planId: sale.planId,
       origin,
-      // Back to the app, where the plans dialog answers the return.
-      successUrl: `${origin}/?checkout=success`,
+      // Back to the app, where the plans dialog answers the return — and
+      // asks this processor for the subscription if its webhook is late.
+      successUrl: `${origin}/?checkout=success&via=${sale.processor}`,
       cancelUrl: `${origin}/?checkout=canceled`
     });
     return { url };
@@ -434,12 +471,18 @@ export async function upgradePlan(userId: string, input: { planId: string }) {
     if (row.status !== 'active') {
       throw new PublicError('This subscription has been canceled.');
     }
+    if (!(await isOwnToResume(row, tx))) {
+      throw new PublicError(
+        'This subscription is set to cancel and cannot be upgraded. You can subscribe again once it is canceled.'
+      );
+    }
     await tx
       .update(subscriptions)
       .set({
         planId: target.planId,
         canceledAt: null,
         cancelReason: null,
+        canceledBy: null,
         updatedAt: new Date()
       })
       .where(eq(subscriptions.id, row.id));
@@ -452,11 +495,32 @@ export async function upgradePlan(userId: string, input: { planId: string }) {
   await settlePlan(userId);
 }
 
+/**
+ * What upgrading to a plan would charge today, as the processor reckons the
+ * difference for the rest of the period; null where it cannot say.
+ */
+export async function previewUpgrade(
+  userId: string,
+  input: { planId: string }
+): Promise<{ amount: number | null }> {
+  const sub = await requireActive(userId);
+  const target = await planOnSale(input.planId, sub.interval);
+  const processor = await getPaymentProcessor(sub.processor);
+  const amount = await processor
+    .previewChange(sub.externalId, { priceId: target.priceId })
+    .catch(err => {
+      console.warn(`[subscription] no preview for ${sub.id}`, err);
+      return null;
+    });
+  return { amount };
+}
+
 /** Cancel when what was paid for runs out: still `active`, with
  *  `canceled_at` set to `expires_at`. */
 async function cancel(
   sub: SubscriptionRow,
-  reason: 'canceled_by_customer' | 'canceled_by_admin'
+  reason: 'canceled_by_customer' | 'canceled_by_admin',
+  by: string
 ) {
   await changeSubscription(sub, async (tx, row) => {
     if (row.status !== 'active') {
@@ -465,22 +529,25 @@ async function cancel(
     if (row.canceledAt) {
       throw new PublicError('This subscription is already set to cancel.');
     }
-    await cancelAtExpiry(tx, row, reason);
+    await cancelAtExpiry(tx, row, reason, by);
   });
 }
 
 /** Sets a running subscription to be canceled when it expires: it is not
- *  renewed, and is usable until then. */
+ *  renewed, and is usable until then. `by` is who set it — the user, an
+ *  admin — or null when no one here did. */
 async function cancelAtExpiry(
   tx: Parameters<Parameters<typeof changeSubscription>[1]>[0],
   row: SubscriptionRow,
-  reason: CancelReason
+  reason: CancelReason,
+  by: string | null
 ) {
   await tx
     .update(subscriptions)
     .set({
       canceledAt: row.expiresAt,
       cancelReason: reason,
+      canceledBy: by,
       updatedAt: new Date()
     })
     .where(eq(subscriptions.id, row.id));
@@ -489,9 +556,10 @@ async function cancelAtExpiry(
 }
 
 /**
- * After a refund, the subscription is canceled, always: at once, or — the
- * rest of what was paid for left to the user — when it expires. One already
- * canceled, or already set to cancel, is left as it is.
+ * After a refund — once the money has gone back — the subscription is
+ * canceled, always: at once, or — the rest of what was paid for left to the
+ * user — when it expires. One already set to cancel is left as it is: with
+ * a payment of it refunded, it is no longer its user's to resume.
  */
 async function cancelRefunded(subscriptionId: string, now: boolean) {
   if (now) {
@@ -504,22 +572,70 @@ async function cancelRefunded(subscriptionId: string, now: boolean) {
   if (!sub) return;
   await changeSubscription(sub, async (tx, row) => {
     if (row.status !== 'active' || row.canceledAt) return;
-    await cancelAtExpiry(tx, row, 'refunded');
+    await cancelAtExpiry(tx, row, 'refunded', null);
+  });
+}
+
+/**
+ * While a refund waits for the processor, its subscription is set to cancel
+ * — by the admin who sent it — so it does not renew meanwhile. Nothing is
+ * taken from the user yet: confirmed, it is canceled as the admin chose;
+ * failed, it is put back. One already set to cancel is left as it is.
+ */
+async function holdForRefund(subscriptionId: string, by: string | null) {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId)
+  });
+  if (!sub) return;
+  await changeSubscription(sub, async (tx, row) => {
+    if (row.status !== 'active' || row.canceledAt) return;
+    await cancelAtExpiry(tx, row, 'refunded', by);
+  }).catch(err => {
+    // The refund has gone out either way, and its confirmation cancels.
+    console.error(`[subscription] could not hold ${subscriptionId}`, err);
+  });
+}
+
+/**
+ * A refund failed. A subscription the refund had set to cancel, with no
+ * other refund of it made or waiting, renews again. One set to cancel
+ * before the refund — by its user, or an admin — was never touched, and
+ * stays as they set it.
+ */
+async function releaseRefundHold(subscriptionId: string) {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId)
+  });
+  if (!sub) return;
+  await changeSubscription(sub, async (tx, row) => {
+    if (row.status !== 'active' || row.cancelReason !== 'refunded') return;
+    if (await refundedOf(row.id, tx)) return;
+    await tx
+      .update(subscriptions)
+      .set({
+        canceledAt: null,
+        cancelReason: null,
+        canceledBy: null,
+        updatedAt: new Date()
+      })
+      .where(eq(subscriptions.id, row.id));
+    const processor = await getPaymentProcessor(row.processor);
+    await processor.resume(row.externalId);
   });
 }
 
 /** The user cancels their subscription. */
 export async function cancelSubscription(userId: string) {
-  await cancel(await requireActive(userId), 'canceled_by_customer');
+  await cancel(await requireActive(userId), 'canceled_by_customer', userId);
 }
 
 /** An admin cancels a subscription when what was paid for runs out. */
-export async function adminCancelSubscription(id: string) {
+export async function adminCancelSubscription(id: string, adminId: string) {
   const sub = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, id)
   });
   if (!sub) throw new PublicError('Subscription not found.');
-  await cancel(sub, 'canceled_by_admin');
+  await cancel(sub, 'canceled_by_admin', adminId);
 }
 
 /** Resubscribe: clear a cancellation waiting, so the subscription renews
@@ -530,9 +646,20 @@ export async function resubscribe(userId: string) {
     if (row.status !== 'active' || !row.canceledAt) {
       throw new PublicError('Only a subscription set to cancel can resume.');
     }
+    // Only what the user set to cancel themselves is theirs to resume.
+    if (!(await isOwnToResume(row, tx))) {
+      throw new PublicError(
+        'This subscription cannot be resumed. You can subscribe again once it is canceled.'
+      );
+    }
     await tx
       .update(subscriptions)
-      .set({ canceledAt: null, cancelReason: null, updatedAt: new Date() })
+      .set({
+        canceledAt: null,
+        cancelReason: null,
+        canceledBy: null,
+        updatedAt: new Date()
+      })
       .where(eq(subscriptions.id, row.id));
     const processor = await getPaymentProcessor(row.processor);
     await processor.resume(row.externalId);
@@ -571,6 +698,69 @@ async function cancelNow(
   });
   await settlePlan(sub.userId);
   return canceled;
+}
+
+/**
+ * A payment's money was taken back by a dispute: the subscription it paid
+ * for is canceled now, and gives nothing. In the processor it is only set
+ * to stop with the period — it charges no more — so that, the dispute won,
+ * what was paid for can be given back.
+ */
+async function cancelDisputed(subscriptionId: string) {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+    columns: { id: true, userId: true }
+  });
+  if (!sub) return;
+  await changeSubscription(sub, async (tx, row) => {
+    if (row.status !== 'active') return;
+    const now = new Date();
+    await tx
+      .update(subscriptions)
+      .set({
+        status: 'canceled',
+        canceledAt: now,
+        cancelReason: 'payment_disputed',
+        updatedAt: now
+      })
+      .where(eq(subscriptions.id, row.id));
+    const processor = await getPaymentProcessor(row.processor);
+    await processor.cancelAtPeriodEnd(row.externalId);
+  });
+  await settlePlan(sub.userId);
+}
+
+/**
+ * The dispute was won and the money is back: a subscription it canceled,
+ * still within what was paid for, is in effect again until it expires —
+ * still set to cancel then — unless the user has another by now.
+ */
+async function restoreDisputed(subscriptionId: string) {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+    columns: { id: true, userId: true }
+  });
+  if (!sub) return;
+  await changeSubscription(sub, async (tx, row) => {
+    if (
+      row.status !== 'canceled' ||
+      row.cancelReason !== 'payment_disputed' ||
+      row.expiresAt <= new Date() ||
+      (await activeSubscription(row.userId, tx))
+    ) {
+      return;
+    }
+    await tx
+      .update(subscriptions)
+      .set({
+        status: 'active',
+        canceledAt: row.expiresAt,
+        canceledBy: null,
+        updatedAt: new Date()
+      })
+      .where(eq(subscriptions.id, row.id));
+  });
+  await settlePlan(sub.userId);
 }
 
 /**
@@ -714,7 +904,11 @@ async function syncSubscription(
       ) {
         return { userId, duplicate: null, failed: again };
       }
-      return null;
+      // Canceled here for any other reason — refunded, disputed — and going
+      // again there, resumed in the processor: cancelled there again.
+      return again.cancel
+        ? { userId, duplicate: null, failed: null, stale: true }
+        : null;
     }
     if (!was && snap.status === 'canceled') return null;
 
@@ -733,12 +927,30 @@ async function syncSubscription(
     let status = snap.status;
     let canceledAt: Date | null = null;
     let cancelReason: CancelReason | null = null;
+    // Set to cancel here, not by its user — by an admin, a refund, a
+    // dispute — and renewing again in the processor, resumed there: the
+    // cancellation stands, and is set there again. One the processor set
+    // is the processor's to unset.
+    const relock =
+      snap.status === 'active' &&
+      !snap.cancelAtPeriodEnd &&
+      was?.status === 'active' &&
+      !!was.canceledAt &&
+      was.cancelReason !== 'canceled_in_processor' &&
+      !(await isOwnToResume(was, tx));
     if (snap.status === 'active' && snap.cancelAtPeriodEnd) {
       canceledAt = expiresAt;
       cancelReason = was?.cancelReason ?? 'canceled_in_processor';
+    } else if (relock) {
+      canceledAt = expiresAt;
+      cancelReason = was.cancelReason;
     } else if (snap.status === 'canceled') {
-      const scheduled = !snap.paymentFailed && was?.canceledAt;
-      canceledAt = scheduled ? was.canceledAt : now;
+      // Set to cancel, and its time has come: canceled then. Ended before
+      // that — stopped early in the processor — or for a failed payment:
+      // canceled now, when it really ended.
+      const due =
+        !snap.paymentFailed && !!was?.canceledAt && was.canceledAt <= now;
+      canceledAt = due ? was.canceledAt : now;
       cancelReason = snap.paymentFailed
         ? 'payment_failed'
         : snap.paused
@@ -756,6 +968,8 @@ async function syncSubscription(
           expiresAt,
           canceledAt,
           cancelReason,
+          // Who set it to cancel stays while it is; no one, once it renews.
+          canceledBy: canceledAt ? was.canceledBy : null,
           updatedAt: now
         })
         .where(eq(subscriptions.id, was.id));
@@ -764,7 +978,8 @@ async function syncSubscription(
       return {
         userId,
         duplicate: null,
-        failed: snap.paymentFailed ? { id: was.id, cancel: true } : null
+        failed: snap.paymentFailed ? { id: was.id, cancel: true } : null,
+        relock
       };
     }
 
@@ -806,6 +1021,10 @@ async function syncSubscription(
     }
   } else if (outcome.failed) {
     await cancelFailed(outcome.failed, processor, externalId);
+  } else if (outcome.stale) {
+    await withRetry(() => processor.cancelNow(externalId));
+  } else if (outcome.relock) {
+    await withRetry(() => processor.cancelAtPeriodEnd(externalId));
   }
 }
 
@@ -952,7 +1171,14 @@ async function syncPayment(
         eq(subscriptions.processor, processorId),
         eq(subscriptions.externalId, subExternalId)
       ),
-      columns: { id: true, userId: true, planId: true, cancelReason: true }
+      columns: {
+        id: true,
+        userId: true,
+        planId: true,
+        status: true,
+        canceledAt: true,
+        cancelReason: true
+      }
     });
   let sub = await find();
   if (!sub || payment.kind === 'upgrade') {
@@ -964,12 +1190,263 @@ async function syncPayment(
       `[payment] ${processorId} ${externalId} is for a subscription not kept`
     );
   }
+  const before = await db.query.payments.findFirst({
+    where: and(
+      eq(payments.processor, processorId),
+      eq(payments.externalId, payment.externalId)
+    ),
+    columns: { status: true }
+  });
   const row = await recordPayment(processorId, payment, sub);
   if (isDuplicate(sub.cancelReason)) {
     await refundDuplicate(sub.id, row.id);
     return;
   }
-  if (!payment.paid) await syncSubscription(processorId, subExternalId);
+  if (!payment.paid) {
+    await syncSubscription(processorId, subExternalId);
+    return;
+  }
+  if (sub.status === 'canceled' && sub.canceledAt) {
+    await refundAfterEnd(processorId, subExternalId, row, {
+      canceledAt: sub.canceledAt,
+      wasFailed: before?.status === 'failed'
+    });
+  }
+}
+
+/**
+ * A payment taken for a subscription that had ended here — one resumed in
+ * the processor, or a failed renewal paid late: it bought nothing. The
+ * subscription is cancelled there again, and the payment goes back whole.
+ * Not a payment made while it still ran, whose webhook only arrives now.
+ */
+async function refundAfterEnd(
+  processorId: PaymentProcessorId,
+  subExternalId: string,
+  row: typeof payments.$inferSelect,
+  ended: { canceledAt: Date; wasFailed: boolean }
+) {
+  const after = ended.wasFailed || row.billedAt > ended.canceledAt;
+  if (!after || row.status !== 'paid') return;
+  await syncSubscription(processorId, subExternalId);
+  try {
+    await startRefund(row.id, Math.round(Number(row.amount) * 100), {
+      adminId: null,
+      retry: true,
+      full: true
+    });
+  } catch (err) {
+    // Left paid, for an admin to refund from Payments.
+    console.error(`[payment] could not refund ${row.id} after its end`, err);
+  }
+}
+
+// ============================================================================
+// Asking the processor, without waiting to be told
+//
+// A webhook can fail to arrive. Two things are then asked of the processor
+// directly: whether a subscription past its expiry still runs, when the
+// user's plan is next read; and what a checkout the user came back from
+// made, when its webhook has not said.
+// ============================================================================
+
+/** How long past its expiry a subscription is left for its renewal's
+ *  webhook to arrive, before the processor is asked. */
+const EXPIRY_GRACE_MS = 60 * 60 * 1000;
+
+/** How long before the processor is asked about one subscription again. */
+const RECHECK_MS = 10 * 60 * 1000;
+
+const lastChecked = new Map<string, number>();
+
+/**
+ * Before a user's plan is read: a subscription still `active` past its
+ * expiry — its webhook lost — is read from the processor, which renews it
+ * or cancels it as it is there. The processor not answering leaves the plan
+ * as it is, to be asked again later.
+ */
+export const refreshIfExpired = perRequest(
+  'refreshIfExpired',
+  async (userId: string): Promise<void> => {
+    const sub = await activeSubscription(userId);
+    if (!sub) return;
+    const now = Date.now();
+    if (sub.expiresAt.getTime() + EXPIRY_GRACE_MS > now) return;
+    if ((lastChecked.get(sub.id) ?? 0) + RECHECK_MS > now) return;
+    lastChecked.set(sub.id, now);
+    try {
+      await syncSubscription(sub.processor, sub.externalId);
+    } catch (err) {
+      console.error(`[subscription] could not refresh ${sub.id}`, err);
+    }
+  }
+);
+
+/**
+ * The user is back from a checkout and no subscription has arrived: the
+ * processor is asked for what the checkout made, and it is kept as a
+ * webhook would have kept it. Nothing found, or the processor not
+ * answering, changes nothing — the webhook may still come.
+ */
+export async function confirmCheckout(
+  user: { id: string; email: string },
+  input: { via: PaymentProcessorId; ref?: string | null }
+) {
+  if (await activeSubscription(user.id)) return;
+  try {
+    const processor = await getPaymentProcessor(input.via);
+    const found = await processor.findSubscriptions({
+      ref: input.ref ?? null,
+      userId: user.id,
+      email: user.email
+    });
+    for (const externalId of found) {
+      const kept = await db.query.subscriptions.findFirst({
+        where: and(
+          eq(subscriptions.processor, input.via),
+          eq(subscriptions.externalId, externalId)
+        ),
+        columns: { id: true }
+      });
+      if (kept) continue;
+      await syncSubscription(input.via, externalId, {
+        userId: user.id,
+        planId: null
+      });
+    }
+  } catch (err) {
+    console.warn(`[subscription] ${input.via} checkout not confirmed`, err);
+  }
+}
+
+/** How far back a payment's refunds and disputes are still read from the
+ *  processor: a dispute can come months after the payment. */
+const RECONCILE_DAYS = 120;
+
+/** How many of each one run reads, so a run ends in time; the least
+ *  recently read go first, and the rest wait for the next. */
+const RECONCILE_BATCH = 100;
+
+/**
+ * One payment's refunds and disputes, read from the processor and applied
+ * as their webhooks would have been — through the same steps, so both ways
+ * of learning it agree.
+ */
+async function reconcilePayment(row: typeof payments.$inferSelect) {
+  if (!row.transactionId) return;
+  const processor = await getPaymentProcessor(row.processor);
+  const state = await processor.getPaymentState(row);
+  const transactionId = row.transactionId;
+  const refundedCents = Math.round(state.refunded * 100);
+  const knownCents = Math.round(Number(row.refundAmount) * 100);
+
+  if (state.dispute === 'won') {
+    if (row.status === 'disputed') {
+      await dispatch(row.processor, { kind: 'dispute_won', transactionId });
+    }
+  } else if (state.dispute !== 'none' && row.status !== 'disputed') {
+    await dispatch(row.processor, {
+      kind: 'dispute',
+      transactionId,
+      withdrawn: state.dispute === 'withdrawn'
+    });
+    return;
+  }
+
+  if (row.status === 'refund_pending') {
+    // Sent from here: gone back, or — nothing back and nothing waiting —
+    // failed.
+    if (refundedCents > 0) {
+      await dispatch(row.processor, {
+        kind: 'refund',
+        transactionId,
+        refundAmount: state.refunded
+      });
+    } else if (!state.refundPending) {
+      await dispatch(row.processor, { kind: 'refund_failed', transactionId });
+    }
+  } else if (refundedCents > knownCents) {
+    // A refund made in the processor itself, never reported.
+    await dispatch(row.processor, {
+      kind: 'refund',
+      transactionId,
+      refundAmount: state.refunded
+    });
+  } else if (
+    row.status === 'refunded' &&
+    refundedCents === 0 &&
+    !state.refundPending
+  ) {
+    // Reported gone back, and failed after.
+    await dispatch(row.processor, { kind: 'refund_failed', transactionId });
+  } else if (row.refundCancelSubscription != null) {
+    // Gone back, with its subscription's cancelling still owed.
+    await afterRefund({
+      paymentId: row.id,
+      subscriptionId: row.subscriptionId,
+      cancelSubscription: row.refundCancelSubscription
+    });
+  }
+}
+
+/**
+ * The job that makes up for webhooks that never came, run on a schedule:
+ * subscriptions still `active` past their expiry, and the refunds and
+ * disputes of recent payments, are read from their processors and kept as
+ * they are there. One that cannot be read is left for the next run.
+ */
+export async function reconcileWithProcessors(): Promise<{
+  subscriptions: number;
+  payments: number;
+  failed: number;
+}> {
+  const now = Date.now();
+  let failed = 0;
+
+  const expired = await db.query.subscriptions.findMany({
+    where: and(
+      eq(subscriptions.status, 'active'),
+      lt(subscriptions.expiresAt, new Date(now - EXPIRY_GRACE_MS))
+    ),
+    orderBy: s => [s.updatedAt],
+    limit: RECONCILE_BATCH,
+    columns: { id: true, processor: true, externalId: true }
+  });
+  for (const sub of expired) {
+    try {
+      await syncSubscription(sub.processor, sub.externalId);
+    } catch (err) {
+      failed++;
+      console.error(`[reconcile] subscription ${sub.id}`, err);
+    }
+  }
+
+  const recent = await db.query.payments.findMany({
+    where: and(
+      ne(payments.status, 'failed'),
+      or(
+        eq(payments.status, 'refund_pending'),
+        gte(payments.billedAt, new Date(now - RECONCILE_DAYS * DAY_MS))
+      )
+    ),
+    orderBy: p => [sql`${p.checkedAt} asc nulls first`],
+    limit: RECONCILE_BATCH
+  });
+  for (const row of recent) {
+    try {
+      await reconcilePayment(row);
+    } catch (err) {
+      failed++;
+      console.error(`[reconcile] payment ${row.id}`, err);
+    }
+    // Read or not, it goes to the back: one that cannot be read must not
+    // keep the rest from their turn.
+    await db
+      .update(payments)
+      .set({ checkedAt: new Date() })
+      .where(eq(payments.id, row.id));
+  }
+  return { subscriptions: expired.length, payments: recent.length, failed };
 }
 
 /** One webhook call: its signature checked, then what it asks for done. */
@@ -1000,26 +1477,73 @@ async function dispatch(
         action.transactionId,
         action.refundAmount
       );
-      if (done?.subscriptionId) await settleDuplicate(done.subscriptionId);
+      await afterRefund(done);
       return;
     }
     case 'refund_failed': {
       const failed = await failRefund(processorId, action.transactionId);
-      if (failed?.subscriptionId) {
+      if (!failed) return;
+      if (failed.subscriptionId) {
         await markDuplicateError(failed.subscriptionId);
+        await releaseRefundHold(failed.subscriptionId);
       }
+      if (failed.refundRequestId) await reopenRequest(failed.refundRequestId);
       return;
     }
     case 'dispute': {
       const row = await markDisputed(processorId, action.transactionId);
-      if (row?.subscriptionId) {
-        await cancelNow(row.subscriptionId, 'payment_disputed');
+      // An inquiry only marks the payment: the money has not left.
+      if (action.withdrawn && row.subscriptionId) {
+        await cancelDisputed(row.subscriptionId);
       }
+      return;
+    }
+    case 'dispute_won': {
+      const row = await markUndisputed(processorId, action.transactionId);
+      if (row?.subscriptionId) await restoreDisputed(row.subscriptionId);
       return;
     }
     case 'ignore':
       return;
   }
+}
+
+/**
+ * Money has gone back of a payment: what it paid for ends. A duplicate's is
+ * resolved; any other subscription is canceled as the refund owes it — at
+ * once, or when it expires — and only then is that owed no more, so a
+ * webhook sent again after a failure does it.
+ */
+async function afterRefund(done: Awaited<ReturnType<typeof applyRefund>>) {
+  if (!done.subscriptionId) return;
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, done.subscriptionId),
+    columns: { cancelReason: true }
+  });
+  if (isDuplicate(sub?.cancelReason)) {
+    await settleDuplicate(done.subscriptionId);
+    return;
+  }
+  if (done.cancelSubscription == null) return;
+  await cancelRefunded(done.subscriptionId, done.cancelSubscription);
+  await clearRefundCancel(done.paymentId);
+}
+
+/** A refund approved for a request failed: the request waits to be decided
+ *  again — unless the user has asked anew meanwhile. */
+async function reopenRequest(requestId: string) {
+  await db
+    .update(refundRequests)
+    .set({ status: 'pending_approval' })
+    .where(
+      and(
+        eq(refundRequests.id, requestId),
+        eq(refundRequests.status, 'approved')
+      )
+    )
+    .catch(err => {
+      console.warn(`[subscription] request ${requestId} not reopened`, err);
+    });
 }
 
 // ============================================================================
@@ -1320,9 +1844,10 @@ export async function getRefundRequest(id: string) {
 /**
  * An admin approves a refund request: what is left of each payment it
  * covers goes back, as the refund settings reckon it, and the subscription
- * is canceled — at once, or when it expires — as a refund from Payments
- * does. Claimed first, so two admins at once approve it once; if no refund
- * goes out, it is left to be decided again.
+ * is canceled — at once, or when it expires — once the processor confirms
+ * the money went back, as a refund from Payments does. Claimed first, so
+ * two admins at once approve it once; if no refund goes out, or it fails
+ * later, it is left to be decided again.
  */
 export async function approveRefundRequest(
   input: z.infer<typeof approveRefundRequestSchema>,
@@ -1358,7 +1883,11 @@ export async function approveRefundRequest(
       await startRefund(
         c.payment.id,
         c.left,
-        { adminId, requestId: claimed.id },
+        {
+          adminId,
+          requestId: claimed.id,
+          cancelSubscription: input.cancelSubscription
+        },
         { refundFee: policy.refundFee }
       );
       sent++;
@@ -1376,7 +1905,7 @@ export async function approveRefundRequest(
       .where(eq(refundRequests.id, claimed.id));
     throw failure ?? new PublicError('Nothing was refunded.');
   }
-  await cancelRefunded(claimed.subscriptionId, input.cancelSubscription);
+  await holdForRefund(claimed.subscriptionId, adminId);
   if (failure) {
     throw new PublicError(
       `Approved, but not every refund went out: ${failure instanceof Error ? failure.message : 'a refund failed'}. Refund the rest from Payments.`
@@ -1449,7 +1978,8 @@ export async function getRefundDetails(paymentId: string) {
 /**
  * An admin refunds a payment — whether or not users may request refunds —
  * of all that is left of it, as the refund settings reckon it. The
- * subscription it paid for is canceled, Refunded: at once, or, if they
+ * subscription it paid for stops renewing at once and, when the processor
+ * confirms the money went back, is canceled, Refunded: at once, or, if they
  * choose, when it expires, the rest of it left to the user.
  */
 export async function refundPayment(
@@ -1472,12 +2002,15 @@ export async function refundPayment(
   await startRefund(
     payment.id,
     refundableCents(payment, refundFee, duplicate),
-    { adminId },
+    {
+      adminId,
+      cancelSubscription: sub && !duplicate ? input.cancelSubscription : null
+    },
     { refundFee }
   );
   if (!sub) return;
   if (duplicate) await settleDuplicate(sub.id);
-  else await cancelRefunded(sub.id, input.cancelSubscription);
+  else await holdForRefund(sub.id, adminId);
 }
 
 // ============================================================================

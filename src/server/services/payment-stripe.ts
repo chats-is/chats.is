@@ -14,6 +14,7 @@ import {
   type PaymentMethod,
   type PaymentProcessor,
   type ProcessorPayment,
+  type ProcessorPaymentState,
   type ProcessorSubscription,
   type WebhookAction
 } from '@/server/services/payment-processor';
@@ -171,6 +172,18 @@ function subscriptionOfInvoice(invoice: Stripe.Invoice): string | null {
   return idOf(invoice.parent?.subscription_details?.subscription);
 }
 
+/**
+ * Where a charge's disputes leave it: the money gone, only asked about, or
+ * given back. An inquiry (`warning_…`) has taken nothing.
+ */
+function disputeOf(statuses: Array<string>): ProcessorPaymentState['dispute'] {
+  const any = (...of: Array<string>) => statuses.some(s => of.includes(s));
+  if (any('needs_response', 'under_review', 'lost')) return 'withdrawn';
+  if (any('warning_needs_response', 'warning_under_review')) return 'inquiry';
+  if (any('won', 'warning_closed')) return 'won';
+  return 'none';
+}
+
 function actionOf(event: Stripe.Event): WebhookAction {
   switch (event.type) {
     case 'checkout.session.completed': {
@@ -204,10 +217,31 @@ function actionOf(event: Stripe.Event): WebhookAction {
         ? { kind: 'refund_failed', transactionId: ref }
         : { kind: 'ignore' };
     }
-    case 'charge.dispute.created': {
+    case 'charge.dispute.created':
+    case 'charge.dispute.funds_withdrawn': {
       const dispute = event.data.object;
       const ref = idOf(dispute.payment_intent) ?? idOf(dispute.charge);
-      return ref ? { kind: 'dispute', transactionId: ref } : { kind: 'ignore' };
+      if (!ref) return { kind: 'ignore' };
+      return {
+        kind: 'dispute',
+        transactionId: ref,
+        // An inquiry (`warning_…`) has taken no money yet.
+        withdrawn:
+          event.type === 'charge.dispute.funds_withdrawn' ||
+          !dispute.status.startsWith('warning_')
+      };
+    }
+    case 'charge.dispute.funds_reinstated':
+    case 'charge.dispute.closed': {
+      const dispute = event.data.object;
+      const ref = idOf(dispute.payment_intent) ?? idOf(dispute.charge);
+      const won =
+        event.type === 'charge.dispute.funds_reinstated' ||
+        dispute.status === 'won' ||
+        dispute.status === 'warning_closed';
+      return ref && won
+        ? { kind: 'dispute_won', transactionId: ref }
+        : { kind: 'ignore' };
     }
     default:
       return { kind: 'ignore' };
@@ -252,7 +286,8 @@ export function createStripeProcessor(): PaymentProcessor {
         client_reference_id: input.userId,
         metadata,
         subscription_data: { metadata },
-        success_url: input.successUrl,
+        // Stripe fills in the session, which names the subscription it made.
+        success_url: `${input.successUrl}&ref={CHECKOUT_SESSION_ID}`,
         cancel_url: input.cancelUrl
       });
       if (!session.url)
@@ -298,6 +333,30 @@ export function createStripeProcessor(): PaymentProcessor {
     async getSubscription(externalId) {
       const stripe = await client();
       return toSubscription(await retrieveSubscription(stripe, externalId));
+    },
+
+    async findSubscriptions({ ref, userId }) {
+      if (!ref) return [];
+      const stripe = await client();
+      const session = await stripe.checkout.sessions.retrieve(ref);
+      if (session.client_reference_id !== userId) return [];
+      const id = idOf(session.subscription);
+      return id ? [id] : [];
+    },
+
+    async previewChange(externalId, target) {
+      const stripe = await client();
+      const sub = await retrieveSubscription(stripe, externalId);
+      const item = sub.items.data[0];
+      if (!item) return null;
+      const preview = await stripe.invoices.createPreview({
+        subscription: externalId,
+        subscription_details: {
+          items: [{ id: item.id, price: target.priceId }],
+          proration_behavior: 'always_invoice'
+        }
+      });
+      return toMajorUnits(preview.amount_due, preview.currency);
     },
 
     async changeNow(externalId, target) {
@@ -388,6 +447,36 @@ export function createStripeProcessor(): PaymentProcessor {
       const { secretKey } = await stripeKeys();
       const test = secretKey?.startsWith('sk_test_') ? 'test/' : '';
       return `https://dashboard.stripe.com/${test}subscriptions/${externalId}`;
+    },
+
+    async getPaymentState(payment) {
+      const none = {
+        refunded: 0,
+        refundPending: false,
+        dispute: 'none'
+      } as const;
+      const ref = payment.transactionId;
+      if (!ref) return none;
+      const stripe = await client();
+      const charge = ref.startsWith('pi_')
+        ? (
+            await stripe.paymentIntents.retrieve(ref, {
+              expand: ['latest_charge']
+            })
+          ).latest_charge
+        : await stripe.charges.retrieve(ref);
+      if (!charge || typeof charge !== 'object') return none;
+      const [refunds, disputes] = await Promise.all([
+        stripe.refunds.list({ charge: charge.id, limit: 100 }),
+        stripe.disputes.list({ charge: charge.id, limit: 100 })
+      ]);
+      return {
+        refunded: toMajorUnits(charge.amount_refunded, charge.currency),
+        refundPending: refunds.data.some(
+          r => r.status === 'pending' || r.status === 'requires_action'
+        ),
+        dispute: disputeOf(disputes.data.map(d => d.status))
+      };
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {

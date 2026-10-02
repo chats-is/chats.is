@@ -462,3 +462,42 @@ describe('a Lemon Squeezy payment method', () => {
     ).toMatchObject({ type: 'paypal', last4: null });
   });
 });
+
+describe('asking Lemon Squeezy, for a webhook that never came', () => {
+  it('where a payment stands: what was refunded of its invoice', async () => {
+    replies.push({
+      body: {
+        data: {
+          type: 'subscription-invoices',
+          id: '900',
+          attributes: { refunded_amount: 800, currency: 'USD' }
+        }
+      }
+    });
+    expect(
+      await lemon.getPaymentState({ externalId: '900', transactionId: '900' })
+    ).toEqual({ refunded: 8, refundPending: false, dispute: 'none' });
+    expect(path(calls.at(-1)!)).toBe('/subscription-invoices/900');
+  });
+
+  it('the subscriptions bought under the email a checkout was made for, still running', async () => {
+    replies.push({
+      body: {
+        data: [
+          subscription(),
+          { ...subscription({ status: 'expired' }), id: '78' }
+        ]
+      }
+    });
+    expect(
+      await lemon.findSubscriptions({
+        ref: null,
+        userId: 'u1',
+        email: 'u1@test.com'
+      })
+    ).toEqual(['77']);
+    expect(path(calls.at(-1)!)).toBe(
+      '/subscriptions?filter[store_id]=42&filter[user_email]=u1%40test.com'
+    );
+  });
+});

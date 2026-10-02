@@ -158,6 +158,7 @@ type PaddleTransaction = {
   status: string;
   subscription_id: string | null;
   customer_id: string | null;
+  custom_data?: Record<string, unknown> | null;
   currency_code: string;
   /** Why Paddle made it: `subscription_recurring` renews, `subscription_update`
    *  charges for a change; anything else began the subscription. */
@@ -205,6 +206,7 @@ type PaddleAdjustment = {
   type: 'full' | 'partial';
   status: 'pending_approval' | 'approved' | 'rejected' | 'reversed';
   transaction_id: string;
+  currency_code?: string;
   items: Array<{ item_id: string; amount: string }>;
   totals: { total: string };
 };
@@ -373,8 +375,20 @@ function actionOf(event: PaddleEvent): WebhookAction {
     if (data.action === 'refund' && data.status === 'rejected') {
       return { kind: 'refund_failed', transactionId: data.transaction_id };
     }
-    if (data.action === 'chargeback') {
-      return { kind: 'dispute', transactionId: data.transaction_id };
+    // A chargeback, or Paddle's own refund to head one off: the money has
+    // left either way.
+    if (data.action === 'chargeback' || data.action === 'chargeback_warning') {
+      return {
+        kind: 'dispute',
+        transactionId: data.transaction_id,
+        withdrawn: true
+      };
+    }
+    if (
+      data.action === 'chargeback_reverse' ||
+      data.action === 'chargeback_warning_reverse'
+    ) {
+      return { kind: 'dispute_won', transactionId: data.transaction_id };
     }
   }
   return { kind: 'ignore' };
@@ -494,6 +508,34 @@ export function createPaddleProcessor(): PaymentProcessor {
       return toSubscription(await getSubscription(externalId));
     },
 
+    async findSubscriptions({ ref, userId }) {
+      // The checkout's return carries its transaction (`_ptxn`).
+      if (!ref) return [];
+      const txn = await paddle<PaddleTransaction>(
+        'GET',
+        `/transactions/${encodeURIComponent(ref)}`
+      );
+      if (textOf(txn.custom_data?.userId) !== userId) return [];
+      return txn.subscription_id ? [txn.subscription_id] : [];
+    },
+
+    async previewChange(externalId, target) {
+      const preview = await paddle<{
+        immediate_transaction: {
+          details: {
+            totals: { grand_total: string; currency_code: string };
+          } | null;
+        } | null;
+      }>('PATCH', `/subscriptions/${externalId}/preview`, {
+        items: [{ price_id: target.priceId, quantity: 1 }],
+        proration_billing_mode: 'prorated_immediately'
+      });
+      const totals = preview.immediate_transaction?.details?.totals;
+      return totals
+        ? toMajorUnits(Number(totals.grand_total), totals.currency_code)
+        : null;
+    },
+
     async changeNow(externalId, target) {
       const sub = await getSubscription(externalId);
       // Switching is choosing to stay: a cancellation waiting is dropped
@@ -586,6 +628,35 @@ export function createPaddleProcessor(): PaymentProcessor {
         ? 'sandbox-vendors.paddle.com'
         : 'vendors.paddle.com';
       return `https://${host}/subscriptions-v2/${externalId}`;
+    },
+
+    async getPaymentState(payment) {
+      // Everything Paddle has done to the transaction since: its refunds,
+      // and its chargebacks and their reversals.
+      const [txn, adjustments] = await Promise.all([
+        paddle<PaddleTransaction>('GET', `/transactions/${payment.externalId}`),
+        paddle<PaddleAdjustment[]>(
+          'GET',
+          `/adjustments?transaction_id=${payment.externalId}&per_page=50`
+        )
+      ]);
+      const refunds = adjustments.filter(a => a.action === 'refund');
+      const cents = refunds
+        .filter(r => r.status === 'approved')
+        .reduce((sum, r) => sum + Number(r.totals.total), 0);
+      const made = (...actions: string[]) =>
+        adjustments.some(
+          a => actions.includes(a.action) && a.status !== 'rejected'
+        );
+      return {
+        refunded: toMajorUnits(cents, txn.currency_code),
+        refundPending: refunds.some(r => r.status === 'pending_approval'),
+        dispute: made('chargeback_reverse', 'chargeback_warning_reverse')
+          ? 'won'
+          : made('chargeback', 'chargeback_warning')
+            ? 'withdrawn'
+            : 'none'
+      };
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {
