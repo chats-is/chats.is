@@ -150,6 +150,8 @@ type LemonInvoice = Resource<{
   /** Why it was made: `initial`, `renewal` or `updated`. */
   billing_reason: string;
   total: number;
+  /** The tax in the total, collected by Lemon Squeezy as the merchant. */
+  tax: number;
   currency: string;
   refunded: boolean;
   refunded_amount: number;
@@ -298,7 +300,7 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
     id: 'lemonsqueezy',
 
     async getPrice(variantId): Promise<ProcessorPrice> {
-      let variant: Resource<{ status: string }>;
+      let variant: Resource<{ status: string; product_id: number }>;
       try {
         variant = await lemon('GET', `/variants/${variantId}`);
       } catch (err) {
@@ -307,7 +309,7 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
         }
         throw err;
       }
-      const [price, store] = await Promise.all([
+      const [price, store, product] = await Promise.all([
         lemon<
           Resource<{
             category: string;
@@ -320,6 +322,10 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
         lemon<Resource<{ currency: string }>>(
           'GET',
           `/stores/${await requireStoreId()}`
+        ),
+        lemon<Resource<{ status: string }>>(
+          'GET',
+          `/products/${variant.attributes.product_id}`
         )
       ]);
       const currency = store.attributes.currency;
@@ -334,7 +340,12 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
               price.attributes.renewal_interval_quantity
             )
           : null,
-        active: variant.attributes.status === 'published',
+        // A product with no variants of its own sells its default one,
+        // which stays `pending`; it is on sale while the product is.
+        active:
+          variant.attributes.status === 'published' ||
+          (variant.attributes.status === 'pending' &&
+            product.attributes.status === 'published'),
         metered: !!price.attributes.usage_aggregation,
         // The checkout the app makes sells one.
         maxQuantity: null
@@ -444,7 +455,7 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
         kind: kindOf(a.billing_reason),
         // Lemon Squeezy does not say its fee on an invoice.
         fee: null,
-        tax: null,
+        tax: toMajorUnits(a.tax ?? 0, a.currency),
         currency: a.currency.toLowerCase(),
         paid: ['paid', 'refunded', 'partial_refund'].includes(a.status),
         invoiceUrl: a.urls.invoice_url,

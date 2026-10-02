@@ -75,7 +75,7 @@ describe('the Lemon Squeezy API', () => {
           data: {
             type: 'variants',
             id: '555',
-            attributes: { status: 'published' }
+            attributes: { status: 'published', product_id: 7 }
           }
         }
       },
@@ -98,6 +98,15 @@ describe('the Lemon Squeezy API', () => {
         body: {
           data: { type: 'stores', id: '42', attributes: { currency: 'USD' } }
         }
+      },
+      {
+        body: {
+          data: {
+            type: 'products',
+            id: '7',
+            attributes: { status: 'published' }
+          }
+        }
       }
     );
     expect(await lemon.getPrice('555')).toEqual({
@@ -112,8 +121,56 @@ describe('the Lemon Squeezy API', () => {
     expect(calls.map(path)).toEqual([
       '/variants/555',
       '/variants/555/price-model',
-      '/stores/42'
+      '/stores/42',
+      '/products/7'
     ]);
+  });
+
+  it('sells a published product’s default variant, which stays pending', async () => {
+    const variant = () => ({
+      body: {
+        data: {
+          type: 'variants',
+          id: '556',
+          attributes: { status: 'pending', product_id: 8 }
+        }
+      }
+    });
+    const rest = (productStatus: string) => [
+      {
+        body: {
+          data: {
+            type: 'prices',
+            id: '2',
+            attributes: {
+              category: 'subscription',
+              unit_price: 1000,
+              renewal_interval_unit: 'month',
+              renewal_interval_quantity: 1,
+              usage_aggregation: null
+            }
+          }
+        }
+      },
+      {
+        body: {
+          data: { type: 'stores', id: '42', attributes: { currency: 'USD' } }
+        }
+      },
+      {
+        body: {
+          data: {
+            type: 'products',
+            id: '8',
+            attributes: { status: productStatus }
+          }
+        }
+      }
+    ];
+    replies.push(variant(), ...rest('published'));
+    expect((await lemon.getPrice('556')).active).toBe(true);
+    replies.push(variant(), ...rest('draft'));
+    expect((await lemon.getPrice('556')).active).toBe(false);
   });
 
   it('reads a one-off price as no interval it can sell', async () => {
@@ -212,7 +269,7 @@ describe('the Lemon Squeezy API', () => {
     ]);
   });
 
-  it('reads an invoice as a payment in dollars', async () => {
+  it('reads an invoice as a payment in dollars, with its tax', async () => {
     replies.push({
       body: {
         data: {
@@ -223,6 +280,7 @@ describe('the Lemon Squeezy API', () => {
             customer_id: 9,
             status: 'paid',
             total: 1999,
+            tax: 150,
             currency: 'USD',
             created_at: '2026-09-01T00:00:00Z',
             urls: { invoice_url: 'https://store/invoice/31' }
@@ -236,6 +294,8 @@ describe('the Lemon Squeezy API', () => {
       subscriptionExternalId: '77',
       customerId: '9',
       amount: 19.99,
+      fee: null,
+      tax: 1.5,
       paid: true,
       invoiceUrl: 'https://store/invoice/31'
     });
