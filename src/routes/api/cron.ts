@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { reconcileWithProcessors } from '@/server/services/subscription';
+import { runScheduledJob } from '@/server/services/subscription';
 
 /**
  * The scheduled job: the recovery for what the webhooks did not say, called
@@ -13,7 +13,7 @@ import { reconcileWithProcessors } from '@/server/services/subscription';
  * `CRON_SECRET` as a bearer token, as Vercel's cron does. Without the
  * secret set the job is off.
  */
-export const Route = createFileRoute('/api/cron/reconcile')({
+export const Route = createFileRoute('/api/cron')({
   server: { handlers: { GET } }
 });
 
@@ -26,5 +26,5 @@ async function GET({ request }: { request: Request }) {
   if (request.headers.get('authorization') !== `Bearer ${env.CRON_SECRET}`) {
     return Response.json({ error: 'Unauthorized.' }, { status: 401 });
   }
-  return Response.json(await reconcileWithProcessors());
+  return Response.json(await runScheduledJob());
 }

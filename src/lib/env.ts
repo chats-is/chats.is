@@ -82,7 +82,7 @@ export const env = createEnv({
     LEMONSQUEEZY_WEBHOOK_SECRET: z.string().optional(),
     LEMONSQUEEZY_STORE_ID: z.string().optional(),
 
-    // What the scheduled job at /api/cron/reconcile is called with, as a
+    // What the scheduled job at /api/cron is called with, as a
     // bearer token. Unset, the job is off.
     CRON_SECRET: z.string().optional()
   },

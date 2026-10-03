@@ -5,10 +5,12 @@ import {
   count,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
   isNotNull,
+  isNull,
   lt,
   or,
   sql,
@@ -304,7 +306,7 @@ export async function getMySubscription(userId: string) {
   });
   if (!sub) return null;
   const mine = await isOwnToResume(sub);
-  const unpaid = await unpaidRenewalOf(sub.id);
+  const unpaid = await unpaidRenewalOf(sub);
   return {
     id: sub.id,
     planId: sub.planId,
@@ -326,41 +328,55 @@ export async function getMySubscription(userId: string) {
 }
 
 /**
- * The renewal a subscription has not been able to pay, as its payments say:
- * its latest payment, when that is a renewal that failed — the processor is
- * retrying it. Paid in the end, the same payment says so.
+ * Whether a subscription's renewal — of the period after its expiry — was
+ * reported failed and not paid since: the processor is retrying it. The
+ * renewal's invoice says the period it is for; one that does not (Lemon
+ * Squeezy) is taken as it stands, since a retry paid later turns that same
+ * invoice paid.
  */
-async function unpaidRenewalOf(subscriptionId: string, ex: Executor = db) {
-  const latest = await ex.query.payments.findFirst({
-    where: eq(payments.subscriptionId, subscriptionId),
-    orderBy: p => [desc(p.billedAt)],
-    columns: { status: true, kind: true, billedAt: true }
+const unpaidRenewalWhere = (
+  expiresAt: SQL | Date | typeof subscriptions.expiresAt
+) =>
+  and(
+    eq(payments.kind, 'renewal'),
+    eq(payments.status, 'failed'),
+    or(gt(payments.periodEnd, expiresAt), isNull(payments.periodEnd))
+  );
+
+async function unpaidRenewalOf(
+  sub: Pick<SubscriptionRow, 'id' | 'expiresAt'>,
+  ex: Executor = db
+) {
+  const row = await ex.query.payments.findFirst({
+    where: and(
+      eq(payments.subscriptionId, sub.id),
+      unpaidRenewalWhere(sub.expiresAt)
+    ),
+    columns: { id: true }
   });
-  return latest?.status === 'failed' && latest.kind === 'renewal'
-    ? latest
-    : null;
+  return !!row;
 }
 
-/** Of these subscriptions, the ones whose latest payment is a renewal that
- *  failed: `unpaidRenewalOf`, for a page of them at once. */
+/** Of these subscriptions, the ones with a renewal unpaid:
+ *  `unpaidRenewalOf`, for a page of them at once. */
 async function unpaidRenewalsOf(
-  subscriptionIds: string[]
+  subs: Array<Pick<SubscriptionRow, 'id' | 'expiresAt'>>
 ): Promise<Set<string>> {
-  if (subscriptionIds.length === 0) return new Set();
-  const latest = await db
-    .selectDistinctOn([payments.subscriptionId], {
-      id: payments.subscriptionId,
-      status: payments.status,
-      kind: payments.kind
-    })
+  if (subs.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ id: payments.subscriptionId })
     .from(payments)
-    .where(inArray(payments.subscriptionId, subscriptionIds))
-    .orderBy(payments.subscriptionId, desc(payments.billedAt));
-  return new Set(
-    latest
-      .filter(p => p.id && p.status === 'failed' && p.kind === 'renewal')
-      .map(p => p.id!)
-  );
+    .innerJoin(subscriptions, eq(subscriptions.id, payments.subscriptionId))
+    .where(
+      and(
+        inArray(
+          payments.subscriptionId,
+          subs.map(s => s.id)
+        ),
+        unpaidRenewalWhere(subscriptions.expiresAt)
+      )
+    );
+  return new Set(rows.map(r => r.id!));
 }
 
 /**
@@ -531,7 +547,7 @@ export async function upgradePlan(userId: string, input: { planId: string }) {
         'This subscription is set to cancel and cannot be upgraded. You can subscribe again once it is canceled.'
       );
     }
-    if (await unpaidRenewalOf(row.id, tx)) {
+    if (await unpaidRenewalOf(row, tx)) {
       throw new PublicError(
         'Your payment failed. Update your payment method before changing your plan.'
       );
@@ -585,7 +601,7 @@ async function cancel(
   // A renewal unpaid: what was paid for has already run out, so there is no
   // period left to see out. It is canceled now, and in the processor, whose
   // retries stop — cancelled, the user is not charged again.
-  if (sub.status === 'active' && (await unpaidRenewalOf(sub.id))) {
+  if (sub.status === 'active' && (await unpaidRenewalOf(sub))) {
     if (!(await cancelNow(sub.id, reason))) {
       throw new PublicError('This subscription has been canceled.');
     }
@@ -1086,6 +1102,14 @@ async function applyPayment(
   if (!payment.externalSubscriptionId) return;
   const externalSubscriptionId = payment.externalSubscriptionId;
   const { userId, planId } = await requireNamed(processorId, payment);
+  // A renewal paid buys the period up to the subscription's next renewal.
+  // A processor whose invoice does not say so (Lemon Squeezy) says it on the
+  // subscription, which is read for it.
+  if (payment.kind === 'renewal' && payment.paid && !payment.periodEnd) {
+    const processor = await getPaymentProcessor(processorId);
+    const snap = await processor.getSubscription(externalSubscriptionId);
+    payment = { ...payment, periodEnd: snap.expiresAt };
+  }
   // Under the user's lock, as the subscription's webhook is: the two arrive
   // together, and whichever is second sees the first.
   const { sub, row } = await withLock(userLock(userId), async tx => {
@@ -1123,8 +1147,7 @@ async function applyPayment(
 
 /**
  * A renewal paid: the subscription goes on to the end of the period it paid
- * for — as the invoice says, or, where the processor does not say it on the
- * invoice, one more interval. Set to cancel, it is set to cancel then.
+ * for. Set to cancel, it is set to cancel then.
  */
 async function renew(
   subscriptionId: string,
@@ -1135,10 +1158,12 @@ async function renew(
     columns: { id: true, userId: true }
   });
   if (!sub) return;
+  if (!paid.periodEnd) {
+    throw new Error(`[payment] ${paid.id} says no period it paid for`);
+  }
+  const expiresAt = paid.periodEnd;
   await changeSubscription(sub, async (tx, row) => {
     if (row.status !== 'active') return;
-    const expiresAt =
-      paid.periodEnd ?? addInterval(row.expiresAt, row.interval);
     if (expiresAt <= row.expiresAt) return;
     await tx
       .update(subscriptions)
@@ -1149,14 +1174,6 @@ async function renew(
       })
       .where(eq(subscriptions.id, row.id));
   });
-}
-
-/** A date one billing interval on. */
-function addInterval(from: Date, interval: BillingInterval): Date {
-  const next = new Date(from);
-  if (interval === 'year') next.setUTCFullYear(next.getUTCFullYear() + 1);
-  else next.setUTCMonth(next.getUTCMonth() + 1);
-  return next;
 }
 
 // ============================================================================
@@ -1232,7 +1249,7 @@ const RECONCILE_BATCH = 100;
  *
  * One that cannot be read is left for the next run.
  */
-export async function reconcileWithProcessors(): Promise<{
+export async function runScheduledJob(): Promise<{
   expired: number;
   unpaid: number;
   refunds: number;
@@ -1241,35 +1258,53 @@ export async function reconcileWithProcessors(): Promise<{
   const now = new Date();
   let failed = 0;
 
-  // 1. Past expiry, nothing heard.
-  const expired = await db.query.subscriptions.findMany({
-    where: and(
-      eq(subscriptions.status, 'active'),
-      lt(subscriptions.expiresAt, new Date(now.getTime() - EXPIRY_GRACE_MS))
-    ),
-    orderBy: s => [s.updatedAt],
-    limit: RECONCILE_BATCH,
-    columns: {
-      id: true,
-      processor: true,
-      externalId: true,
-      userId: true,
-      planId: true,
-      expiresAt: true
-    }
-  });
+  // 1 and 2. Subscriptions past their expiry and still active, each with
+  // whether the renewal of the period after its expiry was reported failed:
+  // one query, one pass. The renewal's invoice says the period it is for;
+  // one that does not (Lemon Squeezy) is taken as it stands — a retry paid
+  // later turns that same invoice paid.
+  const unpaidRenewal = db
+    .select({ subscriptionId: payments.subscriptionId })
+    .from(payments)
+    .where(
+      and(
+        eq(payments.subscriptionId, subscriptions.id),
+        unpaidRenewalWhere(subscriptions.expiresAt)
+      )
+    );
+  const expired = await db
+    .select({
+      id: subscriptions.id,
+      processor: subscriptions.processor,
+      externalId: subscriptions.externalId,
+      userId: subscriptions.userId,
+      planId: subscriptions.planId,
+      expiresAt: subscriptions.expiresAt,
+      unpaid: sql<boolean>`exists ${unpaidRenewal}`
+    })
+    .from(subscriptions)
+    .where(
+      and(
+        eq(subscriptions.status, 'active'),
+        lt(subscriptions.expiresAt, new Date(now.getTime() - EXPIRY_GRACE_MS))
+      )
+    )
+    .orderBy(subscriptions.updatedAt)
+    .limit(RECONCILE_BATCH);
+  const graceDays = await getSubscriptionGraceDays();
   let asked = 0;
   let ended = 0;
   for (const sub of expired) {
     try {
-      if (await unpaidRenewalOf(sub.id)) {
-        // 2. A renewal failed, and the grace days are over.
-        if ((await graceEndOf(sub.expiresAt)) <= now) {
+      if (sub.unpaid) {
+        // A renewal failed: canceled once the grace days are over.
+        if (sub.expiresAt.getTime() + graceDays * DAY_MS <= now.getTime()) {
           await cancelNow(sub.id, 'payment_failed');
           ended++;
         }
         continue;
       }
+      // Nothing heard: the processor is asked.
       asked++;
       const processor = await getPaymentProcessor(sub.processor);
       const snap = await processor.getSubscription(sub.externalId);
@@ -1311,7 +1346,12 @@ export async function reconcileWithProcessors(): Promise<{
       console.error(`[reconcile] refund of ${row.id}`, err);
     }
   }
-  return { expired: asked, unpaid: ended, refunds: waiting.length, failed };
+  return {
+    expired: asked,
+    unpaid: ended,
+    refunds: waiting.length,
+    failed
+  };
 }
 
 /** One webhook call: its signature checked, then what it asks for done. */
@@ -1972,7 +2012,7 @@ export async function listSubscriptions(
   ]);
   const [paid, unpaid] = await Promise.all([
     paidOf(rows.map(r => r.id)),
-    unpaidRenewalsOf(rows.filter(r => r.status === 'active').map(r => r.id))
+    unpaidRenewalsOf(rows.filter(r => r.status === 'active'))
   ]);
   return {
     rows: rows.map(({ plan, ...sub }) => ({

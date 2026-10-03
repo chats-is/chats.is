@@ -85,7 +85,7 @@ const {
   listSubscriptions,
   lookupProcessorPrice,
   previewUpgrade,
-  reconcileWithProcessors,
+  runScheduledJob,
   refundPayment,
   rejectRefundRequest,
   resubscribe,
@@ -700,14 +700,19 @@ describe('a subscription', () => {
       billedAt: EXPIRES
     });
     expect(await rowOf()).toMatchObject({ status: 'active', expiresAt: next });
-    // Reported the other way round — the payment first — the same.
+    // An invoice that does not say the period it paid for (Lemon Squeezy):
+    // the processor's subscription is read for its next renewal.
     const later = new Date('2030-12-01T00:00:00Z');
+    Object.assign(h.processor.subs.get('sub_1'), { expiresAt: later });
     await pay({
       externalId: 'in_3',
       transactionId: 'pi_3',
       kind: 'renewal',
       billedAt: next
     });
+    expect(await rowOf()).toMatchObject({ expiresAt: later });
+    expect(await paymentOf('in_3')).toMatchObject({ periodEnd: later });
+    // The subscription's own webhook, after, moves nothing.
     await report({ expiresAt: later });
     expect(await rowOf()).toMatchObject({ expiresAt: later });
   });
@@ -2306,7 +2311,7 @@ describe('without a webhook', () => {
     await subscribe({ expiresAt: daysAgo(2) });
     Object.assign(h.processor.subs.get('sub_1'), { status: 'canceled' });
     expect(await planOf('u1')).toBe('basic');
-    await reconcileWithProcessors();
+    await runScheduledJob();
     expect(await rowOf()).toMatchObject({ status: 'canceled' });
     expect(await planOf('u1')).toBeNull();
   });
@@ -2314,7 +2319,7 @@ describe('without a webhook', () => {
   it('one not yet expired is not asked about, and a processor not answering leaves the plan', async () => {
     await subscribe();
     h.processor.getSubscription.mockClear();
-    await reconcileWithProcessors();
+    await runScheduledJob();
     expect(h.processor.getSubscription).not.toHaveBeenCalled();
 
     await subscribe(
@@ -2327,7 +2332,7 @@ describe('without a webhook', () => {
       { externalId: 'in_8', transactionId: 'pi_8' }
     );
     h.processor.getSubscription.mockRejectedValueOnce(new Error('down'));
-    await reconcileWithProcessors();
+    await runScheduledJob();
     expect(await planOf('u2')).toBe('basic');
   });
 
@@ -2378,7 +2383,7 @@ describe('the scheduled job, for webhooks that never came', () => {
   it('asks about a refund sent from here a day ago and still waiting: gone back, it cancels as it owed', async () => {
     await refundAgo(true);
     refundState('succeeded');
-    expect(await reconcileWithProcessors()).toMatchObject({
+    expect(await runScheduledJob()).toMatchObject({
       refunds: 1,
       failed: 0
     });
@@ -2400,7 +2405,7 @@ describe('the scheduled job, for webhooks that never came', () => {
   it('leaves a refund the processor is still working on', async () => {
     await refundAgo(true);
     refundState('pending');
-    await reconcileWithProcessors();
+    await runScheduledJob();
     expect(await paymentOf()).toMatchObject({ status: 'refund_pending' });
     expect(await rowOf()).toMatchObject({ cancelReason: 'refunded' });
   });
@@ -2408,7 +2413,7 @@ describe('the scheduled job, for webhooks that never came', () => {
   it('finds a refund sent from here failed: paid again, the subscription renewing', async () => {
     await refundAgo(true);
     refundState('failed');
-    await reconcileWithProcessors();
+    await runScheduledJob();
     expect(await paymentOf()).toMatchObject({
       status: 'paid',
       refundAmount: '0.00'
@@ -2423,14 +2428,14 @@ describe('the scheduled job, for webhooks that never came', () => {
       { paymentId: (await paymentOf())!.id, cancelSubscription: true },
       'admin'
     );
-    expect(await reconcileWithProcessors()).toMatchObject({ refunds: 0 });
+    expect(await runScheduledJob()).toMatchObject({ refunds: 0 });
     expect(h.processor.getRefund).not.toHaveBeenCalled();
   });
 
   it('ends a subscription past its expiry whose user never came back', async () => {
     await subscribe({ expiresAt: daysAgo(2) });
     Object.assign(h.processor.subs.get('sub_1'), { status: 'canceled' });
-    expect(await reconcileWithProcessors()).toMatchObject({ expired: 1 });
+    expect(await runScheduledJob()).toMatchObject({ expired: 1 });
     expect(await rowOf()).toMatchObject({ status: 'canceled' });
     expect(await planOf('u1')).toBeNull();
   });
@@ -2445,7 +2450,7 @@ describe('the scheduled job, for webhooks that never came', () => {
     });
     await h.db.update(schema.subscriptions).set({ expiresAt: daysAgo(4) });
     h.processor.getSubscription.mockClear();
-    expect(await reconcileWithProcessors()).toMatchObject({
+    expect(await runScheduledJob()).toMatchObject({
       expired: 0,
       unpaid: 1
     });
@@ -2467,7 +2472,7 @@ describe('the scheduled job, for webhooks that never came', () => {
       paid: false
     });
     await h.db.update(schema.subscriptions).set({ expiresAt: daysAgo(2) });
-    expect(await reconcileWithProcessors()).toMatchObject({
+    expect(await runScheduledJob()).toMatchObject({
       expired: 0,
       unpaid: 0
     });
@@ -2477,7 +2482,7 @@ describe('the scheduled job, for webhooks that never came', () => {
   it('leaves what it cannot read for the next run, and goes on', async () => {
     await refundAgo(true);
     h.processor.getRefund.mockRejectedValueOnce(new Error('down'));
-    expect(await reconcileWithProcessors()).toMatchObject({
+    expect(await runScheduledJob()).toMatchObject({
       refunds: 1,
       failed: 1
     });

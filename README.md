@@ -124,11 +124,12 @@ Webhook addresses are under `{BETTER_AUTH_URL}`. The events to send:
 - **Lemon Squeezy:** every `subscription_*` event, including
   `subscription_payment_success`, `_failed`, `_recovered` and `_refunded`.
 
-A webhook can fail to arrive. The app makes up for it by asking the
-processor itself: for a subscription past its expiry when the user's plan is
-next read, for a checkout the user has come back from, and — once a day,
-from the scheduled job at `/api/cron/reconcile` — for the refunds and
-disputes of recent payments. Set `CRON_SECRET` to turn the job on; on Vercel
+The processor is asked directly in two places only: for a checkout the user
+has come back from before its webhook, and from the scheduled job at
+`/api/cron`, once a day. The job asks about subscriptions past their expiry
+that nothing has been heard of, ends those whose renewal failed and whose
+grace days are over, and asks about refunds sent from the app that are still
+waiting after a day. Set `CRON_SECRET` to turn the job on; on Vercel
 `vercel.json` schedules it, and elsewhere anything that calls the address
 daily with `Authorization: Bearer {CRON_SECRET}` does.
 

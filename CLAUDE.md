@@ -163,7 +163,7 @@ chose, a chargeback cancels, a second subscription bought beside the first is ca
 refunded, a renewal reported failed past the grace days cancels). A subscription event writes the
 subscription; its expiry moves only when a renewal's payment is reported paid. Nothing in a
 request or a webhook reads the processor to decide; the only reads are the checkout the user
-comes back from and the scheduled `/api/cron/reconcile`, which is the separate recovery for
+comes back from and the scheduled `/api/cron`, which is the separate recovery for
 whatever the webhooks did not say: subscriptions past their expiry, renewals failed past the grace
 days, and refunds sent from here still waiting after a day. Paddle's checkout opens on `/pay/paddle`. A payment keeps the
 facts its status is reckoned from — paid, `refund_amount`, `refund_pending` while a refund waits,
@@ -237,7 +237,7 @@ arrives within seconds; a refund in Paddle's sandbox is approved only by a job t
 ten minutes, so wait for the payment to leave `refund_pending` rather than for a fixed time. The
 sandbox never rejects a refund and cannot make a real chargeback: those paths have only unit tests.
 
-**The daily job** at `/api/cron/reconcile` is off without `CRON_SECRET`. To run it once without
+**The daily job** at `/api/cron` is off without `CRON_SECRET`. To run it once without
 touching `.env` or the running servers, start a short-lived server with the secret given inline
 (`CRON_SECRET=… pnpm vite dev --port 3003 --strictPort`), call it with
 `Authorization: Bearer <secret>`, and stop that server again.

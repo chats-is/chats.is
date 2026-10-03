@@ -18,6 +18,7 @@ import { Route as ChatIndexRouteImport } from './routes/_chat/index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat/library'
 import { Route as ChatPromptsRouteImport } from './routes/_chat/prompts'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiCronRouteImport } from './routes/api/cron'
 import { Route as ApiFilesRouteRouteImport } from './routes/api/files/route'
 import { Route as ApiSpeechRouteImport } from './routes/api/speech'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
@@ -38,7 +39,6 @@ import { Route as ShareIdRouteImport } from './routes/share/$id'
 import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
 import { Route as ApiArtifactsPreviewRouteImport } from './routes/api/artifacts/preview'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as ApiCronReconcileRouteImport } from './routes/api/cron/reconcile'
 import { Route as ApiFilesUploadRouteImport } from './routes/api/files/upload'
 import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users/index'
 import { Route as ConsoleUsersUserIdRouteImport } from './routes/console/users/$userId'
@@ -86,6 +86,11 @@ const ChatPromptsRoute = ChatPromptsRouteImport.update({
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronRoute = ApiCronRouteImport.update({
+  id: '/api/cron',
+  path: '/api/cron',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRouteRoute = ApiFilesRouteRouteImport.update({
@@ -188,11 +193,6 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCronReconcileRoute = ApiCronReconcileRouteImport.update({
-  id: '/api/cron/reconcile',
-  path: '/api/cron/reconcile',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiFilesUploadRoute = ApiFilesUploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -225,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof ChatLibraryRoute
   '/prompts': typeof ChatPromptsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/payments': typeof ConsolePaymentsRoute
@@ -244,7 +245,6 @@ export interface FileRoutesByFullPath {
   '/chat/$chatId': typeof ChatChatChatIdRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/cron/reconcile': typeof ApiCronReconcileRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
@@ -258,6 +258,7 @@ export interface FileRoutesByTo {
   '/library': typeof ChatLibraryRoute
   '/prompts': typeof ChatPromptsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/payments': typeof ConsolePaymentsRoute
@@ -278,7 +279,6 @@ export interface FileRoutesByTo {
   '/chat/$chatId': typeof ChatChatChatIdRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/cron/reconcile': typeof ApiCronReconcileRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users': typeof ConsoleUsersIndexRoute
@@ -295,6 +295,7 @@ export interface FileRoutesById {
   '/_chat/library': typeof ChatLibraryRoute
   '/_chat/prompts': typeof ChatPromptsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/payments': typeof ConsolePaymentsRoute
@@ -315,7 +316,6 @@ export interface FileRoutesById {
   '/_chat/chat/$chatId': typeof ChatChatChatIdRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/cron/reconcile': typeof ApiCronReconcileRoute
   '/api/files/upload': typeof ApiFilesUploadRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
@@ -333,6 +333,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/prompts'
     | '/api/chat'
+    | '/api/cron'
     | '/api/speech'
     | '/console/models'
     | '/console/payments'
@@ -352,7 +353,6 @@ export interface FileRouteTypes {
     | '/chat/$chatId'
     | '/api/artifacts/preview'
     | '/api/auth/$'
-    | '/api/cron/reconcile'
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users/'
@@ -366,6 +366,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/prompts'
     | '/api/chat'
+    | '/api/cron'
     | '/api/speech'
     | '/console/models'
     | '/console/payments'
@@ -386,7 +387,6 @@ export interface FileRouteTypes {
     | '/chat/$chatId'
     | '/api/artifacts/preview'
     | '/api/auth/$'
-    | '/api/cron/reconcile'
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users'
@@ -402,6 +402,7 @@ export interface FileRouteTypes {
     | '/_chat/library'
     | '/_chat/prompts'
     | '/api/chat'
+    | '/api/cron'
     | '/api/speech'
     | '/console/models'
     | '/console/payments'
@@ -422,7 +423,6 @@ export interface FileRouteTypes {
     | '/_chat/chat/$chatId'
     | '/api/artifacts/preview'
     | '/api/auth/$'
-    | '/api/cron/reconcile'
     | '/api/files/upload'
     | '/console/users/$userId'
     | '/console/users/'
@@ -437,12 +437,12 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ApiFilesRouteRoute: typeof ApiFilesRouteRouteWithChildren
   ApiChatRoute: typeof ApiChatRoute
+  ApiCronRoute: typeof ApiCronRoute
   ApiSpeechRoute: typeof ApiSpeechRoute
   PayPaddleRoute: typeof PayPaddleRoute
   ShareIdRoute: typeof ShareIdRoute
   ApiArtifactsPreviewRoute: typeof ApiArtifactsPreviewRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiCronReconcileRoute: typeof ApiCronReconcileRoute
   ApiPaymentsProcessorWebhookRoute: typeof ApiPaymentsProcessorWebhookRoute
 }
 
@@ -509,6 +509,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron': {
+      id: '/api/cron'
+      path: '/api/cron'
+      fullPath: '/api/cron'
+      preLoaderRoute: typeof ApiCronRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -651,13 +658,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/cron/reconcile': {
-      id: '/api/cron/reconcile'
-      path: '/api/cron/reconcile'
-      fullPath: '/api/cron/reconcile'
-      preLoaderRoute: typeof ApiCronReconcileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/files/upload': {
       id: '/api/files/upload'
       path: '/upload'
@@ -764,12 +764,12 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ApiFilesRouteRoute: ApiFilesRouteRouteWithChildren,
   ApiChatRoute: ApiChatRoute,
+  ApiCronRoute: ApiCronRoute,
   ApiSpeechRoute: ApiSpeechRoute,
   PayPaddleRoute: PayPaddleRoute,
   ShareIdRoute: ShareIdRoute,
   ApiArtifactsPreviewRoute: ApiArtifactsPreviewRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiCronReconcileRoute: ApiCronReconcileRoute,
   ApiPaymentsProcessorWebhookRoute: ApiPaymentsProcessorWebhookRoute,
 }
 export const routeTree = rootRouteImport
