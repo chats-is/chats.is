@@ -89,7 +89,6 @@ describe('the Paddle API', () => {
     expect(await paddle.getPrice('pri_pro')).toEqual({
       priceId: 'pri_pro',
       amount: 200,
-      currency: 'usd',
       interval: 'year',
       active: true,
       metered: false,
@@ -304,7 +303,7 @@ describe('the Paddle API', () => {
     expect(await paddle.getPayment('txn_1')).toMatchObject({
       externalId: 'txn_1',
       transactionId: 'txn_1',
-      subscriptionExternalId: 'sub_1',
+      externalSubscriptionId: 'sub_1',
       amount: 10.5,
       paid: true
     });
@@ -340,7 +339,8 @@ describe('a Paddle subscription', () => {
   it.each([
     ['active', 'active', false],
     ['trialing', 'active', false],
-    ['past_due', 'canceled', true],
+    // A renewal failed and Paddle is retrying it: still in effect.
+    ['past_due', 'active', true],
     ['paused', 'canceled', false],
     ['canceled', 'canceled', false]
   ])('reads %s as %s', (status, expected, paymentFailed) => {
@@ -375,7 +375,7 @@ describe('Paddle webhooks', () => {
     data: subscription()
   });
 
-  it('are taken when signed with the secret', async () => {
+  it('are taken when signed with the secret, carrying the subscription as it is, and when', async () => {
     const event = await paddle.parseWebhook(
       body,
       new Headers({ 'paddle-signature': sign(body) })
@@ -385,8 +385,15 @@ describe('Paddle webhooks', () => {
       type: 'subscription.updated',
       action: {
         kind: 'subscription',
-        externalId: 'sub_1',
-        hints: { userId: 'u1', planId: 'pro' }
+        subscription: expect.objectContaining({
+          externalId: 'sub_1',
+          customerId: 'ctm_1',
+          userId: 'u1',
+          planId: 'pro',
+          priceId: 'pri_pro',
+          status: 'active',
+          expiresAt: new Date('2026-10-01T00:00:00Z')
+        })
       }
     });
   });
@@ -407,37 +414,103 @@ describe('Paddle webhooks', () => {
     ).rejects.toThrow('too old');
   });
 
+  const transaction = (extra: Record<string, unknown>) => ({
+    id: 'txn_1',
+    status: 'completed',
+    origin: 'subscription_recurring',
+    subscription_id: 'sub_1',
+    customer_id: 'ctm_1',
+    currency_code: 'USD',
+    custom_data: { userId: 'u1', planId: 'pro' },
+    items: [{ price: { id: 'pri_pro' } }],
+    billing_period: {
+      starts_at: '2026-09-01T00:00:00Z',
+      ends_at: '2026-10-01T00:00:00Z'
+    },
+    details: { totals: { grand_total: '1050', tax: '50', fee: '80' } },
+    billed_at: '2026-09-01T00:00:00Z',
+    ...extra
+  });
+  const refund = (extra: Record<string, unknown>) => ({
+    id: 'adj_1',
+    action: 'refund',
+    type: 'partial',
+    transaction_id: 'txn_1',
+    currency_code: 'USD',
+    totals: { total: '1000' },
+    ...extra
+  });
+
   it.each([
     [
       'transaction.completed',
-      { id: 'txn_1' },
-      { kind: 'payment', externalId: 'txn_1' }
+      transaction({}),
+      {
+        kind: 'payment',
+        payment: expect.objectContaining({
+          externalId: 'txn_1',
+          externalSubscriptionId: 'sub_1',
+          userId: 'u1',
+          planId: 'pro',
+          priceId: 'pri_pro',
+          periodEnd: new Date('2026-10-01T00:00:00Z'),
+          amount: 10.5,
+          tax: 0.5,
+          fee: 0.8,
+          kind: 'renewal',
+          paid: true
+        })
+      }
     ],
     [
       'transaction.payment_failed',
-      { id: 'txn_2' },
-      { kind: 'payment', externalId: 'txn_2' }
+      transaction({ id: 'txn_2', status: 'past_due' }),
+      {
+        kind: 'payment',
+        payment: expect.objectContaining({ externalId: 'txn_2', paid: false })
+      }
     ],
     [
       'adjustment.updated',
-      {
-        action: 'refund',
-        status: 'approved',
-        type: 'full',
-        transaction_id: 'txn_1',
-        currency_code: 'USD',
-        totals: { total: '1000' }
-      },
+      refund({ status: 'approved', type: 'full' }),
       {
         kind: 'refund',
         transactionId: 'txn_1',
-        refundAmount: 10
+        refund: {
+          externalId: 'adj_1',
+          amount: 10,
+          total: null,
+          status: 'succeeded'
+        }
       }
     ],
     [
       'adjustment.created',
-      { action: 'refund', status: 'pending_approval', transaction_id: 'txn_1' },
-      { kind: 'ignore' }
+      refund({ status: 'pending_approval' }),
+      {
+        kind: 'refund',
+        transactionId: 'txn_1',
+        refund: {
+          externalId: 'adj_1',
+          amount: 10,
+          total: null,
+          status: 'pending'
+        }
+      }
+    ],
+    [
+      'adjustment.updated',
+      refund({ status: 'rejected' }),
+      {
+        kind: 'refund',
+        transactionId: 'txn_1',
+        refund: {
+          externalId: 'adj_1',
+          amount: 10,
+          total: null,
+          status: 'failed'
+        }
+      }
     ],
     [
       'adjustment.created',
@@ -462,20 +535,14 @@ describe('Paddle webhooks', () => {
         transaction_id: 'txn_1'
       },
       { kind: 'dispute_won', transactionId: 'txn_1' }
-    ],
-    [
-      'adjustment.updated',
-      {
-        id: 'adj_1',
-        action: 'refund',
-        status: 'rejected',
-        transaction_id: 'txn_1'
-      },
-      { kind: 'refund_failed', transactionId: 'txn_1' }
     ]
   ])('read %s', (type, data, action) => {
     expect(
-      __test.actionOf({ event_id: 'e', event_type: type, data } as any)
+      __test.actionOf({
+        event_id: 'e',
+        event_type: type,
+        data
+      } as any)
     ).toEqual(action);
   });
 });
@@ -498,7 +565,7 @@ describe('Paddle refunds', () => {
     replies.push({ body: { data: { id: 'adj_1' } } });
     await paddle.refundPayment(
       { externalId: 'txn_1', transactionId: 'txn_1' },
-      { cents: 8000, whole: true }
+      { minor: 8000, whole: true }
     );
     expect(calls).toHaveLength(1);
     expect(calls[0].body).toMatchObject({
@@ -529,7 +596,7 @@ describe('Paddle refunds', () => {
     );
     await paddle.refundPayment(
       { externalId: 'txn_1', transactionId: 'txn_1' },
-      { cents: 4000, whole: false }
+      { minor: 4000, whole: false }
     );
     expect(calls[2].body).toMatchObject({
       type: 'partial',
@@ -550,48 +617,6 @@ describe('Paddle refunds', () => {
         2000
       )
     ).toThrow('more than is left');
-  });
-
-  it("say in a webhook all refunded of the payment so far, not only this refund's", async () => {
-    const body = JSON.stringify({
-      event_id: 'evt_r',
-      event_type: 'adjustment.updated',
-      data: {
-        action: 'refund',
-        status: 'approved',
-        type: 'partial',
-        transaction_id: 'txn_1',
-        currency_code: 'USD',
-        totals: { total: '3000' }
-      }
-    });
-    const ts = Math.floor(Date.now() / 1000);
-    const signature = `ts=${ts};h1=${createHmac('sha256', 'pdl_ntfset_secret').update(`${ts}:${body}`).digest('hex')}`;
-    replies.push(
-      { body: { data: upgrade } },
-      {
-        body: {
-          data: [
-            { status: 'approved', type: 'partial', totals: { total: '3000' } },
-            { status: 'approved', type: 'partial', totals: { total: '5000' } },
-            {
-              status: 'pending_approval',
-              type: 'partial',
-              totals: { total: '100' }
-            }
-          ]
-        }
-      }
-    );
-    const event = await paddle.parseWebhook(
-      body,
-      new Headers({ 'paddle-signature': signature })
-    );
-    expect(event.action).toEqual({
-      kind: 'refund',
-      transactionId: 'txn_1',
-      refundAmount: 80
-    });
   });
 });
 
@@ -714,10 +739,7 @@ describe('asking Paddle, for a webhook that never came', () => {
 
   it('where a payment stands: its approved refunds, one still waiting, and its chargebacks', async () => {
     const state = async (adjustments: unknown[]) => {
-      replies.push(
-        { body: { data: { id: 'txn_1', currency_code: 'USD' } } },
-        { body: { data: adjustments } }
-      );
+      replies.push({ body: { data: adjustments } });
       return await paddle.getPaymentState({
         externalId: 'txn_1',
         transactionId: 'txn_1'

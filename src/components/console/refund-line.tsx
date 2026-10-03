@@ -14,7 +14,7 @@ export type RefundLine = Awaited<
 
 /**
  * How the refund of a payment is reckoned, spelled out with its numbers,
- * as `refundShareCents` reckons it: with a refund fee, that share of what
+ * as `refundShareMinor` reckons it: with a refund fee, that share of what
  * was paid; on auto, what was paid less the processor's fee — and where
  * the processor holds the tax too, in proportion to what was paid before
  * tax.

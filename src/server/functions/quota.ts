@@ -43,7 +43,7 @@ export const deleteQuota = createServerFn({ method: 'POST' })
   .validator(quotaIdSchema)
   .handler(({ data }) => quotas.deleteQuota(data.id));
 
-/** Current user's quota — percentages and reset times, never dollars. */
+/** Current user's quota — percentages and reset times, never amounts. */
 export const getMyQuota = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .handler(({ context }) => quotas.getUserQuota(context.user.id));

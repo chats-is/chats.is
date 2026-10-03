@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, TicketCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { toCents, toDollars, type RefundRequestStatus } from '@/types/payment';
+import { toAmount, toMinor, type RefundRequestStatus } from '@/types/payment';
 import { formatPrice } from '@/lib/format-amount';
 import { mutating } from '@/lib/mutation';
 import { paymentQueries, refundPayment } from '@/server/functions/payment';
@@ -157,7 +157,7 @@ function RefundBody({
       queryClient.invalidateQueries({ queryKey: paymentQueries.all() }),
       queryClient.invalidateQueries({ queryKey: subscriptionQueries.all() })
     ]);
-  const total = r.lines.reduce((sum, l) => sum + toCents(l.left), 0);
+  const total = r.lines.reduce((sum, l) => sum + toMinor(l.left), 0);
   const refund = useMutation({
     mutationFn: () =>
       request
@@ -280,7 +280,7 @@ function RefundBody({
               {refund.isPending && <Loader2 className="size-4 animate-spin" />}
               {total === 0
                 ? 'Approve'
-                : `Refund ${formatPrice(toDollars(total))}`}
+                : `Refund ${formatPrice(toAmount(total))}`}
             </Button>
           </>
         )}

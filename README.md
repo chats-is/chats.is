@@ -112,9 +112,9 @@ plan sold through it.
 
 Webhook addresses are under `{BETTER_AUTH_URL}`. The events to send:
 
-- **Stripe:** `checkout.session.completed`, `customer.subscription.created`,
-  `.updated`, `.deleted`, `.paused` and `.resumed`, `invoice.paid`,
-  `invoice.payment_failed`, `charge.refunded`, `refund.failed`,
+- **Stripe:** `customer.subscription.created`, `.updated`, `.deleted`,
+  `.paused` and `.resumed`, `invoice.paid`,
+  `invoice.payment_failed`, `refund.created`, `refund.updated`,
   `charge.dispute.created`, `charge.dispute.funds_withdrawn`,
   `charge.dispute.funds_reinstated`, `charge.dispute.closed`.
 - **Paddle:** every `subscription.*` event, `transaction.completed`,

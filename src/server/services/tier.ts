@@ -18,7 +18,6 @@ import { db } from '@/db';
 import { plans, tiers, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { getDefaultTierId } from '@/server/services/settings';
-import { refreshIfExpired } from '@/server/services/subscription';
 
 // ============================================================================
 // Reads
@@ -84,8 +83,6 @@ export async function getTier(id: string) {
 export const getUserTier = perRequest(
   'getUserTier',
   async (userId: string): Promise<UserTier> => {
-    // The plan is the subscription's: one past its expiry is checked first.
-    await refreshIfExpired(userId);
     const row = await db.query.users.findFirst({
       where: eq(users.id, userId),
       columns: { id: true },

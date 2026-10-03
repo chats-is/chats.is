@@ -98,14 +98,12 @@ export const BILLING_INTERVALS: ReadonlyArray<{
 ];
 
 /**
- * A price as its processor reports it, in the currency's main unit (10.5,
- * not 1050). Read to check a plan's price ID, and to offer the plan its
- * amount.
+ * A price as its processor reports it, as an amount (10.5, not 1050). Read to
+ * check a plan's price ID, and to offer the plan its amount.
  */
 export type ProcessorPrice = {
   priceId: string;
   amount: number | null;
-  currency: string;
   interval: BillingInterval | null;
   active: boolean;
   /** Billed by usage rather than a fixed amount. */
@@ -146,29 +144,22 @@ export type CancelReason =
   | 'canceled_by_admin'
   | 'refunded'
   | 'payment_failed'
-  // Its payment failed, but cancelling it in the processor failed too.
-  | 'payment_failed_error'
   | 'payment_disputed'
   | 'duplicate' // a second subscription bought alongside the first
-  // A duplicate not yet cancelled in the processor, or its payment not yet
-  // refunded: the attempt failed.
-  | 'duplicate_error'
   | 'canceled_in_processor' // cancelled in the payment processor itself
   | 'paused_in_processor'; // paused there, which resuming undoes
 /** Whether a subscription was a duplicate: canceled at once, its payments
  *  refunded in full. */
 export const isDuplicate = (reason: CancelReason | null | undefined) =>
-  reason === 'duplicate' || reason === 'duplicate_error';
+  reason === 'duplicate';
 
 export const CANCEL_REASON_LABELS: Record<CancelReason, string> = {
   canceled_by_customer: 'Canceled by customer',
   canceled_by_admin: 'Canceled by admin',
   refunded: 'Refunded',
   payment_failed: 'Payment failed',
-  payment_failed_error: 'Payment failed, not canceled in processor',
   payment_disputed: 'Payment disputed',
   duplicate: 'Duplicate subscription',
-  duplicate_error: 'Duplicate subscription, not resolved',
   canceled_in_processor: 'Canceled in payment processor',
   paused_in_processor: 'Paused in payment processor'
 };
@@ -247,10 +238,11 @@ export const REFUND_REQUEST_STATUS_LABELS: Record<RefundRequestStatus, string> =
 /** A payment money can still go back from. */
 export const REFUNDABLE_STATUSES: ReadonlyArray<PaymentStatus> = ['paid'];
 
-/** Dollars in cents, and back: refunds are counted in whole cents. */
-export const toCents = (dollars: number | string) =>
-  Math.round(Number(dollars) * 100);
-export const toDollars = (cents: number) => cents / 100;
+/** An amount in the processors' integer units (1050), and back (10.50):
+ *  amounts are counted in whole units. */
+export const toMinor = (amount: number | string) =>
+  Math.round(Number(amount) * 100);
+export const toAmount = (minor: number) => minor / 100;
 
 /**
  * What a refund keeps back of a payment (setting `refunds.fee`): `auto`, the
@@ -283,7 +275,7 @@ export function refundFeeOf(value: string | null): number | null {
 }
 
 /**
- * The share of a payment a refund returns, in cents, before what has gone
+ * The share of a payment a refund returns, in whole units, before what has gone
  * back already.
  *
  * With a `refundFee` percentage, what is left of it. Without one — `auto` —
@@ -295,7 +287,7 @@ export function refundFeeOf(value: string | null): number | null {
  * tax) / paid`; the two are equal at `paid × (paid - tax - fee) / (paid -
  * tax)`. With no tax in the processor's hands, that is `paid - fee`.
  */
-export function refundShareCents(
+export function refundShareMinor(
   payment: {
     amount: number | string;
     fee: number | string | null;
@@ -303,18 +295,18 @@ export function refundShareCents(
   },
   refundFee: number | null
 ): number {
-  const paid = toCents(payment.amount);
+  const paid = toMinor(payment.amount);
   if (refundFee != null) return Math.floor((paid * (100 - refundFee)) / 100);
   if (payment.fee == null) return paid;
-  const beforeTax = paid - toCents(payment.tax ?? 0);
+  const beforeTax = paid - toMinor(payment.tax ?? 0);
   if (beforeTax <= 0) return paid;
-  const kept = beforeTax - toCents(payment.fee);
+  const kept = beforeTax - toMinor(payment.fee);
   return Math.max(0, Math.floor((paid * kept) / beforeTax));
 }
 
-/** What is left to refund of a payment under the refund fee, in cents: its
+/** What is left to refund of a payment under the refund fee, in whole units: its
  *  share less what has gone back already. Never below nothing. */
-export function refundLeftCents(
+export function refundLeftMinor(
   payment: {
     amount: number | string;
     refundAmount: number | string;
@@ -325,7 +317,7 @@ export function refundLeftCents(
 ): number {
   return Math.max(
     0,
-    refundShareCents(payment, refundFee) - toCents(payment.refundAmount)
+    refundShareMinor(payment, refundFee) - toMinor(payment.refundAmount)
   );
 }
 
@@ -368,6 +360,31 @@ export function refundRequestsOf(value: string | null): number | null {
   return value && refundRequestsSchema.safeParse(value).success
     ? Number(value)
     : null;
+}
+
+/**
+ * How many days past its expiry a subscription goes on when its renewal's
+ * payment has failed (setting `subscriptions.graceDays`): from 0 to 7, 3
+ * when unset. The processor retries the payment meanwhile; still unpaid
+ * past these days, the subscription is canceled — however long the
+ * processor would have gone on retrying.
+ */
+export const GRACE_DAYS_MAX = 7;
+export const GRACE_DAYS_DEFAULT = 3;
+export const GRACE_DAYS_CHOICES = Array.from(
+  { length: GRACE_DAYS_MAX + 1 },
+  (_, i) => String(i)
+);
+export const graceDaysSchema = z
+  .string()
+  .refine(v => GRACE_DAYS_CHOICES.includes(v), 'From 0 to 7 days.');
+
+/** The days a `subscriptions.graceDays` value names; the default when unset
+ *  or unknown. */
+export function graceDaysOf(value: string | null): number {
+  return value && graceDaysSchema.safeParse(value).success
+    ? Number(value)
+    : GRACE_DAYS_DEFAULT;
 }
 
 export const paymentIdSchema = z.object({ id: z.string().min(1) });

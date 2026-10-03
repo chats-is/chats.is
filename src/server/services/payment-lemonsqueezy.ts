@@ -2,11 +2,14 @@ import '@tanstack/react-start/server-only';
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { type PaymentKind, type ProcessorPrice } from '@/types/payment';
+import {
+  toAmount,
+  type PaymentKind,
+  type ProcessorPrice
+} from '@/types/payment';
 import { type env as Env } from '@/lib/env';
 import { PublicError } from '@/server/public-error';
 import {
-  toMajorUnits,
   WebhookSignatureError,
   type PaymentMethod,
   type PaymentProcessor,
@@ -19,7 +22,7 @@ import {
  * Lemon Squeezy, as a payment processor.
  *
  * A plan's price is a variant, named by its ID; what it charges is the
- * variant's price model, in the store's currency. Checkout is a checkout
+ * variant's price model. Checkout is a checkout
  * link made for the user, which carries the user and plan as custom data —
  * and only the webhooks repeat it, since a subscription does not keep it.
  *
@@ -152,7 +155,6 @@ type LemonInvoice = Resource<{
   total: number;
   /** The tax in the total, collected by Lemon Squeezy as the merchant. */
   tax: number;
-  currency: string;
   refunded: boolean;
   refunded_amount: number;
   created_at: string;
@@ -172,8 +174,8 @@ const kindOf = (reason: string): PaymentKind =>
 /**
  * Lemon Squeezy's status in the app's words. Its `cancelled` runs until
  * `ends_at` — the app's `active`, set to stop — and is over after, as its
- * `expired` is. Past due and unpaid are a failed payment, which cancels a
- * subscription at once.
+ * `expired` is. Past due, a renewal failed and is being retried: still
+ * `active`, its payment failed. Unpaid, the retries are used up: over.
  */
 function statusOf(
   sub: LemonSubscription['attributes']
@@ -205,9 +207,16 @@ function statusOf(
         paused: true
       };
     case 'past_due':
+      return {
+        status: 'active',
+        cancelAtPeriodEnd: false,
+        paymentFailed: true
+      };
+    // Retries used up and the subscription left standing, unpaid: still
+    // there, still not paid for. Its failed payments say what becomes of it.
     case 'unpaid':
       return {
-        status: 'canceled',
+        status: 'active',
         cancelAtPeriodEnd: false,
         paymentFailed: true
       };
@@ -252,31 +261,75 @@ type LemonEvent = {
 const textOf = (value: unknown) =>
   typeof value === 'string' && value ? value : null;
 
+/** An invoice as a payment, as it comes in a webhook or is read. The user
+ *  and plan come from the checkout's custom data, which only the webhook
+ *  repeats. */
+function toPayment(
+  invoice: LemonInvoice,
+  custom?: Record<string, unknown> | null
+): ProcessorPayment | null {
+  const a = invoice.attributes;
+  // Nothing to pay — a trial's first invoice — is not a payment.
+  if (!a.total) return null;
+  return {
+    externalId: invoice.id,
+    customerId: String(a.customer_id),
+    externalSubscriptionId: String(a.subscription_id),
+    userId: textOf(custom?.user_id),
+    planId: textOf(custom?.plan_id),
+    priceId: null,
+    periodEnd: null,
+    // Refunds name the invoice itself.
+    transactionId: invoice.id,
+    amount: toAmount(a.total),
+    kind: kindOf(a.billing_reason),
+    // Lemon Squeezy does not say its fee on an invoice.
+    fee: null,
+    tax: toAmount(a.tax ?? 0),
+    paid: ['paid', 'refunded', 'partial_refund'].includes(a.status),
+    invoiceUrl: a.urls.invoice_url,
+    billedAt: dateOf(a.created_at) ?? new Date()
+  };
+}
+
+/** What a webhook says: the object it carries, as it is, and when. */
 function actionOf(event: LemonEvent): WebhookAction {
   const name = event.meta.event_name;
   const { data } = event;
+  const custom = event.meta.custom_data;
   switch (name) {
     case 'subscription_payment_success':
     case 'subscription_payment_recovered':
-    case 'subscription_payment_failed':
-      return { kind: 'payment', externalId: data.id };
-    case 'subscription_payment_refunded':
+    case 'subscription_payment_failed': {
+      const payment = toPayment(data as LemonInvoice, custom);
+      return payment ? { kind: 'payment', payment } : { kind: 'ignore' };
+    }
+    case 'subscription_payment_refunded': {
+      // Lemon Squeezy has no refund of its own to name: the invoice says
+      // how much of it has gone back in all.
+      const total = toAmount(Number(data.attributes.refunded_amount ?? 0));
       return {
         kind: 'refund',
         transactionId: data.id,
-        refundAmount: toMajorUnits(
-          Number(data.attributes.refunded_amount ?? 0),
-          data.attributes.currency ?? 'USD'
-        )
+        refund: {
+          externalId: data.id,
+          amount: total,
+          total,
+          status: 'succeeded'
+        },
+        userId: textOf(custom?.user_id),
+        planId: textOf(custom?.plan_id)
       };
+    }
     default:
       if (name.startsWith('subscription_')) {
         return {
           kind: 'subscription',
-          externalId: data.id,
-          hints: {
-            userId: textOf(event.meta.custom_data?.user_id),
-            planId: textOf(event.meta.custom_data?.plan_id)
+          subscription: {
+            ...toSubscription(data as LemonSubscription),
+            // Only the webhook carries the checkout's custom data.
+            userId: textOf(custom?.user_id),
+            planId: textOf(custom?.plan_id)
           }
         };
       }
@@ -309,7 +362,7 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
         }
         throw err;
       }
-      const [price, store, product] = await Promise.all([
+      const [price, product] = await Promise.all([
         lemon<
           Resource<{
             category: string;
@@ -319,21 +372,15 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
             usage_aggregation: string | null;
           }>
         >('GET', `/variants/${variantId}/price-model`),
-        lemon<Resource<{ currency: string }>>(
-          'GET',
-          `/stores/${await requireStoreId()}`
-        ),
         lemon<Resource<{ status: string }>>(
           'GET',
           `/products/${variant.attributes.product_id}`
         )
       ]);
-      const currency = store.attributes.currency;
       const recurring = price.attributes.category === 'subscription';
       return {
         priceId: variant.id,
-        amount: toMajorUnits(price.attributes.unit_price, currency),
-        currency: currency.toLowerCase(),
+        amount: toAmount(price.attributes.unit_price),
         interval: recurring
           ? intervalOf(
               price.attributes.renewal_interval_unit,
@@ -438,8 +485,9 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
     },
 
     async refundPayment(payment, refund) {
-      // Lemon Squeezy answers with the invoice, not a refund of its own.
-      await lemon(
+      // Lemon Squeezy has no refund object: it refunds the invoice and
+      // answers with it, so the invoice's id names the refund.
+      const invoice = await lemon<LemonInvoice>(
         'POST',
         `/subscription-invoices/${payment.externalId}/refund`,
         {
@@ -447,10 +495,11 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
             type: 'subscription-invoices',
             id: payment.externalId,
             // No amount: whatever of the invoice is left.
-            attributes: refund.whole ? {} : { amount: refund.cents }
+            attributes: refund.whole ? {} : { amount: refund.minor }
           }
         }
       );
+      return { externalId: invoice.id };
     },
 
     async dashboardUrl(externalId) {
@@ -466,36 +515,16 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
       );
       const a = invoice.attributes;
       return {
-        refunded: toMajorUnits(a.refunded_amount ?? 0, a.currency),
+        refunded: toAmount(a.refunded_amount ?? 0),
         refundPending: false,
         dispute: 'none'
       };
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {
-      const invoice = await lemon<LemonInvoice>(
-        'GET',
-        `/subscription-invoices/${externalId}`
+      return toPayment(
+        await lemon<LemonInvoice>('GET', `/subscription-invoices/${externalId}`)
       );
-      const a = invoice.attributes;
-      // Nothing to pay — a trial's first invoice — is not a payment.
-      if (!a.total) return null;
-      return {
-        externalId: invoice.id,
-        customerId: String(a.customer_id),
-        subscriptionExternalId: String(a.subscription_id),
-        // Refunds name the invoice itself.
-        transactionId: invoice.id,
-        amount: toMajorUnits(a.total, a.currency),
-        kind: kindOf(a.billing_reason),
-        // Lemon Squeezy does not say its fee on an invoice.
-        fee: null,
-        tax: toMajorUnits(a.tax ?? 0, a.currency),
-        currency: a.currency.toLowerCase(),
-        paid: ['paid', 'refunded', 'partial_refund'].includes(a.status),
-        invoiceUrl: a.urls.invoice_url,
-        billedAt: dateOf(a.created_at) ?? new Date()
-      };
     },
 
     async parseWebhook(payload, headers) {

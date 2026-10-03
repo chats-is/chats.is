@@ -29,6 +29,8 @@ import { toast } from 'sonner';
 
 import { type ModelStatus } from '@/types/model';
 import {
+  GRACE_DAYS_CHOICES,
+  GRACE_DAYS_DEFAULT,
   REFUND_DAYS_CHOICES,
   REFUND_DAYS_DEFAULT,
   REFUND_FEE_DEFAULT,
@@ -187,6 +189,11 @@ const WEB_SEARCH_MODES = [
   { value: 'model', label: 'Model' }
 ];
 
+const GRACE_DAYS_OPTIONS = GRACE_DAYS_CHOICES.map(n => ({
+  value: n,
+  label: n === '1' ? '1 day' : `${n} days`
+}));
+
 const REFUND_DAYS_OPTIONS = REFUND_DAYS_CHOICES.map(n => ({
   value: n,
   label: n === '1' ? '1 day' : `${n} days`
@@ -212,6 +219,7 @@ const KEYS = [
   'chat.systemPrompt',
   'speech.enabled',
   'subscriptions.enabled',
+  'subscriptions.graceDays',
   'refunds.enabled',
   'refunds.fee',
   'refunds.days',
@@ -573,6 +581,19 @@ function SubscriptionSettings({ form }: { form: SettingsFormApi }) {
         </form.Field>
       </SettingsRow>
       <SettingsRow
+        icon={CalendarClock}
+        label="Subscription Grace Period"
+        htmlFor="subscriptions.graceDays"
+        hint="How many days past its expiry a subscription goes on when its renewal payment has failed, while the payment processor retries it. Still unpaid after that, the subscription is canceled, here and in the payment processor."
+        settingKey="subscriptions.graceDays"
+      >
+        <form.AppField name="subscriptions.graceDays">
+          {field => (
+            <field.SelectField options={GRACE_DAYS_OPTIONS} className="w-28" />
+          )}
+        </form.AppField>
+      </SettingsRow>
+      <SettingsRow
         icon={Tickets}
         label="Enable Refunds"
         htmlFor="refunds.enabled"
@@ -906,6 +927,7 @@ function valuesOf(
   // A switch needs a side even before anyone has picked one.
   flat['speech.enabled'] ||= 'false';
   flat['subscriptions.enabled'] ||= 'false';
+  flat['subscriptions.graceDays'] ||= String(GRACE_DAYS_DEFAULT);
   flat['refunds.enabled'] ||= 'false';
   flat['refunds.fee'] ||= REFUND_FEE_DEFAULT;
   flat['refunds.days'] ||= String(REFUND_DAYS_DEFAULT);

@@ -171,7 +171,7 @@ const fmtAmount = (v: string | null): string => {
   return n.toFixed(2);
 };
 
-/** The 5-hour limit a form's values imply, in dollars. */
+/** The 5-hour limit a form's values imply. */
 const fiveHourOf = (
   value: Pick<QuotaForm, 'role' | 'sevenDay' | 'fiveHour'>
 ) =>

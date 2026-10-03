@@ -52,7 +52,7 @@ type Row = Awaited<ReturnType<typeof listPayments>>['rows'][number];
 
 const helper = createAppColumnHelper<Row>();
 
-/** A dollar amount, or a dash where the processor did not say. */
+/** An amount, or a dash where the processor did not say. */
 const moneyOrDash = (value: string | null) =>
   value == null ? (
     <span className="text-muted-foreground">—</span>

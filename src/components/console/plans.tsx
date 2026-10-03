@@ -76,7 +76,7 @@ type EditablePlan = NonNullable<Awaited<ReturnType<typeof getPlan>>>;
 /** The select's value for a plan on no tier: the cost price, every model. */
 const NO_TIER = '__none__';
 
-/** A price as typed: dollars, to the cent at most. */
+/** A price as typed: to two decimals at most. */
 const PRICE_PATTERN = /^\d+(\.\d{1,2})?$/;
 
 const planSchema = z
@@ -102,7 +102,7 @@ const planSchema = z
         ctx.addIssue({
           code: 'custom',
           path: [`${name}Price`],
-          message: 'A price in dollars, like 10 or 9.99'
+          message: 'A price like 10 or 9.99'
         });
       }
       if (!form[`${name}PriceId`].trim()) {
@@ -659,7 +659,7 @@ export default function PlansPage() {
                           >
                             {field => (
                               <field.TextField
-                                label={`${monthly ? 'Monthly' : 'Yearly'} price (USD)`}
+                                label={`${monthly ? 'Monthly' : 'Yearly'} price`}
                                 prefix="$"
                                 inputMode="decimal"
                                 placeholder={monthly ? '10.00' : '100.00'}

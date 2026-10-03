@@ -2,11 +2,14 @@ import '@tanstack/react-start/server-only';
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { type PaymentKind, type ProcessorPrice } from '@/types/payment';
+import {
+  toAmount,
+  type PaymentKind,
+  type ProcessorPrice
+} from '@/types/payment';
 import { type env as Env } from '@/lib/env';
 import { PublicError } from '@/server/public-error';
 import {
-  toMajorUnits,
   WebhookSignatureError,
   type PaymentMethod,
   type PaymentProcessor,
@@ -165,8 +168,15 @@ type PaddleTransaction = {
   origin: string;
   details: {
     totals: { grand_total: string; tax?: string; fee?: string | null };
-    line_items: Array<{ id: string; totals: { total: string } }>;
+    line_items: Array<{
+      id: string;
+      price?: { id: string } | null;
+      totals: { total: string };
+    }>;
   } | null;
+  items?: Array<{ price: { id: string } }>;
+  /** The period it pays for. */
+  billing_period?: { starts_at: string; ends_at: string } | null;
   billed_at: string | null;
   created_at: string;
   checkout: { url: string | null } | null;
@@ -212,14 +222,14 @@ type PaddleAdjustment = {
 };
 
 /**
- * Where a partial refund of `cents` goes in a transaction: Paddle refunds by
+ * Where a partial refund of `minor` goes in a transaction: Paddle refunds by
  * line item, each up to what is left of it. Only the lines that charged —
  * an upgrade's transaction also carries a line crediting the old plan.
  */
 function refundItems(
   lines: Array<{ id: string; totals: { total: string } }>,
   earlier: PaddleAdjustment[],
-  cents: number
+  minor: number
 ): Array<{ item_id: string; type: 'partial'; amount: string }> {
   const taken = new Map<string, number>();
   for (const adj of earlier) {
@@ -234,7 +244,7 @@ function refundItems(
     }
   }
   const items: Array<{ item_id: string; type: 'partial'; amount: string }> = [];
-  let left = cents;
+  let left = minor;
   for (const line of lines) {
     if (left <= 0) break;
     const room = Number(line.totals.total) - (taken.get(line.id) ?? 0);
@@ -263,8 +273,9 @@ const textOf = (value: unknown) =>
 
 /**
  * Paddle's status in the app's words. With a cancellation scheduled for the
- * end of the period, a subscription is still `active`. Past due is a failed
- * payment, which cancels a subscription at once.
+ * end of the period, a subscription is still `active`. Past due, a renewal
+ * failed and Paddle is retrying it: still `active`, its payment failed —
+ * Paddle cancels it itself when the retries are used up.
  */
 function statusOf(
   sub: PaddleSubscription
@@ -289,8 +300,8 @@ function statusOf(
       };
     case 'past_due':
       return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
+        status: 'active',
+        cancelAtPeriodEnd: sub.scheduled_change?.action === 'cancel',
         paymentFailed: true
       };
     default:
@@ -343,37 +354,73 @@ type PaddleEvent = {
   data: Record<string, any>;
 };
 
+/** A transaction as a payment, as it comes in a webhook or is read. */
+function toPayment(txn: PaddleTransaction): ProcessorPayment | null {
+  const total = Number(txn.details?.totals.grand_total ?? 0);
+  // Nothing to pay — a trial's first transaction — is not a payment.
+  if (total === 0) return null;
+  return {
+    externalId: txn.id,
+    customerId: txn.customer_id,
+    externalSubscriptionId: txn.subscription_id,
+    userId: textOf(txn.custom_data?.userId),
+    planId: textOf(txn.custom_data?.planId),
+    priceId:
+      txn.items?.[0]?.price.id ??
+      txn.details?.line_items?.[0]?.price?.id ??
+      null,
+    periodEnd: dateOf(txn.billing_period?.ends_at),
+    // Refunds and chargebacks name the transaction itself.
+    transactionId: txn.id,
+    amount: toAmount(total),
+    kind: kindOf(txn.origin),
+    fee:
+      txn.details?.totals.fee != null
+        ? toAmount(Number(txn.details.totals.fee))
+        : null,
+    // Paddle sells as the merchant: it collects the tax and returns it with
+    // a refund.
+    tax: toAmount(Number(txn.details?.totals.tax ?? 0)),
+    paid: txn.status === 'completed' || txn.status === 'paid',
+    invoiceUrl: null,
+    billedAt: dateOf(txn.billed_at) ?? dateOf(txn.created_at) ?? new Date()
+  };
+}
+
+/** What a webhook says: the object it carries, as it is, and when. */
 function actionOf(event: PaddleEvent): WebhookAction {
   const { event_type: type, data } = event;
   if (type.startsWith('subscription.')) {
     return {
       kind: 'subscription',
-      externalId: data.id,
-      hints: {
-        userId: textOf(data.custom_data?.userId),
-        planId: textOf(data.custom_data?.planId)
-      }
+      subscription: toSubscription(data as PaddleSubscription)
     };
   }
   if (
     type === 'transaction.completed' ||
     type === 'transaction.payment_failed'
   ) {
-    return { kind: 'payment', externalId: data.id };
+    const payment = toPayment(data as PaddleTransaction);
+    return payment ? { kind: 'payment', payment } : { kind: 'ignore' };
   }
   if (type === 'adjustment.created' || type === 'adjustment.updated') {
-    if (data.action === 'refund' && data.status === 'approved') {
+    if (data.action === 'refund') {
+      const status =
+        data.status === 'approved'
+          ? 'succeeded'
+          : data.status === 'pending_approval'
+            ? 'pending'
+            : 'failed';
       return {
         kind: 'refund',
         transactionId: data.transaction_id,
-        refundAmount: toMajorUnits(
-          Number(data.totals?.total ?? 0),
-          data.currency_code ?? 'USD'
-        )
+        refund: {
+          externalId: data.id,
+          amount: toAmount(Number(data.totals?.total ?? 0)),
+          total: null,
+          status
+        }
       };
-    }
-    if (data.action === 'refund' && data.status === 'rejected') {
-      return { kind: 'refund_failed', transactionId: data.transaction_id };
     }
     // A chargeback, or Paddle's own refund to head one off: the money has
     // left either way.
@@ -408,22 +455,6 @@ async function refundsOf(transactionId: string) {
   );
 }
 
-/** A refund as all of the transaction's approved refunds come to. */
-async function refundSoFar(
-  action: Extract<WebhookAction, { kind: 'refund' }>
-): Promise<WebhookAction> {
-  const [txn, refunds] = await Promise.all([
-    paddle<PaddleTransaction>('GET', `/transactions/${action.transactionId}`),
-    refundsOf(action.transactionId)
-  ]);
-  const approved = refunds.filter(r => r.status === 'approved');
-  const cents = approved.reduce((sum, r) => sum + Number(r.totals.total), 0);
-  return {
-    ...action,
-    refundAmount: toMajorUnits(cents, txn.currency_code)
-  };
-}
-
 export function createPaddleProcessor(): PaymentProcessor {
   const getSubscription = async (id: string) =>
     await paddle<PaddleSubscription>('GET', `/subscriptions/${id}`);
@@ -443,11 +474,7 @@ export function createPaddleProcessor(): PaymentProcessor {
       }
       return {
         priceId: price.id,
-        amount: toMajorUnits(
-          Number(price.unit_price.amount),
-          price.unit_price.currency_code
-        ),
-        currency: price.unit_price.currency_code.toLowerCase(),
+        amount: toAmount(Number(price.unit_price.amount)),
         interval: intervalOf(price.billing_cycle),
         active: price.status === 'active',
         metered: false,
@@ -531,9 +558,7 @@ export function createPaddleProcessor(): PaymentProcessor {
         proration_billing_mode: 'prorated_immediately'
       });
       const totals = preview.immediate_transaction?.details?.totals;
-      return totals
-        ? toMajorUnits(Number(totals.grand_total), totals.currency_code)
-        : null;
+      return totals ? toAmount(Number(totals.grand_total)) : null;
     },
 
     async changeNow(externalId, target) {
@@ -601,25 +626,26 @@ export function createPaddleProcessor(): PaymentProcessor {
     async refundPayment(payment, refund) {
       const reason = 'Refund requested.';
       if (refund.whole) {
-        await paddle('POST', '/adjustments', {
+        const made = await paddle<PaddleAdjustment>('POST', '/adjustments', {
           action: 'refund',
           transaction_id: payment.externalId,
           reason,
           type: 'full'
         });
-        return;
+        return { externalId: made.id };
       }
       const [txn, earlier] = await Promise.all([
         paddle<PaddleTransaction>('GET', `/transactions/${payment.externalId}`),
         refundsOf(payment.externalId)
       ]);
-      await paddle('POST', '/adjustments', {
+      const made = await paddle<PaddleAdjustment>('POST', '/adjustments', {
         action: 'refund',
         transaction_id: payment.externalId,
         reason,
         type: 'partial',
-        items: refundItems(txn.details?.line_items ?? [], earlier, refund.cents)
+        items: refundItems(txn.details?.line_items ?? [], earlier, refund.minor)
       });
+      return { externalId: made.id };
     },
 
     async dashboardUrl(externalId) {
@@ -633,15 +659,12 @@ export function createPaddleProcessor(): PaymentProcessor {
     async getPaymentState(payment) {
       // Everything Paddle has done to the transaction since: its refunds,
       // and its chargebacks and their reversals.
-      const [txn, adjustments] = await Promise.all([
-        paddle<PaddleTransaction>('GET', `/transactions/${payment.externalId}`),
-        paddle<PaddleAdjustment[]>(
-          'GET',
-          `/adjustments?transaction_id=${payment.externalId}&per_page=50`
-        )
-      ]);
+      const adjustments = await paddle<PaddleAdjustment[]>(
+        'GET',
+        `/adjustments?transaction_id=${payment.externalId}&per_page=50`
+      );
       const refunds = adjustments.filter(a => a.action === 'refund');
-      const cents = refunds
+      const minor = refunds
         .filter(r => r.status === 'approved')
         .reduce((sum, r) => sum + Number(r.totals.total), 0);
       const made = (...actions: string[]) =>
@@ -649,7 +672,7 @@ export function createPaddleProcessor(): PaymentProcessor {
           a => actions.includes(a.action) && a.status !== 'rejected'
         );
       return {
-        refunded: toMajorUnits(cents, txn.currency_code),
+        refunded: toAmount(minor),
         refundPending: refunds.some(r => r.status === 'pending_approval'),
         dispute: made('chargeback_reverse', 'chargeback_warning_reverse')
           ? 'won'
@@ -660,36 +683,9 @@ export function createPaddleProcessor(): PaymentProcessor {
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {
-      const txn = await paddle<PaddleTransaction>(
-        'GET',
-        `/transactions/${externalId}`
+      return toPayment(
+        await paddle<PaddleTransaction>('GET', `/transactions/${externalId}`)
       );
-      const total = Number(txn.details?.totals.grand_total ?? 0);
-      // Nothing to pay — a trial's first transaction — is not a payment.
-      if (total === 0) return null;
-      return {
-        externalId: txn.id,
-        customerId: txn.customer_id,
-        subscriptionExternalId: txn.subscription_id,
-        // Refunds and chargebacks name the transaction itself.
-        transactionId: txn.id,
-        amount: toMajorUnits(total, txn.currency_code),
-        kind: kindOf(txn.origin),
-        fee:
-          txn.details?.totals.fee != null
-            ? toMajorUnits(Number(txn.details.totals.fee), txn.currency_code)
-            : null,
-        // Paddle sells as the merchant: it collects the tax and returns it
-        // with a refund.
-        tax: toMajorUnits(
-          Number(txn.details?.totals.tax ?? 0),
-          txn.currency_code
-        ),
-        currency: txn.currency_code.toLowerCase(),
-        paid: txn.status === 'completed' || txn.status === 'paid',
-        invoiceUrl: null,
-        billedAt: dateOf(txn.billed_at) ?? dateOf(txn.created_at) ?? new Date()
-      };
     },
 
     async invoiceUrl(externalId) {
@@ -710,11 +706,11 @@ export function createPaddleProcessor(): PaymentProcessor {
       if (!signature) throw new WebhookSignatureError('No Paddle signature.');
       verifySignature(payload, signature, webhookSecret);
       const event = JSON.parse(payload) as PaddleEvent;
-      let action = actionOf(event);
-      // An adjustment says only its own amount; the payment's record is of
-      // all refunded so far.
-      if (action.kind === 'refund') action = await refundSoFar(action);
-      return { id: event.event_id, type: event.event_type, action };
+      return {
+        id: event.event_id,
+        type: event.event_type,
+        action: actionOf(event)
+      };
     }
   };
 }

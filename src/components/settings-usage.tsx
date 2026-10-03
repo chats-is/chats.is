@@ -81,7 +81,7 @@ export function SettingsUsage() {
 /**
  * One window of the user's quota, as a row: what it is and when it resets
  * above, how much of it is left below. Shows ONLY the share remaining and
- * the reset time — never the dollar limit or the amount used behind them.
+ * the reset time — never the limit or the amount used behind them.
  */
 function QuotaWindowRow({
   label,

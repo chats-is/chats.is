@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  graceDaysSchema,
   refundDaysSchema,
   refundFeeSchema,
   refundRequestsSchema
@@ -27,6 +28,7 @@ export const settingKeySchema = z.object({ key: z.string().min(1) });
  * be. An empty value is always allowed: the setting's default.
  */
 export const SETTING_VALUE_SCHEMAS: Record<string, z.ZodType> = {
+  'subscriptions.graceDays': graceDaysSchema,
   'refunds.fee': refundFeeSchema,
   'refunds.days': refundDaysSchema,
   'refunds.maxRequests': refundRequestsSchema

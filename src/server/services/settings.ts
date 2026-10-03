@@ -4,7 +4,12 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { type Model } from '@/types';
-import { refundDaysOf, refundFeeOf, refundRequestsOf } from '@/types/payment';
+import {
+  graceDaysOf,
+  refundDaysOf,
+  refundFeeOf,
+  refundRequestsOf
+} from '@/types/payment';
 import { SETTING_VALUE_SCHEMAS, type settingSchema } from '@/types/settings';
 import {
   DEFAULT_APP_DESCRIPTION,
@@ -89,6 +94,19 @@ export const getSubscriptionsEnabled = perRequest(
   async (): Promise<boolean> => {
     const values = await getSettings(['subscriptions.enabled']);
     return values['subscriptions.enabled'] === 'true';
+  }
+);
+
+/**
+ * How many days past its expiry a subscription goes on, its renewal's
+ * payment having failed, before it is canceled (setting
+ * `subscriptions.graceDays`), the same whichever processor is retrying it.
+ */
+export const getSubscriptionGraceDays = perRequest(
+  'getSubscriptionGraceDays',
+  async (): Promise<number> => {
+    const values = await getSettings(['subscriptions.graceDays']);
+    return graceDaysOf(values['subscriptions.graceDays']);
   }
 );
 

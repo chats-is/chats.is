@@ -42,6 +42,7 @@ import { useCloseSettings } from '@/components/settings-dialog';
  * while they are.
  *
  * - Renewing: upgrade, change how they pay, cancel, request a refund.
+ * - A renewal's payment failed: told so; change how they pay.
  * - Set to cancel: resubscribe, upgrade, change how they pay, request a
  *   refund — unless an admin, a refund or a dispute set it to cancel, which
  *   the user cannot undo.
@@ -91,7 +92,9 @@ export function SettingsBilling() {
   const cancel = useMutation(
     action(
       () => cancelSubscription(),
-      'Canceled. Your plan stays until the end of what you paid for.'
+      sub?.paymentFailed
+        ? 'Canceled.'
+        : 'Canceled. Your plan stays until the end of what you paid for.'
     )
   );
   const again = useMutation(
@@ -198,6 +201,14 @@ export function SettingsBilling() {
               )}
             </div>
           </div>
+
+          {/* A renewal that could not be paid. */}
+          {sub.paymentFailed && (
+            <p className="text-sm text-destructive">
+              Your payment failed. Update your payment method to keep your
+              subscription.
+            </p>
+          )}
         </section>
       ) : (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
@@ -302,6 +313,7 @@ export function SettingsBilling() {
           onOpenChange={setConfirmCancel}
           planName={sub.planName}
           expiresAt={sub.expiresAt}
+          now={sub.paymentFailed}
           onConfirm={() => cancel.mutate()}
         />
       )}

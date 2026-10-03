@@ -3,13 +3,13 @@ import '@tanstack/react-start/server-only';
 import Stripe from 'stripe';
 
 import {
+  toAmount,
   type BillingInterval,
   type PaymentKind,
   type ProcessorPrice
 } from '@/types/payment';
 import { PublicError } from '@/server/public-error';
 import {
-  toMajorUnits,
   WebhookSignatureError,
   type PaymentMethod,
   type PaymentProcessor,
@@ -61,8 +61,9 @@ const intervalOf = (
 
 /**
  * Stripe's status in the app's words. Set to stop at the end of the period,
- * a subscription is still `active`. Past due and unpaid are a failed
- * payment, which cancels a subscription at once.
+ * a subscription is still `active`. Past due, a renewal failed and Stripe
+ * is retrying it: still `active`, its payment failed. Unpaid, the retries
+ * are used up: over.
  */
 function statusOf(
   sub: Stripe.Subscription
@@ -92,10 +93,17 @@ function statusOf(
         paused: true
       };
     case 'past_due':
+      return {
+        status: 'active',
+        cancelAtPeriodEnd: sub.cancel_at_period_end || !!sub.cancel_at,
+        paymentFailed: true
+      };
+    // Retries used up and the subscription left standing, unpaid: still
+    // there, still not paid for. Its failed payments say what becomes of it.
     case 'unpaid':
       return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
+        status: 'active',
+        cancelAtPeriodEnd: sub.cancel_at_period_end || !!sub.cancel_at,
         paymentFailed: true
       };
     default:
@@ -133,10 +141,42 @@ function transactionIdOf(invoice: Stripe.Invoice): string | null {
   return idOf(payment?.payment_intent) ?? idOf(payment?.charge) ?? null;
 }
 
+/** An invoice as a payment, as it comes in a webhook or is read. The fee
+ *  is read apart, when a refund needs it. */
+function toPayment(invoice: Stripe.Invoice): ProcessorPayment | null {
+  const paid = invoice.status === 'paid';
+  const amount = paid ? invoice.amount_paid : invoice.amount_due;
+  // Nothing to pay — a trial's first invoice — is not a payment.
+  if (amount === 0) return null;
+  const line = invoice.lines?.data[0];
+  const details = invoice.parent?.subscription_details ?? null;
+  const metadata: Record<string, string> | null = details?.metadata ?? null;
+  return {
+    externalId: invoice.id,
+    customerId: idOf(invoice.customer),
+    externalSubscriptionId: idOf(details?.subscription),
+    userId: metadata?.userId || null,
+    planId: metadata?.planId || null,
+    priceId: idOf(line?.pricing?.price_details?.price) ?? null,
+    periodEnd: dateOf(line?.period?.end),
+    transactionId: transactionIdOf(invoice),
+    amount: toAmount(amount),
+    kind: kindOf(invoice.billing_reason),
+    fee: null,
+    // Tax on a Stripe invoice is the seller's to hand back, not Stripe's.
+    tax: null,
+    paid,
+    invoiceUrl: invoice.hosted_invoice_url ?? null,
+    billedAt:
+      dateOf(invoice.status_transitions?.paid_at) ??
+      dateOf(invoice.created) ??
+      new Date()
+  };
+}
+
 /**
- * The fee Stripe kept on a charge, in dollars, from its balance
- * transaction. Null when it cannot be read or is not in dollars; a refund
- * then gives back all that was paid.
+ * The fee Stripe kept on a charge, from its balance transaction. Null when
+ * it cannot be read; a refund then gives back all that was paid.
  */
 async function feeOf(stripe: Stripe, ref: string | null) {
   if (!ref) return null;
@@ -152,8 +192,8 @@ async function feeOf(stripe: Stripe, ref: string | null) {
         });
     const txn =
       charge && typeof charge === 'object' ? charge.balance_transaction : null;
-    if (!txn || typeof txn !== 'object' || txn.currency !== 'usd') return null;
-    return toMajorUnits(txn.fee, txn.currency);
+    if (!txn || typeof txn !== 'object') return null;
+    return toAmount(txn.fee);
   } catch (err) {
     console.warn(`[stripe] no fee for ${ref}`, err);
     return null;
@@ -165,11 +205,6 @@ function kindOf(reason: Stripe.Invoice['billing_reason']): PaymentKind {
   if (reason === 'subscription_cycle') return 'renewal';
   if (reason === 'subscription_update') return 'upgrade';
   return 'initial';
-}
-
-/** The subscription an event's object belongs to, where it says. */
-function subscriptionOfInvoice(invoice: Stripe.Invoice): string | null {
-  return idOf(invoice.parent?.subscription_details?.subscription);
 }
 
 /**
@@ -184,38 +219,45 @@ function disputeOf(statuses: Array<string>): ProcessorPaymentState['dispute'] {
   return 'none';
 }
 
+/** What a webhook says: the object it carries, as it is, and when. */
 function actionOf(event: Stripe.Event): WebhookAction {
   switch (event.type) {
-    case 'checkout.session.completed': {
-      const session = event.data.object;
-      const id = idOf(session.subscription);
-      return session.mode === 'subscription' && id
-        ? { kind: 'subscription', externalId: id }
-        : { kind: 'ignore' };
-    }
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted':
     case 'customer.subscription.paused':
     case 'customer.subscription.resumed':
-      return { kind: 'subscription', externalId: event.data.object.id };
-    case 'invoice.paid':
-    case 'invoice.payment_failed':
-      return { kind: 'payment', externalId: event.data.object.id };
-    case 'charge.refunded': {
-      const charge = event.data.object;
       return {
-        kind: 'refund',
-        transactionId: idOf(charge.payment_intent) ?? charge.id,
-        refundAmount: toMajorUnits(charge.amount_refunded, charge.currency)
+        kind: 'subscription',
+        subscription: toSubscription(event.data.object)
       };
+    case 'invoice.paid':
+    case 'invoice.payment_failed': {
+      const payment = toPayment(event.data.object);
+      return payment ? { kind: 'payment', payment } : { kind: 'ignore' };
     }
-    case 'refund.failed': {
+    case 'refund.created':
+    case 'refund.updated': {
+      // The refund itself, by its id — the one `refunds.create` returned,
+      // or one made in the Dashboard.
       const refund = event.data.object;
       const ref = idOf(refund.payment_intent) ?? idOf(refund.charge);
-      return ref
-        ? { kind: 'refund_failed', transactionId: ref }
-        : { kind: 'ignore' };
+      if (!ref) return { kind: 'ignore' };
+      return {
+        kind: 'refund',
+        transactionId: ref,
+        refund: {
+          externalId: refund.id,
+          amount: toAmount(refund.amount),
+          total: null,
+          status:
+            refund.status === 'succeeded'
+              ? 'succeeded'
+              : refund.status === 'failed' || refund.status === 'canceled'
+                ? 'failed'
+                : 'pending'
+        }
+      };
     }
     case 'charge.dispute.created':
     case 'charge.dispute.funds_withdrawn': {
@@ -262,11 +304,7 @@ export function createStripeProcessor(): PaymentProcessor {
       }
       return {
         priceId: price.id,
-        amount:
-          price.unit_amount == null
-            ? null
-            : toMajorUnits(price.unit_amount, price.currency),
-        currency: price.currency,
+        amount: price.unit_amount == null ? null : toAmount(price.unit_amount),
         interval: intervalOf(price.recurring?.interval),
         active: price.active,
         metered: price.recurring?.usage_type === 'metered',
@@ -356,7 +394,7 @@ export function createStripeProcessor(): PaymentProcessor {
           proration_behavior: 'always_invoice'
         }
       });
-      return toMajorUnits(preview.amount_due, preview.currency);
+      return toAmount(preview.amount_due);
     },
 
     async changeNow(externalId, target) {
@@ -435,12 +473,13 @@ export function createStripeProcessor(): PaymentProcessor {
       if (!ref) {
         throw new PublicError('This payment has no transaction to refund.');
       }
-      await stripe.refunds.create({
+      const made = await stripe.refunds.create({
         ...(ref.startsWith('pi_') ? { payment_intent: ref } : { charge: ref }),
         // No amount: whatever of the charge is left.
-        ...(refund.whole ? {} : { amount: refund.cents }),
+        ...(refund.whole ? {} : { amount: refund.minor }),
         reason: 'requested_by_customer'
       });
+      return { externalId: made.id };
     },
 
     async dashboardUrl(externalId) {
@@ -471,7 +510,7 @@ export function createStripeProcessor(): PaymentProcessor {
         stripe.disputes.list({ charge: charge.id, limit: 100 })
       ]);
       return {
-        refunded: toMajorUnits(charge.amount_refunded, charge.currency),
+        refunded: toAmount(charge.amount_refunded),
         refundPending: refunds.data.some(
           r => r.status === 'pending' || r.status === 'requires_action'
         ),
@@ -484,28 +523,11 @@ export function createStripeProcessor(): PaymentProcessor {
       const invoice = await stripe.invoices.retrieve(externalId, {
         expand: ['payments']
       });
-      const paid = invoice.status === 'paid';
-      const amount = paid ? invoice.amount_paid : invoice.amount_due;
-      // Nothing to pay — a trial's first invoice — is not a payment.
-      if (amount === 0) return null;
-      const transactionId = transactionIdOf(invoice);
+      const payment = toPayment(invoice);
+      if (!payment) return null;
       return {
-        externalId: invoice.id,
-        customerId: idOf(invoice.customer),
-        subscriptionExternalId: subscriptionOfInvoice(invoice),
-        transactionId,
-        amount: toMajorUnits(amount, invoice.currency),
-        kind: kindOf(invoice.billing_reason),
-        fee: paid ? await feeOf(stripe, transactionId) : null,
-        // Tax on a Stripe invoice is the seller's to hand back, not Stripe's.
-        tax: null,
-        currency: invoice.currency,
-        paid,
-        invoiceUrl: invoice.hosted_invoice_url ?? null,
-        billedAt:
-          dateOf(invoice.status_transitions.paid_at) ??
-          dateOf(invoice.created) ??
-          new Date()
+        ...payment,
+        fee: payment.paid ? await feeOf(stripe, payment.transactionId) : null
       };
     },
 

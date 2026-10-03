@@ -828,6 +828,17 @@ export const payments = createTable(
     // which refunds and disputes name.
     externalId: varchar('external_id', { length: 255 }).notNull(),
     transactionId: varchar('transaction_id', { length: 255 }),
+    // The subscription in the processor, kept so a payment reported before
+    // its subscription is attached to it once that arrives.
+    externalSubscriptionId: varchar('external_subscription_id', {
+      length: 255
+    }),
+    // Up to when it pays for the subscription, where the processor says.
+    periodEnd: timestamp('period_end', { withTimezone: true }),
+    // The latest refund applied, as the processor names it — the one sent
+    // from here, or one made in the processor — so its later events, and a
+    // webhook sent twice, are known for what they are.
+    externalRefundId: varchar('external_refund_id', { length: 255 }),
     amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
     refundAmount: numeric('refund_amount', { precision: 12, scale: 2 })
       .notNull()

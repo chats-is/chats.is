@@ -176,7 +176,6 @@ export default function Subscriptions() {
       await queryClient.invalidateQueries({
         queryKey: subscriptionQueries.all()
       });
-      toast.success('Set to cancel at the end of what was paid for.');
     },
     onError: (e: Error) => toast.error(e.message)
   });
@@ -253,7 +252,21 @@ export default function Subscriptions() {
           planName={canceling.planName}
           expiresAt={canceling.expiresAt}
           byAdmin
-          onConfirm={() => cancel.mutate({ id: canceling.id })}
+          // A renewal unpaid: nothing paid for is left, so it ends now.
+          now={canceling.paymentFailed}
+          onConfirm={() =>
+            cancel.mutate(
+              { id: canceling.id },
+              {
+                onSuccess: () =>
+                  toast.success(
+                    canceling.paymentFailed
+                      ? 'Canceled.'
+                      : 'Set to cancel at the end of what was paid for.'
+                  )
+              }
+            )
+          }
         />
       )}
     </div>

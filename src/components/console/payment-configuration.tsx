@@ -42,8 +42,8 @@ const REQUIREMENTS: Record<PaymentProcessorId, Requirements> = {
       'customer.subscription.resumed',
       'invoice.paid',
       'invoice.payment_failed',
-      'charge.refunded',
-      'refund.failed',
+      'refund.created',
+      'refund.updated',
       'charge.dispute.created'
     ],
     permissions: [

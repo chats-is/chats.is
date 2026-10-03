@@ -17,7 +17,6 @@ import { db } from '@/db';
 import { quotas, usage, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { getDefaultQuotaId } from '@/server/services/settings';
-import { refreshIfExpired } from '@/server/services/subscription';
 
 type QuotaRow = typeof quotas.$inferSelect;
 
@@ -43,8 +42,6 @@ export const getUserResolvedQuota = perRequest(
     plan: { id: string; name: string } | null;
     source: ResolvedSource;
   }> => {
-    // The plan is the subscription's: one past its expiry is checked first.
-    await refreshIfExpired(userId);
     const userRow = await db.query.users.findFirst({
       where: eq(users.id, userId),
       with: {
@@ -152,7 +149,7 @@ async function getResolvedQuota(userId: string): Promise<{
 
 /**
  * The unified "user's quota" lookup used by both `quota.me` (user-facing)
- * and `quota.getByUser` (admin). Returns no dollar amounts — caps and
+ * and `quota.getByUser` (admin). Returns no amounts — caps and
  * current usage are computed only inside this function and converted to
  * `remainingPct` before any field leaves the lib layer.
  *

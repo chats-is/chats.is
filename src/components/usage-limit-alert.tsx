@@ -15,7 +15,7 @@ import { useOpenPlans } from '@/components/plans-dialog';
  * `preflightGate` is the real enforcement — this is just a UI heads-up.
  *
  * Shows nothing unless enforcement applies AND remaining drops below 20%.
- * No dollar amounts are ever displayed — only a remaining-% gauge and a
+ * No amounts are ever displayed — only a remaining-% gauge and a
  * countdown to reset (server returns just those two values).
  *
  * Where a bigger plan is to be had, it offers the way to it: a plan to

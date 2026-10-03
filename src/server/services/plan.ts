@@ -27,7 +27,7 @@ import {
 /**
  * Plans as the user end may see them: id, name, description, order.
  *
- * Deliberately omits the linked quota row — the dollar amounts in it are not
+ * Deliberately omits the linked quota row — the amounts in it are not
  * for the user end.
  */
 export async function listPublicPlans() {

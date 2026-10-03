@@ -82,39 +82,158 @@ describe('upgrading on Stripe', () => {
   });
 });
 
-describe('a Stripe dispute', () => {
-  const action = async (type: string, object: Record<string, unknown>) => {
-    stripe.webhooks.constructEventAsync.mockResolvedValueOnce({
-      id: 'evt_1',
-      type,
-      data: { object }
-    });
-    const event = await createStripeProcessor().parseWebhook(
-      '{}',
-      new Headers({ 'stripe-signature': 'sig' })
-    );
-    return event.action;
-  };
+const AT = new Date('2026-09-01T00:00:00Z');
 
+/** What one Stripe event, signed, asks for. */
+const action = async (type: string, object: Record<string, unknown>) => {
+  stripe.webhooks.constructEventAsync.mockResolvedValueOnce({
+    id: 'evt_1',
+    type,
+    created: AT.getTime() / 1000,
+    data: { object }
+  });
+  const event = await createStripeProcessor().parseWebhook(
+    '{}',
+    new Headers({ 'stripe-signature': 'sig' })
+  );
+  return event.action;
+};
+
+describe('a Stripe webhook', () => {
+  it('carries the subscription as it is, and when', async () => {
+    expect(
+      await action('customer.subscription.updated', {
+        id: 'sub_1',
+        customer: 'cus_1',
+        status: 'active',
+        cancel_at_period_end: false,
+        metadata: { userId: 'u1', planId: 'pro' },
+        items: {
+          data: [{ price: { id: 'price_1' }, current_period_end: 1790000000 }]
+        }
+      })
+    ).toEqual({
+      kind: 'subscription',
+      subscription: expect.objectContaining({
+        externalId: 'sub_1',
+        customerId: 'cus_1',
+        userId: 'u1',
+        planId: 'pro',
+        priceId: 'price_1',
+        status: 'active',
+        expiresAt: new Date(1790000000 * 1000)
+      })
+    });
+  });
+
+  it('carries an invoice as a payment, with the user, plan, price and period it names', async () => {
+    expect(
+      await action('invoice.paid', {
+        id: 'in_1',
+        customer: 'cus_1',
+        status: 'paid',
+        amount_paid: 1000,
+        amount_due: 1000,
+        currency: 'usd',
+        billing_reason: 'subscription_cycle',
+        hosted_invoice_url: 'https://stripe/in_1',
+        parent: {
+          subscription_details: {
+            subscription: 'sub_1',
+            metadata: { userId: 'u1', planId: 'pro' }
+          }
+        },
+        payments: {
+          data: [{ payment: { payment_intent: 'pi_1' } }]
+        },
+        lines: {
+          data: [
+            {
+              pricing: { price_details: { price: 'price_1' } },
+              period: { end: 1790000000 }
+            }
+          ]
+        }
+      })
+    ).toEqual({
+      kind: 'payment',
+      payment: expect.objectContaining({
+        externalId: 'in_1',
+        externalSubscriptionId: 'sub_1',
+        userId: 'u1',
+        planId: 'pro',
+        priceId: 'price_1',
+        periodEnd: new Date(1790000000 * 1000),
+        amount: 10,
+        kind: 'renewal',
+        paid: true
+      })
+    });
+  });
+
+  it('carries a refund by its id, with its amount and whether it went through', async () => {
+    const refund = (status: string) => ({
+      id: 're_1',
+      payment_intent: 'pi_1',
+      amount: 800,
+      currency: 'usd',
+      status
+    });
+    expect(await action('refund.created', refund('pending'))).toEqual({
+      kind: 'refund',
+      transactionId: 'pi_1',
+      refund: { externalId: 're_1', amount: 8, total: null, status: 'pending' }
+    });
+    expect(await action('refund.updated', refund('succeeded'))).toEqual({
+      kind: 'refund',
+      transactionId: 'pi_1',
+      refund: {
+        externalId: 're_1',
+        amount: 8,
+        total: null,
+        status: 'succeeded'
+      }
+    });
+    expect(await action('refund.updated', refund('failed'))).toEqual({
+      kind: 'refund',
+      transactionId: 'pi_1',
+      refund: { externalId: 're_1', amount: 8, total: null, status: 'failed' }
+    });
+  });
+});
+
+describe('a Stripe dispute', () => {
   it('under inquiry has taken no money; a chargeback has', async () => {
     expect(
       await action('charge.dispute.created', {
         payment_intent: 'pi_1',
         status: 'warning_needs_response'
       })
-    ).toEqual({ kind: 'dispute', transactionId: 'pi_1', withdrawn: false });
+    ).toEqual({
+      kind: 'dispute',
+      transactionId: 'pi_1',
+      withdrawn: false
+    });
     expect(
       await action('charge.dispute.created', {
         payment_intent: 'pi_1',
         status: 'needs_response'
       })
-    ).toEqual({ kind: 'dispute', transactionId: 'pi_1', withdrawn: true });
+    ).toEqual({
+      kind: 'dispute',
+      transactionId: 'pi_1',
+      withdrawn: true
+    });
     expect(
       await action('charge.dispute.funds_withdrawn', {
         payment_intent: 'pi_1',
         status: 'warning_needs_response'
       })
-    ).toEqual({ kind: 'dispute', transactionId: 'pi_1', withdrawn: true });
+    ).toEqual({
+      kind: 'dispute',
+      transactionId: 'pi_1',
+      withdrawn: true
+    });
   });
 
   it('won, or closed as an inquiry, is won; lost is left as it is', async () => {

@@ -11,7 +11,7 @@ import {
 /** The console's plan table, cut to one page. */
 export const planListSchema = z.object({ ...paginationSchema.shape });
 
-/** A plan's price in US dollars: more than nothing, to the cent. */
+/** A plan's price: more than nothing, to two decimals. */
 export const planPriceSchema = z
   .number()
   .positive('The price must be more than $0.')

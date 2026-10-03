@@ -68,7 +68,7 @@ const subscription = (attributes: Record<string, unknown> = {}) => ({
 });
 
 describe('the Lemon Squeezy API', () => {
-  it('reads a variant’s price model in the store’s currency', async () => {
+  it('reads a variant’s price model, in dollars', async () => {
     replies.push(
       {
         body: {
@@ -96,11 +96,6 @@ describe('the Lemon Squeezy API', () => {
       },
       {
         body: {
-          data: { type: 'stores', id: '42', attributes: { currency: 'USD' } }
-        }
-      },
-      {
-        body: {
           data: {
             type: 'products',
             id: '7',
@@ -112,7 +107,6 @@ describe('the Lemon Squeezy API', () => {
     expect(await lemon.getPrice('555')).toEqual({
       priceId: '555',
       amount: 19.99,
-      currency: 'usd',
       interval: 'month',
       active: true,
       metered: false,
@@ -121,7 +115,6 @@ describe('the Lemon Squeezy API', () => {
     expect(calls.map(path)).toEqual([
       '/variants/555',
       '/variants/555/price-model',
-      '/stores/42',
       '/products/7'
     ]);
   });
@@ -150,11 +143,6 @@ describe('the Lemon Squeezy API', () => {
               usage_aggregation: null
             }
           }
-        }
-      },
-      {
-        body: {
-          data: { type: 'stores', id: '42', attributes: { currency: 'USD' } }
         }
       },
       {
@@ -191,11 +179,6 @@ describe('the Lemon Squeezy API', () => {
             id: '1',
             attributes: { category: 'one_time', unit_price: 500 }
           }
-        }
-      },
-      {
-        body: {
-          data: { type: 'stores', id: '42', attributes: { currency: 'USD' } }
         }
       }
     );
@@ -291,7 +274,7 @@ describe('the Lemon Squeezy API', () => {
     expect(await lemon.getPayment('31')).toMatchObject({
       externalId: '31',
       transactionId: '31',
-      subscriptionExternalId: '77',
+      externalSubscriptionId: '77',
       customerId: '9',
       amount: 19.99,
       fee: null,
@@ -319,8 +302,10 @@ describe('a Lemon Squeezy subscription', () => {
   it.each([
     ['active', {}, 'active', false, false],
     ['on_trial', {}, 'active', false, false],
-    ['past_due', {}, 'canceled', false, true],
-    ['unpaid', {}, 'canceled', false, true],
+    // A renewal failed and is being retried: still in effect. Unpaid, the
+    // retries are used up.
+    ['past_due', {}, 'active', false, true],
+    ['unpaid', {}, 'active', false, true],
     ['paused', {}, 'canceled', false, false],
     ['expired', {}, 'canceled', false, false],
     [
@@ -390,8 +375,13 @@ describe('Lemon Squeezy webhooks', () => {
       type: 'subscription_created',
       action: {
         kind: 'subscription',
-        externalId: '77',
-        hints: { userId: 'u1', planId: 'pro' }
+        subscription: expect.objectContaining({
+          externalId: '77',
+          customerId: '9',
+          userId: 'u1',
+          planId: 'pro',
+          status: 'active'
+        })
       }
     });
   });
@@ -405,23 +395,70 @@ describe('Lemon Squeezy webhooks', () => {
     ).rejects.toThrow('Bad Lemon Squeezy signature');
   });
 
-  it.each([
-    ['subscription_payment_success', { kind: 'payment', externalId: '31' }],
-    ['subscription_payment_failed', { kind: 'payment', externalId: '31' }],
-    ['order_created', { kind: 'ignore' }]
-  ])('read %s', (name, action) => {
-    expect(
-      __test.actionOf({
-        meta: { event_name: name },
-        data: { type: 'subscription-invoices', id: '31', attributes: {} }
-      } as any)
-    ).toEqual(action);
+  const invoice = (attributes: Record<string, unknown> = {}) => ({
+    type: 'subscription-invoices',
+    id: '31',
+    attributes: {
+      subscription_id: 77,
+      customer_id: 9,
+      billing_reason: 'renewal',
+      status: 'paid',
+      total: 1999,
+      tax: 150,
+      currency: 'USD',
+      created_at: '2026-09-01T00:00:00Z',
+      updated_at: '2026-09-01T00:00:05Z',
+      urls: { invoice_url: 'https://store/invoice/31' },
+      ...attributes
+    }
   });
 
-  it('read a refund of an invoice, in dollars', () => {
+  it.each([
+    ['subscription_payment_success', {}, true],
+    ['subscription_payment_recovered', {}, true],
+    ['subscription_payment_failed', { status: 'open' }, false]
+  ])('read %s as the invoice it carries', (name, attributes, paid) => {
     expect(
       __test.actionOf({
-        meta: { event_name: 'subscription_payment_refunded' },
+        meta: {
+          event_name: name,
+          custom_data: { user_id: 'u1', plan_id: 'pro' }
+        },
+        data: invoice(attributes)
+      } as any)
+    ).toEqual({
+      kind: 'payment',
+      payment: expect.objectContaining({
+        externalId: '31',
+        externalSubscriptionId: '77',
+        userId: 'u1',
+        planId: 'pro',
+        priceId: null,
+        periodEnd: null,
+        amount: 19.99,
+        tax: 1.5,
+        kind: 'renewal',
+        paid
+      })
+    });
+  });
+
+  it('ignore an event that is not about a subscription', () => {
+    expect(
+      __test.actionOf({
+        meta: { event_name: 'order_created' },
+        data: { type: 'orders', id: '1', attributes: {} }
+      } as any)
+    ).toEqual({ kind: 'ignore' });
+  });
+
+  it('read a refund of an invoice, in dollars, naming the user and plan', () => {
+    expect(
+      __test.actionOf({
+        meta: {
+          event_name: 'subscription_payment_refunded',
+          custom_data: { user_id: 'u1', plan_id: 'pro' }
+        },
         data: {
           type: 'subscription-invoices',
           id: '31',
@@ -436,7 +473,11 @@ describe('Lemon Squeezy webhooks', () => {
     ).toEqual({
       kind: 'refund',
       transactionId: '31',
-      refundAmount: 5
+      // Lemon Squeezy has no refund object: the invoice is the refund's id,
+      // and says how much of it has gone back in all.
+      refund: { externalId: '31', amount: 5, total: 5, status: 'succeeded' },
+      userId: 'u1',
+      planId: 'pro'
     });
   });
 });

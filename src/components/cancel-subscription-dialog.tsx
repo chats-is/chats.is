@@ -14,7 +14,8 @@ import { LocalTime } from '@/components/local-time';
  * The confirmation before a subscription is cancelled, for the user and for
  * an admin: the plan stays until what was paid for runs out, and the
  * subscription is canceled then. The user can resubscribe until then; what
- * an admin cancels, the user cannot.
+ * an admin cancels, the user cannot. One whose renewal is unpaid has nothing
+ * paid for left, and is canceled now.
  */
 export function CancelSubscriptionDialog({
   open,
@@ -22,6 +23,7 @@ export function CancelSubscriptionDialog({
   planName,
   expiresAt,
   byAdmin = false,
+  now = false,
   onConfirm
 }: {
   open: boolean;
@@ -30,6 +32,8 @@ export function CancelSubscriptionDialog({
   expiresAt: Date | string;
   /** Cancelled by an admin, which the user cannot undo. */
   byAdmin?: boolean;
+  /** Canceled at once: what was paid for has run out, its renewal unpaid. */
+  now?: boolean;
   onConfirm: () => void;
 }) {
   return (
@@ -38,12 +42,19 @@ export function CancelSubscriptionDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Cancel subscription?</AlertDialogTitle>
           <AlertDialogDescription>
-            {planName} stays active until{' '}
-            <LocalTime value={expiresAt} precision="day" />, then the
-            subscription is canceled. It does not renew and is not charged again
-            {byAdmin
-              ? ', and the user cannot resubscribe it.'
-              : ', and can be resubscribed until then.'}
+            {now ? (
+              `${planName} is canceled now, and is not charged again.`
+            ) : (
+              <>
+                {planName} stays active until{' '}
+                <LocalTime value={expiresAt} precision="day" />, then the
+                subscription is canceled. It does not renew and is not charged
+                again
+                {byAdmin
+                  ? ', and the user cannot resubscribe it.'
+                  : ', and can be resubscribed until then.'}
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

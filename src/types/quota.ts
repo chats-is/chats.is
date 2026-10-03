@@ -13,7 +13,7 @@ export type ResolvedSource = 'override' | 'plan' | 'default' | 'none';
  * remaining percentage and reset time. Returned by `quota.me` (user) and
  * `quota.getByUser` (admin) — both endpoints get the same shape.
  *
- * Dollar amounts are NEVER exposed: `used` / `limit` are computed only
+ * Amounts are NEVER exposed: `used` / `limit` are computed only
  * inside `lib/quota.ts` and converted to `remainingPct` before reaching
  * the API surface. The user end can never infer their cap.
  *

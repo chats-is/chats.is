@@ -152,13 +152,24 @@ price ID for each interval — kept on the plan only, and fixed once anyone has 
 `cancel_reason` saying why; a user has at most one `active`, and it gives them its plan; the only
 change in place is an upgrade to a dearer plan at the same interval. It reaches a processor only
 through the interface in `services/payment-processor.ts`; Stripe, Paddle and Lemon Squeezy are
-adapters beside it (`services/payment-*.ts`), and a new processor is another. Webhooks arrive at
-`/api/payments/$processor/webhook` and are applied by reading the processor's current state, so a
-webhook sent twice changes nothing; Paddle's checkout opens on `/pay/paddle`. A payment keeps what
-was refunded of it (`amount_refunded`, `refund_pending` while a refund waits, and who sent the
-latest), and is kept when its user is deleted; a user's refund request is a `refund_request` row an
-admin approves or rejects. Work on one user's subscriptions, or one payment, runs under `withLock`
-(`services/db-lock.ts`), since processors send several webhooks about one thing at once.
+adapters beside it (`services/payment-*.ts`), and a new processor is another. The flow has three
+parts that do not mix. What a user or admin does — buy, upgrade, cancel, resume, refund — is a
+business function that decides from the local tables and then calls the processor. What the
+processor did is told by webhook at `/api/payments/$processor/webhook`: the adapter hands over the
+object the event carries (subscription, payment, refund, dispute) and when it happened; the service
+checks it against what is kept — our user, newer than what is kept, no more refunded than was paid
+— and writes it, with the one action the result calls for (a confirmed refund cancels as the admin
+chose, a chargeback cancels, a second subscription bought beside the first is canceled and
+refunded, a renewal reported failed past the grace days cancels). A subscription event writes the
+subscription; its expiry moves only when a renewal's payment is reported paid. Nothing in a
+request or a webhook reads the processor to decide; the only reads are the checkout the user
+comes back from and the scheduled `/api/cron/reconcile`, which is the separate recovery for
+whatever the webhooks did not say. Paddle's checkout opens on `/pay/paddle`. A payment keeps the
+facts its status is reckoned from — paid, `refund_amount`, `refund_pending` while a refund waits,
+`disputed`, and the refund's id — and is kept when its user is deleted; a user's refund request is
+a `refund_request` row an admin approves or rejects. Work on one user's subscriptions, or one
+payment, runs under `withLock` (`services/db-lock.ts`), since processors send several webhooks
+about one thing at once.
 
 Tests sit beside their subject as `foo.ts` and `foo.test.ts`.
 
