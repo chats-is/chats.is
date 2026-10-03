@@ -84,19 +84,6 @@ export type ProcessorRefund = {
 };
 
 /**
- * Where a payment's refunds and disputes stand in the processor now — read
- * to make up for a webhook that never came.
- */
-export type ProcessorPaymentState = {
-  /** All refunded of it so far, where the processor says it. */
-  refunded: number;
-  /** A refund of it is still being processed there. */
-  refundPending: boolean;
-  /** `inquiry` has taken no money; `withdrawn` has; `won` gave it back. */
-  dispute: 'none' | 'inquiry' | 'withdrawn' | 'won';
-};
-
-/**
  * How a subscription is paid for, as the user's Billing shows it: a card's
  * brand, last four digits and expiry, or the kind of method it is — PayPal,
  * say — where it is not a card. Read from the processor when shown.
@@ -236,11 +223,12 @@ export interface PaymentProcessor {
 
   getPayment: (externalId: string) => Promise<ProcessorPayment | null>;
 
-  /** A payment's refunds and disputes as the processor has them now. */
-  getPaymentState: (payment: {
-    externalId: string;
-    transactionId: string | null;
-  }) => Promise<ProcessorPaymentState>;
+  /** One refund as the processor has it now, by the id `refundPayment`
+   *  returned — read when its webhook has not come. */
+  getRefund: (
+    payment: { externalId: string; transactionId: string | null },
+    externalRefundId: string
+  ) => Promise<ProcessorRefund>;
 
   /** A link to a payment's invoice, made when asked — for a processor whose
    *  invoice links do not last, so none is kept on the payment. */

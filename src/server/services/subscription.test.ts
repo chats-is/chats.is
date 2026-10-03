@@ -193,13 +193,12 @@ function fakeProcessor() {
     }),
     refundPayment: vi.fn(async () => ({ externalId: 're_1' })),
     findSubscriptions: vi.fn(async () => [...subs.keys()]),
-    // Where a payment's refunds and disputes stand, as the job reads them.
-    paymentState: {
-      refunded: 0,
-      refundPending: false,
-      dispute: 'none' as 'none' | 'inquiry' | 'withdrawn' | 'won'
-    },
-    getPaymentState: vi.fn(async () => ({ ...processor.paymentState })),
+    getRefund: vi.fn(async () => ({
+      externalId: 're_1',
+      amount: 8,
+      total: null,
+      status: 'pending' as const
+    })),
     previewChange: vi.fn(async () => 7.5),
     dashboardUrl: vi.fn(async (id: string) => `https://pay.example/subs/${id}`),
     getPayment: vi.fn(async (id: string) => invoices.get(id) ?? null),
@@ -2357,25 +2356,39 @@ describe('without a webhook', () => {
 });
 
 describe('the scheduled job, for webhooks that never came', () => {
-  const refund = async (cancelSubscription: boolean) => {
+  /** A refund sent from here a day and more ago, its webhook never come. */
+  const refundAgo = async (cancelSubscription: boolean) => {
     await subscribe();
     await refundPayment(
       { paymentId: (await paymentOf())!.id, cancelSubscription },
       'admin'
     );
+    await h.db
+      .update(schema.payments)
+      .set({ refundAt: new Date(Date.now() - 25 * 60 * 60 * 1000) });
   };
+  const refundState = (status: 'pending' | 'succeeded' | 'failed') =>
+    h.processor.getRefund.mockResolvedValue({
+      externalId: 're_1',
+      amount: 8,
+      total: null,
+      status
+    });
 
-  it('finds a refund sent from here gone back, and cancels as it owed', async () => {
-    await refund(true);
-    h.processor.paymentState.refunded = 8;
+  it('asks about a refund sent from here a day ago and still waiting: gone back, it cancels as it owed', async () => {
+    await refundAgo(true);
+    refundState('succeeded');
     expect(await reconcileWithProcessors()).toMatchObject({
-      payments: 1,
+      refunds: 1,
       failed: 0
     });
+    expect(h.processor.getRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ externalId: 'in_1' }),
+      're_1'
+    );
     expect(await paymentOf()).toMatchObject({
       status: 'refunded',
-      refundAmount: '8.00',
-      checkedAt: expect.any(Date)
+      refundAmount: '8.00'
     });
     expect(await rowOf()).toMatchObject({
       status: 'canceled',
@@ -2385,15 +2398,16 @@ describe('the scheduled job, for webhooks that never came', () => {
   });
 
   it('leaves a refund the processor is still working on', async () => {
-    await refund(true);
-    h.processor.paymentState.refundPending = true;
+    await refundAgo(true);
+    refundState('pending');
     await reconcileWithProcessors();
     expect(await paymentOf()).toMatchObject({ status: 'refund_pending' });
     expect(await rowOf()).toMatchObject({ cancelReason: 'refunded' });
   });
 
   it('finds a refund sent from here failed: paid again, the subscription renewing', async () => {
-    await refund(true);
+    await refundAgo(true);
+    refundState('failed');
     await reconcileWithProcessors();
     expect(await paymentOf()).toMatchObject({
       status: 'paid',
@@ -2403,69 +2417,71 @@ describe('the scheduled job, for webhooks that never came', () => {
     expect(await planOf('u1')).toBe('basic');
   });
 
-  it('finds a refund made in the processor itself, and ends the subscription', async () => {
+  it('does not ask about a refund sent within the day', async () => {
     await subscribe();
-    h.processor.paymentState.refunded = 10;
-    await reconcileWithProcessors();
-    expect(await paymentOf()).toMatchObject({
-      status: 'refunded',
-      refundAmount: '10.00'
-    });
-    expect(await rowOf()).toMatchObject({
-      status: 'canceled',
-      cancelReason: 'refunded'
-    });
-    // Read again, nothing more.
-    h.processor.cancelNow.mockClear();
-    await reconcileWithProcessors();
-    expect(h.processor.cancelNow).not.toHaveBeenCalled();
-  });
-
-  it('finds a dispute, and its being won', async () => {
-    await subscribe();
-    h.processor.paymentState.dispute = 'inquiry';
-    await reconcileWithProcessors();
-    expect(await paymentOf()).toMatchObject({ status: 'disputed' });
-    expect(await rowOf()).toMatchObject({ status: 'active' });
-
-    h.processor.paymentState.dispute = 'won';
-    await reconcileWithProcessors();
-    expect(await paymentOf()).toMatchObject({ status: 'paid' });
-
-    h.processor.paymentState.dispute = 'withdrawn';
-    await reconcileWithProcessors();
-    expect(await paymentOf()).toMatchObject({ status: 'disputed' });
-    expect(await rowOf()).toMatchObject({
-      status: 'canceled',
-      cancelReason: 'payment_disputed'
-    });
-    expect(await planOf('u1')).toBeNull();
-
-    h.processor.paymentState.dispute = 'won';
-    await reconcileWithProcessors();
-    expect(await paymentOf()).toMatchObject({ status: 'paid' });
-    expect(await rowOf()).toMatchObject({ status: 'canceled' });
+    await refundPayment(
+      { paymentId: (await paymentOf())!.id, cancelSubscription: true },
+      'admin'
+    );
+    expect(await reconcileWithProcessors()).toMatchObject({ refunds: 0 });
+    expect(h.processor.getRefund).not.toHaveBeenCalled();
   });
 
   it('ends a subscription past its expiry whose user never came back', async () => {
     await subscribe({ expiresAt: daysAgo(2) });
     Object.assign(h.processor.subs.get('sub_1'), { status: 'canceled' });
-    expect(await reconcileWithProcessors()).toMatchObject({ subscriptions: 1 });
+    expect(await reconcileWithProcessors()).toMatchObject({ expired: 1 });
     expect(await rowOf()).toMatchObject({ status: 'canceled' });
     expect(await planOf('u1')).toBeNull();
   });
 
-  it('leaves what it cannot read for the next run, and goes on', async () => {
+  it('ends a subscription whose renewal failed and whose grace days are over, without asking the processor', async () => {
     await subscribe();
-    h.processor.getPaymentState.mockRejectedValueOnce(new Error('down'));
+    await pay({
+      externalId: 'in_2',
+      transactionId: 'pi_2',
+      kind: 'renewal',
+      paid: false
+    });
+    await h.db.update(schema.subscriptions).set({ expiresAt: daysAgo(4) });
+    h.processor.getSubscription.mockClear();
     expect(await reconcileWithProcessors()).toMatchObject({
-      payments: 1,
+      expired: 0,
+      unpaid: 1
+    });
+    expect(h.processor.getSubscription).not.toHaveBeenCalled();
+    expect(await rowOf()).toMatchObject({
+      status: 'canceled',
+      cancelReason: 'payment_failed'
+    });
+    expect(h.processor.cancelNow).toHaveBeenCalledWith('sub_1');
+    expect(await planOf('u1')).toBeNull();
+  });
+
+  it('leaves one whose renewal failed within its grace days alone', async () => {
+    await subscribe();
+    await pay({
+      externalId: 'in_2',
+      transactionId: 'pi_2',
+      kind: 'renewal',
+      paid: false
+    });
+    await h.db.update(schema.subscriptions).set({ expiresAt: daysAgo(2) });
+    expect(await reconcileWithProcessors()).toMatchObject({
+      expired: 0,
+      unpaid: 0
+    });
+    expect(await rowOf()).toMatchObject({ status: 'active' });
+  });
+
+  it('leaves what it cannot read for the next run, and goes on', async () => {
+    await refundAgo(true);
+    h.processor.getRefund.mockRejectedValueOnce(new Error('down'));
+    expect(await reconcileWithProcessors()).toMatchObject({
+      refunds: 1,
       failed: 1
     });
-    expect(await paymentOf()).toMatchObject({
-      status: 'paid',
-      checkedAt: expect.any(Date)
-    });
+    expect(await paymentOf()).toMatchObject({ status: 'refund_pending' });
   });
 });
 

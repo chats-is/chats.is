@@ -16,8 +16,7 @@ const stripe = {
   checkout: { sessions: { retrieve: vi.fn(), create: vi.fn() } },
   invoices: { createPreview: vi.fn() },
   paymentIntents: { retrieve: vi.fn() },
-  refunds: { list: vi.fn() },
-  disputes: { list: vi.fn() }
+  refunds: { retrieve: vi.fn() }
 };
 
 vi.mock('stripe', () => ({
@@ -307,55 +306,29 @@ describe('asking Stripe', () => {
   });
 });
 
-describe('where a Stripe payment stands', () => {
-  const state = async (
-    refunds: Array<{ status: string }>,
-    disputes: Array<{ status: string }>
-  ) => {
-    stripe.paymentIntents.retrieve.mockResolvedValue({
-      latest_charge: { id: 'ch_1', amount_refunded: 800, currency: 'usd' }
+describe('a Stripe refund, read by its id', () => {
+  it('is the refund as Stripe has it now', async () => {
+    const read = async (status: string) => {
+      stripe.refunds.retrieve.mockResolvedValue({
+        id: 're_1',
+        payment_intent: 'pi_1',
+        amount: 800,
+        currency: 'usd',
+        status
+      });
+      return await createStripeProcessor().getRefund(
+        { externalId: 'in_1', transactionId: 'pi_1' },
+        're_1'
+      );
+    };
+    expect(await read('succeeded')).toEqual({
+      externalId: 're_1',
+      amount: 8,
+      total: null,
+      status: 'succeeded'
     });
-    stripe.refunds.list.mockResolvedValue({ data: refunds });
-    stripe.disputes.list.mockResolvedValue({ data: disputes });
-    return await createStripeProcessor().getPaymentState({
-      externalId: 'in_1',
-      transactionId: 'pi_1'
-    });
-  };
-
-  it('is what was refunded of its charge, and whether a refund still waits', async () => {
-    expect(await state([{ status: 'succeeded' }], [])).toEqual({
-      refunded: 8,
-      refundPending: false,
-      dispute: 'none'
-    });
-    expect(await state([{ status: 'pending' }], [])).toMatchObject({
-      refundPending: true
-    });
-  });
-
-  it('and its disputes: an inquiry, the money taken, or given back', async () => {
-    const dispute = async (...statuses: Array<string>) =>
-      (
-        await state(
-          [],
-          statuses.map(status => ({ status }))
-        )
-      ).dispute;
-    expect(await dispute('warning_needs_response')).toBe('inquiry');
-    expect(await dispute('needs_response')).toBe('withdrawn');
-    expect(await dispute('lost')).toBe('withdrawn');
-    expect(await dispute('won')).toBe('won');
-    expect(await dispute('warning_closed')).toBe('won');
-    expect(await dispute('won', 'needs_response')).toBe('withdrawn');
-  });
-
-  it('with no transaction, nothing', async () => {
-    expect(
-      await createStripeProcessor().getPaymentState({
-        externalId: 'in_1',
-        transactionId: null
-      })
-    ).toEqual({ refunded: 0, refundPending: false, dispute: 'none' });
+    expect(stripe.refunds.retrieve).toHaveBeenCalledWith('re_1');
+    expect((await read('pending')).status).toBe('pending');
+    expect((await read('canceled')).status).toBe('failed');
   });
 });

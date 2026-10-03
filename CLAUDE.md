@@ -164,7 +164,8 @@ refunded, a renewal reported failed past the grace days cancels). A subscription
 subscription; its expiry moves only when a renewal's payment is reported paid. Nothing in a
 request or a webhook reads the processor to decide; the only reads are the checkout the user
 comes back from and the scheduled `/api/cron/reconcile`, which is the separate recovery for
-whatever the webhooks did not say. Paddle's checkout opens on `/pay/paddle`. A payment keeps the
+whatever the webhooks did not say: subscriptions past their expiry, renewals failed past the grace
+days, and refunds sent from here still waiting after a day. Paddle's checkout opens on `/pay/paddle`. A payment keeps the
 facts its status is reckoned from — paid, `refund_amount`, `refund_pending` while a refund waits,
 `disputed`, and the refund's id — and is kept when its user is deleted; a user's refund request is
 a `refund_request` row an admin approves or rejects. Work on one user's subscriptions, or one

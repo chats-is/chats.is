@@ -1,0 +1,1 @@
+ALTER TABLE "payment" DROP COLUMN "checked_at";

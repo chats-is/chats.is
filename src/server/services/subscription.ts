@@ -8,8 +8,8 @@ import {
   gte,
   ilike,
   inArray,
+  isNotNull,
   lt,
-  ne,
   or,
   sql,
   type SQL
@@ -1207,114 +1207,45 @@ export async function confirmCheckout(
  *  webhook, before the job asks the processor about it. */
 const EXPIRY_GRACE_MS = 60 * 60 * 1000;
 
-/** How far back a payment's refunds and disputes are still read from the
- *  processor: a dispute can come months after the payment. */
-const RECONCILE_DAYS = 120;
+/** How long a refund sent from here is left for its webhook, before the job
+ *  asks the processor about it. */
+const REFUND_WAIT_MS = 24 * 60 * 60 * 1000;
 
-/** How many of each one run reads, so a run ends in time; the least
- *  recently read go first, and the rest wait for the next. */
+/** How many of each one run takes, so a run ends in time. */
 const RECONCILE_BATCH = 100;
 
 /**
- * One payment's refunds and disputes, read from the processor and applied
- * as their webhooks would have been — through the same steps, so both ways
- * of learning it agree.
- */
-async function reconcilePayment(row: typeof payments.$inferSelect) {
-  if (!row.transactionId) return;
-  const processor = await getPaymentProcessor(row.processor);
-  const state = await processor.getPaymentState(row);
-  const transactionId = row.transactionId;
-  const refundedMinor = Math.round(state.refunded * 100);
-  const knownMinor = Math.round(Number(row.refundAmount) * 100);
-
-  // The processor's state names no refund; the one kept is the one meant.
-  // (This job's reading of refunds is to be looked at on its own.)
-  const refundId = row.externalRefundId ?? '';
-  const refunded = (total: number) => ({
-    kind: 'refund' as const,
-    transactionId,
-    refund: {
-      externalId: refundId,
-      amount: total,
-      total,
-      status: 'succeeded' as const
-    }
-  });
-  const refundFailed = {
-    kind: 'refund' as const,
-    transactionId,
-    refund: {
-      externalId: refundId,
-      amount: 0,
-      total: null,
-      status: 'failed' as const
-    }
-  };
-
-  if (state.dispute === 'won') {
-    if (row.status === 'disputed') {
-      await dispatch(row.processor, { kind: 'dispute_won', transactionId });
-    }
-  } else if (state.dispute !== 'none' && row.status !== 'disputed') {
-    await dispatch(row.processor, {
-      kind: 'dispute',
-      transactionId,
-      withdrawn: state.dispute === 'withdrawn'
-    });
-    return;
-  }
-
-  if (row.status === 'refund_pending') {
-    // Sent from here: gone back, or — nothing back and nothing waiting —
-    // failed.
-    if (refundedMinor > 0) {
-      await dispatch(row.processor, refunded(state.refunded));
-    } else if (!state.refundPending) {
-      await dispatch(row.processor, refundFailed);
-    }
-  } else if (refundedMinor > knownMinor) {
-    // A refund made in the processor itself, never reported.
-    await dispatch(row.processor, refunded(state.refunded));
-  } else if (
-    row.status === 'refunded' &&
-    refundedMinor === 0 &&
-    !state.refundPending
-  ) {
-    // Reported gone back, and failed after.
-    await dispatch(row.processor, refundFailed);
-  } else if (row.refundCancelSubscription != null) {
-    // Gone back, with its subscription's cancelling still owed.
-    await afterRefund({
-      paymentId: row.id,
-      subscriptionId: row.subscriptionId,
-      refundRequestId: row.refundRequestId,
-      cancelSubscription: row.refundCancelSubscription,
-      failed: false
-    });
-  }
-}
-
-/**
- * The job that makes up for webhooks that never came, run on a schedule:
- * subscriptions still `active` past their expiry, and the refunds and
- * disputes of recent payments, are read from their processors and kept as
- * they are there. One that cannot be read is left for the next run.
+ * The scheduled job: the recovery for what the webhooks did not say, kept
+ * apart from the flow they drive. Three things, each where money and
+ * service would otherwise part:
+ *
+ * 1. A subscription past its expiry and still `active`, with no renewal
+ *    reported failed: its renewal's or its cancellation's webhook has not
+ *    come. The processor is asked for the subscription, and it is kept as
+ *    that webhook would have kept it.
+ * 2. A subscription whose renewal was reported failed and whose grace days
+ *    are over, the processor's next retry not reported yet: canceled, here
+ *    and there, as the next failure would have canceled it.
+ * 3. A refund sent from here and still waiting after a day: the processor
+ *    is asked for that refund, by its id, and it is applied as its webhook
+ *    would have been.
+ *
+ * One that cannot be read is left for the next run.
  */
 export async function reconcileWithProcessors(): Promise<{
-  subscriptions: number;
-  payments: number;
+  expired: number;
+  unpaid: number;
+  refunds: number;
   failed: number;
 }> {
-  const now = Date.now();
+  const now = new Date();
   let failed = 0;
 
-  // Past their expiry — among them those with a renewal unpaid, which
-  // ends them once the grace days are over.
+  // 1. Past expiry, nothing heard.
   const expired = await db.query.subscriptions.findMany({
     where: and(
       eq(subscriptions.status, 'active'),
-      lt(subscriptions.expiresAt, new Date(now - EXPIRY_GRACE_MS))
+      lt(subscriptions.expiresAt, new Date(now.getTime() - EXPIRY_GRACE_MS))
     ),
     orderBy: s => [s.updatedAt],
     limit: RECONCILE_BATCH,
@@ -1323,11 +1254,23 @@ export async function reconcileWithProcessors(): Promise<{
       processor: true,
       externalId: true,
       userId: true,
-      planId: true
+      planId: true,
+      expiresAt: true
     }
   });
+  let asked = 0;
+  let ended = 0;
   for (const sub of expired) {
     try {
+      if (await unpaidRenewalOf(sub.id)) {
+        // 2. A renewal failed, and the grace days are over.
+        if ((await graceEndOf(sub.expiresAt)) <= now) {
+          await cancelNow(sub.id, 'payment_failed');
+          ended++;
+        }
+        continue;
+      }
+      asked++;
       const processor = await getPaymentProcessor(sub.processor);
       const snap = await processor.getSubscription(sub.externalId);
       // Read, not told: a processor's API may not carry the checkout's
@@ -1343,32 +1286,32 @@ export async function reconcileWithProcessors(): Promise<{
     }
   }
 
-  const recent = await db.query.payments.findMany({
+  // 3. Refunds sent from here, a day on and still waiting.
+  const waiting = await db.query.payments.findMany({
     where: and(
-      ne(payments.status, 'failed'),
-      or(
-        eq(payments.status, 'refund_pending'),
-        gte(payments.billedAt, new Date(now - RECONCILE_DAYS * DAY_MS))
-      )
+      eq(payments.status, 'refund_pending'),
+      isNotNull(payments.externalRefundId),
+      isNotNull(payments.transactionId),
+      lt(payments.refundAt, new Date(now.getTime() - REFUND_WAIT_MS))
     ),
-    orderBy: p => [sql`${p.checkedAt} asc nulls first`],
+    orderBy: p => [p.refundAt],
     limit: RECONCILE_BATCH
   });
-  for (const row of recent) {
+  for (const row of waiting) {
     try {
-      await reconcilePayment(row);
+      const processor = await getPaymentProcessor(row.processor);
+      const refund = await processor.getRefund(row, row.externalRefundId!);
+      await dispatch(row.processor, {
+        kind: 'refund',
+        transactionId: row.transactionId!,
+        refund
+      });
     } catch (err) {
       failed++;
-      console.error(`[reconcile] payment ${row.id}`, err);
+      console.error(`[reconcile] refund of ${row.id}`, err);
     }
-    // Read or not, it goes to the back: one that cannot be read must not
-    // keep the rest from their turn.
-    await db
-      .update(payments)
-      .set({ checkedAt: new Date() })
-      .where(eq(payments.id, row.id));
   }
-  return { subscriptions: expired.length, payments: recent.length, failed };
+  return { expired: asked, unpaid: ended, refunds: waiting.length, failed };
 }
 
 /** One webhook call: its signature checked, then what it asks for done. */

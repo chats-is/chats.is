@@ -505,19 +505,19 @@ describe('a Lemon Squeezy payment method', () => {
 });
 
 describe('asking Lemon Squeezy, for a webhook that never came', () => {
-  it('where a payment stands: what was refunded of its invoice', async () => {
+  it('a refund sent from here: the invoice, saying how much has gone back', async () => {
     replies.push({
       body: {
         data: {
           type: 'subscription-invoices',
           id: '900',
-          attributes: { refunded_amount: 800, currency: 'USD' }
+          attributes: { refunded_amount: 800, status: 'partial_refund' }
         }
       }
     });
     expect(
-      await lemon.getPaymentState({ externalId: '900', transactionId: '900' })
-    ).toEqual({ refunded: 8, refundPending: false, dispute: 'none' });
+      await lemon.getRefund({ externalId: '900', transactionId: '900' }, '900')
+    ).toEqual({ externalId: '900', amount: 8, total: 8, status: 'succeeded' });
     expect(path(calls.at(-1)!)).toBe('/subscription-invoices/900');
   });
 

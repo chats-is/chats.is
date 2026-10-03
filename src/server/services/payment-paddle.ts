@@ -14,6 +14,7 @@ import {
   type PaymentMethod,
   type PaymentProcessor,
   type ProcessorPayment,
+  type ProcessorRefund,
   type ProcessorSubscription,
   type WebhookAction
 } from '@/server/services/payment-processor';
@@ -387,6 +388,21 @@ function toPayment(txn: PaddleTransaction): ProcessorPayment | null {
   };
 }
 
+/** A Paddle refund adjustment as the app sees it. */
+function toRefund(adjustment: PaddleAdjustment): ProcessorRefund {
+  return {
+    externalId: adjustment.id,
+    amount: toAmount(Number(adjustment.totals?.total ?? 0)),
+    total: null,
+    status:
+      adjustment.status === 'approved'
+        ? 'succeeded'
+        : adjustment.status === 'pending_approval'
+          ? 'pending'
+          : 'failed'
+  };
+}
+
 /** What a webhook says: the object it carries, as it is, and when. */
 function actionOf(event: PaddleEvent): WebhookAction {
   const { event_type: type, data } = event;
@@ -405,21 +421,10 @@ function actionOf(event: PaddleEvent): WebhookAction {
   }
   if (type === 'adjustment.created' || type === 'adjustment.updated') {
     if (data.action === 'refund') {
-      const status =
-        data.status === 'approved'
-          ? 'succeeded'
-          : data.status === 'pending_approval'
-            ? 'pending'
-            : 'failed';
       return {
         kind: 'refund',
         transactionId: data.transaction_id,
-        refund: {
-          externalId: data.id,
-          amount: toAmount(Number(data.totals?.total ?? 0)),
-          total: null,
-          status
-        }
+        refund: toRefund(data as PaddleAdjustment)
       };
     }
     // A chargeback, or Paddle's own refund to head one off: the money has
@@ -663,30 +668,13 @@ export function createPaddleProcessor(): PaymentProcessor {
       return `https://${host}/subscriptions-v2/${externalId}`;
     },
 
-    async getPaymentState(payment) {
-      // Everything Paddle has done to the transaction since: its refunds,
-      // and its chargebacks and their reversals.
-      const adjustments = await paddle<PaddleAdjustment[]>(
-        'GET',
-        `/adjustments?transaction_id=${payment.externalId}&per_page=50`
+    async getRefund(_payment, externalRefundId) {
+      return toRefund(
+        await paddle<PaddleAdjustment>(
+          'GET',
+          `/adjustments/${externalRefundId}`
+        )
       );
-      const refunds = adjustments.filter(a => a.action === 'refund');
-      const minor = refunds
-        .filter(r => r.status === 'approved')
-        .reduce((sum, r) => sum + Number(r.totals.total), 0);
-      const made = (...actions: string[]) =>
-        adjustments.some(
-          a => actions.includes(a.action) && a.status !== 'rejected'
-        );
-      return {
-        refunded: toAmount(minor),
-        refundPending: refunds.some(r => r.status === 'pending_approval'),
-        dispute: made('chargeback_reverse', 'chargeback_warning_reverse')
-          ? 'won'
-          : made('chargeback', 'chargeback_warning')
-            ? 'withdrawn'
-            : 'none'
-      };
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {

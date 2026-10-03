@@ -14,6 +14,7 @@ import {
   type PaymentMethod,
   type PaymentProcessor,
   type ProcessorPayment,
+  type ProcessorRefund,
   type ProcessorSubscription,
   type WebhookAction
 } from '@/server/services/payment-processor';
@@ -292,6 +293,14 @@ function toPayment(
   };
 }
 
+/** An invoice's refund, as the app sees it. Lemon Squeezy has no refund of
+ *  its own to name: the invoice says how much of it has gone back in all,
+ *  and is done at once. */
+function toRefund(invoice: LemonInvoice): ProcessorRefund {
+  const total = toAmount(Number(invoice.attributes.refunded_amount ?? 0));
+  return { externalId: invoice.id, amount: total, total, status: 'succeeded' };
+}
+
 /** What a webhook says: the object it carries, as it is, and when. */
 function actionOf(event: LemonEvent): WebhookAction {
   const name = event.meta.event_name;
@@ -305,18 +314,10 @@ function actionOf(event: LemonEvent): WebhookAction {
       return payment ? { kind: 'payment', payment } : { kind: 'ignore' };
     }
     case 'subscription_payment_refunded': {
-      // Lemon Squeezy has no refund of its own to name: the invoice says
-      // how much of it has gone back in all.
-      const total = toAmount(Number(data.attributes.refunded_amount ?? 0));
       return {
         kind: 'refund',
         transactionId: data.id,
-        refund: {
-          externalId: data.id,
-          amount: total,
-          total,
-          status: 'succeeded'
-        },
+        refund: toRefund(data as LemonInvoice),
         userId: textOf(custom?.user_id),
         planId: textOf(custom?.plan_id)
       };
@@ -506,19 +507,14 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
       return `https://app.lemonsqueezy.com/subscriptions/${externalId}`;
     },
 
-    async getPaymentState(payment) {
-      // Lemon Squeezy says what was refunded of an invoice, and nothing of
-      // disputes: it settles those itself, as refunds.
-      const invoice = await lemon<LemonInvoice>(
-        'GET',
-        `/subscription-invoices/${payment.externalId}`
+    async getRefund(payment) {
+      // The invoice is the refund: it says how much of it has gone back.
+      return toRefund(
+        await lemon<LemonInvoice>(
+          'GET',
+          `/subscription-invoices/${payment.externalId}`
+        )
       );
-      const a = invoice.attributes;
-      return {
-        refunded: toAmount(a.refunded_amount ?? 0),
-        refundPending: false,
-        dispute: 'none'
-      };
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {

@@ -737,33 +737,23 @@ describe('asking Paddle, for a webhook that never came', () => {
     totals: { total }
   });
 
-  it('where a payment stands: its approved refunds, one still waiting, and its chargebacks', async () => {
-    const state = async (adjustments: unknown[]) => {
-      replies.push({ body: { data: adjustments } });
-      return await paddle.getPaymentState({
-        externalId: 'txn_1',
-        transactionId: 'txn_1'
-      });
+  it('a refund sent from here, by its adjustment id: approved, waiting, or rejected', async () => {
+    const read = async (status: string) => {
+      replies.push({ body: { data: adjustment('refund', status, '800') } });
+      return await paddle.getRefund(
+        { externalId: 'txn_1', transactionId: 'txn_1' },
+        'adj_refund'
+      );
     };
-    expect(
-      await state([
-        adjustment('refund', 'approved', '800'),
-        adjustment('refund', 'pending_approval', '100'),
-        adjustment('refund', 'rejected', '50')
-      ])
-    ).toEqual({ refunded: 8, refundPending: true, dispute: 'none' });
-    expect(calls.at(-1)!.url).toContain('/adjustments?transaction_id=txn_1');
-    expect(
-      (await state([adjustment('chargeback_warning', 'approved')])).dispute
-    ).toBe('withdrawn');
-    expect(
-      (
-        await state([
-          adjustment('chargeback', 'approved'),
-          adjustment('chargeback_reverse', 'approved')
-        ])
-      ).dispute
-    ).toBe('won');
+    expect(await read('approved')).toEqual({
+      externalId: 'adj_refund',
+      amount: 8,
+      total: null,
+      status: 'succeeded'
+    });
+    expect(calls.at(-1)!.url).toContain('/adjustments/adj_refund');
+    expect((await read('pending_approval')).status).toBe('pending');
+    expect((await read('rejected')).status).toBe('failed');
   });
 
   it('the subscription a checkout made, only for the user it was made for', async () => {

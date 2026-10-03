@@ -861,9 +861,6 @@ export const payments = createTable(
     // confirms the money went back: canceled at once (true), or when it
     // expires (false). Null with nothing owed — none sent, or done.
     refundCancelSubscription: boolean('refund_cancel_subscription'),
-    // When its refunds and disputes were last read from the processor, by
-    // the job that makes up for webhooks that never came.
-    checkedAt: timestamp('checked_at', { withTimezone: true }),
     // What the processor kept as its fee, and the tax in the amount. Null
     // where it does not say.
     fee: numeric('fee', { precision: 12, scale: 2 }),

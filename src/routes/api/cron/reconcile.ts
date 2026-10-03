@@ -3,10 +3,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { reconcileWithProcessors } from '@/server/services/subscription';
 
 /**
- * The scheduled job that makes up for webhooks that never came: called once
- * a day (see `vercel.json`), it reads from the payment processors what the
- * app has not been told — subscriptions past their expiry, and the refunds
- * and disputes of recent payments.
+ * The scheduled job: the recovery for what the webhooks did not say, called
+ * once a day (see `vercel.json`). Subscriptions past their expiry are asked
+ * of their processor; those whose renewal failed and whose grace days are
+ * over are ended; refunds sent from here and still waiting after a day are
+ * asked of their processor by id.
  *
  * No session: the scheduler is the caller, and proves itself with
  * `CRON_SECRET` as a bearer token, as Vercel's cron does. Without the

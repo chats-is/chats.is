@@ -14,7 +14,7 @@ import {
   type PaymentMethod,
   type PaymentProcessor,
   type ProcessorPayment,
-  type ProcessorPaymentState,
+  type ProcessorRefund,
   type ProcessorSubscription,
   type WebhookAction
 } from '@/server/services/payment-processor';
@@ -207,16 +207,19 @@ function kindOf(reason: Stripe.Invoice['billing_reason']): PaymentKind {
   return 'initial';
 }
 
-/**
- * Where a charge's disputes leave it: the money gone, only asked about, or
- * given back. An inquiry (`warning_…`) has taken nothing.
- */
-function disputeOf(statuses: Array<string>): ProcessorPaymentState['dispute'] {
-  const any = (...of: Array<string>) => statuses.some(s => of.includes(s));
-  if (any('needs_response', 'under_review', 'lost')) return 'withdrawn';
-  if (any('warning_needs_response', 'warning_under_review')) return 'inquiry';
-  if (any('won', 'warning_closed')) return 'won';
-  return 'none';
+/** A Stripe refund as the app sees it. */
+function toRefund(refund: Stripe.Refund): ProcessorRefund {
+  return {
+    externalId: refund.id,
+    amount: toAmount(refund.amount),
+    total: null,
+    status:
+      refund.status === 'succeeded'
+        ? 'succeeded'
+        : refund.status === 'failed' || refund.status === 'canceled'
+          ? 'failed'
+          : 'pending'
+  };
 }
 
 /** What a webhook says: the object it carries, as it is, and when. */
@@ -243,21 +246,7 @@ function actionOf(event: Stripe.Event): WebhookAction {
       const refund = event.data.object;
       const ref = idOf(refund.payment_intent) ?? idOf(refund.charge);
       if (!ref) return { kind: 'ignore' };
-      return {
-        kind: 'refund',
-        transactionId: ref,
-        refund: {
-          externalId: refund.id,
-          amount: toAmount(refund.amount),
-          total: null,
-          status:
-            refund.status === 'succeeded'
-              ? 'succeeded'
-              : refund.status === 'failed' || refund.status === 'canceled'
-                ? 'failed'
-                : 'pending'
-        }
-      };
+      return { kind: 'refund', transactionId: ref, refund: toRefund(refund) };
     }
     case 'charge.dispute.created':
     case 'charge.dispute.funds_withdrawn': {
@@ -488,34 +477,9 @@ export function createStripeProcessor(): PaymentProcessor {
       return `https://dashboard.stripe.com/${test}subscriptions/${externalId}`;
     },
 
-    async getPaymentState(payment) {
-      const none = {
-        refunded: 0,
-        refundPending: false,
-        dispute: 'none'
-      } as const;
-      const ref = payment.transactionId;
-      if (!ref) return none;
+    async getRefund(_payment, externalRefundId) {
       const stripe = await client();
-      const charge = ref.startsWith('pi_')
-        ? (
-            await stripe.paymentIntents.retrieve(ref, {
-              expand: ['latest_charge']
-            })
-          ).latest_charge
-        : await stripe.charges.retrieve(ref);
-      if (!charge || typeof charge !== 'object') return none;
-      const [refunds, disputes] = await Promise.all([
-        stripe.refunds.list({ charge: charge.id, limit: 100 }),
-        stripe.disputes.list({ charge: charge.id, limit: 100 })
-      ]);
-      return {
-        refunded: toAmount(charge.amount_refunded),
-        refundPending: refunds.data.some(
-          r => r.status === 'pending' || r.status === 'requires_action'
-        ),
-        dispute: disputeOf(disputes.data.map(d => d.status))
-      };
+      return toRefund(await stripe.refunds.retrieve(externalRefundId));
     },
 
     async getPayment(externalId): Promise<ProcessorPayment | null> {
