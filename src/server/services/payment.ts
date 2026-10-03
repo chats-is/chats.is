@@ -30,7 +30,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { payments, subscriptions, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
-import { withLock } from '@/server/services/db-lock';
+import { lockIn, withLock, type Tx } from '@/server/services/db-lock';
 import {
   getPaymentProcessor,
   withRetry,
@@ -78,13 +78,16 @@ export function leftToRefundMinor(
 export async function recordPayment(
   processor: PaymentProcessorId,
   payment: ProcessorPayment,
-  owner: { userId: string; planId: string; subscriptionId: string | null }
+  owner: { userId: string; planId: string; subscriptionId: string | null },
+  /** The user's transaction this runs in; the payment's lock is taken in it. */
+  tx: Tx
 ): Promise<PaymentRow> {
-  const [user] = await db
-    .select({ email: users.email })
-    .from(users)
-    .where(eq(users.id, owner.userId));
-  return await withLock(lockKey(processor, payment.externalId), async tx => {
+  await lockIn(tx, lockKey(processor, payment.externalId));
+  {
+    const [user] = await tx
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, owner.userId));
     const existing = await tx.query.payments.findFirst({
       where: and(
         eq(payments.processor, processor),
@@ -130,7 +133,7 @@ export async function recordPayment(
       })
       .returning();
     return row;
-  });
+  }
 }
 
 /**

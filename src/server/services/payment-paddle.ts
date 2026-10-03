@@ -618,6 +618,13 @@ export function createPaddleProcessor(): PaymentProcessor {
     async cancelNow(externalId) {
       const sub = await getSubscription(externalId);
       if (sub.status === 'canceled') return;
+      // Paddle refuses to cancel one with a change scheduled — a cancel at
+      // the period end, say — until that is dropped.
+      if (sub.scheduled_change) {
+        await paddle('PATCH', `/subscriptions/${externalId}`, {
+          scheduled_change: null
+        });
+      }
       await paddle('POST', `/subscriptions/${externalId}/cancel`, {
         effective_from: 'immediately'
       });

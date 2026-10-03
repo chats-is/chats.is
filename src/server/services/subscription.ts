@@ -1084,17 +1084,24 @@ async function applyPayment(
   payment: ProcessorPayment
 ) {
   if (!payment.externalSubscriptionId) return;
+  const externalSubscriptionId = payment.externalSubscriptionId;
   const { userId, planId } = await requireNamed(processorId, payment);
-  const sub = await subscriptionOf(
-    db,
-    processorId,
-    userId,
-    payment.externalSubscriptionId
-  );
-  const row = await recordPayment(processorId, payment, {
-    userId,
-    planId,
-    subscriptionId: sub?.id ?? null
+  // Under the user's lock, as the subscription's webhook is: the two arrive
+  // together, and whichever is second sees the first.
+  const { sub, row } = await withLock(userLock(userId), async tx => {
+    const sub = await subscriptionOf(
+      tx,
+      processorId,
+      userId,
+      externalSubscriptionId
+    );
+    const row = await recordPayment(
+      processorId,
+      payment,
+      { userId, planId, subscriptionId: sub?.id ?? null },
+      tx
+    );
+    return { sub, row };
   });
   if (!sub) return;
   if (isDuplicate(sub.cancelReason)) {

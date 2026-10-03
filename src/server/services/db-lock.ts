@@ -23,7 +23,13 @@ export async function withLock<T>(
   fn: (tx: Tx) => Promise<T>
 ): Promise<T> {
   return await db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+    await lockIn(tx, key);
     return await fn(tx);
   });
+}
+
+/** Take the lock `key` names in a transaction already open, held until it
+ *  ends — a second lock inside the first, on the one connection. */
+export async function lockIn(tx: Tx, key: string) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
 }
