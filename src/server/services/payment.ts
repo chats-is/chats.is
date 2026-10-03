@@ -80,10 +80,10 @@ export async function recordPayment(
   payment: ProcessorPayment,
   owner: { userId: string; planId: string; subscriptionId: string | null }
 ): Promise<PaymentRow> {
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, owner.userId),
-    columns: { email: true }
-  });
+  const [user] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, owner.userId));
   return await withLock(lockKey(processor, payment.externalId), async tx => {
     const existing = await tx.query.payments.findFirst({
       where: and(
@@ -98,8 +98,8 @@ export async function recordPayment(
       periodEnd: payment.periodEnd,
       amount: payment.amount.toFixed(2),
       kind: payment.kind,
-      fee: payment.fee?.toFixed(2) ?? existing?.fee ?? null,
-      tax: payment.tax?.toFixed(2) ?? existing?.tax ?? null,
+      fee: payment.fee?.toFixed(2) ?? null,
+      tax: payment.tax?.toFixed(2) ?? null,
       status,
       invoiceUrl: payment.invoiceUrl,
       billedAt: payment.billedAt,
@@ -121,7 +121,7 @@ export async function recordPayment(
       .values({
         id: generateUUID(),
         userId: owner.userId,
-        userEmail: user?.email ?? '',
+        userEmail: user.email,
         subscriptionId: owner.subscriptionId,
         planId: owner.planId,
         processor,
