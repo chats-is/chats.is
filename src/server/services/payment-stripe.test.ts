@@ -14,6 +14,7 @@ const stripe = {
   subscriptions: { retrieve: vi.fn(), update: vi.fn() },
   webhooks: { constructEventAsync: vi.fn() },
   checkout: { sessions: { retrieve: vi.fn(), create: vi.fn() } },
+  prices: { retrieve: vi.fn() },
   invoices: { createPreview: vi.fn() },
   paymentIntents: { retrieve: vi.fn() },
   refunds: { retrieve: vi.fn() }
@@ -264,6 +265,41 @@ describe('a Stripe dispute', () => {
 });
 
 describe('asking Stripe', () => {
+  /** A Stripe price of $200, renewing as given. */
+  const price = (recurring: Record<string, unknown> | null) => ({
+    id: 'price_pro',
+    active: true,
+    unit_amount: 20000,
+    recurring
+  });
+
+  it('for a price in dollars, with its interval', async () => {
+    stripe.prices.retrieve.mockResolvedValue(
+      price({ interval: 'year', interval_count: 1, usage_type: 'licensed' })
+    );
+    expect(await createStripeProcessor().getPrice('price_pro')).toEqual({
+      priceId: 'price_pro',
+      amount: 200,
+      interval: 'year',
+      active: true,
+      metered: false,
+      maxQuantity: null
+    });
+  });
+
+  it('for a price every three months, or once, as no interval it can sell', async () => {
+    stripe.prices.retrieve.mockResolvedValue(
+      price({ interval: 'month', interval_count: 3, usage_type: 'licensed' })
+    );
+    expect(
+      (await createStripeProcessor().getPrice('price_pro')).interval
+    ).toBeNull();
+    stripe.prices.retrieve.mockResolvedValue(price(null));
+    expect(
+      (await createStripeProcessor().getPrice('price_pro')).interval
+    ).toBeNull();
+  });
+
   it('for the subscription a checkout made, only for the user it was made for', async () => {
     stripe.checkout.sessions.retrieve.mockResolvedValue({
       client_reference_id: 'u1',

@@ -54,10 +54,18 @@ const idOf = (ref: string | { id: string } | null | undefined) =>
 const dateOf = (seconds: number | null | undefined) =>
   seconds ? new Date(seconds * 1000) : null;
 
+/** The interval a price renews at: every one month or one year. Every three
+ *  months, say, is none a plan is sold at. */
 const intervalOf = (
-  interval: string | null | undefined
-): BillingInterval | null =>
-  interval === 'month' ? 'month' : interval === 'year' ? 'year' : null;
+  recurring: Stripe.Price.Recurring | null | undefined
+): BillingInterval | null => {
+  if (recurring?.interval_count !== 1) return null;
+  return recurring.interval === 'month'
+    ? 'month'
+    : recurring.interval === 'year'
+      ? 'year'
+      : null;
+};
 
 /**
  * Stripe's status in the app's words. Set to stop at the end of the period,
@@ -294,7 +302,7 @@ export function createStripeProcessor(): PaymentProcessor {
       return {
         priceId: price.id,
         amount: price.unit_amount == null ? null : toAmount(price.unit_amount),
-        interval: intervalOf(price.recurring?.interval),
+        interval: intervalOf(price.recurring),
         active: price.active,
         metered: price.recurring?.usage_type === 'metered',
         // The checkout the app makes sells one, not adjustable.
