@@ -1,5 +1,5 @@
 {
-  "id": "0c614fc4-a39b-48cc-a156-9808cbabf711",
+  "id": "71897ded-d362-43a1-a048-5475e6dfbf41",
   "prevId": "6e62c63e-6fb9-423d-82e5-3d561b077dea",
   "version": "7",
   "dialect": "postgresql",
@@ -1239,6 +1239,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "external_subscription_id": {
+          "name": "external_subscription_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "period_end": {
+          "name": "period_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_refund_id": {
+          "name": "external_refund_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "amount": {
           "name": "amount",
           "type": "numeric(12, 2)",
@@ -1273,6 +1291,12 @@
         "refund_at": {
           "name": "refund_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refund_cancel_subscription": {
+          "name": "refund_cancel_subscription",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
@@ -2447,6 +2471,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "canceled_by": {
+          "name": "canceled_by",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2562,6 +2592,19 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "subscription_canceled_by_user_id_fk": {
+          "name": "subscription_canceled_by_user_id_fk",
+          "tableFrom": "subscription",
+          "tableTo": "user",
+          "columnsFrom": [
+            "canceled_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },

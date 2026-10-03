@@ -8,12 +8,16 @@ CREATE TABLE "payment" (
 	"kind" varchar(16) NOT NULL,
 	"external_id" varchar(255) NOT NULL,
 	"transaction_id" varchar(255),
+	"external_subscription_id" varchar(255),
+	"period_end" timestamp with time zone,
+	"external_refund_id" varchar(255),
 	"amount" numeric(12, 2) NOT NULL,
 	"refund_amount" numeric(12, 2) DEFAULT '0' NOT NULL,
 	"refund_by" varchar(255),
 	"refund_request_id" varchar(255),
 	"refund_fee" varchar(8),
 	"refund_at" timestamp with time zone,
+	"refund_cancel_subscription" boolean,
 	"fee" numeric(12, 2),
 	"tax" numeric(12, 2),
 	"status" varchar(32) NOT NULL,
@@ -46,6 +50,7 @@ CREATE TABLE "subscription" (
 	"expires_at" timestamp with time zone NOT NULL,
 	"canceled_at" timestamp with time zone,
 	"cancel_reason" varchar(32),
+	"canceled_by" varchar(255),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "subscription_canceled_check" CHECK ("subscription"."status" <> 'canceled' or ("subscription"."canceled_at" is not null and "subscription"."cancel_reason" is not null)),
@@ -68,6 +73,7 @@ ALTER TABLE "refund_request" ADD CONSTRAINT "refund_request_user_id_user_id_fk" 
 ALTER TABLE "refund_request" ADD CONSTRAINT "refund_request_subscription_id_subscription_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscription"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription" ADD CONSTRAINT "subscription_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription" ADD CONSTRAINT "subscription_plan_id_plan_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."plan"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "subscription" ADD CONSTRAINT "subscription_canceled_by_user_id_fk" FOREIGN KEY ("canceled_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "payment_processor_external_idx" ON "payment" USING btree ("processor","external_id");--> statement-breakpoint
 CREATE INDEX "payment_user_id_idx" ON "payment" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "payment_transaction_idx" ON "payment" USING btree ("processor","transaction_id");--> statement-breakpoint
