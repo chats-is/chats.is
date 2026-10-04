@@ -1214,7 +1214,18 @@ describe("the user's plan", () => {
     await expect(
       report({ planId: 'basic', priceId: 'price_pro_m' })
     ).rejects.toThrow("is not plan basic's");
+    await expect(report({ planId: 'basic', priceId: null })).rejects.toThrow(
+      'names no price'
+    );
     expect(await rowOf()).toBeUndefined();
+  });
+
+  it('is never kept without its price, new or already kept', async () => {
+    await subscribe();
+    await expect(
+      report({ priceId: null, cancelAtPeriodEnd: true })
+    ).rejects.toThrow('names no price');
+    expect(await rowOf()).toMatchObject({ status: 'active', canceledAt: null });
   });
 });
 

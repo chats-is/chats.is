@@ -817,7 +817,9 @@ async function settlePlan(userId: string) {
  * The user and plan a webhook's object names, checked against what is kept:
  * the checkout wrote them on it, and every processor carries them back. A
  * user not kept, a plan not kept, or a price that is not that plan's is an
- * error — the webhook fails, for the admin to see.
+ * error — the webhook fails, for the admin to see. A subscription is sold at
+ * a price, so it always names one; a payment names it where the processor's
+ * invoice carries it, which Lemon Squeezy's does not.
  */
 async function requireNamed(
   processorId: PaymentProcessorId,
@@ -827,6 +829,7 @@ async function requireNamed(
     planId: string | null;
     priceId: string | null;
   },
+  kind: 'subscription' | 'payment',
   ex: Executor = db
 ): Promise<{ userId: string; planId: string }> {
   const where = `${processorId} ${named.externalId}`;
@@ -845,6 +848,9 @@ async function requireNamed(
   });
   if (!plan)
     throw new Error(`[subscription] ${where}: no plan ${named.planId}`);
+  if (kind === 'subscription' && !named.priceId) {
+    throw new Error(`[subscription] ${where} names no price`);
+  }
   // The price, where the processor says it, must be this plan's.
   if (
     named.priceId &&
@@ -881,7 +887,7 @@ async function applySubscription(
   snap: ProcessorSubscription
 ) {
   const { externalId } = snap;
-  const named = await requireNamed(processorId, snap);
+  const named = await requireNamed(processorId, snap, 'subscription');
   const { userId } = named;
 
   const outcome = await withLock(userLock(userId), async tx => {
@@ -1054,7 +1060,11 @@ async function applyPayment(
 ) {
   if (!payment.externalSubscriptionId) return;
   const externalSubscriptionId = payment.externalSubscriptionId;
-  const { userId, planId } = await requireNamed(processorId, payment);
+  const { userId, planId } = await requireNamed(
+    processorId,
+    payment,
+    'payment'
+  );
   // A renewal paid buys the period up to the subscription's next renewal.
   // A processor whose invoice does not say so (Lemon Squeezy) says it on the
   // subscription, which is read for it.
