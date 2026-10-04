@@ -49,6 +49,14 @@ import { getRefundPolicy } from '@/server/services/settings';
 
 type PaymentRow = typeof payments.$inferSelect;
 
+/** A payment its money has moved on from since it was paid: a refund on its
+ *  way or made, or a dispute. Its invoice reported again does not undo it. */
+const SETTLED_STATUSES: ReadonlyArray<PaymentStatus> = [
+  'refund_pending',
+  'refunded',
+  'disputed'
+];
+
 /** One lock per payment, whoever writes it: the webhooks and the refunds. */
 const lockKey = (processor: PaymentProcessorId, externalId: string) =>
   `payment:${processor}:${externalId}`;
@@ -109,10 +117,15 @@ export async function recordPayment(
       updatedAt: new Date()
     };
     if (existing) {
+      // The invoice says only whether it was paid. What became of the money
+      // since — a refund on its way or made, a dispute — is not its to undo:
+      // reported again, by a retried webhook say, it leaves that as it is.
+      const settled = SETTLED_STATUSES.includes(existing.status);
       const [row] = await tx
         .update(payments)
         .set({
           ...values,
+          status: settled ? existing.status : status,
           subscriptionId: existing.subscriptionId ?? owner.subscriptionId
         })
         .where(eq(payments.id, existing.id))

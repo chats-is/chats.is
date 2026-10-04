@@ -1408,6 +1408,30 @@ describe('a payment', () => {
     ).resolves.toMatchObject({ url: expect.any(String) });
   });
 
+  it('reported again, by a retried webhook, keeps what a refund made of it', async () => {
+    await subscribe();
+    const id = (await paymentOf())!.id;
+    await refundPayment({ paymentId: id, cancelSubscription: false }, 'admin');
+    await pay();
+    expect(await paymentOf()).toMatchObject({
+      status: 'refund_pending',
+      refundAmount: '8.00'
+    });
+    await refund('pi_1', 8);
+    await pay();
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '8.00'
+    });
+  });
+
+  it('reported again, by a retried webhook, stays disputed', async () => {
+    await subscribe();
+    await dispute('pi_1', false);
+    await pay();
+    expect(await paymentOf()).toMatchObject({ status: 'disputed' });
+  });
+
   it("is the user's own to see, newest first", async () => {
     await subscribe();
     await pay({ externalId: 'in_2', kind: 'renewal', billedAt: new Date() });
