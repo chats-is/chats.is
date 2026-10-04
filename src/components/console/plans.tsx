@@ -6,12 +6,11 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import {
-  BILLING_TYPES,
-  billingTypeSchema,
-  intervalsOf,
+  BILLING_INTERVALS,
+  billingIntervalOf,
+  billingIntervalSchema,
   PAYMENT_PROCESSORS,
   paymentProcessorSchema,
-  type BillingInterval,
   type PaymentProcessorId
 } from '@/types/payment';
 import { describeMultiplier } from '@/lib/billing';
@@ -79,41 +78,22 @@ const NO_TIER = '__none__';
 /** A price as typed: to two decimals at most. */
 const PRICE_PATTERN = /^\d+(\.\d{1,2})?$/;
 
-const planSchema = z
-  .object({
-    name: z.string().trim().min(1, 'Name is required').max(100),
-    description: z.string().max(500),
-    quotaId: z.string().min(1, 'Select a quota'),
-    tierId: z.string(),
-    displayOrder: z.string(),
-    billingType: billingTypeSchema,
-    processor: paymentProcessorSchema,
-    monthlyPrice: z.string(),
-    monthlyPriceId: z.string(),
-    yearlyPrice: z.string(),
-    yearlyPriceId: z.string()
-  })
-  // Only the intervals the billing type sells at need their price and ID.
-  .superRefine((form, ctx) => {
-    for (const interval of intervalsOf(form.billingType)) {
-      const name = interval === 'month' ? 'monthly' : 'yearly';
-      const price = form[`${name}Price`].trim();
-      if (!PRICE_PATTERN.test(price) || Number(price) <= 0) {
-        ctx.addIssue({
-          code: 'custom',
-          path: [`${name}Price`],
-          message: 'A price like 10 or 9.99'
-        });
-      }
-      if (!form[`${name}PriceId`].trim()) {
-        ctx.addIssue({
-          code: 'custom',
-          path: [`${name}PriceId`],
-          message: 'Enter the price ID'
-        });
-      }
-    }
-  });
+const planSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100),
+  description: z.string().max(500),
+  quotaId: z.string().min(1, 'Select a quota'),
+  tierId: z.string(),
+  displayOrder: z.string(),
+  processor: paymentProcessorSchema,
+  interval: billingIntervalSchema,
+  price: z
+    .string()
+    .refine(
+      v => PRICE_PATTERN.test(v.trim()) && Number(v) > 0,
+      'A price like 10 or 9.99'
+    ),
+  priceId: z.string().trim().min(1, 'Enter the price ID').max(255)
+});
 
 type PlanForm = z.infer<typeof planSchema>;
 
@@ -123,17 +103,15 @@ const emptyForm: PlanForm = {
   quotaId: '',
   tierId: NO_TIER,
   displayOrder: '0',
-  billingType: 'month',
   processor: PAYMENT_PROCESSORS[0].id,
-  monthlyPrice: '',
-  monthlyPriceId: '',
-  yearlyPrice: '',
-  yearlyPriceId: ''
+  interval: 'month',
+  price: '',
+  priceId: ''
 };
 
-const BILLING_TYPE_OPTIONS = BILLING_TYPES.map(t => ({
-  value: t.value,
-  label: t.label
+const INTERVAL_OPTIONS = BILLING_INTERVALS.map(i => ({
+  value: i.value,
+  label: i.label
 }));
 const PROCESSOR_OPTIONS = PAYMENT_PROCESSORS.map(p => ({
   value: p.id,
@@ -141,10 +119,6 @@ const PROCESSOR_OPTIONS = PAYMENT_PROCESSORS.map(p => ({
 }));
 const processorLabel = (id: string | null) =>
   PAYMENT_PROCESSORS.find(p => p.id === id)?.label ?? '—';
-const PER = { month: 'month', year: 'year' } as const;
-/** "Price ID" → "price ID": only the first letter, so an ID stays an ID. */
-const lowerFirst = (text: string) =>
-  text.charAt(0).toLowerCase() + text.slice(1);
 
 const helper = createAppColumnHelper<Plan>();
 
@@ -180,27 +154,15 @@ const planColumns = (actions: {
       header: 'Price',
       cell: ({ row }) => {
         const plan = row.original;
-        const prices = intervalsOf(plan.billingType).flatMap(interval => {
-          const price =
-            interval === 'month' ? plan.monthlyPrice : plan.yearlyPrice;
-          return price == null ? [] : [{ interval, price }];
-        });
-        if (prices.length === 0) {
-          return (
-            <span className="text-sm text-muted-foreground">No price</span>
-          );
-        }
         return (
           <div className="text-sm">
-            {prices.map(({ interval, price }) => (
-              <div key={interval} className="font-medium">
-                {formatPrice(price)}
-                <span className="font-normal text-muted-foreground">
-                  {' '}
-                  / {PER[interval]}
-                </span>
-              </div>
-            ))}
+            <div className="font-medium">
+              {formatPrice(plan.price)}
+              <span className="font-normal text-muted-foreground">
+                {' '}
+                / {plan.interval}
+              </span>
+            </div>
             <div className="text-xs text-muted-foreground">
               {processorLabel(plan.processor)}
             </div>
@@ -390,22 +352,10 @@ export default function PlansPage() {
         quotaId: value.quotaId,
         tierId: value.tierId === NO_TIER ? null : value.tierId,
         displayOrder: Number(value.displayOrder) || 0,
-        billingType: value.billingType,
         processor: value.processor,
-        // The interval the billing type does not sell at is sent as none.
-        ...Object.fromEntries(
-          (['month', 'year'] as const).flatMap(interval => {
-            const name = interval === 'month' ? 'monthly' : 'yearly';
-            const sold = intervalsOf(value.billingType).includes(interval);
-            return [
-              [
-                `${name}Price`,
-                sold ? Number(value[`${name}Price`].trim()) : null
-              ],
-              [`${name}PriceId`, sold ? value[`${name}PriceId`].trim() : null]
-            ];
-          })
-        )
+        interval: value.interval,
+        price: Number(value.price.trim()),
+        priceId: value.priceId.trim()
       };
 
       try {
@@ -435,63 +385,42 @@ export default function PlansPage() {
           quotaId: plan.quotaId,
           tierId: plan.tierId ?? NO_TIER,
           displayOrder: plan.displayOrder.toString(),
-          billingType: plan.billingType ?? 'month',
-          processor: plan.processor ?? PAYMENT_PROCESSORS[0].id,
-          monthlyPrice:
-            plan.monthlyPrice != null
-              ? Number(plan.monthlyPrice).toFixed(2)
-              : '',
-          monthlyPriceId: plan.monthlyPriceId ?? '',
-          yearlyPrice:
-            plan.yearlyPrice != null ? Number(plan.yearlyPrice).toFixed(2) : '',
-          yearlyPriceId: plan.yearlyPriceId ?? ''
+          processor: plan.processor,
+          interval: plan.interval,
+          price: Number(plan.price).toFixed(2),
+          priceId: plan.priceId
         }
       : emptyForm;
-    // The IDs the plan already has are not new ones to offer syncing from.
-    setSyncedIds({
-      month: values.monthlyPriceId,
-      year: values.yearlyPriceId
-    });
+    // The ID the plan already has is not a new one to offer syncing from.
+    setSyncedId(values.priceId);
     setDefaults(values);
     form.reset(values);
     setOpen(true);
   };
 
-  // Subscribed to: the billing, prices, processor and price IDs are fixed.
+  // Subscribed to: the processor, interval, price and price ID are fixed.
   const [locked, setLocked] = useState(false);
-  // Per interval, the price ID the price was last taken from, or the plan's
-  // own; a different one is offered to sync from.
-  const [syncedIds, setSyncedIds] = useState<Record<BillingInterval, string>>({
-    month: '',
-    year: ''
-  });
-  const billingType = useStore(form.store, state => state.values.billingType);
-  const priceIds = useStore(form.store, state => ({
-    month: state.values.monthlyPriceId.trim(),
-    year: state.values.yearlyPriceId.trim()
-  }));
+  // The price ID the price was last taken from, or the plan's own; a
+  // different one is offered to sync from.
+  const [syncedId, setSyncedId] = useState('');
+  const interval = useStore(form.store, state => state.values.interval);
+  const priceId = useStore(form.store, state => state.values.priceId.trim());
   const processor = useStore(form.store, state => state.values.processor);
   // What the chosen processor calls the ID a plan is sold by.
   const processorInfo = PAYMENT_PROCESSORS.find(p => p.id === processor);
   const sync = useMutation({
-    mutationFn: (data: {
-      processor: PaymentProcessorId;
-      priceId: string;
-      interval: BillingInterval;
-    }) => lookupPlanPrice({ data }),
-    onSuccess: (found, { priceId, interval }) => {
-      // Only a price billed at the interval it is entered for.
+    mutationFn: (data: { processor: PaymentProcessorId; priceId: string }) =>
+      lookupPlanPrice({ data }),
+    onSuccess: (found, { priceId }) => {
+      // Only a price billed at the plan's interval.
       if (found.interval !== interval) {
         toast.error(
-          `This price is billed ${found.interval === 'year' ? 'yearly' : 'monthly'}, not ${interval === 'year' ? 'yearly' : 'monthly'}.`
+          `This price is billed ${billingIntervalOf(found.interval).adverb}, not ${billingIntervalOf(interval).adverb}.`
         );
         return;
       }
-      form.setFieldValue(
-        interval === 'month' ? 'monthlyPrice' : 'yearlyPrice',
-        found.price.toFixed(2)
-      );
-      setSyncedIds(ids => ({ ...ids, [interval]: priceId }));
+      form.setFieldValue('price', found.price.toFixed(2));
+      setSyncedId(priceId);
       toast.success('Price synced');
     },
     onError: e => toast.error(e.message)
@@ -629,15 +558,6 @@ export default function PlansPage() {
                 <div className="space-y-4 border-t pt-4">
                   <PaymentConfigurationAlert processor={processor} />
                   <div className="grid grid-cols-2 gap-4">
-                    <form.AppField name="billingType">
-                      {field => (
-                        <field.SelectField
-                          label="Billing"
-                          options={BILLING_TYPE_OPTIONS}
-                          disabled={locked}
-                        />
-                      )}
-                    </form.AppField>
                     <form.AppField name="processor">
                       {field => (
                         <field.SelectField
@@ -647,76 +567,69 @@ export default function PlansPage() {
                         />
                       )}
                     </form.AppField>
+                    <form.AppField name="interval">
+                      {field => (
+                        <field.SelectField
+                          label="Billing"
+                          options={INTERVAL_OPTIONS}
+                          disabled={locked}
+                        />
+                      )}
+                    </form.AppField>
                   </div>
-                  {intervalsOf(billingType).map(interval => {
-                    const monthly = interval === 'month';
-                    const priceId = priceIds[interval];
-                    return (
-                      <div key={interval} className="space-y-2">
-                        <div className="grid grid-cols-2 gap-4">
-                          <form.AppField
-                            name={monthly ? 'monthlyPrice' : 'yearlyPrice'}
-                          >
-                            {field => (
-                              <field.TextField
-                                label={`${monthly ? 'Monthly' : 'Yearly'} price`}
-                                prefix="$"
-                                inputMode="decimal"
-                                placeholder={monthly ? '10.00' : '100.00'}
-                                disabled={locked}
-                              />
-                            )}
-                          </form.AppField>
-                          <form.AppField
-                            name={monthly ? 'monthlyPriceId' : 'yearlyPriceId'}
-                          >
-                            {field => (
-                              <field.TextField
-                                label={`${monthly ? 'Monthly' : 'Yearly'} ${lowerFirst(processorInfo?.priceIdLabel ?? 'Price ID')}`}
-                                placeholder={processorInfo?.priceIdPlaceholder}
-                                disabled={locked}
-                              />
-                            )}
-                          </form.AppField>
-                        </div>
-                        {/* A new ID can bring its amount with it — offered,
-                            never done behind the admin's back. */}
-                        {!locked &&
-                          priceId &&
-                          priceId !== syncedIds[interval] && (
-                            <div className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm">
-                              <span>
-                                Sync the {monthly ? 'monthly' : 'yearly'} price
-                                from {processorLabel(processor)}?
-                              </span>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                                disabled={sync.isPending}
-                                onClick={() =>
-                                  sync.mutate({ processor, priceId, interval })
-                                }
-                              >
-                                {sync.isPending &&
-                                sync.variables?.interval === interval ? (
-                                  <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="size-4" />
-                                )}
-                                Sync price
-                              </Button>
-                            </div>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <form.AppField name="price">
+                        {field => (
+                          <field.TextField
+                            label="Price"
+                            prefix="$"
+                            inputMode="decimal"
+                            placeholder="10.00"
+                            disabled={locked}
+                          />
+                        )}
+                      </form.AppField>
+                      <form.AppField name="priceId">
+                        {field => (
+                          <field.TextField
+                            label={processorInfo?.priceIdLabel ?? 'Price ID'}
+                            placeholder={processorInfo?.priceIdPlaceholder}
+                            disabled={locked}
+                          />
+                        )}
+                      </form.AppField>
+                    </div>
+                    {/* A new ID can bring its amount with it — offered,
+                        never done behind the admin's back. */}
+                    {!locked && priceId && priceId !== syncedId && (
+                      <div className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm">
+                        <span>
+                          Sync the price from {processorLabel(processor)}?
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          disabled={sync.isPending}
+                          onClick={() => sync.mutate({ processor, priceId })}
+                        >
+                          {sync.isPending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="size-4" />
                           )}
+                          Sync price
+                        </Button>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
                   {locked && (
                     <p className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Lock className="size-3.5 shrink-0" />
-                      This plan has subscriptions, so its billing, prices,
-                      payment processor and price IDs are fixed.
+                      This plan has subscriptions, so its payment processor,
+                      billing, price and price ID are fixed.
                     </p>
                   )}
                 </div>

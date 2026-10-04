@@ -21,14 +21,12 @@ import { type z } from 'zod';
 import { pageWindow } from '@/types/pagination';
 import {
   canUpgrade,
-  intervalsOf,
   isDuplicate,
   REFUNDABLE_STATUSES,
   refundLeftMinor,
   toAmount,
   type approveRefundRequestSchema,
   type BillingInterval,
-  type BillingType,
   type CancelReason,
   type PaymentProcessorId,
   type ProcessorPrice,
@@ -114,34 +112,16 @@ import {
 // Plans
 // ============================================================================
 
-/** A plan as far as selling it goes. */
-type SellablePlan = {
-  id: string;
-  billingType: BillingType | null;
-  processor: PaymentProcessorId | null;
-  monthlyPrice: string | null;
-  monthlyPriceId: string | null;
-  yearlyPrice: string | null;
-  yearlyPriceId: string | null;
-};
-
-/** What a plan sells for at an interval, if it is billed at it. */
-export function offerOf(
-  plan: SellablePlan,
-  interval: BillingInterval
-): { price: number; priceId: string } | null {
-  if (!intervalsOf(plan.billingType).includes(interval)) return null;
-  const price = interval === 'month' ? plan.monthlyPrice : plan.yearlyPrice;
-  const priceId =
-    interval === 'month' ? plan.monthlyPriceId : plan.yearlyPriceId;
-  return price != null && priceId ? { price: Number(price), priceId } : null;
-}
+/** What a plan sells for: its price, as an amount. */
+const priceOf = (plan: { price: string }) => Number(plan.price);
 
 /** Why a processor's price cannot sell a plan, or null when it can. */
 function priceProblem(price: ProcessorPrice): string | null {
   if (!price.active) return 'This price is archived in its payment processor.';
   if (price.metered) return 'This price is billed by usage.';
-  if (!price.interval) return 'This price is not billed monthly or yearly.';
+  if (!price.interval) {
+    return 'This price is not billed every day, week, month or year.';
+  }
   if (price.amount == null) return 'This price has no fixed amount.';
   if (price.maxQuantity != null && price.maxQuantity > 1) {
     return 'This price lets the buyer choose a quantity. Set its maximum quantity to 1.';
@@ -202,41 +182,34 @@ async function requireProcessorAgrees(sale: Sale) {
   }
 }
 
-/** A plan that can be bought now at an interval: open, and priced at it. */
-async function planOnSale(
-  planId: string,
-  interval: BillingInterval
-): Promise<Sale> {
+/** A plan that can be bought now: open to new subscriptions. */
+async function planOnSale(planId: string): Promise<Sale> {
   const plan = await db.query.plans.findFirst({ where: eq(plans.id, planId) });
-  const offer = plan?.isEnabled ? offerOf(plan, interval) : null;
-  if (!plan?.processor || !offer) {
-    throw new PublicError(
-      `This plan is not available ${interval === 'year' ? 'yearly' : 'monthly'}.`
-    );
+  if (!plan?.isEnabled) {
+    throw new PublicError('This plan is not available.');
   }
-  return { planId: plan.id, processor: plan.processor, interval, ...offer };
+  return {
+    planId: plan.id,
+    processor: plan.processor,
+    interval: plan.interval,
+    price: priceOf(plan),
+    priceId: plan.priceId
+  };
 }
 
-/** The plan and interval a processor's price belongs to, if any plan has
- *  it. The price IDs are kept on plans only. */
+/** The plan a processor's price belongs to, if any plan has it. The price
+ *  IDs are kept on plans only. */
 async function planForPrice(
   processor: PaymentProcessorId,
   priceId: string | null,
   ex: Executor = db
-): Promise<{ planId: string; interval: BillingInterval } | null> {
+): Promise<string | null> {
   if (!priceId) return null;
   const plan = await ex.query.plans.findFirst({
-    where: and(
-      eq(plans.processor, processor),
-      or(eq(plans.monthlyPriceId, priceId), eq(plans.yearlyPriceId, priceId))
-    ),
-    columns: { id: true, monthlyPriceId: true }
+    where: and(eq(plans.processor, processor), eq(plans.priceId, priceId)),
+    columns: { id: true }
   });
-  if (!plan) return null;
-  return {
-    planId: plan.id,
-    interval: plan.monthlyPriceId === priceId ? 'month' : 'year'
-  };
+  return plan?.id ?? null;
 }
 
 async function requireSelling() {
@@ -246,8 +219,8 @@ async function requireSelling() {
 }
 
 /**
- * The plans a user can subscribe to — enabled, and priced at an interval at
- * least — with what each costs and the description its card shows.
+ * The plans a user can subscribe to — the enabled ones — with what each
+ * costs, how often, and the description its card shows.
  */
 export async function listPlansForSale() {
   const rows = await db.query.plans.findMany({
@@ -255,21 +228,15 @@ export async function listPlansForSale() {
     orderBy: (p, { asc }) => [asc(p.displayOrder), asc(p.name)]
   });
 
-  return rows.flatMap(plan => {
-    const month = offerOf(plan, 'month')?.price ?? null;
-    const year = offerOf(plan, 'year')?.price ?? null;
-    if (!plan.processor || (month == null && year == null)) return [];
-    return [
-      {
-        id: plan.id,
-        name: plan.name,
-        description: plan.description,
-        prices: { month, year },
-        // Only to tell whether a subscription can upgrade to it in place.
-        processor: plan.processor
-      }
-    ];
-  });
+  return rows.map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    description: plan.description,
+    interval: plan.interval,
+    price: priceOf(plan),
+    // Only to tell whether a subscription can upgrade to it in place.
+    processor: plan.processor
+  }));
 }
 
 // ============================================================================
@@ -311,8 +278,8 @@ export async function getMySubscription(userId: string) {
     id: sub.id,
     planId: sub.planId,
     planName: sub.plan.name,
-    interval: sub.interval,
-    price: offerOf(sub.plan, sub.interval)?.price ?? null,
+    interval: sub.plan.interval,
+    price: priceOf(sub.plan),
     processor: sub.processor,
     status: sub.status,
     expiresAt: sub.expiresAt,
@@ -440,10 +407,10 @@ async function customerOf(userId: string, processor: PaymentProcessorId) {
 export const CHECKOUT_FAILED =
   'Checkout could not be opened. Please try again.';
 
-/** Start buying a plan at an interval: its processor's checkout page. */
+/** Start buying a plan: its processor's checkout page. */
 export async function startCheckout(
   user: { id: string; email: string; name: string },
-  input: { planId: string; interval: BillingInterval },
+  input: { planId: string },
   request: Request
 ): Promise<{ url: string }> {
   await requireSelling();
@@ -452,7 +419,7 @@ export async function startCheckout(
       'You already have a subscription. You can choose again once it is canceled.'
     );
   }
-  const sale = await planOnSale(input.planId, input.interval);
+  const sale = await planOnSale(input.planId);
   await requireProcessorAgrees(sale);
 
   const processor = await getPaymentProcessor(sale.processor);
@@ -519,14 +486,13 @@ export async function upgradePlan(userId: string, input: { planId: string }) {
   const current = await db.query.plans.findFirst({
     where: eq(plans.id, sub.planId)
   });
-  const currentOffer = current && offerOf(current, sub.interval);
-  const target = await planOnSale(input.planId, sub.interval);
+  const target = await planOnSale(input.planId);
   if (
-    !currentOffer ||
+    !current ||
     !canUpgrade(
       {
-        price: currentOffer.price,
-        interval: sub.interval,
+        price: priceOf(current),
+        interval: current.interval,
         processor: sub.processor
       },
       target
@@ -580,7 +546,7 @@ export async function previewUpgrade(
   input: { planId: string }
 ): Promise<{ amount: number | null }> {
   const sub = await requireActive(userId);
-  const target = await planOnSale(input.planId, sub.interval);
+  const target = await planOnSale(input.planId);
   const processor = await getPaymentProcessor(sub.processor);
   const amount = await processor
     .previewChange(sub.externalId, { priceId: target.priceId })
@@ -862,11 +828,7 @@ async function requireNamed(
     priceId: string | null;
   },
   ex: Executor = db
-): Promise<{
-  userId: string;
-  planId: string;
-  interval: BillingInterval | null;
-}> {
+): Promise<{ userId: string; planId: string }> {
   const where = `${processorId} ${named.externalId}`;
   if (!named.userId || !named.planId) {
     throw new Error(`[subscription] ${where} names no user or plan`);
@@ -879,21 +841,20 @@ async function requireNamed(
     throw new Error(`[subscription] ${where}: no user ${named.userId}`);
   const plan = await ex.query.plans.findFirst({
     where: eq(plans.id, named.planId),
-    columns: { id: true }
+    columns: { id: true, processor: true, priceId: true }
   });
   if (!plan)
     throw new Error(`[subscription] ${where}: no plan ${named.planId}`);
-  // The price, where the processor says it, must be this plan's; it says the
-  // interval.
-  if (!named.priceId)
-    return { userId: user.id, planId: plan.id, interval: null };
-  const byPrice = await planForPrice(processorId, named.priceId, ex);
-  if (byPrice?.planId !== plan.id) {
+  // The price, where the processor says it, must be this plan's.
+  if (
+    named.priceId &&
+    (plan.processor !== processorId || plan.priceId !== named.priceId)
+  ) {
     throw new Error(
       `[subscription] ${where}: price ${named.priceId} is not plan ${plan.id}'s`
     );
   }
-  return { userId: user.id, planId: plan.id, interval: byPrice.interval };
+  return { userId: user.id, planId: plan.id };
 }
 
 /**
@@ -941,12 +902,6 @@ async function applySubscription(
     if (!was && snap.status === 'canceled') return null;
 
     const { planId } = named;
-    const interval = named.interval ?? was?.interval;
-    if (!interval) {
-      throw new Error(
-        `[subscription] ${processorId} ${externalId} names no price`
-      );
-    }
     const now = new Date();
     // The expiry is written once, when the subscription is made. From then
     // on it moves only when a renewal is paid — the payment's webhook says
@@ -990,7 +945,6 @@ async function applySubscription(
         .update(subscriptions)
         .set({
           planId,
-          interval,
           status,
           expiresAt,
           canceledAt,
@@ -1010,7 +964,6 @@ async function applySubscription(
       id,
       userId,
       planId,
-      interval,
       processor: processorId,
       externalId,
       customerId: snap.customerId,
@@ -1209,10 +1162,7 @@ export async function confirmCheckout(
       await applySubscription(input.via, {
         ...snap,
         userId: snap.userId ?? user.id,
-        planId:
-          snap.planId ??
-          (await planForPrice(input.via, snap.priceId))?.planId ??
-          null
+        planId: snap.planId ?? (await planForPrice(input.via, snap.priceId))
       });
     }
   } catch (err) {
@@ -1469,17 +1419,16 @@ async function refundablePayments(
       gte(payments.billedAt, new Date(at.getTime() - policy.days * DAY_MS))
     ),
     orderBy: p => [p.billedAt],
-    with: { plan: true, subscription: { columns: { interval: true } } }
+    with: { plan: true }
   });
   const covered = await Promise.all(
     rows
       .filter(p => p.billedAt <= at)
-      .map(async ({ plan, subscription, ...p }) => {
+      .map(async ({ plan, ...p }) => {
         const payment = await withFee(p, policy.refundFee);
         return {
           payment,
           plan,
-          interval: subscription?.interval ?? null,
           left: leftToRefundMinor(payment, policy.refundFee),
           estimate: refundLeftMinor(payment, policy.refundFee)
         };
@@ -1498,8 +1447,7 @@ async function refundablePayments(
  */
 function refundLineOf(
   payment: typeof payments.$inferSelect,
-  plan: SellablePlan & { name: string },
-  interval: BillingInterval | null,
+  plan: { name: string; price: string; interval: BillingInterval },
   left: number,
   duplicate = false
 ) {
@@ -1507,9 +1455,9 @@ function refundLineOf(
     id: payment.id,
     billedAt: payment.billedAt,
     planName: plan.name,
-    // What the plan is billed at, as its subscription is.
-    price: interval ? (offerOf(plan, interval)?.price ?? null) : null,
-    interval,
+    // What the plan is billed at.
+    price: priceOf(plan),
+    interval: plan.interval,
     kind: payment.kind,
     status: payment.status,
     paid: Number(payment.amount),
@@ -1740,7 +1688,7 @@ export async function getRefundRequest(id: string) {
     },
     refundFee: policy.refundFee,
     payments: covered.map(c =>
-      refundLineOf(c.payment, c.plan, c.interval, Math.min(c.estimate, c.left))
+      refundLineOf(c.payment, c.plan, Math.min(c.estimate, c.left))
     )
   };
 }
@@ -1869,7 +1817,6 @@ export async function getRefundDetails(paymentId: string) {
     payment: refundLineOf(
       payment,
       plan,
-      subscription?.interval ?? null,
       refundableMinor(payment, policy.refundFee, duplicate),
       duplicate
     ),
@@ -2019,8 +1966,8 @@ export async function listSubscriptions(
       id: sub.id,
       user: sub.user,
       planName: plan.name,
-      interval: sub.interval,
-      price: offerOf(plan, sub.interval)?.price ?? null,
+      interval: plan.interval,
+      price: priceOf(plan),
       status: sub.status,
       expiresAt: sub.expiresAt,
       canceledAt: sub.canceledAt,
@@ -2064,20 +2011,20 @@ export async function getSubscriptionDetail(id: string) {
     processor.dashboardUrl(sub.externalId).catch(() => null),
     listSubscriptionPayments(sub.id)
   ]);
-  const price = offerOf(sub.plan, sub.interval)?.price ?? null;
+  const price = priceOf(sub.plan);
 
   return {
     id: sub.id,
     user: sub.user,
     planName: sub.plan.name,
-    interval: sub.interval,
+    interval: sub.plan.interval,
     price,
     status: sub.status,
     expiresAt: sub.expiresAt,
     canceledAt: sub.canceledAt,
     cancelReason: sub.cancelReason,
     nextCharge:
-      sub.status === 'active' && !sub.canceledAt && price != null
+      sub.status === 'active' && !sub.canceledAt
         ? { at: sub.expiresAt, amount: price }
         : null,
     processor: sub.processor,

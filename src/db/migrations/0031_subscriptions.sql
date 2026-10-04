@@ -42,7 +42,6 @@ CREATE TABLE "subscription" (
 	"id" varchar(255) PRIMARY KEY NOT NULL,
 	"user_id" varchar(255) NOT NULL,
 	"plan_id" varchar(255) NOT NULL,
-	"interval" varchar(8) NOT NULL,
 	"processor" varchar(32) NOT NULL,
 	"external_id" varchar(255) NOT NULL,
 	"customer_id" varchar(255) NOT NULL,
@@ -57,12 +56,11 @@ CREATE TABLE "subscription" (
 	CONSTRAINT "subscription_cancel_pair_check" CHECK (("subscription"."canceled_at" is null) = ("subscription"."cancel_reason" is null))
 );
 --> statement-breakpoint
-ALTER TABLE "plan" ADD COLUMN "billing_type" varchar(8);--> statement-breakpoint
-ALTER TABLE "plan" ADD COLUMN "processor" varchar(32);--> statement-breakpoint
-ALTER TABLE "plan" ADD COLUMN "monthly_price" numeric(12, 2);--> statement-breakpoint
-ALTER TABLE "plan" ADD COLUMN "monthly_price_id" varchar(255);--> statement-breakpoint
-ALTER TABLE "plan" ADD COLUMN "yearly_price" numeric(12, 2);--> statement-breakpoint
-ALTER TABLE "plan" ADD COLUMN "yearly_price_id" varchar(255);--> statement-breakpoint
+ALTER TABLE "plan" DROP CONSTRAINT "plan_name_unique";--> statement-breakpoint
+ALTER TABLE "plan" ADD COLUMN "processor" varchar(32) NOT NULL;--> statement-breakpoint
+ALTER TABLE "plan" ADD COLUMN "interval" varchar(8) NOT NULL;--> statement-breakpoint
+ALTER TABLE "plan" ADD COLUMN "price" numeric(12, 2) NOT NULL;--> statement-breakpoint
+ALTER TABLE "plan" ADD COLUMN "price_id" varchar(255) NOT NULL;--> statement-breakpoint
 ALTER TABLE "plan" ADD COLUMN "is_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "payment" ADD CONSTRAINT "payment_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment" ADD CONSTRAINT "payment_subscription_id_subscription_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscription"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -86,5 +84,5 @@ CREATE UNIQUE INDEX "subscription_processor_external_idx" ON "subscription" USIN
 CREATE UNIQUE INDEX "subscription_user_active_idx" ON "subscription" USING btree ("user_id") WHERE "subscription"."status" = 'active';--> statement-breakpoint
 CREATE INDEX "subscription_user_id_idx" ON "subscription" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "subscription_status_created_idx" ON "subscription" USING btree ("status","created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "plan_processor_monthly_price_idx" ON "plan" USING btree ("processor","monthly_price_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "plan_processor_yearly_price_idx" ON "plan" USING btree ("processor","yearly_price_id");
+CREATE UNIQUE INDEX "plan_name_interval_idx" ON "plan" USING btree ("name","interval");--> statement-breakpoint
+CREATE UNIQUE INDEX "plan_processor_price_idx" ON "plan" USING btree ("processor","price_id");

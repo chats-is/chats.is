@@ -97,22 +97,16 @@ function useUpgradeOffer(wanted: boolean): (() => void) | null {
   if (!enabled || !plans || !isSuccess) return null;
 
   const available = mine
-    ? plans.some(plan => {
-        const price = mine.interval ? plan.prices[mine.interval] : null;
-        return (
-          price != null &&
-          mine.price != null &&
-          mine.interval != null &&
-          canUpgrade(
-            {
-              price: mine.price,
-              interval: mine.interval,
-              processor: mine.processor
-            },
-            { price, interval: mine.interval, processor: plan.processor }
-          )
-        );
-      })
+    ? plans.some(plan =>
+        canUpgrade(
+          {
+            price: mine.price,
+            interval: mine.interval,
+            processor: mine.processor
+          },
+          plan
+        )
+      )
     : plans.length > 0;
   return available ? openPlans : null;
 }

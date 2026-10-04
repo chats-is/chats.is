@@ -110,6 +110,22 @@ describe('the Paddle API', () => {
     expect((await paddle.getPrice('pri_q')).interval).toBeNull();
   });
 
+  it('reads every day or week as its interval', async () => {
+    for (const interval of ['day', 'week']) {
+      replies.push({
+        body: {
+          data: {
+            id: 'pri_short',
+            status: 'active',
+            billing_cycle: { interval, frequency: 1 },
+            unit_price: { amount: '300', currency_code: 'USD' }
+          }
+        }
+      });
+      expect((await paddle.getPrice('pri_short')).interval).toBe(interval);
+    }
+  });
+
   it('says a price it has not got is not there', async () => {
     replies.push({ status: 404, body: { error: { code: 'not_found' } } });
     await expect(paddle.getPrice('pri_x')).rejects.toThrow(

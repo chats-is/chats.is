@@ -1,5 +1,5 @@
 {
-  "id": "71897ded-d362-43a1-a048-5475e6dfbf41",
+  "id": "47c86d3b-5d51-46ec-b0b9-1475ba8bb65f",
   "prevId": "6e62c63e-6fb9-423d-82e5-3d561b077dea",
   "version": "7",
   "dialect": "postgresql",
@@ -1550,41 +1550,29 @@
           "notNull": true,
           "default": 0
         },
-        "billing_type": {
-          "name": "billing_type",
-          "type": "varchar(8)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "processor": {
           "name": "processor",
           "type": "varchar(32)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "monthly_price": {
-          "name": "monthly_price",
+        "interval": {
+          "name": "interval",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price": {
+          "name": "price",
           "type": "numeric(12, 2)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "monthly_price_id": {
-          "name": "monthly_price_id",
+        "price_id": {
+          "name": "price_id",
           "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": false
-        },
-        "yearly_price": {
-          "name": "yearly_price",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "yearly_price_id": {
-          "name": "yearly_price_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "is_enabled": {
           "name": "is_enabled",
@@ -1609,17 +1597,17 @@
         }
       },
       "indexes": {
-        "plan_processor_monthly_price_idx": {
-          "name": "plan_processor_monthly_price_idx",
+        "plan_name_interval_idx": {
+          "name": "plan_name_interval_idx",
           "columns": [
             {
-              "expression": "processor",
+              "expression": "name",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "monthly_price_id",
+              "expression": "interval",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1630,8 +1618,8 @@
           "method": "btree",
           "with": {}
         },
-        "plan_processor_yearly_price_idx": {
-          "name": "plan_processor_yearly_price_idx",
+        "plan_processor_price_idx": {
+          "name": "plan_processor_price_idx",
           "columns": [
             {
               "expression": "processor",
@@ -1640,7 +1628,7 @@
               "nulls": "last"
             },
             {
-              "expression": "yearly_price_id",
+              "expression": "price_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1681,15 +1669,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "plan_name_unique": {
-          "name": "plan_name_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2420,12 +2400,6 @@
         "plan_id": {
           "name": "plan_id",
           "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "interval": {
-          "name": "interval",
-          "type": "varchar(8)",
           "primaryKey": false,
           "notNull": true
         },

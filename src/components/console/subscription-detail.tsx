@@ -126,13 +126,10 @@ function DetailBody({ detail: d }: { detail: Detail }) {
           </Field>
           <Field label="Plan">
             <span className="font-medium">{d.planName}</span>
-            {d.price != null && (
-              <span className="text-muted-foreground">
-                {' '}
-                {formatPrice(d.price)} /{' '}
-                {d.interval === 'year' ? 'year' : 'month'}
-              </span>
-            )}
+            <span className="text-muted-foreground">
+              {' '}
+              {formatPrice(d.price)} / {d.interval}
+            </span>
           </Field>
           <Field label="Status">
             <SubscriptionStatusTag sub={d} />

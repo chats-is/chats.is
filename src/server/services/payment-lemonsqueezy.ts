@@ -3,6 +3,7 @@ import '@tanstack/react-start/server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import {
+  billingIntervalSchema,
   toAmount,
   type PaymentKind,
   type ProcessorPrice
@@ -338,8 +339,12 @@ function actionOf(event: LemonEvent): WebhookAction {
   }
 }
 
-const intervalOf = (unit: unknown, quantity: unknown) =>
-  quantity === 1 && (unit === 'month' || unit === 'year') ? unit : null;
+/** The interval a variant renews at: every one day, week, month or year. */
+const intervalOf = (unit: unknown, quantity: unknown) => {
+  if (quantity !== 1) return null;
+  const parsed = billingIntervalSchema.safeParse(unit);
+  return parsed.success ? parsed.data : null;
+};
 
 export function createLemonSqueezyProcessor(): PaymentProcessor {
   const getSubscription = async (id: string) =>

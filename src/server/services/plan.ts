@@ -1,16 +1,15 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq, inArray, ne, or } from 'drizzle-orm';
+import { and, count, eq, ne, or } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { pageWindow } from '@/types/pagination';
 import {
-  intervalsOf,
-  type BillingType,
+  billingIntervalOf,
+  type BillingInterval,
   type PaymentProcessorId
 } from '@/types/payment';
 import {
-  sellingIssues,
   type planCreateSchema,
   type planListSchema,
   type planUpdateSchema
@@ -68,7 +67,7 @@ export async function listPlans(page: z.infer<typeof planListSchema>) {
     rows: rows.map(p => ({
       ...p,
       userCount: countMap.get(p.id) ?? 0,
-      // Subscribed to: its billing, prices, processor and price IDs are fixed.
+      // Subscribed to: its processor, interval, price and price ID are fixed.
       isLocked: locked.has(p.id)
     })),
     total: Number(totalRow?.count ?? 0),
@@ -96,74 +95,64 @@ async function requireQuotaExists(quotaId: string) {
 
 /** What selling a plan rests on, as it is stored. */
 type Selling = {
-  billingType: BillingType | null;
-  processor: PaymentProcessorId | null;
-  monthlyPrice: string | null;
-  monthlyPriceId: string | null;
-  yearlyPrice: string | null;
-  yearlyPriceId: string | null;
+  processor: PaymentProcessorId;
+  interval: BillingInterval;
+  price: string;
+  priceId: string;
 };
 
-/** Selling fields as stored: an interval the billing type does not sell at
- *  keeps no price, and prices are kept to the cent. */
-function normalized(input: {
-  billingType?: BillingType | null;
-  processor?: PaymentProcessorId | null;
-  monthlyPrice?: number | string | null;
-  monthlyPriceId?: string | null;
-  yearlyPrice?: number | string | null;
-  yearlyPriceId?: string | null;
-}): Selling {
-  const intervals = intervalsOf(input.billingType ?? null);
-  const price = (v: number | string | null | undefined) =>
-    v == null ? null : Number(v).toFixed(2);
-  const monthly = intervals.includes('month');
-  const yearly = intervals.includes('year');
-  return {
-    billingType: input.billingType ?? null,
-    processor: input.processor ?? null,
-    monthlyPrice: monthly ? price(input.monthlyPrice) : null,
-    monthlyPriceId: monthly ? (input.monthlyPriceId ?? null) : null,
-    yearlyPrice: yearly ? price(input.yearlyPrice) : null,
-    yearlyPriceId: yearly ? (input.yearlyPriceId ?? null) : null
-  };
-}
+const SELLING_KEYS: ReadonlyArray<keyof Selling> = [
+  'processor',
+  'interval',
+  'price',
+  'priceId'
+];
+
+/** Prices are kept to the cent. */
+const priceOf = (price: number | string) => Number(price).toFixed(2);
 
 const sameSelling = (a: Selling, b: Selling) =>
-  (Object.keys(a) as Array<keyof Selling>).every(key => a[key] === b[key]);
+  SELLING_KEYS.every(key => a[key] === b[key]);
 
 /**
- * A processor's price names one plan and interval, so a webhook can tell
- * which: not another plan's, at either interval, and not the plan's own
- * other interval.
+ * A name is sold at each interval once — Pro monthly, Pro yearly — and a
+ * processor's price names one plan, so a webhook can tell which. Both are
+ * held by unique indexes; here they are said plainly first.
  */
-async function requirePriceIdsFree(selling: Selling, planId?: string) {
-  const ids = [selling.monthlyPriceId, selling.yearlyPriceId].filter(
-    (id): id is string => !!id
-  );
-  if (ids.length === 2 && ids[0] === ids[1]) {
-    throw new PublicError('The monthly and yearly price IDs must differ.');
-  }
-  if (!selling.processor || ids.length === 0) return;
+async function requireFree(plan: { name: string } & Selling, planId?: string) {
   const other = await db.query.plans.findFirst({
     where: and(
-      eq(plans.processor, selling.processor),
-      or(inArray(plans.monthlyPriceId, ids), inArray(plans.yearlyPriceId, ids)),
+      or(
+        and(eq(plans.name, plan.name), eq(plans.interval, plan.interval)),
+        and(
+          eq(plans.processor, plan.processor),
+          eq(plans.priceId, plan.priceId)
+        )
+      ),
       planId ? ne(plans.id, planId) : undefined
     ),
-    columns: { name: true }
+    columns: { name: true, interval: true }
   });
-  if (other) {
-    throw new PublicError(`Plan ${other.name} already uses this price ID.`);
+  if (!other) return;
+  if (other.name === plan.name && other.interval === plan.interval) {
+    throw new PublicError(
+      `There is already a ${billingIntervalOf(plan.interval).adverb} plan named ${plan.name}.`
+    );
   }
+  throw new PublicError(`Plan ${other.name} already uses this price ID.`);
 }
 
 export async function createPlan(input: z.infer<typeof planCreateSchema>) {
   const id = generateUUID();
   await requireQuotaExists(input.quotaId);
   if (input.tierId) await requireTierExists(input.tierId);
-  const selling = normalized(input);
-  await requirePriceIdsFree(selling);
+  const selling: Selling = {
+    processor: input.processor,
+    interval: input.interval,
+    price: priceOf(input.price),
+    priceId: input.priceId
+  };
+  await requireFree({ name: input.name, ...selling });
 
   await db.insert(plans).values({
     id,
@@ -192,9 +181,9 @@ export async function getPlan(id: string) {
 
 /**
  * Change a plan. Its quota, tier, name and description may change at any
- * time. How it is billed, its prices, its processor and price IDs may not
- * once anyone has subscribed: the processor goes on charging against them, and a
- * plan that said otherwise would no longer be what its subscribers pay for.
+ * time. Its processor, interval, price and price ID may not once anyone has
+ * subscribed: the processor goes on charging against them, and a plan that
+ * said otherwise would no longer be what its subscribers pay for.
  */
 export async function updatePlan(input: z.infer<typeof planUpdateSchema>) {
   const { id, ...updates } = input;
@@ -218,55 +207,41 @@ export async function updatePlan(input: z.infer<typeof planUpdateSchema>) {
 
   // What selling it rests on, as it would be: sent back unchanged is not a
   // change.
-  const was = normalized(current);
-  const next = normalized({
-    billingType: updates.billingType ?? current.billingType,
-    processor: updates.processor ?? current.processor,
-    monthlyPrice:
-      updates.monthlyPrice !== undefined
-        ? updates.monthlyPrice
-        : current.monthlyPrice,
-    monthlyPriceId:
-      updates.monthlyPriceId !== undefined
-        ? updates.monthlyPriceId
-        : current.monthlyPriceId,
-    yearlyPrice:
-      updates.yearlyPrice !== undefined
-        ? updates.yearlyPrice
-        : current.yearlyPrice,
-    yearlyPriceId:
-      updates.yearlyPriceId !== undefined
-        ? updates.yearlyPriceId
-        : current.yearlyPriceId
-  });
+  const was: Selling = {
+    processor: current.processor,
+    interval: current.interval,
+    price: priceOf(current.price),
+    priceId: current.priceId
+  };
+  const next: Selling = {
+    processor: updates.processor ?? was.processor,
+    interval: updates.interval ?? was.interval,
+    price: updates.price != null ? priceOf(updates.price) : was.price,
+    priceId: updates.priceId ?? was.priceId
+  };
   if (!sameSelling(was, next)) {
     if (await planHasSubscriptions(id)) {
       throw new PublicError(
-        'This plan has subscriptions, so its billing, prices, payment processor and price IDs cannot change.'
+        'This plan has subscriptions, so its payment processor, interval, price and price ID cannot change.'
       );
     }
-    const issue = sellingIssues(next)[0];
-    if (issue) throw new PublicError(issue.message);
-    await requirePriceIdsFree(next, id);
     Object.assign(patch, next);
+  }
+  if (!sameSelling(was, next) || updates.name !== undefined) {
+    await requireFree({ name: updates.name ?? current.name, ...next }, id);
   }
 
   await db.update(plans).set(patch).where(eq(plans.id, id));
 }
 
 /** Open a plan to new subscriptions, or close it. Closed, those already on
- *  it go on renewing. Only a plan with its prices can open. */
+ *  it go on renewing. */
 export async function setPlanEnabled(id: string, isEnabled: boolean) {
-  const plan = await db.query.plans.findFirst({ where: eq(plans.id, id) });
+  const plan = await db.query.plans.findFirst({
+    where: eq(plans.id, id),
+    columns: { id: true }
+  });
   if (!plan) throw new PublicError('Plan not found');
-  if (
-    isEnabled &&
-    (!plan.billingType || !plan.processor || sellingIssues(plan).length > 0)
-  ) {
-    throw new PublicError(
-      'Give this plan its billing, payment processor, prices and price IDs first.'
-    );
-  }
   await db
     .update(plans)
     .set({ isEnabled, updatedAt: new Date() })

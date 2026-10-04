@@ -3,6 +3,7 @@ import '@tanstack/react-start/server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import {
+  billingIntervalSchema,
   toAmount,
   type PaymentKind,
   type ProcessorPrice
@@ -446,11 +447,12 @@ function actionOf(event: PaddleEvent): WebhookAction {
   return { kind: 'ignore' };
 }
 
-const intervalOf = (cycle: PaddlePrice['billing_cycle']) =>
-  cycle?.frequency === 1 &&
-  (cycle.interval === 'month' || cycle.interval === 'year')
-    ? cycle.interval
-    : null;
+/** The interval a price renews at: every one day, week, month or year. */
+const intervalOf = (cycle: PaddlePrice['billing_cycle']) => {
+  if (cycle?.frequency !== 1) return null;
+  const parsed = billingIntervalSchema.safeParse(cycle.interval);
+  return parsed.success ? parsed.data : null;
+};
 
 /** A transaction's refunds, whatever their state. */
 async function refundsOf(transactionId: string) {

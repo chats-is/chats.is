@@ -185,6 +185,50 @@ describe('the Lemon Squeezy API', () => {
     expect((await lemon.getPrice('1')).interval).toBeNull();
   });
 
+  it('reads every day or week as its interval, and every two weeks as none', async () => {
+    const renewing = (unit: string, quantity: number) => {
+      replies.push(
+        {
+          body: {
+            data: {
+              type: 'variants',
+              id: '9',
+              attributes: { status: 'published', product_id: 7 }
+            }
+          }
+        },
+        {
+          body: {
+            data: {
+              type: 'prices',
+              id: '9',
+              attributes: {
+                category: 'subscription',
+                unit_price: 300,
+                renewal_interval_unit: unit,
+                renewal_interval_quantity: quantity,
+                usage_aggregation: null
+              }
+            }
+          }
+        },
+        {
+          body: {
+            data: {
+              type: 'products',
+              id: '7',
+              attributes: { status: 'published' }
+            }
+          }
+        }
+      );
+      return lemon.getPrice('9');
+    };
+    expect((await renewing('day', 1)).interval).toBe('day');
+    expect((await renewing('week', 1)).interval).toBe('week');
+    expect((await renewing('week', 2)).interval).toBeNull();
+  });
+
   it('opens a checkout for the variant, carrying the user and plan', async () => {
     replies.push({
       body: {

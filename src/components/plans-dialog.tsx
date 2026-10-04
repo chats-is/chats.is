@@ -11,6 +11,8 @@ import { Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
+  BILLING_INTERVALS,
+  billingIntervalOf,
   canUpgrade,
   paymentProcessorSchema,
   type BillingInterval,
@@ -55,23 +57,16 @@ import { LocalTime } from '@/components/local-time';
 type PlanForSale = Awaited<ReturnType<typeof listPlansForSale>>[number];
 type Mine = NonNullable<Awaited<ReturnType<typeof getMySubscription>>>;
 
-const INTERVALS: Array<{ value: BillingInterval; label: string }> = [
-  { value: 'month', label: 'Monthly' },
-  { value: 'year', label: 'Yearly' }
-];
-
-const ADVERB = { month: 'monthly', year: 'yearly' } as const;
-
 /**
- * The plans to subscribe to, over the page rather than instead of it. A
- * plan billed both monthly and yearly has its own Monthly / Yearly choice,
- * which picks the price it shows and the one it is bought at.
+ * The plans to subscribe to, over the page rather than instead of it, one
+ * interval at a time: where plans are sold at more than one, a choice
+ * above them picks which are shown.
  *
- * Without a subscription, a plan is bought at the chosen interval on its
- * payment processor's own checkout page, which sends the user back with
- * `?checkout=` in the address. With one, the only move is up — to a plan
- * that costs more at the same interval — and it starts now. Anything else
- * waits until the current subscription has ended.
+ * Without a subscription, a plan is bought on its payment processor's own
+ * checkout page, which sends the user back with `?checkout=` in the
+ * address. With one, the only move is up — to a plan that costs more at the
+ * same interval — and it starts now. Anything else waits until the current
+ * subscription has ended.
  */
 function PlansDialog({
   open,
@@ -113,7 +108,17 @@ function PlansDialog({
     refetchInterval: 8000
   });
 
-  const shown = plans ?? [];
+  // The intervals plans are sold at, and the one shown: as chosen, else the
+  // one the user is billed at, else monthly, else the first sold.
+  const sold = BILLING_INTERVALS.filter(i =>
+    plans?.some(plan => plan.interval === i.value)
+  ).map(i => i.value);
+  const [chosen, choose] = useState<BillingInterval | null>(null);
+  const interval =
+    [chosen, mine?.interval, 'month' as const].find(
+      (i): i is BillingInterval => !!i && sold.includes(i)
+    ) ?? sold[0];
+  const shown = (plans ?? []).filter(plan => plan.interval === interval);
   const [upgradeTo, setUpgradeTo] = useState<PlanForSale | null>(null);
   // What the upgrade charges today, asked of the processor for the dialog.
   const preview = useQuery({
@@ -124,8 +129,7 @@ function PlansDialog({
   });
 
   const checkout = useMutation({
-    mutationFn: (data: { planId: string; interval: BillingInterval }) =>
-      startCheckout({ data }),
+    mutationFn: (planId: string) => startCheckout({ data: { planId } }),
     onSuccess: ({ url }) => {
       window.location.href = url;
     },
@@ -177,8 +181,8 @@ function PlansDialog({
             <DialogDescription>
               {mine ? (
                 <>
-                  You are on {mine.planName ?? 'a plan'}
-                  {mine.interval && `, billed ${ADVERB[mine.interval]}`}.{' '}
+                  You are on {mine.planName ?? 'a plan'}, billed{' '}
+                  {billingIntervalOf(mine.interval).adverb}.{' '}
                   {mine.canceledAt ? 'It will be canceled on' : 'It renews on'}{' '}
                   <LocalTime
                     value={mine.canceledAt ?? mine.expiresAt}
@@ -199,6 +203,16 @@ function PlansDialog({
             </p>
           )}
 
+          {sold.length > 1 && (
+            <div className="flex justify-center">
+              <IntervalSwitch
+                options={sold}
+                value={interval}
+                onChange={choose}
+              />
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex flex-wrap justify-center gap-4">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -217,17 +231,15 @@ function PlansDialog({
                 <PlanCard
                   key={plan.id}
                   plan={plan}
+                  saving={savingOf(plan, plans ?? [])}
                   mine={mine ?? null}
                   busy={busy}
                   loading={
-                    (checkout.isPending &&
-                      checkout.variables?.planId === plan.id) ||
+                    (checkout.isPending && checkout.variables === plan.id) ||
                     (upgrade.isPending && upgrade.variables === plan.id) ||
                     (resubscribing.isPending && mine?.planId === plan.id)
                   }
-                  onSubscribe={interval =>
-                    checkout.mutate({ planId: plan.id, interval })
-                  }
+                  onSubscribe={() => checkout.mutate(plan.id)}
                   onUpgrade={() => setUpgradeTo(plan)}
                   onResubscribe={() => resubscribing.mutate()}
                 />
@@ -268,56 +280,53 @@ function PlansDialog({
 }
 
 /**
- * How much less a year costs paid yearly than paid monthly, as a whole
- * percentage rounded down so it never says more than it saves. Null when
- * the plan is not sold at both, or yearly saves nothing.
+ * How much less a plan costs than the plan of its name sold at the shortest
+ * interval, reckoned by the day: a whole percentage rounded down, so it
+ * never says more than it saves. Null when the name is sold at no shorter
+ * interval, or this saves nothing.
  */
-function yearlySaving(plan: PlanForSale): number | null {
-  const { month, year } = plan.prices;
-  if (month == null || year == null || month <= 0) return null;
-  const saving = Math.floor((1 - year / (month * 12)) * 100);
-  return saving >= 1 ? saving : null;
+function savingOf(
+  plan: PlanForSale,
+  plans: PlanForSale[]
+): { percent: number; than: BillingInterval } | null {
+  const days = (p: PlanForSale) => billingIntervalOf(p.interval).days;
+  const base = plans
+    .filter(p => p.name === plan.name && days(p) < days(plan))
+    .sort((a, b) => days(a) - days(b))[0];
+  if (!base || base.price <= 0) return null;
+  const percent = Math.floor(
+    (1 - plan.price / days(plan) / (base.price / days(base))) * 100
+  );
+  return percent >= 1 ? { percent, than: base.interval } : null;
 }
 
-/** The intervals a plan is sold at, in the order they are offered. */
-const intervalsOf = (plan: PlanForSale) =>
-  INTERVALS.filter(i => plan.prices[i.value] != null);
-
-/**
- * A plan's own Monthly / Yearly choice, for a plan sold at both: beside its
- * name, and only for its own price.
- */
+/** Which interval's plans are shown, where plans are sold at more than
+ *  one. */
 function IntervalSwitch({
+  options,
   value,
-  onChange,
-  saving
+  onChange
 }: {
+  options: BillingInterval[];
   value: BillingInterval;
   onChange: (value: BillingInterval) => void;
-  /** Yearly's saving over monthly, in percent, where there is one. */
-  saving: number | null;
 }) {
   return (
-    <div className="inline-flex h-7 shrink-0 items-center rounded-full border bg-muted/50 p-0.5">
-      {INTERVALS.map(option => (
+    <div className="inline-flex h-8 items-center rounded-full border bg-muted/50 p-0.5">
+      {options.map(option => (
         <button
-          key={option.value}
+          key={option}
           type="button"
-          onClick={() => onChange(option.value)}
-          aria-pressed={value === option.value}
+          onClick={() => onChange(option)}
+          aria-pressed={value === option}
           className={cn(
-            'inline-flex h-6 items-center rounded-full px-2.5 text-xs font-medium whitespace-nowrap transition-colors',
-            value === option.value
+            'inline-flex h-7 items-center rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors',
+            value === option
               ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           )}
         >
-          {option.label}
-          {option.value === 'year' && saving != null && (
-            <span className="ml-1 font-semibold text-emerald-600 dark:text-emerald-400">
-              Save {saving}%
-            </span>
-          )}
+          {billingIntervalOf(option).label}
         </button>
       ))}
     </div>
@@ -326,6 +335,7 @@ function IntervalSwitch({
 
 function PlanCard({
   plan,
+  saving,
   mine,
   busy,
   loading,
@@ -334,24 +344,16 @@ function PlanCard({
   onResubscribe
 }: {
   plan: PlanForSale;
+  /** What it saves over its name at a shorter interval, where it does. */
+  saving: { percent: number; than: BillingInterval } | null;
   mine: Mine | null;
   busy: boolean;
   loading: boolean;
-  onSubscribe: (interval: BillingInterval) => void;
+  onSubscribe: () => void;
   onUpgrade: () => void;
   onResubscribe: () => void;
 }) {
-  const sold = intervalsOf(plan);
-  // The interval the user is billed at where the plan has it — the one
-  // their plan and any upgrade go by — else the first it is sold at.
-  const [interval, chooseInterval] = useState<BillingInterval>(
-    mine?.interval && plan.prices[mine.interval] != null
-      ? mine.interval
-      : (sold[0]?.value ?? 'month')
-  );
-  const price = plan.prices[interval]!;
-  const isCurrentPlan = mine?.planId === plan.id;
-  const isCurrent = isCurrentPlan && mine?.interval === interval;
+  const isCurrent = mine?.planId === plan.id;
   const features = (plan.description ?? '')
     .split('\n')
     .map(line => line.trim())
@@ -361,11 +363,7 @@ function PlanCard({
   let button: React.ReactNode;
   if (!mine) {
     button = (
-      <Button
-        className="w-full"
-        disabled={busy}
-        onClick={() => onSubscribe(interval)}
-      >
+      <Button className="w-full" disabled={busy} onClick={onSubscribe}>
         {spinner}
         Subscribe
       </Button>
@@ -387,15 +385,13 @@ function PlanCard({
     );
   } else if (
     mine.canUpgrade &&
-    mine.price != null &&
-    mine.interval &&
     canUpgrade(
       {
         price: mine.price,
         interval: mine.interval,
         processor: mine.processor
       },
-      { price, interval, processor: plan.processor }
+      plan
     )
   ) {
     button = (
@@ -422,21 +418,18 @@ function PlanCard({
             <h2 className="truncate font-semibold">{plan.name}</h2>
             {isCurrent && <Badge>Current</Badge>}
           </div>
-          {/* Its own choice of interval, where it is sold at both. */}
-          {sold.length > 1 && (
-            <IntervalSwitch
-              value={interval}
-              onChange={chooseInterval}
-              saving={yearlySaving(plan)}
-            />
+          {saving && (
+            <span className="shrink-0 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              Save {saving.percent}% vs {billingIntervalOf(saving.than).adverb}
+            </span>
           )}
         </div>
 
         <div className="text-2xl font-bold">
-          {formatPrice(price)}
+          {formatPrice(plan.price)}
           <span className="text-sm font-normal text-muted-foreground">
             {' '}
-            / {interval}
+            / {plan.interval}
           </span>
         </div>
 

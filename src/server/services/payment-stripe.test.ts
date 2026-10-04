@@ -287,6 +287,17 @@ describe('asking Stripe', () => {
     });
   });
 
+  it('for a price every day or week, with its interval', async () => {
+    for (const interval of ['day', 'week']) {
+      stripe.prices.retrieve.mockResolvedValue(
+        price({ interval, interval_count: 1, usage_type: 'licensed' })
+      );
+      expect(
+        (await createStripeProcessor().getPrice('price_pro')).interval
+      ).toBe(interval);
+    }
+  });
+
   it('for a price every three months, or once, as no interval it can sell', async () => {
     stripe.prices.retrieve.mockResolvedValue(
       price({ interval: 'month', interval_count: 3, usage_type: 'licensed' })

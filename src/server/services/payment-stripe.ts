@@ -3,6 +3,7 @@ import '@tanstack/react-start/server-only';
 import Stripe from 'stripe';
 
 import {
+  billingIntervalSchema,
   toAmount,
   type BillingInterval,
   type PaymentKind,
@@ -54,17 +55,14 @@ const idOf = (ref: string | { id: string } | null | undefined) =>
 const dateOf = (seconds: number | null | undefined) =>
   seconds ? new Date(seconds * 1000) : null;
 
-/** The interval a price renews at: every one month or one year. Every three
- *  months, say, is none a plan is sold at. */
+/** The interval a price renews at: every one day, week, month or year.
+ *  Every three months, say, is none a plan is sold at. */
 const intervalOf = (
   recurring: Stripe.Price.Recurring | null | undefined
 ): BillingInterval | null => {
   if (recurring?.interval_count !== 1) return null;
-  return recurring.interval === 'month'
-    ? 'month'
-    : recurring.interval === 'year'
-      ? 'year'
-      : null;
+  const parsed = billingIntervalSchema.safeParse(recurring.interval);
+  return parsed.success ? parsed.data : null;
 };
 
 /**

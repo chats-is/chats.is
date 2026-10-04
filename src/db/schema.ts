@@ -23,7 +23,6 @@ import {
 } from '@/types';
 import {
   type BillingInterval,
-  type BillingType,
   type CancelReason,
   type PaymentKind,
   type PaymentProcessorId,
@@ -652,7 +651,9 @@ export const plans = createTable(
   'plan',
   {
     id: varchar('id', { length: 255 }).notNull().primaryKey(),
-    name: varchar('name', { length: 100 }).notNull().unique(),
+    // One name may be sold at several intervals, each its own plan: Pro
+    // monthly and Pro yearly.
+    name: varchar('name', { length: 100 }).notNull(),
     description: varchar('description', { length: 500 }),
     quotaId: varchar('quota_id', { length: 255 })
       .notNull()
@@ -662,20 +663,19 @@ export const plans = createTable(
       onDelete: 'restrict'
     }),
     displayOrder: integer('display_order').notNull().default(0),
-    // What the plan sells for. It is billed monthly, yearly or either, as the
-    // user chooses — each with a price of its own and the ID its payment
-    // processor knows that price by — through one processor. The price IDs
-    // are kept here only. Null only on plans made before plans were sold,
-    // and on the interval a plan is not billed at. Once anyone has subscribed
-    // they are fixed: the processor goes on charging against them.
-    billingType: varchar('billing_type', { length: 8 }).$type<BillingType>(),
-    processor: varchar('processor', {
-      length: 32
-    }).$type<PaymentProcessorId>(),
-    monthlyPrice: numeric('monthly_price', { precision: 12, scale: 2 }),
-    monthlyPriceId: varchar('monthly_price_id', { length: 255 }),
-    yearlyPrice: numeric('yearly_price', { precision: 12, scale: 2 }),
-    yearlyPriceId: varchar('yearly_price_id', { length: 255 }),
+    // What the plan sells for: one price, billed every interval, through one
+    // processor that knows it by its price ID. The price ID is kept here
+    // only. Once anyone has subscribed these are fixed: the processor goes
+    // on charging against them, and a subscription is billed at its plan's
+    // interval.
+    processor: varchar('processor', { length: 32 })
+      .$type<PaymentProcessorId>()
+      .notNull(),
+    interval: varchar('interval', { length: 8 })
+      .$type<BillingInterval>()
+      .notNull(),
+    price: numeric('price', { precision: 12, scale: 2 }).notNull(),
+    priceId: varchar('price_id', { length: 255 }).notNull(),
     // Open to new subscriptions. Closed, it is not offered, and those already
     // on it go on renewing.
     isEnabled: boolean('is_enabled').notNull().default(false),
@@ -687,17 +687,9 @@ export const plans = createTable(
       .defaultNow()
   },
   table => [
-    // A processor's price names one plan and interval, so a webhook can tell
-    // which. (The service also keeps a monthly ID from being another plan's
-    // yearly one.)
-    uniqueIndex('plan_processor_monthly_price_idx').on(
-      table.processor,
-      table.monthlyPriceId
-    ),
-    uniqueIndex('plan_processor_yearly_price_idx').on(
-      table.processor,
-      table.yearlyPriceId
-    )
+    uniqueIndex('plan_name_interval_idx').on(table.name, table.interval),
+    // A processor's price names one plan, so a webhook can tell which.
+    uniqueIndex('plan_processor_price_idx').on(table.processor, table.priceId)
   ]
 );
 
@@ -716,7 +708,8 @@ export const plansRelations = relations(plans, ({ one, many }) => ({
  * `expiresAt`, once cancelled to stop at the end of what was paid for — and
  * `canceled` once it has stopped, when `canceledAt` says when and
  * `cancelReason` why. A user has at most one `active` subscription; buying
- * again after one is cancelled is a new subscription.
+ * again after one is cancelled is a new subscription. It is billed at its
+ * plan's price and interval.
  */
 export const subscriptions = createTable(
   'subscription',
@@ -728,9 +721,6 @@ export const subscriptions = createTable(
     planId: varchar('plan_id', { length: 255 })
       .notNull()
       .references(() => plans.id, { onDelete: 'restrict' }),
-    interval: varchar('interval', { length: 8 })
-      .$type<BillingInterval>()
-      .notNull(),
     processor: varchar('processor', { length: 32 })
       .$type<PaymentProcessorId>()
       .notNull(),

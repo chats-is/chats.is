@@ -10,7 +10,7 @@ import {
   vi
 } from 'vitest';
 
-import { type ProcessorPrice } from '@/types/payment';
+import { type BillingInterval, type ProcessorPrice } from '@/types/payment';
 import { planCreateSchema } from '@/types/plan';
 import * as schema from '@/db/schema';
 import { PublicError } from '@/server/public-error';
@@ -130,6 +130,7 @@ const PROCESSOR_PRICES: Record<string, ProcessorPrice> = Object.fromEntries(
       ['price_max_m', 50, 'month'],
       ['price_twin_m', 20, 'month'],
       ['price_yearly_y', 300, 'year'],
+      ['price_weekly_w', 3, 'week'],
       ['price_old', 5, 'month']
     ] as const
   ).map(([priceId, amount, interval]) => [
@@ -349,22 +350,21 @@ const requestId = async () =>
 const request = new Request('https://app.example/');
 const user = { id: 'u1', email: 'u1@test.com', name: 'U1' };
 
-/** A plan as sold through Stripe, enabled, at the intervals given. */
+/** A plan as sold through Stripe, enabled: its price and price ID, billed
+ *  every interval. Named as its id unless `extra` names it. */
 const plan = (
   id: string,
-  prices: { month?: [number, string]; year?: [number, string] },
+  interval: BillingInterval,
+  [price, priceId]: [number, string],
   extra: Record<string, unknown> = {}
 ) => ({
   id,
   name: id,
   quotaId: 'q1',
-  billingType:
-    prices.month && prices.year ? 'both' : prices.month ? 'month' : 'year',
   processor: 'stripe' as const,
-  monthlyPrice: prices.month?.[0].toFixed(2) ?? null,
-  monthlyPriceId: prices.month?.[1] ?? null,
-  yearlyPrice: prices.year?.[0].toFixed(2) ?? null,
-  yearlyPriceId: prices.year?.[1] ?? null,
+  interval,
+  price: price.toFixed(2),
+  priceId,
   isEnabled: true,
   ...extra
 });
@@ -394,22 +394,26 @@ beforeEach(async () => {
     modelIds: ['cheap']
   });
   await h.db.insert(schema.plans).values([
-    plan(
-      'basic',
-      { month: [10, 'price_basic_m'], year: [100, 'price_basic_y'] },
-      { tierId: 't-cheap', displayOrder: 1 }
-    ),
-    plan(
-      'pro',
-      { month: [20, 'price_pro_m'], year: [200, 'price_pro_y'] },
-      { displayOrder: 2 }
-    ),
-    plan('max', { month: [50, 'price_max_m'] }, { displayOrder: 3 }),
-    plan('twin', { month: [20, 'price_twin_m'] }, { displayOrder: 4 }),
-    plan('yearly', { year: [300, 'price_yearly_y'] }, { displayOrder: 5 }),
-    plan('closed', { month: [5, 'price_old'] }, { isEnabled: false }),
-    // A plan from before plans were sold: no billing at all.
-    { id: 'legacy', name: 'legacy', quotaId: 'q1', isEnabled: false }
+    plan('basic', 'month', [10, 'price_basic_m'], {
+      tierId: 't-cheap',
+      displayOrder: 1
+    }),
+    // Basic sold yearly too: a plan of its own, of the same name.
+    plan('basic_y', 'year', [100, 'price_basic_y'], {
+      name: 'basic',
+      tierId: 't-cheap',
+      displayOrder: 2
+    }),
+    plan('pro', 'month', [20, 'price_pro_m'], { displayOrder: 3 }),
+    plan('pro_y', 'year', [200, 'price_pro_y'], {
+      name: 'pro',
+      displayOrder: 4
+    }),
+    plan('max', 'month', [50, 'price_max_m'], { displayOrder: 5 }),
+    plan('twin', 'month', [20, 'price_twin_m'], { displayOrder: 6 }),
+    plan('yearly', 'year', [300, 'price_yearly_y'], { displayOrder: 7 }),
+    plan('weekly', 'week', [3, 'price_weekly_w'], { displayOrder: 8 }),
+    plan('closed', 'month', [5, 'price_old'], { isEnabled: false })
   ]);
   await h.db.insert(schema.users).values([
     { id: 'u1', name: 'U1', email: 'u1@test.com' },
@@ -427,67 +431,73 @@ describe('a plan', () => {
     name: 'New',
     quotaId: 'q1',
     displayOrder: 0,
-    billingType: 'both' as const,
     processor: 'stripe' as const,
-    monthlyPrice: 15,
-    monthlyPriceId: 'price_new_m',
-    yearlyPrice: 150,
-    yearlyPriceId: 'price_new_y'
+    interval: 'week' as const,
+    price: 15,
+    priceId: 'price_new_w'
   };
 
-  it('needs a price and price ID for each interval its billing sells at', () => {
-    expect(
-      planCreateSchema.safeParse({
-        ...input,
-        yearlyPrice: null,
-        yearlyPriceId: null
-      }).success
-    ).toBe(false);
-    expect(
-      planCreateSchema.safeParse({
-        ...input,
-        billingType: 'month',
-        yearlyPrice: null,
-        yearlyPriceId: null
-      }).success
-    ).toBe(true);
+  it('needs its processor, interval, price and price ID', () => {
+    for (const key of ['processor', 'interval', 'price', 'priceId'] as const) {
+      const { [key]: _, ...rest } = input;
+      expect(planCreateSchema.safeParse(rest).success).toBe(false);
+    }
+    expect(planCreateSchema.safeParse(input).success).toBe(true);
   });
 
-  it('is made closed, keeping only the prices its billing sells at', async () => {
-    const { id } = await createPlan(
-      planCreateSchema.parse({ ...input, billingType: 'month' })
-    );
+  it('is made closed, its price kept to the cent', async () => {
+    const { id } = await createPlan(planCreateSchema.parse(input));
     expect(await planRow(id)).toMatchObject({
-      billingType: 'month',
       processor: 'stripe',
-      monthlyPrice: '15.00',
-      monthlyPriceId: 'price_new_m',
-      yearlyPrice: null,
-      yearlyPriceId: null,
+      interval: 'week',
+      price: '15.00',
+      priceId: 'price_new_w',
       isEnabled: false
     });
   });
 
-  it('cannot share a price ID with another plan, or use one for both intervals', async () => {
+  it('is sold under its name once at each interval', async () => {
+    await createPlan(planCreateSchema.parse({ ...input, name: 'pro' }));
     await expect(
       createPlan(
-        planCreateSchema.parse({ ...input, yearlyPriceId: 'price_pro_m' })
+        planCreateSchema.parse({
+          ...input,
+          name: 'pro',
+          interval: 'month',
+          priceId: 'price_other'
+        })
       )
+    ).rejects.toThrow('already a monthly plan named pro');
+    await expect(updatePlan({ id: 'max', name: 'pro' })).rejects.toThrow(
+      'already a monthly plan named pro'
+    );
+  });
+
+  it('cannot share a price ID with another plan of its processor', async () => {
+    await expect(
+      createPlan(planCreateSchema.parse({ ...input, priceId: 'price_pro_m' }))
+    ).rejects.toThrow('already uses this price ID');
+    await expect(
+      updatePlan({ id: 'max', priceId: 'price_pro_m' })
     ).rejects.toThrow('already uses this price ID');
     await expect(
       createPlan(
-        planCreateSchema.parse({ ...input, yearlyPriceId: 'price_new_m' })
+        planCreateSchema.parse({
+          ...input,
+          processor: 'paddle',
+          priceId: 'price_pro_m'
+        })
       )
-    ).rejects.toThrow('must differ');
+    ).resolves.toBeDefined();
   });
 
-  it('keeps its billing, prices, processor and price IDs once subscribed to, even when canceled', async () => {
+  it('keeps its processor, interval, price and price ID once subscribed to, even when canceled', async () => {
     await subscribe();
     await report({ status: 'canceled' });
     for (const change of [
-      { monthlyPrice: 12 },
-      { billingType: 'month' as const },
-      { yearlyPriceId: 'price_other' },
+      { price: 12 },
+      { interval: 'year' as const },
+      { priceId: 'price_other' },
       { processor: 'paddle' as const }
     ]) {
       await expect(updatePlan({ id: 'basic', ...change })).rejects.toThrow(
@@ -507,10 +517,7 @@ describe('a plan', () => {
     await expect(deletePlan('pro')).resolves.toBeUndefined();
   });
 
-  it('opens only with its prices', async () => {
-    await expect(setPlanEnabled('legacy', true)).rejects.toThrow(
-      'billing, payment processor, prices and price IDs'
-    );
+  it('opens to new subscriptions', async () => {
     await setPlanEnabled('closed', true);
     expect((await planRow('closed'))?.isEnabled).toBe(true);
   });
@@ -522,12 +529,20 @@ describe("a processor's price, read for a plan", () => {
       price: 200,
       interval: 'year'
     });
+    expect(await lookupProcessorPrice('stripe', 'price_weekly_w')).toEqual({
+      price: 3,
+      interval: 'week'
+    });
   });
 
   it.each([
     ['archived', { active: false }, 'archived'],
     ['billed by usage', { metered: true }, 'billed by usage'],
-    ['not recurring', { interval: null }, 'not billed monthly or yearly'],
+    [
+      'not recurring',
+      { interval: null },
+      'not billed every day, week, month or year'
+    ],
     ['sold by the dozen', { maxQuantity: 12 }, 'maximum quantity to 1']
   ])('is refused %s', async (_, change, message) => {
     Object.assign(h.processor.prices.price_pro_m, change);
@@ -542,25 +557,29 @@ describe("a processor's price, read for a plan", () => {
 // ---------------------------------------------------------------------------
 
 describe('subscribing', () => {
-  it('lists enabled plans with their price at each interval, and no price IDs', async () => {
+  it('lists enabled plans with their price and interval, and no price IDs', async () => {
     const plans = await listPlansForSale();
     expect(plans.map(p => p.id)).toEqual([
       'basic',
+      'basic_y',
       'pro',
+      'pro_y',
       'max',
       'twin',
-      'yearly'
+      'yearly',
+      'weekly'
     ]);
-    expect(plans[0]).toMatchObject({ prices: { month: 10, year: 100 } });
+    expect(plans[1]).toMatchObject({
+      name: 'basic',
+      interval: 'year',
+      price: 100
+    });
+    expect(plans[7]).toMatchObject({ interval: 'week', price: 3 });
     expect(JSON.stringify(plans)).not.toContain('price_');
   });
 
-  it("opens the processor's checkout for the interval chosen, with no customer the first time", async () => {
-    const { url } = await startCheckout(
-      user,
-      { planId: 'pro', interval: 'year' },
-      request
-    );
+  it("opens the processor's checkout for the plan's price, with no customer the first time", async () => {
+    const { url } = await startCheckout(user, { planId: 'pro_y' }, request);
     expect(url).toBe('https://pay.example/checkout');
     expect(h.processor.createCheckout).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -568,7 +587,7 @@ describe('subscribing', () => {
         email: 'u1@test.com',
         priceId: 'price_pro_y',
         userId: 'u1',
-        planId: 'pro',
+        planId: 'pro_y',
         successUrl: 'https://app.example/?checkout=success&via=stripe',
         cancelUrl: 'https://app.example/?checkout=canceled'
       })
@@ -578,7 +597,7 @@ describe('subscribing', () => {
   it('checks out as the customer the user already is, once canceled', async () => {
     await subscribe();
     await report({ status: 'canceled' });
-    await startCheckout(user, { planId: 'pro', interval: 'month' }, request);
+    await startCheckout(user, { planId: 'pro' }, request);
     expect(h.processor.createCheckout).toHaveBeenCalledWith(
       expect.objectContaining({ customerId: 'cus_u1' })
     );
@@ -589,38 +608,46 @@ describe('subscribing', () => {
       new Error('checkout.url domain is not approved')
     );
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+      startCheckout(user, { planId: 'pro' }, request)
     ).rejects.toThrow('Checkout could not be opened. Please try again.');
     // Not set up: the admin's words are not the user's.
     h.processor.createCheckout.mockRejectedValueOnce(
       new PublicError('Paddle is not configured.')
     );
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+      startCheckout(user, { planId: 'pro' }, request)
     ).rejects.toThrow('Checkout could not be opened. Please try again.');
     h.processor.getPrice.mockRejectedValueOnce(
       new PublicError('Paddle is not configured.')
     );
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+      startCheckout(user, { planId: 'pro' }, request)
     ).rejects.toThrow('This plan cannot be bought right now.');
   });
 
-  it('refuses an interval the plan is not billed at, a closed plan, and one with no billing', async () => {
-    await expect(
-      startCheckout(user, { planId: 'max', interval: 'year' }, request)
-    ).rejects.toThrow('not available yearly');
-    for (const planId of ['closed', 'legacy']) {
-      await expect(
-        startCheckout(user, { planId, interval: 'month' }, request)
-      ).rejects.toThrow('not available');
+  it('sells a weekly plan at its weekly price', async () => {
+    await startCheckout(user, { planId: 'weekly' }, request);
+    expect(h.processor.createCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({ priceId: 'price_weekly_w', planId: 'weekly' })
+    );
+  });
+
+  it('refuses a closed plan, and one not there', async () => {
+    for (const planId of ['closed', 'gone']) {
+      await expect(startCheckout(user, { planId }, request)).rejects.toThrow(
+        'not available'
+      );
     }
   });
 
   it("refuses when the processor's price does not match the plan", async () => {
     h.processor.prices.price_pro_m.amount = 25;
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+      startCheckout(user, { planId: 'pro' }, request)
+    ).rejects.toThrow('cannot be bought right now');
+    h.processor.prices.price_weekly_w.interval = 'month';
+    await expect(
+      startCheckout(user, { planId: 'weekly' }, request)
     ).rejects.toThrow('cannot be bought right now');
     expect(h.processor.createCheckout).not.toHaveBeenCalled();
   });
@@ -628,22 +655,22 @@ describe('subscribing', () => {
   it('is refused while the feature is off', async () => {
     h.selling = false;
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'month' }, request)
+      startCheckout(user, { planId: 'pro' }, request)
     ).rejects.toThrow('not available');
   });
 
   it('refuses a second subscription while one is active — set to cancel or not — but not once canceled', async () => {
     await subscribe();
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'year' }, request)
+      startCheckout(user, { planId: 'pro_y' }, request)
     ).rejects.toThrow('already have a subscription');
     await cancelSubscription('u1');
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'year' }, request)
+      startCheckout(user, { planId: 'pro_y' }, request)
     ).rejects.toThrow('already have a subscription');
     await report({ status: 'canceled' });
     await expect(
-      startCheckout(user, { planId: 'pro', interval: 'year' }, request)
+      startCheckout(user, { planId: 'pro_y' }, request)
     ).resolves.toEqual({ url: 'https://pay.example/checkout' });
   });
 });
@@ -658,7 +685,6 @@ describe('a subscription', () => {
     expect(await rowOf()).toMatchObject({
       userId: 'u1',
       planId: 'basic',
-      interval: 'month',
       processor: 'stripe',
       externalId: 'sub_1',
       customerId: 'cus_u1',
@@ -934,7 +960,7 @@ describe('a subscription', () => {
     expect(await planOf('u1')).toBeNull();
     // Free to subscribe again.
     await expect(
-      startCheckout(user, { planId: 'basic', interval: 'month' }, request)
+      startCheckout(user, { planId: 'basic' }, request)
     ).resolves.toMatchObject({ url: expect.any(String) });
   });
 
@@ -1147,10 +1173,27 @@ describe('a subscription', () => {
 });
 
 describe("the user's plan", () => {
-  it('follows the price the processor bills at', async () => {
-    await subscribe({ priceId: 'price_pro_y', planId: 'pro' });
-    expect(await rowOf()).toMatchObject({ planId: 'pro', interval: 'year' });
-    expect(await planOf('u1')).toBe('pro');
+  it('is the plan the processor bills for, at its interval', async () => {
+    await subscribe({ priceId: 'price_pro_y', planId: 'pro_y' });
+    expect(await rowOf()).toMatchObject({ planId: 'pro_y' });
+    expect(await planOf('u1')).toBe('pro_y');
+    expect(await getMySubscription('u1')).toMatchObject({
+      planName: 'pro',
+      interval: 'year',
+      price: 200
+    });
+  });
+
+  it('is billed weekly on a weekly plan', async () => {
+    await subscribe(
+      { priceId: 'price_weekly_w', planId: 'weekly' },
+      { planId: 'weekly', amount: 3 }
+    );
+    expect(await getMySubscription('u1')).toMatchObject({
+      planId: 'weekly',
+      interval: 'week',
+      price: 3
+    });
   });
 
   it('keeps renewing on a plan that has since been closed', async () => {
@@ -1198,25 +1241,28 @@ describe('upgrading', () => {
     });
   });
 
-  it('keeps the interval the subscription is billed at', async () => {
-    await subscribe({ priceId: 'price_basic_y' });
-    await upgradePlan('u1', { planId: 'pro' });
+  it('moves up only at the interval the subscription is billed at', async () => {
+    await subscribe(
+      { priceId: 'price_basic_y', planId: 'basic_y' },
+      { planId: 'basic_y', amount: 100 }
+    );
+    await expect(upgradePlan('u1', { planId: 'pro' })).rejects.toThrow(
+      'cannot be switched to in place'
+    );
+    await upgradePlan('u1', { planId: 'pro_y' });
     expect(h.processor.changeNow).toHaveBeenCalledWith('sub_1', {
       priceId: 'price_pro_y',
-      planId: 'pro'
+      planId: 'pro_y'
     });
   });
 
-  it('refuses a plan that costs the same or less, or is not billed at the interval', async () => {
+  it('refuses a plan that costs the same or less, or is billed at another interval', async () => {
     await subscribe({ priceId: 'price_pro_m', planId: 'pro' });
-    for (const planId of ['twin', 'basic']) {
+    for (const planId of ['twin', 'basic', 'yearly', 'weekly']) {
       await expect(upgradePlan('u1', { planId })).rejects.toThrow(
         'cannot be switched to in place'
       );
     }
-    await expect(upgradePlan('u1', { planId: 'yearly' })).rejects.toThrow(
-      'not available monthly'
-    );
   });
 
   it('changes nothing when the charge fails', async () => {
@@ -1358,7 +1404,7 @@ describe('a payment', () => {
     });
     expect(await planOf('u1')).toBeNull();
     await expect(
-      startCheckout(user, { planId: 'basic', interval: 'month' }, request)
+      startCheckout(user, { planId: 'basic' }, request)
     ).resolves.toMatchObject({ url: expect.any(String) });
   });
 

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { type BillingInterval } from '@/types/payment';
 import { describeMultiplier } from '@/lib/billing';
 import { CAPABILITIES } from '@/lib/constant';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { intervalLabelOf } from '@/components/billing-labels';
 import { DataTable } from '@/components/console/data-table';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
@@ -270,7 +272,7 @@ function describeSubscription(
   sub:
     | {
         planName: string | null;
-        interval: string | null;
+        interval: BillingInterval | null;
         expiresAt: Date | string;
         canceledAt: Date | string | null;
       }
@@ -279,7 +281,7 @@ function describeSubscription(
 ): React.ReactNode {
   if (!sub) return null;
   const parts = [sub.planName ?? 'Unknown plan'];
-  if (sub.interval) parts.push(sub.interval === 'year' ? 'yearly' : 'monthly');
+  if (sub.interval) parts.push(intervalLabelOf(sub.interval));
   return (
     <>
       {parts.join(', ')}, {sub.canceledAt ? 'will be canceled on' : 'renews on'}{' '}

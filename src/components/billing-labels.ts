@@ -1,4 +1,5 @@
 import {
+  billingIntervalOf,
   PAYMENT_KIND_LABELS,
   PAYMENT_PROCESSORS,
   type BillingInterval,
@@ -10,9 +11,9 @@ export function processorLabelOf(id: string): string {
   return PAYMENT_PROCESSORS.find(p => p.id === id)?.label ?? id;
 }
 
-/** "monthly" or "yearly". */
+/** "daily", "weekly", "monthly" or "yearly". */
 export const intervalLabelOf = (interval: BillingInterval | null) =>
-  interval === 'year' ? 'yearly' : interval === 'month' ? 'monthly' : '';
+  interval ? billingIntervalOf(interval).adverb : '';
 
 /** What a payment was for. */
 export const paymentKindLabelOf = (kind: PaymentKind) =>

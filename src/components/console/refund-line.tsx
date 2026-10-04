@@ -54,12 +54,10 @@ export function RefundLineRow({
         </span>
         <span>
           <span className="font-medium">{line.planName}</span>
-          {line.price != null && (
-            <span className="text-muted-foreground">
-              {' '}
-              {formatPrice(line.price)} / {line.interval}
-            </span>
-          )}
+          <span className="text-muted-foreground">
+            {' '}
+            {formatPrice(line.price)} / {line.interval}
+          </span>
         </span>
         <Badge variant="secondary" className="text-muted-foreground">
           {paymentKindLabelOf(line.kind)}

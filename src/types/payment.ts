@@ -65,37 +65,29 @@ export const PAYMENT_PROCESSORS: ReadonlyArray<{
   }
 ];
 
-export const billingIntervalSchema = z.enum(['month', 'year']);
+/** How often a plan is billed: every one day, week, month or year — the
+ *  units every processor bills by. */
+export const billingIntervalSchema = z.enum(['day', 'week', 'month', 'year']);
 export type BillingInterval = z.infer<typeof billingIntervalSchema>;
 
-/**
- * How a plan is billed: every month, every year, or either, as the user
- * chooses when they subscribe.
- */
-export const billingTypeSchema = z.enum(['month', 'year', 'both']);
-export type BillingType = z.infer<typeof billingTypeSchema>;
-
-export const BILLING_TYPES: ReadonlyArray<{
-  value: BillingType;
-  label: string;
-}> = [
-  { value: 'month', label: 'Monthly' },
-  { value: 'year', label: 'Yearly' },
-  { value: 'both', label: 'Monthly and Yearly' }
-];
-
-/** The intervals a billing type sells at. */
-export const intervalsOf = (type: BillingType | null): BillingInterval[] =>
-  type === 'both' ? ['month', 'year'] : type ? [type] : [];
-
-/** Every interval a plan can be billed at, as the console offers them. */
+/** Every interval a plan can be billed at, shortest first, as the pages
+ *  offer them. `days` is about how long one is, to compare prices by. */
 export const BILLING_INTERVALS: ReadonlyArray<{
   value: BillingInterval;
   label: string;
+  /** "monthly", as in "billed monthly". */
+  adverb: string;
+  days: number;
 }> = [
-  { value: 'month', label: 'Monthly' },
-  { value: 'year', label: 'Yearly' }
+  { value: 'day', label: 'Daily', adverb: 'daily', days: 1 },
+  { value: 'week', label: 'Weekly', adverb: 'weekly', days: 7 },
+  { value: 'month', label: 'Monthly', adverb: 'monthly', days: 365.25 / 12 },
+  { value: 'year', label: 'Yearly', adverb: 'yearly', days: 365.25 }
 ];
+
+/** An interval as the pages name it. */
+export const billingIntervalOf = (interval: BillingInterval) =>
+  BILLING_INTERVALS.find(i => i.value === interval)!;
 
 /**
  * A price as its processor reports it, as an amount (10.5, not 1050). Read to
@@ -182,10 +174,8 @@ export function canUpgrade(
   );
 }
 
-export const checkoutSchema = z.object({
-  planId: z.string().min(1),
-  interval: billingIntervalSchema
-});
+/** A plan is bought at its own price and interval. */
+export const checkoutSchema = z.object({ planId: z.string().min(1) });
 
 /** Back from a checkout: which processor, and what its return carried. */
 export const confirmCheckoutSchema = z.object({
@@ -193,7 +183,7 @@ export const confirmCheckoutSchema = z.object({
   ref: z.string().max(255).nullable().optional()
 });
 
-/** An upgrade keeps the interval the subscription is billed at. */
+/** An upgrade is to a plan at the interval the subscription is billed at. */
 export const changePlanSchema = z.object({ planId: z.string().min(1) });
 
 // ============================================================================

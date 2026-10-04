@@ -134,12 +134,9 @@ export function SettingsBilling() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-baseline gap-2">
               <span className="font-medium">{sub.planName}</span>
-              {sub.price != null && (
-                <span className="text-sm text-muted-foreground">
-                  {formatPrice(sub.price)} /{' '}
-                  {sub.interval === 'year' ? 'year' : 'month'}
-                </span>
-              )}
+              <span className="text-sm text-muted-foreground">
+                {formatPrice(sub.price)} / {sub.interval}
+              </span>
             </div>
             {subscriptionsEnabled && sub.canUpgrade && (
               <Button variant="outline" size="sm" onClick={showPlans}>

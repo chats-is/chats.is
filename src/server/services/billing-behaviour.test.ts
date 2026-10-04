@@ -428,9 +428,16 @@ describe('tier', () => {
       isUnlimited: true
     });
     const planId = randomUUID();
-    await h.db
-      .insert(schema.plans)
-      .values({ id: planId, name: `p-${planId}`, quotaId, tierId });
+    await h.db.insert(schema.plans).values({
+      id: planId,
+      name: `p-${planId}`,
+      quotaId,
+      tierId,
+      processor: 'stripe',
+      interval: 'month',
+      price: '10.00',
+      priceId: `price_${planId}`
+    });
     await h.db
       .update(schema.users)
       .set({ planId })

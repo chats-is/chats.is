@@ -287,7 +287,11 @@ describe('listPlans', () => {
         id: `pl-${i}`,
         name: `Plan ${i}`,
         quotaId: 'q-1',
-        displayOrder: 0
+        displayOrder: 0,
+        processor: 'stripe' as const,
+        interval: 'month' as const,
+        price: '10.00',
+        priceId: `price_${i}`
       }))
     );
     await h.db.insert(schema.users).values([

@@ -23,7 +23,7 @@ What it supports:
   prices; a tier (the user's own, else the plan's, else the install's default; none is the cost
   price and every model) holds the price multiplier a call is charged at and the models allowed,
   and quotas count what was spent.
-- Subscriptions: a plan billed monthly, yearly or either, at prices of its own, through the payment processor it names, with the plan set by webhook.
+- Subscriptions: a plan billed every day, week, month or year, at a price of its own, through the payment processor it names, with the plan set by webhook.
 - Several providers behind one model, with automatic failover, and streams that survive a reconnect.
 
 An admin runs the platform from `/console`: which providers exist and with which keys, which models
@@ -144,9 +144,11 @@ a conversation, registered in `services/chat-tools.ts`, so a new capability is a
 is `services/web-search.ts`: it decides per provider whether the model searches for itself or through
 the search model, and `lib/chat-usage.ts` counts the searches a step made.
 
-**A plan is the product; payment is taking the money.** A plan is billed monthly, yearly or either,
-through the one payment processor it names, with a price of its own in US dollars and the processor's
-price ID for each interval — kept on the plan only, and fixed once anyone has subscribed.
+**A plan is the product; payment is taking the money.** A plan is billed at one interval — every
+day, week, month or year — through the one payment processor it names, with a price of its own in US
+dollars and the processor's price ID — kept on the plan only, and fixed once anyone has subscribed. A
+name sold at several intervals is a plan for each (Pro monthly, Pro yearly), and a subscription is
+billed at its plan's interval.
 `services/subscription.ts` holds the one subscription flow every processor shares: a subscription is
 `active` (with `canceled_at` set to `expires_at` once cancelled to stop then) or `canceled`, with
 `cancel_reason` saying why; a user has at most one `active`, and it gives them its plan; the only
@@ -243,7 +245,7 @@ touching `.env` or the running servers, start a short-lived server with the secr
 `Authorization: Bearer <secret>`, and stop that server again.
 
 **Before the first purchase.** The plans under test must exist in `/console/plans`, each with its
-processor and that processor's price IDs, and be enabled; `subscriptions.enabled` must be on, and
+processor and that processor's price ID, and be enabled; `subscriptions.enabled` must be on, and
 `refunds.enabled` for refund requests. A processor's prices must be in US dollars. Which processors
 can be tested is which have keys in `.env`.
 
