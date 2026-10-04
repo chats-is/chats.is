@@ -207,8 +207,9 @@ through its API:
 app's own page, so for Paddle everything is driven at the tunnel address — sign in there too; its
 cookies are `__Secure-` ones and must be set `secure`. Through the tunnel a page takes about half a
 minute before React has taken it over: wait for that (a button carrying a `__react…` property)
-rather than for a fixed time, and keep a browser profile directory between runs so the modules are
-cached. Lemon Squeezy's checkout is its own hosted page, so for Lemon Squeezy the browser can be
+rather than for a fixed time. Start every run with a fresh browser profile: one kept between runs
+came to hold the dev server's modules in a state it never answered, and the page was never taken
+over. Lemon Squeezy's checkout is its own hosted page, so for Lemon Squeezy the browser can be
 driven at `http://localhost:3000`, which is far quicker.
 
 **Signing in is yours to do.** Test accounts exist, plus-aliases of the owner's address ending
@@ -227,11 +228,21 @@ table. A user with an active subscription cannot buy another, so pick one withou
 the project, and write the scripts there: one small library — sign in, open a page with the cookies
 set, click by visible text, read the toasts and dialogs — and one script per flow. The plans dialog
 opens from the Upgrade pill for a user with no subscription, and from Settings → Billing → Upgrade
-plan for one who has. Pay with the sandbox test card `4242 4242 4242 4242`:
+plan for one who has. Its choice of interval shows only once the plans have arrived, and a press
+made before then is lost: check that the interval wanted is the one pressed, and the card's price,
+before pressing Subscribe — otherwise another plan is bought. Pay with the sandbox test card
+`4242 4242 4242 4242`:
 
 - **Paddle** — an overlay in a frame from `sandbox-buy.paddle.com/checkout`: the postcode first, then
-  `#cardNumber`, `#cardHolder`, `#expiry`, `#cvv`.
-- **Lemon Squeezy** — its hosted page, with the card fields inside a Stripe iframe.
+  `#cardNumber`, `#cardHolder`, `#expiry`, `#cvv`. It speaks the browser's language — Chinese here —
+  so find its buttons by what they do, not by their words: Continue after the postcode, then the
+  subscribe button, not the PayPal one beside it.
+- **Lemon Squeezy** — its hosted page, with the card fields inside a Stripe iframe. Type the card,
+  its expiry and code, and the address at a person's pace, about 150 ms a key: typed faster, its
+  hCaptcha check holds the payment back, and Pay does nothing, with no error. Send
+  `Accept-Language: en-US`, or the page comes in another language. Paid, it shows a thank-you whose
+  Continue goes back to the app. It keeps one cart per browser session: a second checkout opened in
+  the same browser replaces the first.
 
 After each step print the `subscription`, `payment` and `refund_request` rows and what the processor
 itself says of the subscription, then again once the webhooks have come. A purchase or a cancel
@@ -247,7 +258,10 @@ touching `.env` or the running servers, start a short-lived server with the secr
 **Before the first purchase.** The plans under test must exist in `/console/plans`, each with its
 processor and that processor's price ID, and be enabled; `subscriptions.enabled` must be on, and
 `refunds.enabled` for refund requests. A processor's prices must be in US dollars. Which processors
-can be tested is which have keys in `.env`.
+can be tested is which have keys in `.env`. A daily or weekly price is made in Paddle's sandbox
+through its API — `POST /prices` with `billing_cycle: { interval: 'week', frequency: 1 }` and
+`quantity: { minimum: 1, maximum: 1 }`; Lemon Squeezy's API cannot make a variant, so one there is
+made in its dashboard.
 
 **What to walk through**, checking after each step the rows, the user's plan, and that the
 processor's side agrees:
@@ -260,7 +274,10 @@ processor's side agrees:
    subscription only stops renewing until the processor confirms the money went back; a refund the
    processor rejects puts it back, and the request waits to be decided again.
 6. An admin refunds a payment from Payments, cancelling now or at expiry.
-7. A second subscription bought beside the first: cancelled, and refunded in full.
+7. A second subscription bought beside the first: cancelled, and refunded in full. Open both
+   checkouts through the app before paying either, and keep their addresses; then pay each in the
+   tab in front, since a tab behind it is held back and Paddle's overlay never finishes there — and,
+   for Lemon Squeezy, each in a browser of its own, since a second cart replaces the first.
 8. A refund made in the processor's own dashboard ends the subscription too.
 9. A dispute, where the sandbox can make one.
 
