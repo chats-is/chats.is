@@ -22,7 +22,7 @@ type History = InfiniteData<Awaited<ReturnType<typeof listChats>>>;
 export function useChatsInfinite() {
   const {
     data,
-    isLoading,
+    isPending,
     isFetching,
     isFetchingNextPage,
     fetchNextPage,
@@ -35,7 +35,10 @@ export function useChatsInfinite() {
 
   return {
     chats: chats as Chat[],
-    isLoading,
+    // Nothing of the history read yet. Not "a first request in flight": a
+    // server render never fetches, so only this reads the same on the server
+    // and in the browser taking the page over — which then draws the same.
+    isLoading: isPending,
     isValidating: isFetching,
     // Distinct from `isValidating`, which is true for any request in flight —
     // including the refetch that follows renaming or deleting a chat. Only a

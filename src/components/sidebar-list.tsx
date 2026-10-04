@@ -87,7 +87,7 @@ export function SidebarList() {
       className="flex-1 overflow-auto group-data-[collapsible=icon]:hidden"
       ref={listRef}
     >
-      {(isLoading || (isValidating && chats.length === 0)) && (
+      {isLoading && (
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -103,7 +103,10 @@ export function SidebarList() {
           </p>
         </div>
       )}
-      {!isLoading && !isValidating && !isError && chats.length === 0 && (
+      {/* Read, and empty — also while it is read again, as it is the moment
+          the browser takes over a page whose history has gone stale: the
+          server drew it so. */}
+      {!isLoading && !isError && chats.length === 0 && (
         <div className="p-8 text-center">
           <p className="text-sm text-muted-foreground">No chat history</p>
         </div>
