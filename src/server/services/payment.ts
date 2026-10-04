@@ -194,8 +194,9 @@ async function paymentByTransaction(
   if (!found) {
     throw new Error(`[payment] ${processor} ${transactionId} is not kept`);
   }
+  // A payment whose user has been deleted since keeps no user to compare.
   if (
-    (named?.userId && named.userId !== found.userId) ||
+    (named?.userId && found.userId && named.userId !== found.userId) ||
     (named?.planId && named.planId !== found.planId)
   ) {
     throw new Error(

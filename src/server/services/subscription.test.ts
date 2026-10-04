@@ -2688,4 +2688,25 @@ describe('deleting a user', () => {
       amount: '10.00'
     });
   });
+
+  it('leaves their payments refundable, the refund confirmed by a webhook that names them', async () => {
+    await subscribe();
+    await report({ status: 'canceled' });
+    await deleteUser('admin', 'u1');
+    const id = (await paymentOf())!.id;
+    await refundPayment({ paymentId: id, cancelSubscription: false }, 'admin');
+    // As Lemon Squeezy confirms it: naming the user and plan the checkout
+    // wrote, the user since deleted.
+    await webhook({
+      kind: 'refund',
+      transactionId: 'pi_1',
+      refund: { externalId: 're_1', amount: 8, total: 8, status: 'succeeded' },
+      userId: 'u1',
+      planId: 'basic'
+    });
+    expect(await paymentOf()).toMatchObject({
+      status: 'refunded',
+      refundAmount: '8.00'
+    });
+  });
 });
