@@ -1,12 +1,12 @@
 import {
   Banknote,
-  BarChart3,
   CalendarCheck,
   CircleDollarSign,
   Cpu,
   CreditCard,
   Gauge,
   LayoutGrid,
+  Logs,
   Percent,
   Settings,
   Sparkles,
@@ -21,6 +21,11 @@ export const ConsoleNavigation = {
       title: 'Overview',
       url: '/console',
       icon: LayoutGrid
+    },
+    {
+      title: 'Usage',
+      url: '/console/usage',
+      icon: Logs
     },
     {
       title: 'Providers',
@@ -48,14 +53,14 @@ export const ConsoleNavigation = {
       icon: Gauge
     },
     {
-      title: 'Plans',
-      url: '/console/plans',
-      icon: CreditCard
-    },
-    {
       title: 'Tiers',
       url: '/console/tiers',
       icon: Percent
+    },
+    {
+      title: 'Plans',
+      url: '/console/plans',
+      icon: CreditCard
     },
     {
       title: 'Subscriptions',
@@ -73,19 +78,14 @@ export const ConsoleNavigation = {
       icon: Tickets
     },
     {
-      title: 'Usage',
-      url: '/console/usage',
-      icon: BarChart3
+      title: 'Users',
+      url: '/console/users',
+      icon: Users
     },
     {
       title: 'Settings',
       url: '/console/settings',
       icon: Settings
-    },
-    {
-      title: 'Users',
-      url: '/console/users',
-      icon: Users
     }
   ]
 };
