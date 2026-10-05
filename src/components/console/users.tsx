@@ -7,6 +7,7 @@ import {
   Loader2,
   Mail,
   ShieldCheck,
+  Trash2,
   User as UserIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,10 +21,21 @@ import {
 } from '@/server/functions/quota';
 import { setUserTier, tierQueries } from '@/server/functions/tier';
 import {
+  deleteUser,
   updateUserRole,
   userQueries,
   type listUsers
 } from '@/server/functions/user';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -35,6 +47,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { RowAction } from '@/components/console/row-action';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { userTableInput } from '@/components/console/table-filters';
 import { TierLabel } from '@/components/console/tier-label';
@@ -86,6 +99,7 @@ const userColumns = (ctx: {
   setRole: (user: User, role: 'user' | 'admin') => void;
   setQuota: (user: User, quotaId: string) => void;
   setTier: (user: User, tierId: string) => void;
+  remove: (user: User) => void;
 }) =>
   helper.columns([
     helper.display({
@@ -335,6 +349,25 @@ const userColumns = (ctx: {
           </div>
         );
       }
+    }),
+    helper.display({
+      id: 'actions',
+      header: 'Actions',
+      meta: { align: 'right', headClassName: 'w-24' },
+      cell: ({ row }) => (
+        <RowAction
+          icon={Trash2}
+          label="Delete user"
+          disabled={
+            row.original.role === 'admin'
+              ? 'Admins cannot be deleted'
+              : row.original.hasLiveSubscription
+                ? 'Has a subscription in effect, so it cannot be deleted.'
+                : null
+          }
+          onClick={() => ctx.remove(row.original)}
+        />
+      )
     })
   ]);
 
@@ -363,7 +396,8 @@ export function UsersPending() {
         updatingTierUserId: null,
         setRole: noop,
         setQuota: noop,
-        setTier: noop
+        setTier: noop,
+        remove: noop
       })}
       action="text"
     />
@@ -382,6 +416,7 @@ export default function UsersPage() {
   const [updatingTierUserId, setUpdatingTierUserId] = useState<string | null>(
     null
   );
+  const [deleting, setDeleting] = useState<User | null>(null);
 
   const queryClient = useQueryClient();
   const { data, isLoading, isPlaceholderData } = useQuery(
@@ -454,6 +489,19 @@ export default function UsersPage() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: mutating(deleteUser),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: userQueries.key.list() });
+      await queryClient.invalidateQueries({
+        queryKey: userQueries.key.stats()
+      });
+      setDeleting(null);
+      toast.success('User deleted');
+    },
+    onError: error => toast.error(error.message)
+  });
+
   const columns = useMemo(
     () =>
       userColumns({
@@ -480,7 +528,8 @@ export default function UsersPage() {
             id: user.id,
             tierId: tierId === TIER_NONE ? null : tierId
           });
-        }
+        },
+        remove: setDeleting
       }),
     [
       quotaOptions,
@@ -522,6 +571,42 @@ export default function UsersPage() {
           }
         }
       />
+
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={open => !open && setDeleting(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleting?.name || deleting?.email} and everything they own —
+              chats, messages and files — are deleted. Their payments are kept,
+              under the email they paid with. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => {
+                // Stays open while it deletes, and on a refusal.
+                e.preventDefault();
+                if (deleting) deleteMutation.mutate({ id: deleting.id });
+              }}
+              disabled={deleteMutation.isPending}
+              variant="destructive"
+              className="gap-2"
+            >
+              {deleteMutation.isPending && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
+              Delete user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

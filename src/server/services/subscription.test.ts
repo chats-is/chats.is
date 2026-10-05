@@ -2697,7 +2697,7 @@ describe('deleting a user', () => {
     await subscribe();
     await cancelSubscription('u1');
     await expect(deleteUser('admin', 'u1')).rejects.toThrow(
-      'active subscription'
+      'subscription in effect'
     );
   });
 

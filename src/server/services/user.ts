@@ -13,7 +13,10 @@ import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
-import { hasActiveSubscription } from '@/server/services/subscription';
+import {
+  hasLiveSubscription,
+  usersWithLiveSubscriptions
+} from '@/server/services/subscription';
 import { getUserTier } from '@/server/services/tier';
 
 /**
@@ -95,9 +98,11 @@ export async function listUsers(filter: z.infer<typeof userSearchSchema>) {
     }),
     db.select({ count: count() }).from(users).where(where)
   ]);
+  // A user with a subscription in effect cannot be deleted.
+  const live = await usersWithLiveSubscriptions(rows.map(r => r.id));
 
   return {
-    rows,
+    rows: rows.map(row => ({ ...row, hasLiveSubscription: live.has(row.id) })),
     total: Number(totalRow?.count ?? 0),
     page: filter.page,
     pageSize: filter.pageSize
@@ -180,9 +185,9 @@ export async function deleteUser(actingUserId: string, id: string) {
   }
 
   // Deleting the account would not stop the processor charging for it.
-  if (await hasActiveSubscription(id)) {
+  if (await hasLiveSubscription(id)) {
     throw new PublicError(
-      'This user has an active subscription, so the account cannot be deleted.'
+      'This user has a subscription in effect, so the account cannot be deleted.'
     );
   }
 

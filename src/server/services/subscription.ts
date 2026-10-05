@@ -1885,8 +1885,25 @@ export async function refundPayment(
 // ============================================================================
 
 /** Whether a user has a subscription in effect. */
-export async function hasActiveSubscription(userId: string) {
+export async function hasLiveSubscription(userId: string) {
   return !!(await liveSubscription(userId));
+}
+
+/** Of these users, the ones with a subscription in effect. */
+export async function usersWithLiveSubscriptions(
+  userIds: string[]
+): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ userId: subscriptions.userId })
+    .from(subscriptions)
+    .where(
+      and(
+        inArray(subscriptions.userId, userIds),
+        inArray(subscriptions.status, LIVE_STATUSES)
+      )
+    );
+  return new Set(rows.map(r => r.userId));
 }
 
 /**

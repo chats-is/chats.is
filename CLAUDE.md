@@ -216,7 +216,7 @@ driven at `http://localhost:3000`, which is far quicker.
 
 **Signing in is yours to do.** Test accounts exist, plus-aliases of the owner's address ending
 `+claude-test` (an admin), `+claude-test2` and `+claude-test3` (users); find them in the `user`
-table. A user with an active subscription cannot buy another, so pick one without. For any of them:
+table. A user with a subscription in effect (`active` or `canceled`) cannot buy another, so pick one without. For any of them:
 
 1. `POST /api/auth/email-otp/send-verification-otp` with `{ email, type: 'sign-in' }` and an `Origin`
    header of the address being driven.
