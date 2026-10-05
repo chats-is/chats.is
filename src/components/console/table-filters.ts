@@ -82,7 +82,7 @@ export const quotaTableInput = (search: PageOnly) => ({
 /** Subscriptions narrow by status and processor beside the search; either
  *  at `all` is no filter. */
 type SubscriptionSearch = SearchOnly & { status?: string; processor?: string };
-const STATUSES = ['active', 'canceled'] as const;
+const STATUSES = ['active', 'canceled', 'ended'] as const;
 const PROCESSORS = ['stripe', 'paddle', 'lemonsqueezy'] as const;
 const oneOf = <T extends string>(options: readonly T[], value?: string) =>
   options.includes(value as T) ? (value as T) : undefined;

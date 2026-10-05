@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  CancelNowSwitch,
+  EndSubscriptionSwitch,
   RefundLineRow,
   type RefundLine
 } from '@/components/console/refund-line';
@@ -61,7 +61,7 @@ interface Refund {
   lines: RefundLine[];
   /** The refund fee percentage the settings have, or null for auto. */
   refundFee: number | null;
-  /** Whether its subscription is still running, to be canceled. */
+  /** Whether its subscription is still live, to be ended or canceled. */
   running: boolean;
   request: {
     id: string;
@@ -73,8 +73,7 @@ interface Refund {
  * An admin refunds: from a payment, that payment; from a user's request,
  * the payments it covers, with the request above and Reject beside Refund.
  * Each payment gives back all that is left of it, as the refund settings
- * reckon it, and the subscription is canceled — at once, or when it
- * expires.
+ * reckon it, and the subscription is ended, or canceled.
  */
 export function RefundDialog({
   target,
@@ -100,7 +99,7 @@ export function RefundDialog({
     refund = {
       lines: [d.payment],
       refundFee: d.refundFee,
-      running: d.subscription?.status === 'active',
+      running: !!d.subscription && d.subscription.status !== 'ended',
       request: null
     };
   } else if (requestId && request.data) {
@@ -108,7 +107,7 @@ export function RefundDialog({
     refund = {
       lines: d.payments,
       refundFee: d.refundFee,
-      running: d.subscription.status === 'active',
+      running: d.subscription.status !== 'ended',
       request: {
         id: d.id,
         reason: d.reason
@@ -148,7 +147,7 @@ function RefundBody({
 }) {
   const queryClient = useQueryClient();
   const request = r.request;
-  const [cancelNow, setCancelNow] = useState(true);
+  const [endSubscription, setEndSubscription] = useState(true);
   const [rejecting, setRejecting] = useState(false);
   const [rejection, setRejection] = useState('');
 
@@ -163,11 +162,11 @@ function RefundBody({
       request
         ? mutating(approveRefundRequest)({
             id: request.id,
-            cancelSubscription: cancelNow
+            endSubscription
           })
         : mutating(refundPayment)({
             paymentId: r.lines[0].id,
-            cancelSubscription: cancelNow
+            endSubscription
           }),
     onSuccess: async () => {
       await refresh();
@@ -213,9 +212,9 @@ function RefundBody({
       )}
 
       {r.running && total > 0 && (
-        <CancelNowSwitch
-          checked={cancelNow}
-          onChange={setCancelNow}
+        <EndSubscriptionSwitch
+          checked={endSubscription}
+          onChange={setEndSubscription}
           disabled={busy}
         />
       )}

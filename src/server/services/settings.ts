@@ -98,8 +98,8 @@ export const getSubscriptionsEnabled = perRequest(
 );
 
 /**
- * How many days past its expiry a subscription goes on, its renewal's
- * payment having failed, before it is canceled (setting
+ * How many days past its period end a subscription goes on, its renewal's
+ * payment having failed, before it ends (setting
  * `subscriptions.graceDays`), the same whichever processor is retrying it.
  */
 export const getSubscriptionGraceDays = perRequest(

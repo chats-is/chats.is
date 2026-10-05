@@ -256,9 +256,9 @@ async function ofDuplicate(
   if (!subscriptionId) return false;
   const sub = await executor.query.subscriptions.findFirst({
     where: eq(subscriptions.id, subscriptionId),
-    columns: { cancelReason: true }
+    columns: { reason: true }
   });
-  return isDuplicate(sub?.cancelReason);
+  return isDuplicate(sub?.reason);
 }
 
 /**
@@ -289,9 +289,9 @@ export async function startRefund(
     requestId?: string | null;
     /** Try the processor again when it fails for a while. */
     retry?: boolean;
-    /** What the refund owes the subscription once it is confirmed: canceled
-     *  at once, or when it expires. None for a refund that cancels nothing. */
-    cancelSubscription?: boolean | null;
+    /** What the refund owes the subscription once it is confirmed: to end
+     *  it, or to cancel it. None for a refund that does neither. */
+    endSubscription?: boolean | null;
     /** All of it, whatever the refund fee: it bought nothing. */
     full?: boolean;
   },
@@ -349,7 +349,7 @@ export async function startRefund(
         externalRefundId: made.externalId,
         refundBy: by.adminId,
         refundRequestId: by.requestId ?? null,
-        refundCancelSubscription: by.cancelSubscription ?? null,
+        refundEndSubscription: by.endSubscription ?? null,
         refundFee: whole ? '0' : refundFee == null ? 'auto' : String(refundFee),
         refundAt: new Date(),
         updatedAt: new Date()
@@ -372,11 +372,11 @@ export async function startRefund(
  * - Failed: the refund is undone, and the payment is as before it.
  *
  * Money that went back ends what it paid for, wherever the refund was made:
- * `cancelSubscription` is what the subscription is still owed for it —
- * canceled at once, or when it expires — and null when nothing is. A refund
- * sent from here owes what the admin chose; one made in the processor, at
- * once when all of it went back, else when it expires. It is owed until
- * `clearRefundCancel` says it is done, so a webhook sent again does it.
+ * `endSubscription` is what the subscription is still owed for it — to end
+ * it, or to cancel it — and null when nothing is. A refund sent from here
+ * owes what the admin chose; one made in the processor, to end it when all
+ * of it went back, else to cancel it. It is owed until `clearRefundEnd`
+ * says it is done, so a webhook sent again does it.
  */
 export async function applyRefund(
   processor: PaymentProcessorId,
@@ -387,7 +387,7 @@ export async function applyRefund(
   paymentId: string;
   subscriptionId: string | null;
   refundRequestId: string | null;
-  cancelSubscription: boolean | null;
+  endSubscription: boolean | null;
   failed: boolean;
 } | null> {
   const found = await paymentByTransaction(processor, transactionId, named);
@@ -413,7 +413,7 @@ export async function applyRefund(
           .set({
             status: 'paid',
             refundAmount: '0.00',
-            refundCancelSubscription: null,
+            refundEndSubscription: null,
             updatedAt: new Date()
           })
           .where(eq(payments.id, row.id));
@@ -434,7 +434,7 @@ export async function applyRefund(
         pending || minor === 0 || disputed
           ? null
           : ours
-            ? row.refundCancelSubscription
+            ? row.refundEndSubscription
             : minor >= amountMinor;
       await tx
         .update(payments)
@@ -446,9 +446,7 @@ export async function applyRefund(
               ? 'refund_pending'
               : 'refunded',
           externalRefundId: refund.externalId,
-          refundCancelSubscription: pending
-            ? row.refundCancelSubscription
-            : owed,
+          refundEndSubscription: pending ? row.refundEndSubscription : owed,
           ...(ours
             ? {}
             : {
@@ -468,16 +466,16 @@ export async function applyRefund(
     paymentId: found.id,
     subscriptionId: found.subscriptionId,
     refundRequestId: outcome.requestId,
-    cancelSubscription: outcome.owed,
+    endSubscription: outcome.owed,
     failed: outcome.failed
   };
 }
 
 /** What a refund owed its subscription has been done. */
-export async function clearRefundCancel(paymentId: string) {
+export async function clearRefundEnd(paymentId: string) {
   await db
     .update(payments)
-    .set({ refundCancelSubscription: null })
+    .set({ refundEndSubscription: null })
     .where(eq(payments.id, paymentId));
 }
 
@@ -593,7 +591,7 @@ export async function listPayments(page: z.infer<typeof paymentListSchema>) {
       with: {
         user: { columns: { id: true, name: true, email: true } },
         plan: { columns: { name: true } },
-        subscription: { columns: { status: true, cancelReason: true } },
+        subscription: { columns: { status: true, reason: true } },
         ...REFUND_WITH
       }
     }),
@@ -608,11 +606,7 @@ export async function listPayments(page: z.infer<typeof paymentListSchema>) {
       ...row,
       invoiceOnDemand: onDemand(row),
       leftToRefund: toAmount(
-        refundableMinor(
-          row,
-          refundFee,
-          isDuplicate(row.subscription?.cancelReason)
-        )
+        refundableMinor(row, refundFee, isDuplicate(row.subscription?.reason))
       )
     })),
     total: Number(totalRow?.count ?? 0),

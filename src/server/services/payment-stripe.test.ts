@@ -121,7 +121,7 @@ describe('a Stripe webhook', () => {
         planId: 'pro',
         priceId: 'price_1',
         status: 'active',
-        expiresAt: new Date(1790000000 * 1000)
+        periodEnd: new Date(1790000000 * 1000)
       })
     });
   });

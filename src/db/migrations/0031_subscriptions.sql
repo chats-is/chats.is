@@ -17,7 +17,7 @@ CREATE TABLE "payment" (
 	"refund_request_id" varchar(255),
 	"refund_fee" varchar(8),
 	"refund_at" timestamp with time zone,
-	"refund_cancel_subscription" boolean,
+	"refund_end_subscription" boolean,
 	"fee" numeric(12, 2),
 	"tax" numeric(12, 2),
 	"status" varchar(32) NOT NULL,
@@ -46,14 +46,16 @@ CREATE TABLE "subscription" (
 	"external_id" varchar(255) NOT NULL,
 	"customer_id" varchar(255) NOT NULL,
 	"status" varchar(16) NOT NULL,
-	"expires_at" timestamp with time zone NOT NULL,
+	"period_end" timestamp with time zone NOT NULL,
 	"canceled_at" timestamp with time zone,
-	"cancel_reason" varchar(32),
 	"canceled_by" varchar(255),
+	"ended_at" timestamp with time zone,
+	"reason" varchar(32),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "subscription_canceled_check" CHECK ("subscription"."status" <> 'canceled' or ("subscription"."canceled_at" is not null and "subscription"."cancel_reason" is not null)),
-	CONSTRAINT "subscription_cancel_pair_check" CHECK (("subscription"."canceled_at" is null) = ("subscription"."cancel_reason" is null))
+	CONSTRAINT "subscription_status_check" CHECK (("subscription"."status" = 'active' and "subscription"."canceled_at" is null and "subscription"."canceled_by" is null and "subscription"."ended_at" is null and "subscription"."reason" is null)
+        or ("subscription"."status" = 'canceled' and "subscription"."canceled_at" is not null and "subscription"."reason" is not null and "subscription"."ended_at" is null)
+        or ("subscription"."status" = 'ended' and "subscription"."ended_at" is not null and "subscription"."reason" is not null))
 );
 --> statement-breakpoint
 ALTER TABLE "plan" DROP CONSTRAINT "plan_name_unique";--> statement-breakpoint
@@ -81,7 +83,7 @@ CREATE UNIQUE INDEX "refund_request_pending_idx" ON "refund_request" USING btree
 CREATE INDEX "refund_request_user_id_idx" ON "refund_request" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "refund_request_status_idx" ON "refund_request" USING btree ("status","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "subscription_processor_external_idx" ON "subscription" USING btree ("processor","external_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "subscription_user_active_idx" ON "subscription" USING btree ("user_id") WHERE "subscription"."status" = 'active';--> statement-breakpoint
+CREATE UNIQUE INDEX "subscription_user_live_idx" ON "subscription" USING btree ("user_id") WHERE "subscription"."status" in ('active', 'canceled');--> statement-breakpoint
 CREATE INDEX "subscription_user_id_idx" ON "subscription" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "subscription_status_created_idx" ON "subscription" USING btree ("status","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "plan_name_interval_idx" ON "plan" USING btree ("name","interval");--> statement-breakpoint

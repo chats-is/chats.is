@@ -66,15 +66,15 @@ const requestColumns = (review: (row: Row) => void) =>
     helper.display({
       id: 'subscription',
       header: 'Subscription',
-      // When it renews or stops, while it runs; once stopped, only that.
+      // When it renews or ends, while it is live; once ended, only that.
       cell: ({ row }) => {
         const sub = row.original.subscription;
         return (
           <span className="text-sm whitespace-nowrap">
-            {sub.status === 'active' ? (
+            {sub.status !== 'ended' ? (
               <SubscriptionNote sub={sub} />
             ) : (
-              <SubscriptionStatusBadge status="canceled" />
+              <SubscriptionStatusBadge status="ended" />
             )}
           </span>
         );

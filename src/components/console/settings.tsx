@@ -584,7 +584,7 @@ function SubscriptionSettings({ form }: { form: SettingsFormApi }) {
         icon={CalendarClock}
         label="Subscription Grace Period"
         htmlFor="subscriptions.graceDays"
-        hint="How many days past its expiry a subscription goes on when its renewal payment has failed, while the payment processor retries it. Still unpaid after that, the subscription is canceled, here and in the payment processor."
+        hint="How many days past its period end a subscription goes on when its renewal payment has failed, while the payment processor retries it. Still unpaid after that, the subscription ends, here and in the payment processor."
         settingKey="subscriptions.graceDays"
       >
         <form.AppField name="subscriptions.graceDays">

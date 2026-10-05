@@ -183,12 +183,8 @@ function PlansDialog({
                 <>
                   You are on {mine.planName ?? 'a plan'}, billed{' '}
                   {billingIntervalOf(mine.interval).adverb}.{' '}
-                  {mine.canceledAt ? 'It will be canceled on' : 'It renews on'}{' '}
-                  <LocalTime
-                    value={mine.canceledAt ?? mine.expiresAt}
-                    precision="day"
-                  />
-                  .
+                  {mine.status === 'canceled' ? 'It ends on' : 'It renews on'}{' '}
+                  <LocalTime value={mine.periodEnd} precision="day" />.
                 </>
               ) : (
                 'Choose the plan that suits you.'
@@ -402,10 +398,10 @@ function PlanCard({
     );
   } else {
     // Cheaper, another interval, another processor: a new subscription,
-    // once the current one is canceled.
+    // once the current one has ended.
     button = (
       <Button variant="outline" className="w-full" disabled>
-        After your subscription is canceled
+        After your subscription ends
       </Button>
     );
   }

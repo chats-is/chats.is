@@ -43,7 +43,7 @@ export const getRefundDetails = createServerFn({ method: 'GET' })
   .validator(paymentIdSchema)
   .handler(({ data }) => subscription.getRefundDetails(data.id));
 
-/** Admin: refund a payment, and cancel its subscription at once if asked. */
+/** Admin: refund a payment, and end its subscription or cancel it. */
 export const refundPayment = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
   .validator(refundPaymentSchema)

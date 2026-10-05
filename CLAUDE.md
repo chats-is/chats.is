@@ -150,9 +150,11 @@ dollars and the processor's price ID — kept on the plan only, and fixed once a
 name sold at several intervals is a plan for each (Pro monthly, Pro yearly), and a subscription is
 billed at its plan's interval.
 `services/subscription.ts` holds the one subscription flow every processor shares: a subscription is
-`active` (with `canceled_at` set to `expires_at` once cancelled to stop then) or `canceled`, with
-`cancel_reason` saying why; a user has at most one `active`, and it gives them its plan; the only
-change in place is an upgrade to a dearer plan at the same interval. It reaches a processor only
+`active` (it renews at `period_end`), `canceled` (it does not renew, and ends at `period_end`) or
+`ended`. `period_end` is the only time of the subscription itself; `canceled_at` and `canceled_by`
+say when and by whom it was cancelled, `ended_at` when it ended, and `reason` why it was cancelled or
+ended. A user has at most one live subscription — `active` or `canceled` — and it gives them its
+plan; the only change in place is an upgrade to a dearer plan at the same interval. It reaches a processor only
 through the interface in `services/payment-processor.ts`; Stripe, Paddle and Lemon Squeezy are
 adapters beside it (`services/payment-*.ts`), and a new processor is another. The flow has three
 parts that do not mix. What a user or admin does — buy, upgrade, cancel, resume, refund — is a
@@ -160,13 +162,13 @@ business function that decides from the local tables and then calls the processo
 processor did is told by webhook at `/api/payments/$processor/webhook`: the adapter hands over the
 object the event carries (subscription, payment, refund, dispute) and when it happened; the service
 checks it against what is kept — our user, newer than what is kept, no more refunded than was paid
-— and writes it, with the one action the result calls for (a confirmed refund cancels as the admin
-chose, a chargeback cancels, a second subscription bought beside the first is canceled and
-refunded, a renewal reported failed past the grace days cancels). A subscription event writes the
-subscription; its expiry moves only when a renewal's payment is reported paid. Nothing in a
+— and writes it, with the one action the result calls for (a confirmed refund ends it as the admin
+chose, a chargeback ends it, a second subscription bought beside the first is ended and refunded, a
+renewal reported failed past the grace days ends it). A subscription event writes the
+subscription; its `period_end` moves only when a renewal's payment is reported paid. Nothing in a
 request or a webhook reads the processor to decide; the only reads are the checkout the user
 comes back from and the scheduled `/api/cron`, which is the separate recovery for
-whatever the webhooks did not say: subscriptions past their expiry, renewals failed past the grace
+whatever the webhooks did not say: subscriptions past their period end, renewals failed past the grace
 days, and refunds sent from here still waiting after a day. Paddle's checkout opens on `/pay/paddle`. A payment keeps the
 facts its status is reckoned from — paid, `refund_amount`, `refund_pending` while a refund waits,
 `disputed`, and the refund's id — and is kept when its user is deleted; a user's refund request is
@@ -272,11 +274,11 @@ processor's side agrees:
 2. Cancel, then Resubscribe — only what the user cancelled themselves can be resumed.
 3. Upgrade to a dearer plan (Stripe, Paddle): the dialog shows the charge first.
 4. An admin cancels: the user has no Resubscribe.
-5. The user asks for a refund; an admin approves it, cancelling now or at expiry, or rejects it. The
-   subscription only stops renewing until the processor confirms the money went back; a refund the
+5. The user asks for a refund; an admin approves it, ending the subscription or cancelling it, or rejects
+   it. The subscription is only canceled until the processor confirms the money went back; a refund the
    processor rejects puts it back, and the request waits to be decided again.
-6. An admin refunds a payment from Payments, cancelling now or at expiry.
-7. A second subscription bought beside the first: cancelled, and refunded in full. Open both
+6. An admin refunds a payment from Payments, ending the subscription or cancelling it.
+7. A second subscription bought beside the first: ended, and refunded in full. Open both
    checkouts through the app before paying either, and keep their addresses; then pay each in the
    tab in front, since a tab behind it is held back and Paddle's overlay never finishes there — and,
    for Lemon Squeezy, each in a browser of its own, since a second cart replaces the first.

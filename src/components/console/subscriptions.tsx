@@ -48,7 +48,7 @@ type Row = Awaited<ReturnType<typeof listSubscriptions>>['rows'][number];
 
 const helper = createAppColumnHelper<Row>();
 
-const STATUSES = (['active', 'canceled'] as const).map(value => ({
+const STATUSES = (['active', 'canceled', 'ended'] as const).map(value => ({
   value,
   label: SUBSCRIPTION_STATUS_LABELS[value]
 }));
@@ -80,7 +80,7 @@ const subscriptionColumns = (
     helper.display({
       id: 'expires',
       header: 'Expires',
-      // The day it renews or is canceled — or, canceled, when it was.
+      // The day it renews or ends — or, ended, when it did.
       cell: ({ row }) => (
         <span className="text-sm whitespace-nowrap">
           <SubscriptionNote sub={row.original} />
@@ -124,15 +124,15 @@ const subscriptionColumns = (
       },
       cell: ({ row }) => (
         <>
-          {/* Only one that renews: cancelled, it stops then. */}
+          {/* Only one that renews: canceled, it ends at its period end. */}
           <RowAction
             icon={CalendarX}
             label="Cancel subscription"
             disabled={
-              row.original.status !== 'active'
-                ? 'Already canceled'
-                : row.original.canceledAt
-                  ? 'Already set to cancel'
+              row.original.status === 'ended'
+                ? 'Already ended'
+                : row.original.status === 'canceled'
+                  ? 'Already canceled'
                   : null
             }
             onClick={() => cancel(row.original)}
@@ -250,19 +250,17 @@ export default function Subscriptions() {
           open
           onOpenChange={open => !open && setCanceling(null)}
           planName={canceling.planName}
-          expiresAt={canceling.expiresAt}
+          periodEnd={canceling.periodEnd}
           byAdmin
-          // A renewal unpaid: nothing paid for is left, so it ends now.
-          now={canceling.paymentFailed}
+          // A renewal unpaid: nothing paid for is left, so it ends.
+          ends={canceling.paymentFailed}
           onConfirm={() =>
             cancel.mutate(
               { id: canceling.id },
               {
                 onSuccess: () =>
                   toast.success(
-                    canceling.paymentFailed
-                      ? 'Canceled.'
-                      : 'Set to cancel at the end of what was paid for.'
+                    canceling.paymentFailed ? 'Ended.' : 'Canceled.'
                   )
               }
             )

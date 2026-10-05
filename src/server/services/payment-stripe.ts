@@ -67,57 +67,32 @@ const intervalOf = (
 
 /**
  * Stripe's status in the app's words. Set to stop at the end of the period,
- * a subscription is still `active`. Past due, a renewal failed and Stripe
- * is retrying it: still `active`, its payment failed. Unpaid, the retries
- * are used up: over.
+ * a subscription is `canceled`: still in effect until then. Past due, a
+ * renewal failed and Stripe is retrying it: still in effect, its payment
+ * failed. Unpaid, the retries are used up: over.
  */
 function statusOf(
   sub: Stripe.Subscription
-): Pick<
-  ProcessorSubscription,
-  'status' | 'cancelAtPeriodEnd' | 'paymentFailed' | 'paused'
-> {
+): Pick<ProcessorSubscription, 'status' | 'paymentFailed' | 'paused'> {
+  // In effect: renewing, or cancelled to end with the period.
+  const inEffect =
+    sub.cancel_at_period_end || !!sub.cancel_at ? 'canceled' : 'active';
   switch (sub.status) {
     case 'active':
     case 'trialing':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: sub.cancel_at_period_end || !!sub.cancel_at,
-        paymentFailed: false
-      };
+      return { status: inEffect, paymentFailed: false };
     case 'incomplete':
-      return {
-        status: 'incomplete',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false
-      };
+      return { status: 'incomplete', paymentFailed: false };
     case 'paused':
-      return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false,
-        paused: true
-      };
+      return { status: 'ended', paymentFailed: false, paused: true };
     case 'past_due':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: sub.cancel_at_period_end || !!sub.cancel_at,
-        paymentFailed: true
-      };
+      return { status: inEffect, paymentFailed: true };
     // Retries used up and the subscription left standing, unpaid: still
     // there, still not paid for. Its failed payments say what becomes of it.
     case 'unpaid':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: sub.cancel_at_period_end || !!sub.cancel_at,
-        paymentFailed: true
-      };
+      return { status: inEffect, paymentFailed: true };
     default:
-      return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false
-      };
+      return { status: 'ended', paymentFailed: false };
   }
 }
 
@@ -134,7 +109,7 @@ function toSubscription(sub: Stripe.Subscription): ProcessorSubscription {
     planId: sub.metadata?.planId || null,
     priceId: item?.price.id ?? null,
     ...statusOf(sub),
-    expiresAt: dateOf(item?.current_period_end)
+    periodEnd: dateOf(item?.current_period_end)
   };
 }
 
@@ -439,7 +414,7 @@ export function createStripeProcessor(): PaymentProcessor {
       }
     },
 
-    async cancelAtPeriodEnd(externalId) {
+    async cancel(externalId) {
       const stripe = await client();
       await stripe.subscriptions.update(externalId, {
         cancel_at_period_end: true
@@ -453,7 +428,7 @@ export function createStripeProcessor(): PaymentProcessor {
       });
     },
 
-    async cancelNow(externalId) {
+    async end(externalId) {
       const stripe = await client();
       const sub = await stripe.subscriptions.retrieve(externalId);
       if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {

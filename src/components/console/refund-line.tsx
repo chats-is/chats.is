@@ -87,10 +87,10 @@ export function RefundLineRow({
 }
 
 /**
- * Whether the subscription is canceled at once with the refund. Off, it is
- * canceled when it expires, and usable until then.
+ * Whether the refund ends the subscription. Off, it cancels it: it does not
+ * renew, and is usable until the end of what was paid for.
  */
-export function CancelNowSwitch({
+export function EndSubscriptionSwitch({
   checked,
   onChange,
   disabled
@@ -103,17 +103,17 @@ export function CancelNowSwitch({
     <div className="space-y-1.5">
       <div className="flex items-center space-x-2">
         <Switch
-          id="cancel-now"
+          id="end-subscription"
           checked={checked}
           disabled={disabled}
           onCheckedChange={onChange}
         />
-        <Label htmlFor="cancel-now">Cancel the subscription now</Label>
+        <Label htmlFor="end-subscription">End the subscription</Label>
       </div>
       {!checked && (
         <p className="text-xs text-muted-foreground">
-          The subscription is canceled when it expires, and can be used until
-          then.
+          The subscription is canceled: it does not renew, and can be used until
+          the end of what was paid for.
         </p>
       )}
     </div>

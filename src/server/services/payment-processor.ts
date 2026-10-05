@@ -26,21 +26,20 @@ export type ProcessorSubscription = {
   /** The price it is billed at, which names its plan and interval. */
   priceId: string | null;
   /**
-   * `active` while it is in effect — also while a renewal that failed is
-   * being retried (`paymentFailed`); `canceled` once it has stopped — by
-   * whoever, or with its retries used up (`paymentFailed`). `incomplete` is
-   * one not paid for yet, which the app does not keep.
+   * `active` while it is in effect and renews; `canceled` while it is in
+   * effect and ends when what was paid for runs out; both also while a
+   * renewal that failed is being retried (`paymentFailed`). `ended` once it
+   * has stopped — by whoever, or with its retries used up (`paymentFailed`).
+   * `incomplete` is one not paid for yet, which the app does not keep.
    */
-  status: 'incomplete' | 'active' | 'canceled';
-  /** Set to stop when what was paid for runs out, rather than renew. */
-  cancelAtPeriodEnd: boolean;
-  /** A renewal could not be paid: still retried while `active`, given up
-   *  on once `canceled`. */
+  status: 'incomplete' | 'active' | 'canceled' | 'ended';
+  /** A renewal could not be paid: still retried while in effect, given up
+   *  on once `ended`. */
   paymentFailed: boolean;
   /** Stopped by a pause in the processor, which may resume it. */
   paused?: boolean;
-  /** Paid up to here. */
-  expiresAt: Date | null;
+  /** The end of the period paid for. */
+  periodEnd: Date | null;
 };
 
 /** One invoice, paid or not. Amounts as kept (10.5, not 1050). */
@@ -201,14 +200,14 @@ export interface PaymentProcessor {
     target: { priceId: string; planId: string }
   ) => Promise<void>;
 
-  /** Stop when what was paid for runs out. */
-  cancelAtPeriodEnd: (externalId: string) => Promise<void>;
+  /** Cancel: it does not renew, and ends when what was paid for runs out. */
+  cancel: (externalId: string) => Promise<void>;
 
-  /** Undo `cancelAtPeriodEnd` while it still runs. */
+  /** Undo `cancel` while it is still in effect: it renews again. */
   resume: (externalId: string) => Promise<void>;
 
-  /** Stop now. Already stopped is not an error. */
-  cancelNow: (externalId: string) => Promise<void>;
+  /** End it: no longer in effect. Already ended is not an error. */
+  end: (externalId: string) => Promise<void>;
 
   /**
    * Refund one payment, all or part: `minor` go back now, and `whole` says

@@ -275,43 +275,27 @@ const textOf = (value: unknown) =>
 
 /**
  * Paddle's status in the app's words. With a cancellation scheduled for the
- * end of the period, a subscription is still `active`. Past due, a renewal
- * failed and Paddle is retrying it: still `active`, its payment failed —
- * Paddle cancels it itself when the retries are used up.
+ * end of the period, a subscription is `canceled`: still in effect until
+ * then. Past due, a renewal failed and Paddle is retrying it: still in
+ * effect, its payment failed — Paddle cancels it itself when the retries are
+ * used up.
  */
 function statusOf(
   sub: PaddleSubscription
-): Pick<
-  ProcessorSubscription,
-  'status' | 'cancelAtPeriodEnd' | 'paymentFailed' | 'paused'
-> {
+): Pick<ProcessorSubscription, 'status' | 'paymentFailed' | 'paused'> {
+  // In effect: renewing, or cancelled to end with the period.
+  const inEffect =
+    sub.scheduled_change?.action === 'cancel' ? 'canceled' : 'active';
   switch (sub.status) {
     case 'active':
     case 'trialing':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: sub.scheduled_change?.action === 'cancel',
-        paymentFailed: false
-      };
+      return { status: inEffect, paymentFailed: false };
     case 'paused':
-      return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false,
-        paused: true
-      };
+      return { status: 'ended', paymentFailed: false, paused: true };
     case 'past_due':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: sub.scheduled_change?.action === 'cancel',
-        paymentFailed: true
-      };
+      return { status: inEffect, paymentFailed: true };
     default:
-      return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false
-      };
+      return { status: 'ended', paymentFailed: false };
   }
 }
 
@@ -323,8 +307,8 @@ function toSubscription(sub: PaddleSubscription): ProcessorSubscription {
     planId: textOf(sub.custom_data?.planId),
     priceId: sub.items[0]?.price.id ?? null,
     ...statusOf(sub),
-    // Paddle stops saying the period once a subscription is cancelled.
-    expiresAt: dateOf(sub.current_billing_period?.ends_at)
+    // Paddle stops saying the period once a subscription has ended.
+    periodEnd: dateOf(sub.current_billing_period?.ends_at)
   };
 }
 
@@ -610,7 +594,7 @@ export function createPaddleProcessor(): PaymentProcessor {
       }
     },
 
-    async cancelAtPeriodEnd(externalId) {
+    async cancel(externalId) {
       await paddle('POST', `/subscriptions/${externalId}/cancel`, {
         effective_from: 'next_billing_period'
       });
@@ -622,7 +606,7 @@ export function createPaddleProcessor(): PaymentProcessor {
       });
     },
 
-    async cancelNow(externalId) {
+    async end(externalId) {
       const sub = await getSubscription(externalId);
       if (sub.status === 'canceled') return;
       // Paddle refuses to cancel one with a change scheduled — a cancel at

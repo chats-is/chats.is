@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
-import { type BillingInterval } from '@/types/payment';
+import { type BillingInterval, type SubscriptionStatus } from '@/types/payment';
 import { describeMultiplier } from '@/lib/billing';
 import { CAPABILITIES } from '@/lib/constant';
 import { cn } from '@/lib/utils';
@@ -267,14 +267,14 @@ export default function UserDetail({ userId }: { userId: string }) {
 }
 
 /** The plan as the subscription behind it has it: "Pro, monthly, renews
- *  on Oct 1, 2026", or the day it will be canceled once it is set to. */
+ *  on Oct 1, 2026", or the day it ends once it is canceled. */
 function describeSubscription(
   sub:
     | {
         planName: string | null;
         interval: BillingInterval | null;
-        expiresAt: Date | string;
-        canceledAt: Date | string | null;
+        status: SubscriptionStatus;
+        periodEnd: Date | string;
       }
     | null
     | undefined
@@ -284,8 +284,8 @@ function describeSubscription(
   if (sub.interval) parts.push(intervalLabelOf(sub.interval));
   return (
     <>
-      {parts.join(', ')}, {sub.canceledAt ? 'will be canceled on' : 'renews on'}{' '}
-      <LocalTime value={sub.canceledAt ?? sub.expiresAt} precision="day" />
+      {parts.join(', ')}, {sub.status === 'canceled' ? 'ends on' : 'renews on'}{' '}
+      <LocalTime value={sub.periodEnd} precision="day" />
     </>
   );
 }

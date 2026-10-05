@@ -1,11 +1,11 @@
 import {
-  CANCEL_REASON_LABELS,
   PAYMENT_STATUS_LABELS,
   REFUND_REQUEST_STATUS_LABELS,
+  SUBSCRIPTION_REASON_LABELS,
   SUBSCRIPTION_STATUS_LABELS,
-  type CancelReason,
   type PaymentStatus,
   type RefundRequestStatus,
+  type SubscriptionReason,
   type SubscriptionStatus
 } from '@/types/payment';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,8 @@ const TONES: Record<Tone, string> = {
 
 const SUBSCRIPTION: Record<SubscriptionStatus, Tone> = {
   active: 'green',
-  canceled: 'red'
+  canceled: 'amber',
+  ended: 'red'
 };
 
 const PAYMENT: Record<PaymentStatus, Tone> = {
@@ -65,7 +66,7 @@ function ToneBadge({
   );
 }
 
-/** A subscription's status as a badge: Active or Canceled. */
+/** A subscription's status as a badge: Active, Canceled or Ended. */
 export function SubscriptionStatusBadge({
   status
 }: {
@@ -80,14 +81,14 @@ export function SubscriptionStatusBadge({
 
 type SubscriptionPlace = {
   status: SubscriptionStatus;
-  expiresAt: Date | string;
-  canceledAt: Date | string | null;
-  cancelReason?: CancelReason | null;
+  periodEnd: Date | string;
+  endedAt?: Date | string | null;
+  reason?: SubscriptionReason | null;
 };
 
 /**
  * The note beside a subscription's status: the day it renews, the day it
- * will be canceled, or when it was canceled and — for an admin — why.
+ * ends, or when it ended and — for an admin — why.
  */
 export function SubscriptionNote({
   sub,
@@ -96,27 +97,26 @@ export function SubscriptionNote({
   sub: SubscriptionPlace;
   showReason?: boolean;
 }) {
-  if (sub.status === 'active' && !sub.canceledAt) {
-    return (
-      <>
-        Renews on <LocalTime value={sub.expiresAt} precision="day" />
-      </>
-    );
-  }
   if (sub.status === 'active') {
     return (
       <>
-        Will be canceled on{' '}
-        <LocalTime value={sub.canceledAt!} precision="day" />
+        Renews on <LocalTime value={sub.periodEnd} precision="day" />
+      </>
+    );
+  }
+  if (sub.status === 'canceled') {
+    return (
+      <>
+        Ends on <LocalTime value={sub.periodEnd} precision="day" />
       </>
     );
   }
   return (
     <>
-      Canceled on <LocalTime value={sub.canceledAt!} />
+      Ended on <LocalTime value={sub.endedAt!} />
       {showReason &&
-        sub.cancelReason &&
-        ` · ${CANCEL_REASON_LABELS[sub.cancelReason]}`}
+        sub.reason &&
+        ` · ${SUBSCRIPTION_REASON_LABELS[sub.reason]}`}
     </>
   );
 }
@@ -156,21 +156,21 @@ export function RefundRequestStatusBadge({
   );
 }
 
-/** A subscription's status for an admin; why a canceled one was canceled
- *  is on hover. */
+/** A subscription's status for an admin; why an ended one ended is on
+ *  hover. */
 export function SubscriptionStatusTag({
   sub
 }: {
-  sub: { status: SubscriptionStatus; cancelReason: CancelReason | null };
+  sub: { status: SubscriptionStatus; reason: SubscriptionReason | null };
 }) {
   const badge = <SubscriptionStatusBadge status={sub.status} />;
-  if (sub.status !== 'canceled' || !sub.cancelReason) return badge;
+  if (sub.status !== 'ended' || !sub.reason) return badge;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="cursor-default">{badge}</span>
       </TooltipTrigger>
-      <TooltipContent>{CANCEL_REASON_LABELS[sub.cancelReason]}</TooltipContent>
+      <TooltipContent>{SUBSCRIPTION_REASON_LABELS[sub.reason]}</TooltipContent>
     </Tooltip>
   );
 }

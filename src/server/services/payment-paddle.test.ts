@@ -282,11 +282,11 @@ describe('the Paddle API', () => {
     ).rejects.toThrow('did not go through');
   });
 
-  it('cancels at the period end, resumes, and cancels at once', async () => {
-    await paddle.cancelAtPeriodEnd('sub_1');
+  it('cancels at the period end, resumes, and ends', async () => {
+    await paddle.cancel('sub_1');
     await paddle.resume('sub_1');
     replies.push({ body: { data: subscription() } }, { body: { data: {} } });
-    await paddle.cancelNow('sub_1');
+    await paddle.end('sub_1');
     expect(
       calls.map(c => [c.method, c.url.replace(/^.*\.com/, ''), c.body])
     ).toEqual([
@@ -357,8 +357,8 @@ describe('a Paddle subscription', () => {
     ['trialing', 'active', false],
     // A renewal failed and Paddle is retrying it: still in effect.
     ['past_due', 'active', true],
-    ['paused', 'canceled', false],
-    ['canceled', 'canceled', false]
+    ['paused', 'ended', false],
+    ['canceled', 'ended', false]
   ])('reads %s as %s', (status, expected, paymentFailed) => {
     expect(
       __test.toSubscription(subscription({ status }) as any)
@@ -372,12 +372,11 @@ describe('a Paddle subscription', () => {
       }) as any
     );
     expect(sub).toMatchObject({
-      status: 'active',
-      cancelAtPeriodEnd: true,
+      status: 'canceled',
       userId: 'u1',
       planId: 'pro',
       priceId: 'pri_pro',
-      expiresAt: new Date('2026-10-01T00:00:00Z')
+      periodEnd: new Date('2026-10-01T00:00:00Z')
     });
   });
 });
@@ -408,7 +407,7 @@ describe('Paddle webhooks', () => {
           planId: 'pro',
           priceId: 'pri_pro',
           status: 'active',
-          expiresAt: new Date('2026-10-01T00:00:00Z')
+          periodEnd: new Date('2026-10-01T00:00:00Z')
         })
       }
     });

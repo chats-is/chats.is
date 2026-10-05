@@ -23,11 +23,11 @@ import {
 } from '@/types';
 import {
   type BillingInterval,
-  type CancelReason,
   type PaymentKind,
   type PaymentProcessorId,
   type PaymentStatus,
   type RefundRequestStatus,
+  type SubscriptionReason,
   type SubscriptionStatus
 } from '@/types/payment';
 
@@ -704,12 +704,13 @@ export const plansRelations = relations(plans, ({ one, many }) => ({
 
 /**
  * A user's subscription to a plan, as its payment processor has it. It is
- * `active` while it renews — and still `active`, with `canceledAt` set to
- * `expiresAt`, once cancelled to stop at the end of what was paid for — and
- * `canceled` once it has stopped, when `canceledAt` says when and
- * `cancelReason` why. A user has at most one `active` subscription; buying
- * again after one is cancelled is a new subscription. It is billed at its
- * plan's price and interval.
+ * `active` while it renews at `periodEnd`, `canceled` once cancelled — still
+ * in effect, and ending at `periodEnd` — and `ended` once it has stopped.
+ * `periodEnd` is the subscription's own time; `canceledAt` and `endedAt` are
+ * when it was cancelled and when it ended, and `reason` why it is `canceled`
+ * or `ended`. A user has at most one subscription in effect; buying again
+ * after one has ended is a new subscription. It is billed at its plan's
+ * price and interval.
  */
 export const subscriptions = createTable(
   'subscription',
@@ -730,20 +731,22 @@ export const subscriptions = createTable(
     status: varchar('status', { length: 16 })
       .$type<SubscriptionStatus>()
       .notNull(),
-    // Paid up to here: it renews, or is cancelled, then.
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    // The end of the period paid for: `active` renews then, `canceled` ends
+    // then. It moves only when a renewal is paid.
+    periodEnd: timestamp('period_end', { withTimezone: true }).notNull(),
+    // When it was cancelled, and by whom: the user themselves, or an admin —
+    // by cancelling it, or by the refund that did. Null by whom when no one
+    // here did: the processor. Only what its own user cancelled is theirs to
+    // resume.
     canceledAt: timestamp('canceled_at', { withTimezone: true }),
-    cancelReason: varchar('cancel_reason', {
-      length: 32
-    }).$type<CancelReason>(),
-    // Who set it to cancel: the user themselves, or an admin — by
-    // cancelling it, or by the refund that did. Null when no one here did:
-    // the processor, a dispute, a failed payment. Only what its own user
-    // set to cancel is theirs to resume.
     canceledBy: varchar('canceled_by', { length: 255 }).references(
       () => users.id,
       { onDelete: 'set null' }
     ),
+    // When it ended.
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    // Why it is `canceled` or `ended`.
+    reason: varchar('reason', { length: 32 }).$type<SubscriptionReason>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -756,18 +759,17 @@ export const subscriptions = createTable(
       table.processor,
       table.externalId
     ),
-    uniqueIndex('subscription_user_active_idx')
+    // At most one in effect per user.
+    uniqueIndex('subscription_user_live_idx')
       .on(table.userId)
-      .where(sql`${table.status} = 'active'`),
+      .where(sql`${table.status} in ('active', 'canceled')`),
     index('subscription_user_id_idx').on(table.userId),
     index('subscription_status_created_idx').on(table.status, table.createdAt),
     check(
-      'subscription_canceled_check',
-      sql`${table.status} <> 'canceled' or (${table.canceledAt} is not null and ${table.cancelReason} is not null)`
-    ),
-    check(
-      'subscription_cancel_pair_check',
-      sql`(${table.canceledAt} is null) = (${table.cancelReason} is null)`
+      'subscription_status_check',
+      sql`(${table.status} = 'active' and ${table.canceledAt} is null and ${table.canceledBy} is null and ${table.endedAt} is null and ${table.reason} is null)
+        or (${table.status} = 'canceled' and ${table.canceledAt} is not null and ${table.reason} is not null and ${table.endedAt} is null)
+        or (${table.status} = 'ended' and ${table.endedAt} is not null and ${table.reason} is not null)`
     )
   ]
 );
@@ -848,9 +850,9 @@ export const payments = createTable(
     // processor itself. Null with none.
     refundAt: timestamp('refund_at', { withTimezone: true }),
     // What a refund of it still owes its subscription once the processor
-    // confirms the money went back: canceled at once (true), or when it
-    // expires (false). Null with nothing owed — none sent, or done.
-    refundCancelSubscription: boolean('refund_cancel_subscription'),
+    // confirms the money went back: to end it (true), or to cancel it
+    // (false). Null with nothing owed — none sent, or done.
+    refundEndSubscription: boolean('refund_end_subscription'),
     // What the processor kept as its fee, and the tax in the amount. Null
     // where it does not say.
     fee: numeric('fee', { precision: 12, scale: 2 }),

@@ -1,5 +1,5 @@
 {
-  "id": "47c86d3b-5d51-46ec-b0b9-1475ba8bb65f",
+  "id": "d14dff07-0e2b-4c32-8936-e911fc4e310e",
   "prevId": "6e62c63e-6fb9-423d-82e5-3d561b077dea",
   "version": "7",
   "dialect": "postgresql",
@@ -1294,8 +1294,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "refund_cancel_subscription": {
-          "name": "refund_cancel_subscription",
+        "refund_end_subscription": {
+          "name": "refund_end_subscription",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
@@ -2427,8 +2427,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "expires_at": {
-          "name": "expires_at",
+        "period_end": {
+          "name": "period_end",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
@@ -2439,15 +2439,21 @@
           "primaryKey": false,
           "notNull": false
         },
-        "cancel_reason": {
-          "name": "cancel_reason",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "canceled_by": {
           "name": "canceled_by",
           "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "varchar(32)",
           "primaryKey": false,
           "notNull": false
         },
@@ -2488,8 +2494,8 @@
           "method": "btree",
           "with": {}
         },
-        "subscription_user_active_idx": {
-          "name": "subscription_user_active_idx",
+        "subscription_user_live_idx": {
+          "name": "subscription_user_live_idx",
           "columns": [
             {
               "expression": "user_id",
@@ -2499,7 +2505,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"subscription\".\"status\" = 'active'",
+          "where": "\"subscription\".\"status\" in ('active', 'canceled')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2586,13 +2592,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "subscription_canceled_check": {
-          "name": "subscription_canceled_check",
-          "value": "\"subscription\".\"status\" <> 'canceled' or (\"subscription\".\"canceled_at\" is not null and \"subscription\".\"cancel_reason\" is not null)"
-        },
-        "subscription_cancel_pair_check": {
-          "name": "subscription_cancel_pair_check",
-          "value": "(\"subscription\".\"canceled_at\" is null) = (\"subscription\".\"cancel_reason\" is null)"
+        "subscription_status_check": {
+          "name": "subscription_status_check",
+          "value": "(\"subscription\".\"status\" = 'active' and \"subscription\".\"canceled_at\" is null and \"subscription\".\"canceled_by\" is null and \"subscription\".\"ended_at\" is null and \"subscription\".\"reason\" is null)\n        or (\"subscription\".\"status\" = 'canceled' and \"subscription\".\"canceled_at\" is not null and \"subscription\".\"reason\" is not null and \"subscription\".\"ended_at\" is null)\n        or (\"subscription\".\"status\" = 'ended' and \"subscription\".\"ended_at\" is not null and \"subscription\".\"reason\" is not null)"
         }
       },
       "isRLSEnabled": false

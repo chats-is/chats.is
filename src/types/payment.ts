@@ -117,21 +117,30 @@ export const processorPriceLookupSchema = z.object({
 /**
  * A subscription's status, the same whichever processor it is in:
  *
- * - `active` — in effect. It renews at `expiresAt`, or, once cancelled
- *   (`canceledAt` set), is cancelled then;
- * - `canceled` — cancelled: `canceledAt` says when, `cancelReason` why.
+ * - `active` — in effect, and renews at `periodEnd`;
+ * - `canceled` — in effect, and ends at `periodEnd`: `canceledAt` says when
+ *   it was canceled, `canceledBy` by whom, `reason` why;
+ * - `ended` — no longer in effect: `endedAt` says when it ended, `reason`
+ *   why.
  *
  * The processors' own statuses are mapped onto these where they are read.
  */
-export type SubscriptionStatus = 'active' | 'canceled';
-export const subscriptionStatusSchema = z.enum(['active', 'canceled']);
+export type SubscriptionStatus = 'active' | 'canceled' | 'ended';
+export const subscriptionStatusSchema = z.enum(['active', 'canceled', 'ended']);
 export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
   active: 'Active',
-  canceled: 'Canceled'
+  canceled: 'Canceled',
+  ended: 'Ended'
 };
 
-/** Why a subscription was cancelled. */
-export type CancelReason =
+/** The statuses of a subscription in effect: it gives its user its plan. */
+export const LIVE_STATUSES: ReadonlyArray<SubscriptionStatus> = [
+  'active',
+  'canceled'
+];
+
+/** Why a subscription is `canceled`, or `ended`. */
+export type SubscriptionReason =
   | 'canceled_by_customer'
   | 'canceled_by_admin'
   | 'refunded'
@@ -140,12 +149,12 @@ export type CancelReason =
   | 'duplicate' // a second subscription bought alongside the first
   | 'canceled_in_processor' // cancelled in the payment processor itself
   | 'paused_in_processor'; // paused there, which resuming undoes
-/** Whether a subscription was a duplicate: canceled at once, its payments
+/** Whether a subscription was a duplicate: ended, its payments
  *  refunded in full. */
-export const isDuplicate = (reason: CancelReason | null | undefined) =>
+export const isDuplicate = (reason: SubscriptionReason | null | undefined) =>
   reason === 'duplicate';
 
-export const CANCEL_REASON_LABELS: Record<CancelReason, string> = {
+export const SUBSCRIPTION_REASON_LABELS: Record<SubscriptionReason, string> = {
   canceled_by_customer: 'Canceled by customer',
   canceled_by_admin: 'Canceled by admin',
   refunded: 'Refunded',
@@ -353,10 +362,10 @@ export function refundRequestsOf(value: string | null): number | null {
 }
 
 /**
- * How many days past its expiry a subscription goes on when its renewal's
+ * How many days past its period end a subscription goes on when its renewal's
  * payment has failed (setting `subscriptions.graceDays`): from 0 to 7, 3
  * when unset. The processor retries the payment meanwhile; still unpaid
- * past these days, the subscription is canceled — however long the
+ * past these days, the subscription ends — however long the
  * processor would have gone on retrying.
  */
 export const GRACE_DAYS_MAX = 7;
@@ -383,8 +392,8 @@ export const paymentIdSchema = z.object({ id: z.string().min(1) });
  *  settings reckon it. */
 export const refundPaymentSchema = z.object({
   paymentId: z.string().min(1),
-  /** Cancel the subscription at once; otherwise when it expires. */
-  cancelSubscription: z.boolean()
+  /** End the subscription; otherwise cancel it. */
+  endSubscription: z.boolean()
 });
 
 /** A user asks for a refund: no amount, only why, if they say. */
@@ -396,8 +405,8 @@ export const refundRequestSchema = z.object({
  *  back, as the refund settings reckon it. */
 export const approveRefundRequestSchema = z.object({
   id: z.string().min(1),
-  /** Cancel the subscription at once; otherwise when it expires. */
-  cancelSubscription: z.boolean()
+  /** End the subscription; otherwise cancel it. */
+  endSubscription: z.boolean()
 });
 
 /** An admin rejects a refund request, saying why if they choose to. */

@@ -282,13 +282,13 @@ describe('the Lemon Squeezy API', () => {
     expect(calls).toEqual([]);
   });
 
-  it('cancels, resumes, and leaves an already cancelled one alone', async () => {
-    await lemon.cancelAtPeriodEnd('77');
+  it('cancels, resumes, and leaves an already ended one alone', async () => {
+    await lemon.cancel('77');
     await lemon.resume('77');
     replies.push({
       body: { data: subscription({ cancelled: true, status: 'cancelled' }) }
     });
-    await lemon.cancelNow('77');
+    await lemon.end('77');
     expect(calls.map(c => [c.method, path(c)])).toEqual([
       ['DELETE', '/subscriptions/77'],
       ['PATCH', '/subscriptions/77'],
@@ -344,43 +344,29 @@ describe('a Lemon Squeezy subscription', () => {
   const past = new Date(Date.now() - 86_400_000).toISOString();
 
   it.each([
-    ['active', {}, 'active', false, false],
-    ['on_trial', {}, 'active', false, false],
+    ['active', {}, 'active', false],
+    ['on_trial', {}, 'active', false],
     // A renewal failed and is being retried: still in effect. Unpaid, the
     // retries are used up.
-    ['past_due', {}, 'active', false, true],
-    ['unpaid', {}, 'active', false, true],
-    ['paused', {}, 'canceled', false, false],
-    ['expired', {}, 'canceled', false, false],
+    ['past_due', {}, 'active', true],
+    ['unpaid', {}, 'active', true],
+    ['paused', {}, 'ended', false],
+    ['expired', {}, 'ended', false],
     [
       'cancelled, running to its end',
       { cancelled: true, ends_at: future },
-      'active',
-      true,
+      'canceled',
       false
     ],
-    [
-      'cancelled, and ended',
-      { cancelled: true, ends_at: past },
-      'canceled',
-      false,
-      false
-    ]
-  ])(
-    'reads %s',
-    (status, extra, expected, cancelAtPeriodEnd, paymentFailed) => {
-      const sub = __test.toSubscription(
-        subscription({ status: status.split(',')[0], ...extra }) as any
-      );
-      expect(sub).toMatchObject({
-        status: expected,
-        cancelAtPeriodEnd,
-        paymentFailed
-      });
-    }
-  );
+    ['cancelled, and ended', { cancelled: true, ends_at: past }, 'ended', false]
+  ])('reads %s', (status, extra, expected, paymentFailed) => {
+    const sub = __test.toSubscription(
+      subscription({ status: status.split(',')[0], ...extra }) as any
+    );
+    expect(sub).toMatchObject({ status: expected, paymentFailed });
+  });
 
-  it('reads a cancellation as coming when what was paid for runs out', () => {
+  it('reads a cancellation as ending when what was paid for runs out', () => {
     const sub = __test.toSubscription(
       subscription({
         status: 'cancelled',
@@ -389,9 +375,8 @@ describe('a Lemon Squeezy subscription', () => {
       }) as any
     );
     expect(sub).toMatchObject({
-      status: 'active',
-      cancelAtPeriodEnd: true,
-      expiresAt: new Date(future),
+      status: 'canceled',
+      periodEnd: new Date(future),
       priceId: '555',
       customerId: '9',
       userId: null

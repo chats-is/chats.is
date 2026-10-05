@@ -43,9 +43,9 @@ import { useCloseSettings } from '@/components/settings-dialog';
  *
  * - Renewing: upgrade, change how they pay, cancel, request a refund.
  * - A renewal's payment failed: told so; change how they pay.
- * - Set to cancel: resubscribe, upgrade, change how they pay, request a
- *   refund — unless an admin, a refund or a dispute set it to cancel, which
- *   the user cannot undo.
+ * - Canceled: resubscribe, upgrade, change how they pay, request a refund
+ *   — unless an admin, a refund or a dispute canceled it, which the user
+ *   cannot undo.
  *
  * A refund request is asked for beside Cancel, and once asked, where it
  * stands shows there in its place.
@@ -93,7 +93,7 @@ export function SettingsBilling() {
     action(
       () => cancelSubscription(),
       sub?.paymentFailed
-        ? 'Canceled.'
+        ? 'Ended.'
         : 'Canceled. Your plan stays until the end of what you paid for.'
     )
   );
@@ -166,7 +166,7 @@ export function SettingsBilling() {
                   Resubscribe
                 </Button>
               )}
-              {!sub.canceledAt && (
+              {sub.status === 'active' && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -309,8 +309,8 @@ export function SettingsBilling() {
           open={confirmCancel}
           onOpenChange={setConfirmCancel}
           planName={sub.planName}
-          expiresAt={sub.expiresAt}
-          now={sub.paymentFailed}
+          periodEnd={sub.periodEnd}
+          ends={sub.paymentFailed}
           onConfirm={() => cancel.mutate()}
         />
       )}

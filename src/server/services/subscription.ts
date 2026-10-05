@@ -22,19 +22,20 @@ import { pageWindow } from '@/types/pagination';
 import {
   canUpgrade,
   isDuplicate,
+  LIVE_STATUSES,
   REFUNDABLE_STATUSES,
   refundLeftMinor,
   toAmount,
   type approveRefundRequestSchema,
   type BillingInterval,
-  type CancelReason,
   type PaymentProcessorId,
   type ProcessorPrice,
   type refundPaymentSchema,
   type refundRequestListSchema,
   type refundRequestSchema,
   type rejectRefundRequestSchema,
-  type subscriptionListSchema
+  type subscriptionListSchema,
+  type SubscriptionReason
 } from '@/types/payment';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
@@ -50,7 +51,7 @@ import { withLock, type Executor, type Tx } from '@/server/services/db-lock';
 import {
   applyRefund,
   attachPayments,
-  clearRefundCancel,
+  clearRefundEnd,
   leftToRefundMinor,
   listSubscriptionPayments,
   markDisputed,
@@ -78,29 +79,30 @@ import {
  * keeping the user's plan in step with what the payment processor says.
  *
  * One flow, whatever the processor. A subscription is `active` while it is
- * in effect, and `canceled` once it has stopped:
+ * in effect and renews, `canceled` while it is in effect and ends at
+ * `period_end`, and `ended` once it has stopped:
  *
- * - Subscribing makes it `active`; each renewal keeps it so and moves
- *   `expires_at` on.
- * - Cancelling — by the user or an admin — keeps it `active` with
- *   `canceled_at` set to `expires_at`: it will be cancelled then. What the
- *   user cancelled they can resubscribe until then, which clears it; what
- *   an admin, a refund or a dispute set to cancel is not theirs to undo.
+ * - Subscribing makes it `active`; each renewal moves `period_end` on.
+ * - Cancelling — by the user or an admin — makes it `canceled`, with when
+ *   (`canceled_at`), by whom (`canceled_by`) and why (`reason`): it ends at
+ *   `period_end`. What the user cancelled they can resubscribe until then,
+ *   which makes it `active` again; what an admin, a refund or a dispute
+ *   cancelled is not theirs to undo.
  * - Upgrading — to a plan that costs more, at the same interval, through
  *   the same processor — starts now and charges the difference; it also
- *   clears a cancellation of the user's own.
+ *   makes a cancellation of the user's own `active` again.
  * - A renewal that fails is retried by the processor. The subscription
- *   stays `active` and keeps its plan to its expiry and the grace days
- *   past it — one setting, whichever the processor and however long it
- *   would go on retrying. Paid by then, it goes on; still unpaid, it is
- *   `canceled`, and cancelled in the processor, whose retries stop.
+ *   keeps its status and its plan to `period_end` and the grace days past
+ *   it — one setting, whichever the processor and however long it would go
+ *   on retrying. Paid by then, it goes on; still unpaid, it is `ended`
+ *   (`ended_at`, `reason`), and ended in the processor, whose retries stop.
  * - A dispute that took the money back, a second subscription bought beside
- *   the first: it is `canceled` at once, with the reason kept.
+ *   the first: it is `ended`, with the reason kept.
  * - A user asks for a refund; an admin approves it, or rejects it. An admin
- *   can also refund a payment. A refund ends the subscription once the
- *   money has gone back — wherever the refund was made — at once or when
- *   it expires; while the processor has not confirmed it the subscription
- *   only stops renewing, and a refund that fails puts it back.
+ *   can also refund a payment. Once the money has gone back — wherever the
+ *   refund was made — the refund ends the subscription, or cancels it;
+ *   while the processor has not confirmed it the subscription is only
+ *   `canceled`, and a refund that fails puts it back.
  *
  * The processor's webhooks carry the subscription or the payment as it is
  * there, and that is applied — checked against what is kept, and in the
@@ -245,19 +247,19 @@ export async function listPlansForSale() {
 
 type SubscriptionRow = typeof subscriptions.$inferSelect;
 
-/** The user's `active` subscription, if any: the one that gives them their
- *  plan. */
-async function activeSubscription(userId: string, ex: Executor = db) {
+/** The user's live subscription — `active` or `canceled` — if any: the one
+ *  that gives them their plan. */
+async function liveSubscription(userId: string, ex: Executor = db) {
   return await ex.query.subscriptions.findFirst({
     where: and(
       eq(subscriptions.userId, userId),
-      eq(subscriptions.status, 'active')
+      inArray(subscriptions.status, LIVE_STATUSES)
     )
   });
 }
 
-async function requireActive(userId: string) {
-  const sub = await activeSubscription(userId);
+async function requireLive(userId: string) {
+  const sub = await liveSubscription(userId);
   if (!sub) throw new PublicError('You have no subscription.');
   return sub;
 }
@@ -267,7 +269,7 @@ export async function getMySubscription(userId: string) {
   const sub = await db.query.subscriptions.findFirst({
     where: and(
       eq(subscriptions.userId, userId),
-      eq(subscriptions.status, 'active')
+      inArray(subscriptions.status, LIVE_STATUSES)
     ),
     with: { plan: true }
   });
@@ -282,42 +284,41 @@ export async function getMySubscription(userId: string) {
     price: priceOf(sub.plan),
     processor: sub.processor,
     status: sub.status,
-    expiresAt: sub.expiresAt,
-    canceledAt: sub.canceledAt,
+    periodEnd: sub.periodEnd,
     // A renewal's payment failed and is being retried: all the user is
     // told of it. How long it may stay unpaid is the app's own to know.
     paymentFailed: !!unpaid,
-    // Whether the cancellation waiting is the user's own to undo.
-    canResume: !!sub.canceledAt && mine,
+    // Whether the cancellation is the user's own to undo.
+    canResume: sub.status === 'canceled' && mine,
     // Not while a renewal is unpaid: no new charge before that one is paid.
     canUpgrade: mine && !unpaid
   };
 }
 
 /**
- * Whether a subscription's renewal — of the period after its expiry — was
+ * Whether a subscription's renewal — of the period after `period_end` — was
  * reported failed and not paid since: the processor is retrying it. The
  * renewal's invoice says the period it is for; one that does not (Lemon
  * Squeezy) is taken as it stands, since a retry paid later turns that same
  * invoice paid.
  */
 const unpaidRenewalWhere = (
-  expiresAt: SQL | Date | typeof subscriptions.expiresAt
+  periodEnd: SQL | Date | typeof subscriptions.periodEnd
 ) =>
   and(
     eq(payments.kind, 'renewal'),
     eq(payments.status, 'failed'),
-    or(gt(payments.periodEnd, expiresAt), isNull(payments.periodEnd))
+    or(gt(payments.periodEnd, periodEnd), isNull(payments.periodEnd))
   );
 
 async function unpaidRenewalOf(
-  sub: Pick<SubscriptionRow, 'id' | 'expiresAt'>,
+  sub: Pick<SubscriptionRow, 'id' | 'periodEnd'>,
   ex: Executor = db
 ) {
   const row = await ex.query.payments.findFirst({
     where: and(
       eq(payments.subscriptionId, sub.id),
-      unpaidRenewalWhere(sub.expiresAt)
+      unpaidRenewalWhere(sub.periodEnd)
     ),
     columns: { id: true }
   });
@@ -327,7 +328,7 @@ async function unpaidRenewalOf(
 /** Of these subscriptions, the ones with a renewal unpaid:
  *  `unpaidRenewalOf`, for a page of them at once. */
 async function unpaidRenewalsOf(
-  subs: Array<Pick<SubscriptionRow, 'id' | 'expiresAt'>>
+  subs: Array<Pick<SubscriptionRow, 'id' | 'periodEnd'>>
 ): Promise<Set<string>> {
   if (subs.length === 0) return new Set();
   const rows = await db
@@ -340,7 +341,7 @@ async function unpaidRenewalsOf(
           payments.subscriptionId,
           subs.map(s => s.id)
         ),
-        unpaidRenewalWhere(subscriptions.expiresAt)
+        unpaidRenewalWhere(subscriptions.periodEnd)
       )
     );
   return new Set(rows.map(r => r.id!));
@@ -348,13 +349,13 @@ async function unpaidRenewalsOf(
 
 /**
  * Until when a subscription whose renewal could not be paid goes on: the
- * grace days past its expiry — what was paid for, and those days more —
+ * grace days past `period_end` — what was paid for, and those days more —
  * the same whichever processor is retrying it. Still unpaid then, it is
- * canceled.
+ * ended.
  */
-async function graceEndOf(expiresAt: Date): Promise<Date> {
+async function graceEndOf(periodEnd: Date): Promise<Date> {
   const days = await getSubscriptionGraceDays();
-  return new Date(expiresAt.getTime() + days * DAY_MS);
+  return new Date(periodEnd.getTime() + days * DAY_MS);
 }
 
 /** Whether money has gone back, or is on its way back, of any payment of a
@@ -372,12 +373,12 @@ async function refundedOf(subscriptionId: string, ex: Executor = db) {
 
 /**
  * Whether a subscription is its user's own to resume or upgrade: nothing of
- * it has been refunded, and it renews — or it was they who set it to
- * cancel. What an admin, a refund, a dispute or the processor set to cancel
- * is not theirs to undo.
+ * it has been refunded, and it is `active` — or it was they who canceled
+ * it. What an admin, a refund, a dispute or the processor canceled is not
+ * theirs to undo.
  */
 async function isOwnToResume(row: SubscriptionRow, ex: Executor = db) {
-  if (row.canceledAt && row.canceledBy !== row.userId) return false;
+  if (row.status === 'canceled' && row.canceledBy !== row.userId) return false;
   return !(await refundedOf(row.id, ex));
 }
 
@@ -414,9 +415,9 @@ export async function startCheckout(
   request: Request
 ): Promise<{ url: string }> {
   await requireSelling();
-  if (await activeSubscription(user.id)) {
+  if (await liveSubscription(user.id)) {
     throw new PublicError(
-      'You already have a subscription. You can choose again once it is canceled.'
+      'You already have a subscription. You can choose again once it has ended.'
     );
   }
   const sale = await planOnSale(input.planId);
@@ -474,12 +475,12 @@ async function changeSubscription<T>(
 /**
  * Upgrade: to a plan that costs more at the interval the subscription is
  * billed at, through the same processor. It starts now and the difference
- * is charged; a cancellation waiting is cleared, since upgrading is
- * choosing to stay. A charge that fails changes nothing.
+ * is charged; a canceled subscription is made `active` again, since
+ * upgrading is choosing to stay. A charge that fails changes nothing.
  */
 export async function upgradePlan(userId: string, input: { planId: string }) {
   await requireSelling();
-  const sub = await requireActive(userId);
+  const sub = await requireLive(userId);
   if (input.planId === sub.planId) {
     throw new PublicError('You are already on this plan.');
   }
@@ -499,18 +500,18 @@ export async function upgradePlan(userId: string, input: { planId: string }) {
     )
   ) {
     throw new PublicError(
-      'This plan cannot be switched to in place. To choose it, cancel your subscription and subscribe again once it is canceled.'
+      'This plan cannot be switched to in place. To choose it, cancel your subscription and subscribe again once it has ended.'
     );
   }
   await requireProcessorAgrees(target);
 
   await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active') {
-      throw new PublicError('This subscription has been canceled.');
+    if (row.status === 'ended') {
+      throw new PublicError('This subscription has ended.');
     }
     if (!(await isOwnToResume(row, tx))) {
       throw new PublicError(
-        'This subscription is set to cancel and cannot be upgraded. You can subscribe again once it is canceled.'
+        'This subscription has been canceled and cannot be upgraded. You can subscribe again once it has ended.'
       );
     }
     if (await unpaidRenewalOf(row, tx)) {
@@ -522,9 +523,10 @@ export async function upgradePlan(userId: string, input: { planId: string }) {
       .update(subscriptions)
       .set({
         planId: target.planId,
+        status: 'active',
         canceledAt: null,
-        cancelReason: null,
         canceledBy: null,
+        reason: null,
         updatedAt: new Date()
       })
       .where(eq(subscriptions.id, row.id));
@@ -545,7 +547,7 @@ export async function previewUpgrade(
   userId: string,
   input: { planId: string }
 ): Promise<{ amount: number | null }> {
-  const sub = await requireActive(userId);
+  const sub = await requireLive(userId);
   const target = await planOnSale(input.planId);
   const processor = await getPaymentProcessor(sub.processor);
   const amount = await processor
@@ -557,64 +559,66 @@ export async function previewUpgrade(
   return { amount };
 }
 
-/** Cancel when what was paid for runs out: still `active`, with
- *  `canceled_at` set to `expires_at` — or at once, when it already has. */
+/** Cancel: `canceled`, ending at `period_end` — or `ended`, when what was
+ *  paid for has already run out. */
 async function cancel(
   sub: SubscriptionRow,
   reason: 'canceled_by_customer' | 'canceled_by_admin',
   by: string
 ) {
   // A renewal unpaid: what was paid for has already run out, so there is no
-  // period left to see out. It is canceled now, and in the processor, whose
-  // retries stop — cancelled, the user is not charged again.
-  if (sub.status === 'active' && (await unpaidRenewalOf(sub))) {
-    if (!(await cancelNow(sub.id, reason))) {
-      throw new PublicError('This subscription has been canceled.');
+  // period left to see out. It is ended, and in the processor, whose
+  // retries stop — ended, the user is not charged again.
+  if (sub.status !== 'ended' && (await unpaidRenewalOf(sub))) {
+    if (!(await endSubscription(sub.id, reason))) {
+      throw new PublicError('This subscription has ended.');
     }
     return;
   }
   await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active') {
-      throw new PublicError('This subscription has been canceled.');
+    if (row.status === 'ended') {
+      throw new PublicError('This subscription has ended.');
     }
-    if (row.canceledAt) {
-      throw new PublicError('This subscription is already set to cancel.');
+    if (row.status === 'canceled') {
+      throw new PublicError('This subscription is already canceled.');
     }
-    await cancelAtExpiry(tx, row, reason, by);
+    await markCanceled(tx, row, reason, by);
   });
 }
 
-/** Sets a running subscription to be canceled when it expires: it is not
- *  renewed, and is usable until then. `by` is who set it — the user, an
- *  admin — or null when no one here did. */
-async function cancelAtExpiry(
+/** Cancels an `active` subscription: it is not renewed, and is usable until
+ *  `period_end`. `by` is who canceled it — the user, an admin — or null
+ *  when no one here did. */
+async function markCanceled(
   tx: Parameters<Parameters<typeof changeSubscription>[1]>[0],
   row: SubscriptionRow,
-  reason: CancelReason,
+  reason: SubscriptionReason,
   by: string | null
 ) {
+  const now = new Date();
   await tx
     .update(subscriptions)
     .set({
-      canceledAt: row.expiresAt,
-      cancelReason: reason,
+      status: 'canceled',
+      canceledAt: now,
       canceledBy: by,
-      updatedAt: new Date()
+      reason,
+      updatedAt: now
     })
     .where(eq(subscriptions.id, row.id));
   const processor = await getPaymentProcessor(row.processor);
-  await processor.cancelAtPeriodEnd(row.externalId);
+  await processor.cancel(row.externalId);
 }
 
 /**
  * After a refund — once the money has gone back — the subscription is
- * canceled, always: at once, or — the rest of what was paid for left to the
- * user — when it expires. One already set to cancel is left as it is: with
- * a payment of it refunded, it is no longer its user's to resume.
+ * ended, or — the rest of what was paid for left to the user — canceled.
+ * One already canceled is left as it is: with a payment of it refunded, it
+ * is no longer its user's to resume.
  */
-async function cancelRefunded(subscriptionId: string, now: boolean) {
-  if (now) {
-    await cancelNow(subscriptionId, 'refunded');
+async function endOrCancelRefunded(subscriptionId: string, end: boolean) {
+  if (end) {
+    await endSubscription(subscriptionId, 'refunded');
     return;
   }
   const sub = await db.query.subscriptions.findFirst({
@@ -622,16 +626,16 @@ async function cancelRefunded(subscriptionId: string, now: boolean) {
   });
   if (!sub) return;
   await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active' || row.canceledAt) return;
-    await cancelAtExpiry(tx, row, 'refunded', null);
+    if (row.status !== 'active') return;
+    await markCanceled(tx, row, 'refunded', null);
   });
 }
 
 /**
- * While a refund waits for the processor, its subscription is set to cancel
- * — by the admin who sent it — so it does not renew meanwhile. Nothing is
- * taken from the user yet: confirmed, it is canceled as the admin chose;
- * failed, it is put back. One already set to cancel is left as it is.
+ * While a refund waits for the processor, its subscription is canceled — by
+ * the admin who sent it — so it does not renew meanwhile. Nothing is taken
+ * from the user yet: confirmed, it ends as the admin chose; failed, it is
+ * put back. One already canceled is left as it is.
  */
 async function holdForRefund(subscriptionId: string, by: string | null) {
   const sub = await db.query.subscriptions.findFirst({
@@ -639,19 +643,19 @@ async function holdForRefund(subscriptionId: string, by: string | null) {
   });
   if (!sub) return;
   await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active' || row.canceledAt) return;
-    await cancelAtExpiry(tx, row, 'refunded', by);
+    if (row.status !== 'active') return;
+    await markCanceled(tx, row, 'refunded', by);
   }).catch(err => {
-    // The refund has gone out either way, and its confirmation cancels.
+    // The refund has gone out either way, and its confirmation ends it.
     console.error(`[subscription] could not hold ${subscriptionId}`, err);
   });
 }
 
 /**
- * A refund failed. A subscription the refund had set to cancel, with no
- * other refund of it made or waiting, renews again. One set to cancel
- * before the refund — by its user, or an admin — was never touched, and
- * stays as they set it.
+ * A refund failed. A subscription the refund had canceled, with no other
+ * refund of it made or waiting, is `active` again. One canceled before the
+ * refund — by its user, or an admin — was never touched, and stays as they
+ * left it.
  */
 async function releaseRefundHold(subscriptionId: string) {
   const sub = await db.query.subscriptions.findFirst({
@@ -659,14 +663,15 @@ async function releaseRefundHold(subscriptionId: string) {
   });
   if (!sub) return;
   await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active' || row.cancelReason !== 'refunded') return;
+    if (row.status !== 'canceled' || row.reason !== 'refunded') return;
     if (await refundedOf(row.id, tx)) return;
     await tx
       .update(subscriptions)
       .set({
+        status: 'active',
         canceledAt: null,
-        cancelReason: null,
         canceledBy: null,
+        reason: null,
         updatedAt: new Date()
       })
       .where(eq(subscriptions.id, row.id));
@@ -677,10 +682,11 @@ async function releaseRefundHold(subscriptionId: string) {
 
 /** The user cancels their subscription. */
 export async function cancelSubscription(userId: string) {
-  await cancel(await requireActive(userId), 'canceled_by_customer', userId);
+  await cancel(await requireLive(userId), 'canceled_by_customer', userId);
 }
 
-/** An admin cancels a subscription when what was paid for runs out. */
+/** An admin cancels a subscription: it ends when what was paid for runs
+ *  out. */
 export async function adminCancelSubscription(id: string, adminId: string) {
   const sub = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, id)
@@ -689,26 +695,27 @@ export async function adminCancelSubscription(id: string, adminId: string) {
   await cancel(sub, 'canceled_by_admin', adminId);
 }
 
-/** Resubscribe: clear a cancellation waiting, so the subscription renews
- *  again. Nothing is charged. The user's alone to do. */
+/** Resubscribe: a canceled subscription is `active` again, and renews.
+ *  Nothing is charged. The user's alone to do. */
 export async function resubscribe(userId: string) {
-  const sub = await requireActive(userId);
+  const sub = await requireLive(userId);
   await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active' || !row.canceledAt) {
-      throw new PublicError('Only a subscription set to cancel can resume.');
+    if (row.status !== 'canceled') {
+      throw new PublicError('Only a canceled subscription can resume.');
     }
-    // Only what the user set to cancel themselves is theirs to resume.
+    // Only what the user canceled themselves is theirs to resume.
     if (!(await isOwnToResume(row, tx))) {
       throw new PublicError(
-        'This subscription cannot be resumed. You can subscribe again once it is canceled.'
+        'This subscription cannot be resumed. You can subscribe again once it has ended.'
       );
     }
     await tx
       .update(subscriptions)
       .set({
+        status: 'active',
         canceledAt: null,
-        cancelReason: null,
         canceledBy: null,
+        reason: null,
         updatedAt: new Date()
       })
       .where(eq(subscriptions.id, row.id));
@@ -718,47 +725,47 @@ export async function resubscribe(userId: string) {
 }
 
 /**
- * Cancel a subscription now, with why, and in the processor as soon as it
- * allows — a processor that can only cancel it with the period still has
- * it canceled here. False when it was canceled already.
+ * End a subscription, with why, and in the processor as near as it allows —
+ * a processor that can only end it with the period still has it ended
+ * here. False when it had ended already.
  */
-async function cancelNow(
+async function endSubscription(
   subscriptionId: string,
-  reason: CancelReason
+  reason: SubscriptionReason
 ): Promise<boolean> {
   const sub = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, subscriptionId),
     columns: { id: true, userId: true }
   });
   if (!sub) return false;
-  const canceled = await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active') return false;
+  const ended = await changeSubscription(sub, async (tx, row) => {
+    if (row.status === 'ended') return false;
     const now = new Date();
     await tx
       .update(subscriptions)
       .set({
-        status: 'canceled',
-        canceledAt: now,
-        cancelReason: reason,
+        status: 'ended',
+        endedAt: now,
+        reason,
         updatedAt: now
       })
       .where(eq(subscriptions.id, row.id));
     const processor = await getPaymentProcessor(row.processor);
-    await processor.cancelNow(row.externalId);
+    await processor.end(row.externalId);
     return true;
   });
   await settlePlan(sub.userId);
-  return canceled;
+  return ended;
 }
 
 /**
  * A payment's money was taken back by a dispute: the customer does not stand
- * by the payment, so the subscription it paid for is canceled now, here and
- * in the processor, and gives nothing. A dispute won gives the money back,
+ * by the payment, so the subscription it paid for is ended, here and in the
+ * processor, and gives nothing. A dispute won gives the money back,
  * not the subscription: the customer subscribes again if they want it.
  */
-async function cancelDisputed(subscriptionId: string) {
-  await cancelNow(subscriptionId, 'payment_disputed');
+async function endDisputed(subscriptionId: string) {
+  await endSubscription(subscriptionId, 'payment_disputed');
 }
 
 /**
@@ -767,7 +774,7 @@ async function cancelDisputed(subscriptionId: string) {
  * Null when there is none on file, or the processor cannot say.
  */
 export async function getMyPaymentMethod(userId: string) {
-  const sub = await activeSubscription(userId);
+  const sub = await liveSubscription(userId);
   if (!sub) return null;
   const processor = await getPaymentProcessor(sub.processor);
   return await processor
@@ -786,7 +793,7 @@ export async function openPaymentMethods(
   userId: string,
   request: Request
 ): Promise<{ url: string }> {
-  const sub = await requireActive(userId);
+  const sub = await requireLive(userId);
   const processor = await getPaymentProcessor(sub.processor);
   const url = await processor.paymentMethodsUrl(
     { externalId: sub.externalId, customerId: sub.customerId },
@@ -795,9 +802,9 @@ export async function openPaymentMethods(
   return { url };
 }
 
-/** The user's plan: that of their `active` subscription, or none. */
+/** The user's plan: that of their live subscription, or none. */
 async function settlePlan(userId: string) {
-  const sub = await activeSubscription(userId);
+  const sub = await liveSubscription(userId);
   await db
     .update(users)
     .set({ planId: sub?.planId ?? null, updatedAt: new Date() })
@@ -866,16 +873,15 @@ async function requireNamed(
 /**
  * Keep a subscription as a webhook says it is, under its user's lock.
  *
- * - New and `active`: kept, and the user has its plan; payments of it
- *   reported first are attached. A user with another `active` subscription
- *   already has it kept as `canceled`, a duplicate, and its payment
- *   refunded.
- * - `active` and set to cancel: `canceled_at` is `expires_at`, with the
- *   reason the app gave — or, set in the processor, cancelled there.
- * - `canceled`: canceled, when it was set to — or now, because its payment
- *   failed or it was cancelled in the processor.
+ * - New and in effect: kept, and the user has its plan; payments of it
+ *   reported first are attached. A user with another live subscription
+ *   already has it kept as `ended`, a duplicate, and its payment refunded.
+ * - `canceled`: canceled, with the reason the app gave — or, canceled in
+ *   the processor, `canceled_in_processor`.
+ * - `ended`: ended at `period_end`, when it was canceled and that has come
+ *   — or now, because its payment failed or it was ended in the processor.
  *
- * `canceled` is final: a subscription canceled here stays so, whatever the
+ * `ended` is final: a subscription ended here stays so, whatever the
  * processor goes on saying. One not paid for yet is not kept.
  *
  * The webhook names the user and plan the checkout wrote on it, and those
@@ -896,54 +902,61 @@ async function applySubscription(
     // Paused in the processor and resumed there: in effect again, unless
     // the user has another by now.
     const resumed =
-      was?.status === 'canceled' &&
-      was.cancelReason === 'paused_in_processor' &&
-      snap.status === 'active' &&
-      !(await activeSubscription(userId, tx));
-    if (was?.status === 'canceled' && !resumed) {
-      // Canceled here stays so. One the processor still keeps going —
-      // resumed there, or still retrying a payment — is cancelled there.
-      return aliveIn(snap) ? { userId, cancelThere: true } : null;
+      was?.status === 'ended' &&
+      was.reason === 'paused_in_processor' &&
+      (snap.status === 'active' || snap.status === 'canceled') &&
+      !(await liveSubscription(userId, tx));
+    if (was?.status === 'ended' && !resumed) {
+      // Ended here stays so. One the processor still keeps going — resumed
+      // there, or still retrying a payment — is ended there.
+      return aliveIn(snap) ? { userId, endThere: true } : null;
     }
-    if (!was && snap.status === 'canceled') return null;
+    if (!was && snap.status === 'ended') return null;
 
     const { planId } = named;
     const now = new Date();
-    // The expiry is written once, when the subscription is made. From then
-    // on it moves only when a renewal is paid — the payment's webhook says
-    // so — never on the processor's word alone: a processor counts the next
-    // period from the moment it bills it, paid or not.
-    const expiresAt = was?.expiresAt ?? snap.expiresAt ?? now;
+    // The period end is written once, when the subscription is made. From
+    // then on it moves only when a renewal is paid — the payment's webhook
+    // says so — never on the processor's word alone: a processor counts the
+    // next period from the moment it bills it, paid or not.
+    const periodEnd = was?.periodEnd ?? snap.periodEnd ?? now;
 
-    const status = snap.status;
+    let status: SubscriptionRow['status'] = 'active';
     let canceledAt: Date | null = null;
-    let cancelReason: CancelReason | null = null;
-    // Set to cancel here, not by its user — by an admin, a refund, a
-    // dispute — and renewing again in the processor, resumed there: the
-    // cancellation stands, and is set there again. One the processor set
-    // is the processor's to unset.
+    let canceledBy: string | null = null;
+    let endedAt: Date | null = null;
+    let reason: SubscriptionReason | null = null;
+    // Canceled here, not by its user — by an admin, a refund, a dispute —
+    // and renewing again in the processor, resumed there: the cancellation
+    // stands, and is made there again. One the processor canceled is the
+    // processor's to undo.
     const relock =
       snap.status === 'active' &&
-      !snap.cancelAtPeriodEnd &&
-      was?.status === 'active' &&
-      !!was.canceledAt &&
-      was.cancelReason !== 'canceled_in_processor' &&
+      was?.status === 'canceled' &&
+      was.reason !== 'canceled_in_processor' &&
       !(await isOwnToResume(was, tx));
-    if (snap.status === 'active' && snap.cancelAtPeriodEnd) {
-      canceledAt = expiresAt;
-      cancelReason = was?.cancelReason ?? 'canceled_in_processor';
+    if (snap.status === 'canceled') {
+      status = 'canceled';
+      canceledAt = was?.canceledAt ?? now;
+      canceledBy = was?.canceledBy ?? null;
+      reason = was?.reason ?? 'canceled_in_processor';
     } else if (relock) {
-      canceledAt = expiresAt;
-      cancelReason = was.cancelReason;
-    } else if (snap.status === 'canceled') {
-      // Set to cancel, and its time has come: canceled then. Ended before
-      // that — stopped early in the processor — canceled now, when it
-      // really ended.
-      const due = !!was?.canceledAt && was.canceledAt <= now;
-      canceledAt = due ? was.canceledAt : now;
-      cancelReason = snap.paused
+      status = 'canceled';
+      canceledAt = was.canceledAt;
+      canceledBy = was.canceledBy;
+      reason = was.reason;
+    } else if (snap.status === 'ended') {
+      // Canceled, and its period end has come: ended then. Ended before
+      // that — stopped early in the processor — ended now, when it really
+      // ended.
+      const due = was?.status === 'canceled' && was.periodEnd <= now;
+      status = 'ended';
+      canceledAt = was?.canceledAt ?? null;
+      canceledBy = was?.canceledBy ?? null;
+      endedAt = due ? was.periodEnd : now;
+      reason = snap.paused
         ? 'paused_in_processor'
-        : (was?.cancelReason ?? 'canceled_in_processor');
+        : (was?.reason ?? 'canceled_in_processor');
     }
 
     if (was) {
@@ -952,11 +965,11 @@ async function applySubscription(
         .set({
           planId,
           status,
-          expiresAt,
+          periodEnd,
           canceledAt,
-          cancelReason,
-          // Who set it to cancel stays while it is; no one, once it renews.
-          canceledBy: canceledAt ? was.canceledBy : null,
+          canceledBy,
+          endedAt,
+          reason,
           updatedAt: now
         })
         .where(eq(subscriptions.id, was.id));
@@ -964,7 +977,7 @@ async function applySubscription(
     }
 
     // Two checkouts finished side by side: the first bought stays.
-    const duplicate = !!(await activeSubscription(userId, tx));
+    const duplicate = !!(await liveSubscription(userId, tx));
     const id = generateUUID();
     await tx.insert(subscriptions).values({
       id,
@@ -973,32 +986,32 @@ async function applySubscription(
       processor: processorId,
       externalId,
       customerId: snap.customerId,
-      status: duplicate ? 'canceled' : status,
-      expiresAt,
-      canceledAt: duplicate ? now : canceledAt,
-      cancelReason: duplicate ? 'duplicate' : cancelReason
+      status: duplicate ? 'ended' : status,
+      periodEnd,
+      canceledAt,
+      canceledBy,
+      endedAt: duplicate ? now : endedAt,
+      reason: duplicate ? 'duplicate' : reason
     });
     await attachPayments(processorId, userId, externalId, id, tx);
-    return { userId, duplicate: duplicate ? id : null, cancelThere: duplicate };
+    return { userId, duplicate: duplicate ? id : null, endThere: duplicate };
   });
   if (!outcome) return;
   await settlePlan(outcome.userId);
 
   const processor = await getPaymentProcessor(processorId);
-  if (outcome.cancelThere) {
-    await withRetry(() => processor.cancelNow(externalId));
+  if (outcome.endThere) {
+    await withRetry(() => processor.end(externalId));
   } else if (outcome.relock) {
-    await withRetry(() => processor.cancelAtPeriodEnd(externalId));
+    await withRetry(() => processor.cancel(externalId));
   }
   if (outcome.duplicate) await refundDuplicate(outcome.duplicate);
 }
 
-/** Whether the processor still keeps a subscription going: running and not
- *  set to stop, or retrying a payment that failed. */
+/** Whether the processor still keeps a subscription going: `active` and
+ *  renewing, or retrying a payment that failed. */
 function aliveIn(snap: ProcessorSubscription): boolean {
-  return (
-    (snap.status === 'active' && !snap.cancelAtPeriodEnd) || snap.paymentFailed
-  );
+  return snap.status === 'active' || snap.paymentFailed;
 }
 
 /**
@@ -1052,7 +1065,7 @@ async function subscriptionOf(
  * A renewal paid moves the subscription on to the period it paid for. One
  * not paid is kept so, and the subscription goes on through its grace days
  * — the processor retrying meanwhile; a failure reported once those are
- * over cancels it.
+ * over ends it.
  */
 async function applyPayment(
   processorId: PaymentProcessorId,
@@ -1071,7 +1084,7 @@ async function applyPayment(
   if (payment.kind === 'renewal' && payment.paid && !payment.periodEnd) {
     const processor = await getPaymentProcessor(processorId);
     const snap = await processor.getSubscription(externalSubscriptionId);
-    payment = { ...payment, periodEnd: snap.expiresAt };
+    payment = { ...payment, periodEnd: snap.periodEnd };
   }
   // Under the user's lock, as the subscription's webhook is: the two arrive
   // together, and whichever is second sees the first.
@@ -1091,7 +1104,7 @@ async function applyPayment(
     return { sub, row };
   });
   if (!sub) return;
-  if (isDuplicate(sub.cancelReason)) {
+  if (isDuplicate(sub.reason)) {
     await refundDuplicate(sub.id);
     return;
   }
@@ -1099,18 +1112,18 @@ async function applyPayment(
   if (payment.paid) {
     await renew(sub.id, row);
   } else if (
-    sub.status === 'active' &&
-    (await graceEndOf(sub.expiresAt)) <= new Date()
+    sub.status !== 'ended' &&
+    (await graceEndOf(sub.periodEnd)) <= new Date()
   ) {
     // Still unpaid past the grace days: over, and the processor's retries
     // with it.
-    await cancelNow(sub.id, 'payment_failed');
+    await endSubscription(sub.id, 'payment_failed');
   }
 }
 
 /**
  * A renewal paid: the subscription goes on to the end of the period it paid
- * for. Set to cancel, it is set to cancel then.
+ * for. Canceled, it ends then.
  */
 async function renew(
   subscriptionId: string,
@@ -1124,15 +1137,14 @@ async function renew(
   if (!paid.periodEnd) {
     throw new Error(`[payment] ${paid.id} says no period it paid for`);
   }
-  const expiresAt = paid.periodEnd;
+  const periodEnd = paid.periodEnd;
   await changeSubscription(sub, async (tx, row) => {
-    if (row.status !== 'active') return;
-    if (expiresAt <= row.expiresAt) return;
+    if (row.status === 'ended') return;
+    if (periodEnd <= row.periodEnd) return;
     await tx
       .update(subscriptions)
       .set({
-        expiresAt,
-        canceledAt: row.canceledAt ? expiresAt : null,
+        periodEnd,
         updatedAt: new Date()
       })
       .where(eq(subscriptions.id, row.id));
@@ -1144,8 +1156,8 @@ async function renew(
 //
 // Two things are read from the processor rather than told by webhook: what
 // a checkout the user came back from made, when its webhook has not said;
-// and, by the scheduled job, whether a subscription past its expiry still
-// runs. Both are kept as a webhook saying the same would have kept them.
+// and, by the scheduled job, whether a subscription past its period end
+// still runs. Both are kept as a webhook saying the same would have kept them.
 // ============================================================================
 
 /**
@@ -1158,7 +1170,7 @@ export async function confirmCheckout(
   user: { id: string; email: string },
   input: { via: PaymentProcessorId; ref?: string | null }
 ) {
-  if (await activeSubscription(user.id)) return;
+  if (await liveSubscription(user.id)) return;
   try {
     const processor = await getPaymentProcessor(input.via);
     const found = await processor.findSubscriptions({
@@ -1180,7 +1192,7 @@ export async function confirmCheckout(
   }
 }
 
-/** How long past its expiry a subscription is left for its renewal's
+/** How long past its period end a subscription is left for its renewal's
  *  webhook, before the job asks the processor about it. */
 const EXPIRY_GRACE_MS = 60 * 60 * 1000;
 
@@ -1196,13 +1208,12 @@ const RECONCILE_BATCH = 100;
  * apart from the flow they drive. Three things, each where money and
  * service would otherwise part:
  *
- * 1. A subscription past its expiry and still `active`, with no renewal
- *    reported failed: its renewal's or its cancellation's webhook has not
- *    come. The processor is asked for the subscription, and it is kept as
+ * 1. A subscription past its period end and still live, with no renewal
+ *    reported failed: its renewal's or its end's webhook has not come. The processor is asked for the subscription, and it is kept as
  *    that webhook would have kept it.
  * 2. A subscription whose renewal was reported failed and whose grace days
- *    are over, the processor's next retry not reported yet: canceled, here
- *    and there, as the next failure would have canceled it.
+ *    are over, the processor's next retry not reported yet: ended, here and
+ *    there, as the next failure would have ended it.
  * 3. A refund sent from here and still waiting after a day: the processor
  *    is asked for that refund, by its id, and it is applied as its webhook
  *    would have been.
@@ -1218,8 +1229,8 @@ export async function runScheduledJob(): Promise<{
   const now = new Date();
   let failed = 0;
 
-  // 1 and 2. Subscriptions past their expiry and still active, each with
-  // whether the renewal of the period after its expiry was reported failed:
+  // 1 and 2. Subscriptions past their period end and still live, each with
+  // whether the renewal of the period after it was reported failed:
   // one query, one pass. The renewal's invoice says the period it is for;
   // one that does not (Lemon Squeezy) is taken as it stands — a retry paid
   // later turns that same invoice paid.
@@ -1229,7 +1240,7 @@ export async function runScheduledJob(): Promise<{
     .where(
       and(
         eq(payments.subscriptionId, subscriptions.id),
-        unpaidRenewalWhere(subscriptions.expiresAt)
+        unpaidRenewalWhere(subscriptions.periodEnd)
       )
     );
   const expired = await db
@@ -1239,14 +1250,14 @@ export async function runScheduledJob(): Promise<{
       externalId: subscriptions.externalId,
       userId: subscriptions.userId,
       planId: subscriptions.planId,
-      expiresAt: subscriptions.expiresAt,
+      periodEnd: subscriptions.periodEnd,
       unpaid: sql<boolean>`exists ${unpaidRenewal}`
     })
     .from(subscriptions)
     .where(
       and(
-        eq(subscriptions.status, 'active'),
-        lt(subscriptions.expiresAt, new Date(now.getTime() - EXPIRY_GRACE_MS))
+        inArray(subscriptions.status, LIVE_STATUSES),
+        lt(subscriptions.periodEnd, new Date(now.getTime() - EXPIRY_GRACE_MS))
       )
     )
     .orderBy(subscriptions.updatedAt)
@@ -1257,9 +1268,9 @@ export async function runScheduledJob(): Promise<{
   for (const sub of expired) {
     try {
       if (sub.unpaid) {
-        // A renewal failed: canceled once the grace days are over.
-        if (sub.expiresAt.getTime() + graceDays * DAY_MS <= now.getTime()) {
-          await cancelNow(sub.id, 'payment_failed');
+        // A renewal failed: ended once the grace days are over.
+        if (sub.periodEnd.getTime() + graceDays * DAY_MS <= now.getTime()) {
+          await endSubscription(sub.id, 'payment_failed');
           ended++;
         }
         continue;
@@ -1356,7 +1367,7 @@ async function dispatch(
       const row = await markDisputed(processorId, action.transactionId);
       // An inquiry only marks the payment: the money has not left.
       if (action.withdrawn && row.subscriptionId) {
-        await cancelDisputed(row.subscriptionId);
+        await endDisputed(row.subscriptionId);
       }
       return;
     }
@@ -1369,23 +1380,23 @@ async function dispatch(
 }
 
 /**
- * Money has gone back of a payment: what it paid for ends. A duplicate's
- * was to go back; any other subscription is canceled as the refund owes it
- * — at once, or when it expires — and only then is that owed no more, so a
- * webhook sent again after a failure does it.
+ * Money has gone back of a payment: what it paid for stops. A duplicate's
+ * was to go back; any other subscription is ended, or canceled, as the
+ * refund owes it — and only then is that owed no more, so a webhook sent
+ * again after a failure does it.
  */
 async function afterRefund(
   done: NonNullable<Awaited<ReturnType<typeof applyRefund>>>
 ) {
-  if (!done.subscriptionId || done.cancelSubscription == null) return;
+  if (!done.subscriptionId || done.endSubscription == null) return;
   const sub = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, done.subscriptionId),
-    columns: { cancelReason: true }
+    columns: { reason: true }
   });
-  if (!isDuplicate(sub?.cancelReason)) {
-    await cancelRefunded(done.subscriptionId, done.cancelSubscription);
+  if (!isDuplicate(sub?.reason)) {
+    await endOrCancelRefunded(done.subscriptionId, done.endSubscription);
   }
-  await clearRefundCancel(done.paymentId);
+  await clearRefundEnd(done.paymentId);
 }
 
 /** A refund approved for a request failed: the request waits to be decided
@@ -1494,7 +1505,7 @@ export async function getMyRefundRequest(userId: string) {
 async function refundOffer(userId: string) {
   const [policy, sub] = await Promise.all([
     getRefundPolicy(),
-    activeSubscription(userId)
+    liveSubscription(userId)
   ]);
   if (!sub) return null;
   const requests = await db.query.refundRequests.findMany({
@@ -1530,11 +1541,11 @@ async function refundOffer(userId: string) {
   } else if (requestsLeft === 0) {
     unavailable =
       'Your refund request was rejected, and no more can be made for this subscription.';
-  } else if (sub.expiresAt <= new Date()) {
+  } else if (sub.periodEnd <= new Date()) {
     // What was paid for has run out — a renewal unpaid, say: nothing of it
     // is left to ask back.
     unavailable =
-      'Refunds can be requested only before your subscription expires.';
+      'Refunds can be requested only before your subscription ends.';
   } else if (covered.length === 0) {
     unavailable = `Refunds can be requested within ${policy.days} days of a payment.`;
   }
@@ -1638,9 +1649,7 @@ export async function listRefundRequests(
           columns: {
             status: true,
             processor: true,
-            expiresAt: true,
-            canceledAt: true,
-            cancelReason: true
+            periodEnd: true
           },
           with: { plan: { columns: { name: true } } }
         }
@@ -1692,7 +1701,6 @@ export async function getRefundRequest(id: string) {
     subscription: {
       id: request.subscription.id,
       status: request.subscription.status,
-      canceledAt: request.subscription.canceledAt,
       planName: request.subscription.plan.name,
       processor: request.subscription.processor
     },
@@ -1706,8 +1714,8 @@ export async function getRefundRequest(id: string) {
 /**
  * An admin approves a refund request: what is left of each payment it
  * covers goes back, as the refund settings reckon it, and the subscription
- * is canceled — at once, or when it expires — once the processor confirms
- * the money went back, as a refund from Payments does. Claimed first, so
+ * is ended, or canceled, once the processor confirms the money went back,
+ * as a refund from Payments does. Claimed first, so
  * two admins at once approve it once; if no refund goes out, or it fails
  * later, it is left to be decided again.
  */
@@ -1748,7 +1756,7 @@ export async function approveRefundRequest(
         {
           adminId,
           requestId: claimed.id,
-          cancelSubscription: input.cancelSubscription
+          endSubscription: input.endSubscription
         },
         { refundFee: policy.refundFee }
       );
@@ -1818,7 +1826,7 @@ export async function getRefundDetails(paymentId: string) {
   if (!row) throw new PublicError('Payment not found.');
   const { subscription, plan, user, ...rest } = row;
   const payment = await withFee(rest, policy.refundFee);
-  const duplicate = isDuplicate(subscription?.cancelReason);
+  const duplicate = isDuplicate(subscription?.reason);
   return {
     user,
     userEmail: payment.userEmail,
@@ -1839,9 +1847,9 @@ export async function getRefundDetails(paymentId: string) {
 /**
  * An admin refunds a payment — whether or not users may request refunds —
  * of all that is left of it, as the refund settings reckon it. The
- * subscription it paid for stops renewing at once and, when the processor
- * confirms the money went back, is canceled, Refunded: at once, or, if they
- * choose, when it expires, the rest of it left to the user.
+ * subscription it paid for is canceled meanwhile and, when the processor
+ * confirms the money went back, ended, Refunded — or, if they choose, left
+ * canceled, the rest of it left to the user.
  */
 export async function refundPayment(
   input: z.infer<typeof refundPaymentSchema>,
@@ -1856,16 +1864,16 @@ export async function refundPayment(
   const sub = payment.subscriptionId
     ? await db.query.subscriptions.findFirst({
         where: eq(subscriptions.id, payment.subscriptionId),
-        columns: { id: true, cancelReason: true }
+        columns: { id: true, reason: true }
       })
     : null;
-  const duplicate = isDuplicate(sub?.cancelReason);
+  const duplicate = isDuplicate(sub?.reason);
   await startRefund(
     payment.id,
     refundableMinor(payment, refundFee, duplicate),
     {
       adminId,
-      cancelSubscription: sub && !duplicate ? input.cancelSubscription : null
+      endSubscription: sub && !duplicate ? input.endSubscription : null
     },
     { refundFee }
   );
@@ -1878,7 +1886,7 @@ export async function refundPayment(
 
 /** Whether a user has a subscription in effect. */
 export async function hasActiveSubscription(userId: string) {
-  return !!(await activeSubscription(userId));
+  return !!(await liveSubscription(userId));
 }
 
 /**
@@ -1969,7 +1977,7 @@ export async function listSubscriptions(
   ]);
   const [paid, unpaid] = await Promise.all([
     paidOf(rows.map(r => r.id)),
-    unpaidRenewalsOf(rows.filter(r => r.status === 'active'))
+    unpaidRenewalsOf(rows.filter(r => r.status !== 'ended'))
   ]);
   return {
     rows: rows.map(({ plan, ...sub }) => ({
@@ -1979,14 +1987,14 @@ export async function listSubscriptions(
       interval: plan.interval,
       price: priceOf(plan),
       status: sub.status,
-      expiresAt: sub.expiresAt,
-      canceledAt: sub.canceledAt,
-      cancelReason: sub.cancelReason,
+      periodEnd: sub.periodEnd,
+      endedAt: sub.endedAt,
+      reason: sub.reason,
       processor: sub.processor,
       externalId: sub.externalId,
       createdAt: sub.createdAt,
       paid: paid.get(sub.id) ?? 0,
-      // A renewal unpaid: cancelling it ends it now.
+      // A renewal unpaid: cancelling it ends it.
       paymentFailed: unpaid.has(sub.id)
     })),
     total: Number(totalRow?.count ?? 0),
@@ -2030,13 +2038,12 @@ export async function getSubscriptionDetail(id: string) {
     interval: sub.plan.interval,
     price,
     status: sub.status,
-    expiresAt: sub.expiresAt,
+    periodEnd: sub.periodEnd,
     canceledAt: sub.canceledAt,
-    cancelReason: sub.cancelReason,
+    endedAt: sub.endedAt,
+    reason: sub.reason,
     nextCharge:
-      sub.status === 'active' && !sub.canceledAt
-        ? { at: sub.expiresAt, amount: price }
-        : null,
+      sub.status === 'active' ? { at: sub.periodEnd, amount: price } : null,
     processor: sub.processor,
     externalId: sub.externalId,
     customerId: sub.customerId,

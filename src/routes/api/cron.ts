@@ -4,7 +4,7 @@ import { runScheduledJob } from '@/server/services/subscription';
 
 /**
  * The scheduled job: the recovery for what the webhooks did not say, called
- * once a day (see `vercel.json`). Subscriptions past their expiry are asked
+ * once a day (see `vercel.json`). Subscriptions past their period end are asked
  * of their processor; those whose renewal failed and whose grace days are
  * over are ended; refunds sent from here and still waiting after a day are
  * asked of their processor by id.

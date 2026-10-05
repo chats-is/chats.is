@@ -65,7 +65,7 @@ export const cancelSubscription = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .handler(({ context }) => subscription.cancelSubscription(context.user.id));
 
-/** Resubscribe a subscription set to cancel, before it is canceled. */
+/** Resubscribe a canceled subscription, before it ends. */
 export const resubscribe = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])
   .handler(({ context }) => subscription.resubscribe(context.user.id));

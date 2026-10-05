@@ -28,8 +28,8 @@ import {
  * link made for the user, which carries the user and plan as custom data —
  * and only the webhooks repeat it, since a subscription does not keep it.
  *
- * Lemon Squeezy has no way to cancel a subscription at once: cancelling
- * runs to the end of the period. The subscription service makes up for it.
+ * Lemon Squeezy has no way to end a subscription: cancelling there runs to
+ * the end of the period. The subscription service makes up for it.
  */
 
 type LemonKeys = {
@@ -175,59 +175,31 @@ const kindOf = (reason: string): PaymentKind =>
 
 /**
  * Lemon Squeezy's status in the app's words. Its `cancelled` runs until
- * `ends_at` — the app's `active`, set to stop — and is over after, as its
- * `expired` is. Past due, a renewal failed and is being retried: still
- * `active`, its payment failed. Unpaid, the retries are used up: over.
+ * `ends_at` — the app's `canceled` — and is over after, as its `expired`
+ * is. Past due, a renewal failed and is being retried: still in effect, its
+ * payment failed. Unpaid, the retries are used up: over.
  */
 function statusOf(
   sub: LemonSubscription['attributes']
-): Pick<
-  ProcessorSubscription,
-  'status' | 'cancelAtPeriodEnd' | 'paymentFailed' | 'paused'
-> {
+): Pick<ProcessorSubscription, 'status' | 'paymentFailed' | 'paused'> {
   switch (sub.status) {
     case 'active':
     case 'on_trial':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false
-      };
+      return { status: 'active', paymentFailed: false };
     case 'cancelled':
       return sub.ends_at && new Date(sub.ends_at) > new Date()
-        ? { status: 'active', cancelAtPeriodEnd: true, paymentFailed: false }
-        : {
-            status: 'canceled',
-            cancelAtPeriodEnd: false,
-            paymentFailed: false
-          };
+        ? { status: 'canceled', paymentFailed: false }
+        : { status: 'ended', paymentFailed: false };
     case 'paused':
-      return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false,
-        paused: true
-      };
+      return { status: 'ended', paymentFailed: false, paused: true };
     case 'past_due':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: false,
-        paymentFailed: true
-      };
+      return { status: 'active', paymentFailed: true };
     // Retries used up and the subscription left standing, unpaid: still
     // there, still not paid for. Its failed payments say what becomes of it.
     case 'unpaid':
-      return {
-        status: 'active',
-        cancelAtPeriodEnd: false,
-        paymentFailed: true
-      };
+      return { status: 'active', paymentFailed: true };
     default:
-      return {
-        status: 'canceled',
-        cancelAtPeriodEnd: false,
-        paymentFailed: false
-      };
+      return { status: 'ended', paymentFailed: false };
   }
 }
 
@@ -241,7 +213,7 @@ function toSubscription(sub: LemonSubscription): ProcessorSubscription {
     planId: null,
     priceId: String(a.variant_id),
     ...statusOf(a),
-    expiresAt: dateOf(a.cancelled ? a.ends_at : a.renews_at)
+    periodEnd: dateOf(a.cancelled ? a.ends_at : a.renews_at)
   };
 }
 
@@ -472,7 +444,7 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
       );
     },
 
-    async cancelAtPeriodEnd(externalId) {
+    async cancel(externalId) {
       await lemon('DELETE', `/subscriptions/${externalId}`);
     },
 
@@ -480,9 +452,9 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
       await patch(externalId, { cancelled: false });
     },
 
-    async cancelNow(externalId) {
-      // As soon as it allows: cancelling here ends at the period's end, and
-      // the subscription service keeps the plan away until then.
+    async end(externalId) {
+      // As near as it allows: cancelled there, it ends at the period's end,
+      // and the subscription service keeps the plan away until then.
       const sub = await getSubscription(externalId);
       if (sub.attributes.cancelled || sub.attributes.status === 'expired') {
         return;
