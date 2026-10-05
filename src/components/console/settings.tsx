@@ -199,7 +199,7 @@ const REFUND_DAYS_OPTIONS = REFUND_DAYS_CHOICES.map(n => ({
   label: n === '1' ? '1 day' : `${n} days`
 }));
 
-/** Refund Requests' choice for no limit, which is saved as no value: a
+/** Max Refund Requests' choice for no limit, which is saved as no value: a
  *  select cannot offer an empty one. */
 const UNLIMITED = 'unlimited';
 const REFUND_REQUESTS_OPTIONS = [
@@ -641,7 +641,7 @@ function SubscriptionSettings({ form }: { form: SettingsFormApi }) {
       </SettingsRow>
       <SettingsRow
         icon={Hash}
-        label="Refund Requests"
+        label="Max Refund Requests"
         htmlFor="refunds.maxRequests"
         hint="How many times a user can request a refund for one subscription. A rejected request counts; once they are used up, no more can be made."
         settingKey="refunds.maxRequests"
