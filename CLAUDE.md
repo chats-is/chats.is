@@ -226,9 +226,11 @@ table. A user with an active subscription cannot buy another, so pick one withou
 
 **Driving it is yours to do.** Install `puppeteer` in the session's scratchpad directory, never in
 the project, and write the scripts there: one small library — sign in, open a page with the cookies
-set, click by visible text, read the toasts and dialogs — and one script per flow. The plans dialog
-opens from the Upgrade pill for a user with no subscription, and from Settings → Billing → Upgrade
-plan for one who has. Its choice of interval shows only once the plans have arrived, and a press
+set, click by visible text, read the toasts and dialogs — and one script per flow. Launch the
+headless shell (`headless: 'shell'`), not the full headless browser: that one stops drawing once the
+machine has sat idle a while, and a wait for a frame, a click or a screenshot then never finishes.
+The plans dialog opens from the Upgrade pill for a user with no subscription, and from Settings →
+Billing → Upgrade plan for one who has. Its choice of interval shows only once the plans have arrived, and a press
 made before then is lost: check that the interval wanted is the one pressed, and the card's price,
 before pressing Subscribe — otherwise another plan is bought. Pay with the sandbox test card
 `4242 4242 4242 4242`:
