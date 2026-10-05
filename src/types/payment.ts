@@ -363,13 +363,13 @@ export function refundRequestsOf(value: string | null): number | null {
 
 /**
  * How many days past its period end a subscription goes on when its renewal's
- * payment has failed (setting `subscriptions.graceDays`): from 0 to 7, 3
+ * payment has failed (setting `subscriptions.graceDays`): from 0 to 7, 1
  * when unset. The processor retries the payment meanwhile; still unpaid
  * past these days, the subscription ends — however long the
  * processor would have gone on retrying.
  */
 export const GRACE_DAYS_MAX = 7;
-export const GRACE_DAYS_DEFAULT = 3;
+export const GRACE_DAYS_DEFAULT = 1;
 export const GRACE_DAYS_CHOICES = Array.from(
   { length: GRACE_DAYS_MAX + 1 },
   (_, i) => String(i)
