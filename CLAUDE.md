@@ -216,7 +216,10 @@ driven at `http://localhost:3000`, which is far quicker.
 
 **Signing in is yours to do.** Test accounts exist, plus-aliases of the owner's address ending
 `+claude-test` (an admin), `+claude-test2` and `+claude-test3` (users); find them in the `user`
-table. A user with a subscription in effect (`active` or `canceled`) cannot buy another, so pick one without. For any of them:
+table. A user with a subscription in effect (`active` or `canceled`) cannot buy another, so pick one without.
+More are made as needed: any `+claude-testN` alias, signed in as below, becomes a user the first time.
+Flows run side by side each need an account of their own, and a refund that only cancels leaves its
+account unable to buy until the period ends — take a new alias rather than wait. For any of them:
 
 1. `POST /api/auth/email-otp/send-verification-otp` with `{ email, type: 'sign-in' }` and an `Origin`
    header of the address being driven.
@@ -245,8 +248,10 @@ before pressing Subscribe — otherwise another plan is bought. Pay with the san
   its expiry and code, and the address at a person's pace, about 150 ms a key: typed faster, its
   hCaptcha check holds the payment back, and Pay does nothing, with no error. Send
   `Accept-Language: en-US`, or the page comes in another language. Paid, it shows a thank-you whose
-  Continue goes back to the app. It keeps one cart per browser session: a second checkout opened in
-  the same browser replaces the first.
+  Continue goes back to the app; the button appears a second or two after the page, so wait for it.
+  Its invoice can stay pending for a minute after that, and the payment is kept only once it is paid:
+  wait for the `payment` row rather than assume it. It keeps one cart per browser session: a second
+  checkout opened in the same browser replaces the first.
 
 After each step print the `subscription`, `payment` and `refund_request` rows and what the processor
 itself says of the subscription, then again once the webhooks have come. A purchase or a cancel
@@ -254,10 +259,38 @@ arrives within seconds; a refund in Paddle's sandbox is approved only by a job t
 ten minutes, so wait for the payment to leave `refund_pending` rather than for a fixed time. The
 sandbox never rejects a refund and cannot make a real chargeback: those paths have only unit tests.
 
+**What a processor does by itself** — the steps that are not the app's — is done through its API:
+
+- **Paddle** — a refund: `POST /adjustments` with `action: 'refund'`, the `transaction_id`, a `reason`,
+  and `type: 'full'`, or `type: 'partial'` with `items: [{ item_id, type: 'partial', amount }]` — the
+  item from the transaction's `details.line_items`, the amount in cents. A pause, a resume, or an end
+  at once: `POST /subscriptions/{id}/pause`, `…/resume` or `…/cancel` with
+  `effective_from: 'immediately'`.
+- **Lemon Squeezy** — a refund: `POST /v1/subscription-invoices/{id}/refund` with `amount` in cents;
+  the invoice is the payment's `external_id`.
+
+**A renewal that fails** is made for real in Paddle: give the subscription a card that is accepted
+but whose charges fail, `4000 0000 0000 0341`, then bring its renewal forward. The card is changed
+through `GET /subscriptions/{id}/update-payment-method-transaction`: open its transaction on the
+app's `/pay/paddle?_ptxn=<id>` — a page with no buttons of its own, so wait for Paddle's frame, not
+for React — and pay it there. Then `PATCH /subscriptions/{id}` with `next_billed_at` at least half an
+hour ahead and `proration_billing_mode: 'do_not_bill'`; at that time Paddle charges, the charge fails,
+and the app has a failed renewal, a subscription still in effect, and Billing saying the payment
+failed. Paddle's simulations (`POST /simulations`) are no stand-in: a renewal they send reuses the
+subscription's first transaction and its period, so it never reads as the next period unpaid.
+
 **The daily job** at `/api/cron` is off without `CRON_SECRET`. To run it once without
 touching `.env` or the running servers, start a short-lived server with the secret given inline
 (`CRON_SECRET=… pnpm vite dev --port 3003 --strictPort`), call it with
-`Authorization: Bearer <secret>`, and stop that server again.
+`Authorization: Bearer <secret>`, and stop that server again. What it recovers is what a webhook did
+not say, so each path is made by keeping the webhook away: point Paddle's notification setting at a
+path the app does not answer, act in the processor, then set back the time the job looks at, and run
+it. A subscription past its period end: end it in Paddle, set its `period_end` two days back — the
+job asks Paddle and ends it. A refund still waiting: refund from the console, wait until Paddle
+approves it, set the payment's `refund_at` a day and an hour back — the job asks Paddle for the
+refund. A renewal unpaid past the grace days: after a renewal that fails (above), set `period_end`
+back past the grace days — the job ends it without asking, and in Paddle too. Point the setting back
+afterwards; Paddle sends the failed notifications again later, and they change nothing.
 
 **Before the first purchase.** The plans under test must exist in `/console/plans`, each with its
 processor and that processor's price ID, and be enabled; `subscriptions.enabled` must be on, and
@@ -282,7 +315,15 @@ processor's side agrees:
    checkouts through the app before paying either, and keep their addresses; then pay each in the
    tab in front, since a tab behind it is held back and Paddle's overlay never finishes there — and,
    for Lemon Squeezy, each in a browser of its own, since a second cart replaces the first.
-8. A refund made in the processor's own dashboard ends the subscription too.
+8. A refund made in the processor's own dashboard ends the subscription too; one of only part of the
+   payment cancels it, and the plan stays until the period end.
 9. A dispute, where the sandbox can make one.
+10. Paused in the processor: ended, the plan gone; resumed there: in effect again, with the period
+    the processor charged for.
+11. A renewal that fails: still in effect, the user told to update how they pay, and no upgrade;
+    unpaid past the grace days, ended, and ended in the processor.
+12. A canceled subscription reaching its period end, and one renewing: Paddle's daily plan gives
+    both a day later — ended at `period_end`, or a renewal paid and `period_end` a day on.
+13. The daily job's three recoveries, as above.
 
 Say plainly which steps were run and which could not be, and why.
