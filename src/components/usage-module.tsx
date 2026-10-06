@@ -58,18 +58,25 @@ export function UsageModuleSkeleton() {
             <CardContent className="space-y-2 p-4">
               <Skeleton className="h-4 w-16" />
               <Skeleton className="h-7 w-24" />
-              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-12 w-full" />
             </CardContent>
           </Card>
         ))}
       </div>
-      <Card className="py-0">
-        <CardContent className="space-y-3 p-4">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-40 w-full" />
-        </CardContent>
-      </Card>
+      <UsageChartSkeleton />
     </div>
+  );
+}
+
+/** One chart's card while its rows are on their way. */
+export function UsageChartSkeleton() {
+  return (
+    <Card className="py-0">
+      <CardContent className="space-y-3 p-4">
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-44 w-full" />
+      </CardContent>
+    </Card>
   );
 }
 

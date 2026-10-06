@@ -7,7 +7,10 @@ import { pageTitle } from '@/lib/head';
 import { overviewQueries } from '@/server/functions/overview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConsoleCardsSkeleton } from '@/components/console/skeletons';
-import { UsageStats } from '@/components/console/usage-stats';
+import {
+  UsageStats,
+  UsageStatsSkeleton
+} from '@/components/console/usage-stats';
 
 export const Route = createFileRoute('/console/')({
   // The stats' window lives in the address, so a view can be linked.
@@ -18,14 +21,25 @@ export const Route = createFileRoute('/console/')({
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(overviewQueries.console()),
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Console') }] }),
-  pendingComponent: () => <ConsoleCardsSkeleton />,
+  pendingComponent: () => <OverviewSkeleton />,
   component: ConsoleHome
 });
+
+/** The page while its counts are on their way: the cards, and the usage
+ *  section under them. */
+function OverviewSkeleton() {
+  return (
+    <div className="space-y-6">
+      <ConsoleCardsSkeleton />
+      <UsageStatsSkeleton />
+    </div>
+  );
+}
 
 function ConsoleHome() {
   const { data } = useQuery(overviewQueries.console());
   // Primed by the loader; a placeholder only for the cache being emptied.
-  if (!data) return <ConsoleCardsSkeleton />;
+  if (!data) return <OverviewSkeleton />;
   const { hasDefaultQuota, providers, models, prompts, users } = data;
 
   return (

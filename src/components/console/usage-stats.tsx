@@ -4,12 +4,14 @@ import { RefreshCw } from 'lucide-react';
 
 import { usageQueries } from '@/server/functions/usage';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DateRangeFilter,
   useReportWindow
 } from '@/components/date-range-filter';
 import {
   DailyStackedChart,
+  UsageChartSkeleton,
   UsageModule,
   UsageModuleSkeleton
 } from '@/components/usage-module';
@@ -63,7 +65,7 @@ export function UsageStats() {
       </div>
 
       {isLoading ? (
-        <UsageModuleSkeleton />
+        <UsageFiguresSkeleton />
       ) : (
         data && (
           <>
@@ -91,6 +93,32 @@ export function UsageStats() {
           </>
         )
       )}
+    </section>
+  );
+}
+
+/** The figures while they are on their way: the totals and their chart,
+ *  then the provider and capability charts. */
+function UsageFiguresSkeleton() {
+  return (
+    <>
+      <UsageModuleSkeleton />
+      <UsageChartSkeleton />
+      <UsageChartSkeleton />
+    </>
+  );
+}
+
+/** The whole section before the page has drawn: the window and refresh
+ *  controls too. */
+export function UsageStatsSkeleton() {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-9 w-32" />
+        <Skeleton className="size-9" />
+      </div>
+      <UsageFiguresSkeleton />
     </section>
   );
 }
