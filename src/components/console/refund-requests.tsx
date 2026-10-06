@@ -5,6 +5,7 @@ import {
   REFUND_REQUEST_STATUS_LABELS,
   type RefundRequestStatus
 } from '@/types/payment';
+import { formatPrice } from '@/lib/format-amount';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {
   subscriptionQueries,
@@ -19,8 +20,7 @@ import {
 } from '@/components/ui/select';
 import {
   RefundRequestStatusBadge,
-  SubscriptionNote,
-  SubscriptionStatusBadge
+  SubscriptionStatusWithDate
 } from '@/components/billing-status';
 import {
   createAppColumnHelper,
@@ -63,22 +63,14 @@ const requestColumns = (review: (row: Row) => void) =>
         </span>
       )
     }),
+    // The subscription asked about.
     helper.display({
       id: 'subscription',
       header: 'Subscription',
-      // When it renews or ends, while it is live; once ended, only that.
-      cell: ({ row }) => {
-        const sub = row.original.subscription;
-        return (
-          <span className="text-sm whitespace-nowrap">
-            {sub.status !== 'ended' ? (
-              <SubscriptionNote sub={sub} />
-            ) : (
-              <SubscriptionStatusBadge status="ended" />
-            )}
-          </span>
-        );
-      }
+      meta: { headClassName: 'w-28' },
+      cell: ({ row }) => (
+        <SubscriptionStatusWithDate sub={row.original.subscription} />
+      )
     }),
     helper.display({
       id: 'status',
@@ -88,17 +80,58 @@ const requestColumns = (review: (row: Row) => void) =>
       )
     }),
     helper.display({
+      id: 'refunded',
+      header: 'Refunded',
+      // What has gone back, in red as money going out is; and whether the
+      // processor has still to confirm it.
+      cell: ({ row }) => {
+        const { refunded, refundPending } = row.original;
+        if (refunded <= 0) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
+        return (
+          <div className="text-sm whitespace-nowrap">
+            <div className="text-red-600 tabular-nums dark:text-red-400">
+              {formatPrice(refunded)}
+            </div>
+            {refundPending && (
+              <div className="text-xs text-muted-foreground">
+                Refund pending
+              </div>
+            )}
+          </div>
+        );
+      }
+    }),
+    helper.display({
       id: 'reason',
       header: 'Reason',
       meta: { cellClassName: 'max-w-64' },
-      cell: ({ row }) => (
-        <span
-          className="line-clamp-2 text-sm text-muted-foreground"
-          title={row.original.reason ?? undefined}
-        >
-          {row.original.reason ?? '—'}
-        </span>
-      )
+      // Why the user asked; under it, rejected, why the admin said no — as
+      // the subscription's own page shows them.
+      cell: ({ row }) => {
+        const { reason, status, rejectionReason } = row.original;
+        return (
+          <div>
+            {reason && (
+              <span
+                className="line-clamp-2 text-sm text-muted-foreground"
+                title={reason}
+              >
+                {reason}
+              </span>
+            )}
+            {status === 'rejected' && rejectionReason && (
+              <div
+                className="truncate text-xs text-muted-foreground"
+                title={rejectionReason}
+              >
+                Rejected: {rejectionReason}
+              </div>
+            )}
+          </div>
+        );
+      }
     }),
     helper.display({
       id: 'submitted',

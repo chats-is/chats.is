@@ -1649,10 +1649,13 @@ export async function listRefundRequests(
           columns: {
             status: true,
             processor: true,
-            periodEnd: true
+            periodEnd: true,
+            endedAt: true
           },
           with: { plan: { columns: { name: true } } }
-        }
+        },
+        // The payments its approval refunded.
+        payments: { columns: { refundAmount: true, status: true } }
       }
     }),
     db.select({ count: count() }).from(refundRequests).where(where),
@@ -1662,7 +1665,13 @@ export async function listRefundRequests(
       .where(eq(refundRequests.status, 'pending_approval'))
   ]);
   return {
-    rows,
+    rows: rows.map(({ payments: refunded, ...request }) => ({
+      ...request,
+      // What has gone back of its payments, and whether any of it still
+      // waits for the processor.
+      refunded: refunded.reduce((sum, p) => sum + Number(p.refundAmount), 0),
+      refundPending: refunded.some(p => p.status === 'refund_pending')
+    })),
     total: Number(totalRow?.count ?? 0),
     pendingApproval: Number(pendingRow?.count ?? 0),
     page: filter.page,
@@ -1889,13 +1898,18 @@ export async function hasLiveSubscription(userId: string) {
   return !!(await liveSubscription(userId));
 }
 
-/** Of these users, the ones with a subscription in effect. */
-export async function usersWithLiveSubscriptions(
+/** Of these users, each one's subscription in effect: its status, and
+ *  when it renews or ends. */
+export async function liveSubscriptionsOf(
   userIds: string[]
-): Promise<Set<string>> {
-  if (userIds.length === 0) return new Set();
+): Promise<Map<string, Pick<SubscriptionRow, 'status' | 'periodEnd'>>> {
+  if (userIds.length === 0) return new Map();
   const rows = await db
-    .selectDistinct({ userId: subscriptions.userId })
+    .select({
+      userId: subscriptions.userId,
+      status: subscriptions.status,
+      periodEnd: subscriptions.periodEnd
+    })
     .from(subscriptions)
     .where(
       and(
@@ -1903,7 +1917,7 @@ export async function usersWithLiveSubscriptions(
         inArray(subscriptions.status, LIVE_STATUSES)
       )
     );
-  return new Set(rows.map(r => r.userId));
+  return new Map(rows.map(({ userId, ...sub }) => [userId, sub]));
 }
 
 /**

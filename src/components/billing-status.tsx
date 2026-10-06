@@ -121,16 +121,25 @@ export function SubscriptionNote({
   );
 }
 
-/** A subscription's status whole, for an admin: its badge, and its note
- *  under it. */
-export function SubscriptionStatus({ sub }: { sub: SubscriptionPlace }) {
+/** A subscription's status as a badge, for an admin — when it renews or
+ *  ends, or ended, on hover. None shows a dash. */
+export function SubscriptionStatusWithDate({
+  sub
+}: {
+  sub: SubscriptionPlace | null;
+}) {
+  if (!sub) return <span className="text-sm text-muted-foreground">—</span>;
   return (
-    <div className="space-y-1">
-      <SubscriptionStatusBadge status={sub.status} />
-      <div className="text-xs whitespace-nowrap text-muted-foreground">
-        <SubscriptionNote sub={sub} showReason />
-      </div>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex cursor-default">
+          <SubscriptionStatusBadge status={sub.status} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <SubscriptionNote sub={sub} />
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

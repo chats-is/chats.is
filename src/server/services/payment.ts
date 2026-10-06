@@ -591,7 +591,14 @@ export async function listPayments(page: z.infer<typeof paymentListSchema>) {
       with: {
         user: { columns: { id: true, name: true, email: true } },
         plan: { columns: { name: true } },
-        subscription: { columns: { status: true, reason: true } },
+        subscription: {
+          columns: {
+            status: true,
+            reason: true,
+            periodEnd: true,
+            endedAt: true
+          }
+        },
         ...REFUND_WITH
       }
     }),

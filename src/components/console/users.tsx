@@ -43,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { SubscriptionStatusWithDate } from '@/components/billing-status';
 import {
   createAppColumnHelper,
   DataTable
@@ -136,7 +137,7 @@ const userColumns = (ctx: {
     // rather than wrapped.
     helper.accessor('name', {
       header: 'User',
-      meta: { headClassName: 'w-56', cellClassName: 'max-w-0' },
+      meta: { headClassName: 'w-52 min-w-52', cellClassName: 'max-w-0' },
       cell: ({ row }) => {
         const user = row.original;
         return (
@@ -164,62 +165,21 @@ const userColumns = (ctx: {
         );
       }
     }),
-    helper.display({
-      id: 'provider',
-      header: 'Provider',
-      meta: { align: 'center', headClassName: 'w-20' },
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-2">
-          {row.original.accounts && row.original.accounts.length > 0 ? (
-            row.original.accounts.map((account, idx) => (
-              <ProviderIcon key={idx} provider={account.providerId} />
-            ))
-          ) : (
-            <span className="text-xs text-muted-foreground">-</span>
-          )}
-        </div>
-      )
-    }),
-    helper.accessor('emailVerified', {
-      header: 'Verified',
-      meta: {
-        align: 'center',
-        headClassName: 'w-20',
-        cellClassName: 'text-sm'
-      },
-      // Verification is a yes or no now, not a date: the auth library records
-      // whether an address was confirmed, not when. The column always asked
-      // "Verified".
-      cell: ({ row }) =>
-        row.original.emailVerified ? (
-          <CircleCheck
-            className="mx-auto size-4 text-green-600 dark:text-green-500"
-            aria-label="Verified"
-          />
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )
-    }),
-    helper.accessor('createdAt', {
-      header: 'Joined',
-      meta: {
-        headClassName: 'w-40',
-        cellClassName: 'text-sm whitespace-nowrap'
-      },
-      cell: ({ row }) => <LocalTime value={row.original.createdAt} />
-    }),
     helper.accessor(row => row.plan?.name, {
       id: 'plan',
       header: 'Plan',
-      meta: {
-        align: 'center',
-        headClassName: 'w-24',
-        cellClassName: 'text-sm'
-      },
+      meta: { headClassName: 'w-32 min-w-32' },
       cell: ({ row }) => (
-        <span className={row.original.plan ? '' : 'text-muted-foreground'}>
-          {row.original.plan?.name ?? 'No plan'}
-        </span>
+        <span className="text-sm">{row.original.plan?.name ?? '—'}</span>
+      )
+    }),
+    // The subscription in effect that gives the plan.
+    helper.display({
+      id: 'subscription',
+      header: 'Subscription',
+      meta: { headClassName: 'w-28' },
+      cell: ({ row }) => (
+        <SubscriptionStatusWithDate sub={row.original.subscription} />
       )
     }),
     helper.accessor('role', {
@@ -351,9 +311,53 @@ const userColumns = (ctx: {
       }
     }),
     helper.display({
+      id: 'provider',
+      header: 'Provider',
+      meta: { align: 'center', headClassName: 'w-20' },
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center gap-2">
+          {row.original.accounts && row.original.accounts.length > 0 ? (
+            row.original.accounts.map((account, idx) => (
+              <ProviderIcon key={idx} provider={account.providerId} />
+            ))
+          ) : (
+            <span className="text-xs text-muted-foreground">-</span>
+          )}
+        </div>
+      )
+    }),
+    helper.accessor('emailVerified', {
+      header: 'Verified',
+      meta: {
+        align: 'center',
+        headClassName: 'w-20',
+        cellClassName: 'text-sm'
+      },
+      // Verification is a yes or no now, not a date: the auth library records
+      // whether an address was confirmed, not when. The column always asked
+      // "Verified".
+      cell: ({ row }) =>
+        row.original.emailVerified ? (
+          <CircleCheck
+            className="mx-auto size-4 text-green-600 dark:text-green-500"
+            aria-label="Verified"
+          />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )
+    }),
+    helper.accessor('createdAt', {
+      header: 'Joined',
+      meta: {
+        headClassName: 'w-40',
+        cellClassName: 'text-sm whitespace-nowrap'
+      },
+      cell: ({ row }) => <LocalTime value={row.original.createdAt} />
+    }),
+    helper.display({
       id: 'actions',
       header: 'Actions',
-      meta: { align: 'right', headClassName: 'w-24' },
+      meta: { align: 'right', sticky: true, headClassName: 'w-24' },
       cell: ({ row }) => (
         <RowAction
           icon={Trash2}
@@ -361,7 +365,7 @@ const userColumns = (ctx: {
           disabled={
             row.original.role === 'admin'
               ? 'Admins cannot be deleted'
-              : row.original.hasLiveSubscription
+              : row.original.subscription
                 ? 'Has a subscription in effect, so it cannot be deleted.'
                 : null
           }

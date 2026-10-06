@@ -15,7 +15,7 @@ import { PublicError } from '@/server/public-error';
 import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
 import {
   hasLiveSubscription,
-  usersWithLiveSubscriptions
+  liveSubscriptionsOf
 } from '@/server/services/subscription';
 import { getUserTier } from '@/server/services/tier';
 
@@ -98,11 +98,12 @@ export async function listUsers(filter: z.infer<typeof userSearchSchema>) {
     }),
     db.select({ count: count() }).from(users).where(where)
   ]);
-  // A user with a subscription in effect cannot be deleted.
-  const live = await usersWithLiveSubscriptions(rows.map(r => r.id));
+  // The subscription in effect behind each one's plan, if any: shown under
+  // the plan, and a user who has one cannot be deleted.
+  const live = await liveSubscriptionsOf(rows.map(r => r.id));
 
   return {
-    rows: rows.map(row => ({ ...row, hasLiveSubscription: live.has(row.id) })),
+    rows: rows.map(row => ({ ...row, subscription: live.get(row.id) ?? null })),
     total: Number(totalRow?.count ?? 0),
     page: filter.page,
     pageSize: filter.pageSize

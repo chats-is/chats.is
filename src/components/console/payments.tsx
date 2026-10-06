@@ -26,7 +26,10 @@ import {
   paymentKindLabelOf,
   processorLabelOf
 } from '@/components/billing-labels';
-import { PaymentStatusBadge } from '@/components/billing-status';
+import {
+  PaymentStatusBadge,
+  SubscriptionStatusWithDate
+} from '@/components/billing-status';
 import {
   createAppColumnHelper,
   DataTable
@@ -76,6 +79,15 @@ const paymentColumns = (act: (payment: Row) => void) =>
       meta: { headClassName: 'w-32 min-w-32' },
       cell: ({ row }) => (
         <span className="text-sm">{row.original.plan.name}</span>
+      )
+    }),
+    // Where the subscription it paid for stands now.
+    helper.display({
+      id: 'subscription',
+      header: 'Subscription',
+      meta: { headClassName: 'w-28' },
+      cell: ({ row }) => (
+        <SubscriptionStatusWithDate sub={row.original.subscription} />
       )
     }),
     helper.display({
