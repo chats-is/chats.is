@@ -34,7 +34,6 @@ const REQUIREMENTS: Record<PaymentProcessorId, Requirements> = {
       ['STRIPE_WEBHOOK_SECRET', 'The webhook signing secret']
     ],
     events: [
-      'checkout.session.completed',
       'customer.subscription.created',
       'customer.subscription.updated',
       'customer.subscription.deleted',
@@ -44,7 +43,10 @@ const REQUIREMENTS: Record<PaymentProcessorId, Requirements> = {
       'invoice.payment_failed',
       'refund.created',
       'refund.updated',
-      'charge.dispute.created'
+      'charge.dispute.created',
+      'charge.dispute.funds_withdrawn',
+      'charge.dispute.funds_reinstated',
+      'charge.dispute.closed'
     ],
     permissions: [
       'Checkout Sessions: Write',
@@ -114,7 +116,7 @@ const REQUIREMENTS: Record<PaymentProcessorId, Requirements> = {
 /**
  * An icon after a label, opening the payment configuration in a dialog.
  */
-export function PaymentConfigurationButton({
+export function PaymentHelpButton({
   processor
 }: {
   /** The processor shown first. */
@@ -136,7 +138,7 @@ export function PaymentConfigurationButton({
         </TooltipTrigger>
         <TooltipContent>Payment Configuration</TooltipContent>
       </Tooltip>
-      <PaymentConfigurationDialog
+      <PaymentHelpDialog
         open={open}
         onOpenChange={setOpen}
         initial={processor ?? 'stripe'}
@@ -149,7 +151,7 @@ export function PaymentConfigurationButton({
  * The same, as a line across a form: a prompt to configure payment, with
  * an icon that opens the configuration.
  */
-export function PaymentConfigurationAlert({
+export function PaymentHelpAlert({
   processor
 }: {
   processor?: PaymentProcessorId;
@@ -172,7 +174,7 @@ export function PaymentConfigurationAlert({
           Open
         </Button>
       </div>
-      <PaymentConfigurationDialog
+      <PaymentHelpDialog
         open={open}
         onOpenChange={setOpen}
         initial={processor ?? 'stripe'}
@@ -181,7 +183,7 @@ export function PaymentConfigurationAlert({
   );
 }
 
-function PaymentConfigurationDialog({
+function PaymentHelpDialog({
   open,
   onOpenChange,
   initial
