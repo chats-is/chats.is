@@ -204,6 +204,10 @@ through its API:
   its checkout on the app's own `/pay/paddle`, and refuses a domain it has not approved —
   `POST /checkout-domains` with `{ "domain": "<tunnel host>" }` approves it at once in the sandbox.
 - **Lemon Squeezy** — the webhook: `PATCH /v1/webhooks/{id}` with the new `url`.
+- **Stripe** — the webhook endpoint: `POST /v1/webhook_endpoints/{id}` with the new `url`; its
+  signing secret stays the same. Where there is none yet, `POST /v1/webhook_endpoints` with the `url`
+  and `enabled_events[]` — the events the console's payment configuration lists — makes one, and
+  answers its `secret` that once only: it goes straight into `.env` as `STRIPE_WEBHOOK_SECRET`.
 
 **Which address the browser is driven at** depends on the processor. Paddle's checkout runs on the
 app's own page, so for Paddle everything is driven at the tunnel address — sign in there too; its
