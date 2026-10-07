@@ -129,7 +129,10 @@ function toPayment(invoice: Stripe.Invoice): ProcessorPayment | null {
   const amount = paid ? invoice.amount_paid : invoice.amount_due;
   // Nothing to pay — a trial's first invoice — is not a payment.
   if (amount === 0) return null;
-  const line = invoice.lines?.data[0];
+  // The line that charges: an upgrade's invoice opens with the credit for
+  // what was left of the old price, and the new price comes after it.
+  const lines = invoice.lines?.data ?? [];
+  const line = lines.find(l => l.amount > 0) ?? lines[0];
   const details = invoice.parent?.subscription_details ?? null;
   const metadata: Record<string, string> | null = details?.metadata ?? null;
   return {
@@ -174,7 +177,13 @@ async function feeOf(stripe: Stripe, ref: string | null) {
     const txn =
       charge && typeof charge === 'object' ? charge.balance_transaction : null;
     if (!txn || typeof txn !== 'object') return null;
-    return toAmount(txn.fee);
+    // The fee is in the account's own currency. A charge in another was
+    // converted into it, at the rate Stripe kept on the transaction: the fee
+    // goes back at that rate, into the charge's currency. None, and the two
+    // were the same.
+    return toAmount(
+      txn.exchange_rate ? Math.round(txn.fee / txn.exchange_rate) : txn.fee
+    );
   } catch (err) {
     console.warn(`[stripe] no fee for ${ref}`, err);
     return null;
@@ -373,44 +382,25 @@ export function createStripeProcessor(): PaymentProcessor {
       const item = sub.items.data[0];
       if (!item) throw new PublicError('This subscription has no price.');
 
-      // What costs nothing goes first, and back if the change does not go
-      // through: a switch is choosing to stay, under the plan named. Stripe
-      // takes these apart from a change held back on payment.
-      await stripe.subscriptions.update(externalId, {
-        cancel_at_period_end: false,
-        metadata: { planId: target.planId }
-      });
-      // Then the change, charged at once and last, so nothing after it can
-      // fail: if the charge fails it is held back rather than applied, and
-      // a declined card leaves the plan as it was.
-      let updated: Stripe.Subscription;
+      // One request, so no event shows the plan named apart from its price:
+      // the price, the plan it names, and staying — a switch is choosing to
+      // stay. Charged at once; a charge that fails is an error, and then
+      // nothing has changed.
       try {
-        updated = await stripe.subscriptions.update(externalId, {
+        await stripe.subscriptions.update(externalId, {
           items: [{ id: item.id, price: target.priceId }],
+          cancel_at_period_end: false,
+          metadata: { planId: target.planId },
           proration_behavior: 'always_invoice',
-          payment_behavior: 'pending_if_incomplete'
+          payment_behavior: 'error_if_incomplete'
         });
       } catch (err) {
-        await restore();
-        throw err;
-      }
-      if (updated.pending_update) {
-        await restore();
-        throw new PublicError(
-          'The payment for this change did not go through, so your plan has not changed.'
-        );
-      }
-
-      /** Put back what went first. */
-      async function restore() {
-        await stripe.subscriptions
-          .update(externalId, {
-            cancel_at_period_end: sub.cancel_at_period_end,
-            metadata: { planId: sub.metadata?.planId ?? '' }
-          })
-          .catch((e: unknown) =>
-            console.error(`[stripe] could not restore ${externalId}`, e)
+        if ((err as { type?: string } | null)?.type === 'StripeCardError') {
+          throw new PublicError(
+            'The payment for this change did not go through, so your plan has not changed.'
           );
+        }
+        throw err;
       }
     },
 
@@ -496,7 +486,18 @@ export function createStripeProcessor(): PaymentProcessor {
           err instanceof Error ? err.message : 'Bad Stripe signature.'
         );
       }
-      return { id: event.id, type: event.type, action: actionOf(event) };
+      const action = actionOf(event);
+      // An invoice in a webhook does not carry its payments, so not the
+      // transaction that paid it, which refunds and disputes name: it is
+      // read, as `getPayment` reads it.
+      if (action.kind === 'payment' && !action.payment.transactionId) {
+        const invoice = await stripe.invoices.retrieve(
+          action.payment.externalId,
+          { expand: ['payments'] }
+        );
+        action.payment.transactionId = transactionIdOf(invoice);
+      }
+      return { id: event.id, type: event.type, action };
     }
   };
 }

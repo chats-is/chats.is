@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * The Stripe adapter against a stand-in for the Stripe SDK: the order of the
- * requests an upgrade makes, and what it puts back when the change does not
- * go through.
+ * The Stripe adapter against a stand-in for the Stripe SDK: the request an
+ * upgrade makes, and what a webhook carries — as Stripe sends it.
  */
 
 vi.mock('@/lib/env', () => ({
@@ -15,7 +14,7 @@ const stripe = {
   webhooks: { constructEventAsync: vi.fn() },
   checkout: { sessions: { retrieve: vi.fn(), create: vi.fn() } },
   prices: { retrieve: vi.fn() },
-  invoices: { createPreview: vi.fn() },
+  invoices: { createPreview: vi.fn(), retrieve: vi.fn() },
   paymentIntents: { retrieve: vi.fn() },
   refunds: { retrieve: vi.fn() }
 };
@@ -47,38 +46,35 @@ describe('upgrading on Stripe', () => {
       planId: 'pro'
     });
 
-  it('charges last, after what costs nothing', async () => {
+  it('changes the price, the plan it names and staying in one request, charged at once', async () => {
     await upgrade();
     expect(stripe.subscriptions.update.mock.calls).toEqual([
-      ['sub_1', { cancel_at_period_end: false, metadata: { planId: 'pro' } }],
       [
         'sub_1',
         {
           items: [{ id: 'si_1', price: 'price_pro' }],
+          cancel_at_period_end: false,
+          metadata: { planId: 'pro' },
           proration_behavior: 'always_invoice',
-          payment_behavior: 'pending_if_incomplete'
+          payment_behavior: 'error_if_incomplete'
         }
       ]
     ]);
   });
 
-  it('puts back what went first when the charge is declined', async () => {
-    stripe.subscriptions.update
-      .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({ pending_update: { expires_at: 1 } });
+  it('says so when the charge is declined, and changes nothing more', async () => {
+    stripe.subscriptions.update.mockRejectedValueOnce(
+      Object.assign(new Error('Your card was declined.'), {
+        type: 'StripeCardError'
+      })
+    );
     await expect(upgrade()).rejects.toThrow('did not go through');
-    expect(stripe.subscriptions.update).toHaveBeenLastCalledWith('sub_1', {
-      cancel_at_period_end: true,
-      metadata: { planId: 'go' }
-    });
+    expect(stripe.subscriptions.update).toHaveBeenCalledTimes(1);
   });
 
-  it('puts it back when the change fails', async () => {
-    stripe.subscriptions.update
-      .mockResolvedValueOnce({})
-      .mockRejectedValueOnce(new Error('down'));
+  it('passes on any other failure', async () => {
+    stripe.subscriptions.update.mockRejectedValueOnce(new Error('down'));
     await expect(upgrade()).rejects.toThrow('down');
-    expect(stripe.subscriptions.update).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -126,35 +122,48 @@ describe('a Stripe webhook', () => {
     });
   });
 
-  it('carries an invoice as a payment, with the user, plan, price and period it names', async () => {
+  /** An invoice as a webhook carries it: without its payments. */
+  const invoice = (lines: Array<Record<string, unknown>>, reason: string) => ({
+    id: 'in_1',
+    customer: 'cus_1',
+    status: 'paid',
+    amount_paid: 1000,
+    amount_due: 1000,
+    currency: 'usd',
+    billing_reason: reason,
+    hosted_invoice_url: 'https://stripe/in_1',
+    parent: {
+      subscription_details: {
+        subscription: 'sub_1',
+        metadata: { userId: 'u1', planId: 'pro' }
+      }
+    },
+    lines: { data: lines }
+  });
+
+  beforeEach(() => {
+    stripe.invoices.retrieve.mockReset().mockResolvedValue({
+      payments: {
+        data: [{ status: 'paid', payment: { payment_intent: 'pi_1' } }]
+      }
+    });
+  });
+
+  it('carries an invoice as a payment, with the user, plan, price and period it names — and the transaction that paid it, read', async () => {
     expect(
-      await action('invoice.paid', {
-        id: 'in_1',
-        customer: 'cus_1',
-        status: 'paid',
-        amount_paid: 1000,
-        amount_due: 1000,
-        currency: 'usd',
-        billing_reason: 'subscription_cycle',
-        hosted_invoice_url: 'https://stripe/in_1',
-        parent: {
-          subscription_details: {
-            subscription: 'sub_1',
-            metadata: { userId: 'u1', planId: 'pro' }
-          }
-        },
-        payments: {
-          data: [{ payment: { payment_intent: 'pi_1' } }]
-        },
-        lines: {
-          data: [
+      await action(
+        'invoice.paid',
+        invoice(
+          [
             {
+              amount: 1000,
               pricing: { price_details: { price: 'price_1' } },
               period: { end: 1790000000 }
             }
-          ]
-        }
-      })
+          ],
+          'subscription_cycle'
+        )
+      )
     ).toEqual({
       kind: 'payment',
       payment: expect.objectContaining({
@@ -164,9 +173,42 @@ describe('a Stripe webhook', () => {
         planId: 'pro',
         priceId: 'price_1',
         periodEnd: new Date(1790000000 * 1000),
+        transactionId: 'pi_1',
         amount: 10,
         kind: 'renewal',
         paid: true
+      })
+    });
+    expect(stripe.invoices.retrieve).toHaveBeenCalledWith('in_1', {
+      expand: ['payments']
+    });
+  });
+
+  it("takes an upgrade's price from the line that charges, not the credit before it", async () => {
+    expect(
+      await action(
+        'invoice.paid',
+        invoice(
+          [
+            {
+              amount: -500,
+              pricing: { price_details: { price: 'price_go' } },
+              period: { end: 1790000000 }
+            },
+            {
+              amount: 1500,
+              pricing: { price_details: { price: 'price_pro' } },
+              period: { end: 1790000000 }
+            }
+          ],
+          'subscription_update'
+        )
+      )
+    ).toEqual({
+      kind: 'payment',
+      payment: expect.objectContaining({
+        priceId: 'price_pro',
+        kind: 'upgrade'
       })
     });
   });
@@ -377,5 +419,49 @@ describe('a Stripe refund, read by its id', () => {
     expect(stripe.refunds.retrieve).toHaveBeenCalledWith('re_1');
     expect((await read('pending')).status).toBe('pending');
     expect((await read('canceled')).status).toBe('failed');
+  });
+});
+
+describe('the fee on a Stripe payment', () => {
+  /** A payment of $10.00, with the balance transaction Stripe kept. */
+  const feeWith = async (txn: Record<string, unknown>) => {
+    stripe.invoices.retrieve.mockResolvedValueOnce({
+      id: 'in_1',
+      status: 'paid',
+      amount_paid: 1000,
+      amount_due: 1000,
+      billing_reason: 'subscription_create',
+      lines: { data: [{ amount: 1000 }] },
+      payments: {
+        data: [{ status: 'paid', payment: { payment_intent: 'pi_1' } }]
+      }
+    });
+    stripe.paymentIntents.retrieve.mockResolvedValueOnce({
+      latest_charge: { balance_transaction: txn }
+    });
+    return (await createStripeProcessor().getPayment('in_1'))?.fee;
+  };
+
+  it('is the fee Stripe kept, where the account settles in the charge’s currency', async () => {
+    expect(
+      await feeWith({
+        amount: 1000,
+        currency: 'usd',
+        fee: 59,
+        exchange_rate: null
+      })
+    ).toBe(0.59);
+  });
+
+  it('goes back into the charge’s currency, at Stripe’s rate, where the account settles in another', async () => {
+    // $10.00 into an account in Hong Kong dollars: HK$78.48, its fee HK$6.98.
+    expect(
+      await feeWith({
+        amount: 7848,
+        currency: 'hkd',
+        fee: 698,
+        exchange_rate: 7.84776
+      })
+    ).toBe(0.89);
   });
 });
