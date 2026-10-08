@@ -43,6 +43,7 @@ const REQUIREMENTS: Record<PaymentProcessorId, Requirements> = {
       'invoice.payment_failed',
       'refund.created',
       'refund.updated',
+      'refund.failed',
       'charge.dispute.created',
       'charge.dispute.funds_withdrawn',
       'charge.dispute.funds_reinstated',

@@ -230,9 +230,11 @@ function actionOf(event: Stripe.Event): WebhookAction {
       return payment ? { kind: 'payment', payment } : { kind: 'ignore' };
     }
     case 'refund.created':
-    case 'refund.updated': {
+    case 'refund.updated':
+    case 'refund.failed': {
       // The refund itself, by its id — the one `refunds.create` returned,
-      // or one made in the Dashboard.
+      // or one made in the Dashboard. One that fails after it succeeded —
+      // the card closed meanwhile — is told by `refund.failed` alone.
       const refund = event.data.object;
       const ref = idOf(refund.payment_intent) ?? idOf(refund.charge);
       if (!ref) return { kind: 'ignore' };

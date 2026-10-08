@@ -242,6 +242,23 @@ describe('a Stripe webhook', () => {
       refund: { externalId: 're_1', amount: 8, total: null, status: 'failed' }
     });
   });
+
+  it('carries a refund that failed after it succeeded, told by refund.failed', async () => {
+    expect(
+      await action('refund.failed', {
+        id: 're_1',
+        payment_intent: 'pi_1',
+        amount: 800,
+        currency: 'usd',
+        status: 'failed',
+        failure_reason: 'expired_or_canceled_card'
+      })
+    ).toEqual({
+      kind: 'refund',
+      transactionId: 'pi_1',
+      refund: { externalId: 're_1', amount: 8, total: null, status: 'failed' }
+    });
+  });
 });
 
 describe('a Stripe dispute', () => {
