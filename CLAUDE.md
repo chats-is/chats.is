@@ -206,8 +206,12 @@ through its API:
 - **Lemon Squeezy** — the webhook: `PATCH /v1/webhooks/{id}` with the new `url`.
 - **Stripe** — the webhook endpoint: `POST /v1/webhook_endpoints/{id}` with the new `url`; its
   signing secret stays the same. Where there is none yet, `POST /v1/webhook_endpoints` with the `url`
-  and `enabled_events[]` — the events the console's payment configuration lists — makes one, and
-  answers its `secret` that once only: it goes straight into `.env` as `STRIPE_WEBHOOK_SECRET`.
+  and `enabled_events[]` — the events the console's payment configuration lists — and `api_version`
+  makes one, and answers its `secret` that once only: it goes straight into `.env` as
+  `STRIPE_WEBHOOK_SECRET`. The `api_version` is the one the installed `stripe` package is written
+  for (`Stripe.API_VERSION`, `2026-08-26.dahlia` today): an endpoint made without it sends its
+  events in the account's default version, whose objects an older account may shape otherwise —
+  the same goes for one made in Stripe's Dashboard, live or sandbox.
 
 **Which address the browser is driven at** depends on the processor. Paddle's checkout runs on the
 app's own page, so for Paddle everything is driven at the tunnel address — sign in there too; its
