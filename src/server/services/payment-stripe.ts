@@ -423,10 +423,20 @@ export function createStripeProcessor(): PaymentProcessor {
     async end(externalId) {
       const stripe = await client();
       const sub = await stripe.subscriptions.retrieve(externalId);
-      if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {
-        return;
+      if (sub.status !== 'canceled' && sub.status !== 'incomplete_expired') {
+        await stripe.subscriptions.cancel(externalId);
       }
-      await stripe.subscriptions.cancel(externalId);
+      // A canceled subscription's unpaid invoice can still be paid from its
+      // link, for a plan the user no longer has: void it. Done again when
+      // the end is sent again, should this fail.
+      const open = await stripe.invoices.list({
+        subscription: externalId,
+        status: 'open',
+        limit: 100
+      });
+      for (const invoice of open.data) {
+        await stripe.invoices.voidInvoice(invoice.id);
+      }
     },
 
     async refundPayment(payment, refund) {

@@ -10,11 +10,16 @@ vi.mock('@/lib/env', () => ({
 }));
 
 const stripe = {
-  subscriptions: { retrieve: vi.fn(), update: vi.fn() },
+  subscriptions: { retrieve: vi.fn(), update: vi.fn(), cancel: vi.fn() },
   webhooks: { constructEventAsync: vi.fn() },
   checkout: { sessions: { retrieve: vi.fn(), create: vi.fn() } },
   prices: { retrieve: vi.fn() },
-  invoices: { createPreview: vi.fn(), retrieve: vi.fn() },
+  invoices: {
+    createPreview: vi.fn(),
+    retrieve: vi.fn(),
+    list: vi.fn(),
+    voidInvoice: vi.fn()
+  },
   paymentIntents: { retrieve: vi.fn() },
   refunds: { retrieve: vi.fn() }
 };
@@ -37,6 +42,35 @@ const current = {
 beforeEach(() => {
   stripe.subscriptions.retrieve.mockReset().mockResolvedValue(current);
   stripe.subscriptions.update.mockReset().mockResolvedValue({});
+});
+
+describe('ending a subscription on Stripe', () => {
+  beforeEach(() => {
+    stripe.subscriptions.cancel.mockReset().mockResolvedValue({});
+    stripe.invoices.list.mockReset().mockResolvedValue({ data: [] });
+    stripe.invoices.voidInvoice.mockReset().mockResolvedValue({});
+  });
+
+  it('cancels it, and voids the renewal it left unpaid, which could otherwise still be paid', async () => {
+    stripe.subscriptions.retrieve.mockResolvedValueOnce({ status: 'past_due' });
+    stripe.invoices.list.mockResolvedValueOnce({ data: [{ id: 'in_2' }] });
+    await createStripeProcessor().end('sub_1');
+    expect(stripe.subscriptions.cancel).toHaveBeenCalledWith('sub_1');
+    expect(stripe.invoices.list).toHaveBeenCalledWith({
+      subscription: 'sub_1',
+      status: 'open',
+      limit: 100
+    });
+    expect(stripe.invoices.voidInvoice.mock.calls).toEqual([['in_2']]);
+  });
+
+  it('already canceled, still voids what it left unpaid', async () => {
+    stripe.subscriptions.retrieve.mockResolvedValueOnce({ status: 'canceled' });
+    stripe.invoices.list.mockResolvedValueOnce({ data: [{ id: 'in_2' }] });
+    await createStripeProcessor().end('sub_1');
+    expect(stripe.subscriptions.cancel).not.toHaveBeenCalled();
+    expect(stripe.invoices.voidInvoice.mock.calls).toEqual([['in_2']]);
+  });
 });
 
 describe('upgrading on Stripe', () => {
