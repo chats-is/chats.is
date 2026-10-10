@@ -54,32 +54,27 @@ import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 type Quota = Awaited<ReturnType<typeof listQuotas>>['rows'][number];
 /** What the edit form is filled from: the quota as read when it opens. */
 type EditableQuota = NonNullable<Awaited<ReturnType<typeof getQuota>>>;
-type Role = 'strict' | 'standard' | 'flexible' | 'custom';
+type Role = 'steady' | 'balanced' | 'burst';
 
 // 5h limit as a fraction of the weekly limit. Weekly is the anchor — admin
 // enters a weekly budget and the role chooses how much of it a single 5h
-// burst can consume. `custom` has no preset ratio — admin keeps whatever
-// values are already stored, edits each separately.
-const ROLE_RATIOS: Record<Exclude<Role, 'custom'>, number> = {
-  strict: 0.1,
-  standard: 0.15,
-  flexible: 0.2
+// burst can consume.
+const ROLE_RATIOS: Record<Role, number> = {
+  steady: 0.1,
+  balanced: 0.15,
+  burst: 0.2
 };
 
 const ROLE_LABEL: Record<Role, string> = {
-  strict: 'Strict (10%)',
-  standard: 'Standard (15%)',
-  flexible: 'Flexible (20%)',
-  custom: 'Custom'
+  steady: 'Steady (10%)',
+  balanced: 'Balanced (15%)',
+  burst: 'Burst (20%)'
 };
 
 const ROLE_OPTIONS = (Object.keys(ROLE_LABEL) as Array<Role>).map(role => ({
   value: role,
   label: ROLE_LABEL[role]
 }));
-
-/** Tolerance for role detection. Anything within ±1% of a preset is "that". */
-const ROLE_DETECT_TOLERANCE = 0.01;
 
 /** A money field as typed: blank, or a non-negative number. */
 const amount = (value: string): number | null => {
@@ -93,10 +88,8 @@ const quotaSchema = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(100),
     description: z.string().max(500),
-    role: z.enum(['strict', 'standard', 'flexible', 'custom']),
+    role: z.enum(['steady', 'balanced', 'burst']),
     sevenDay: z.string(),
-    // Editable only when role === 'custom'; derived from sevenDay otherwise.
-    fiveHour: z.string(),
     isUnlimited: z.boolean()
   })
   // The limits only have to make sense when the quota actually has limits, so
@@ -120,14 +113,6 @@ const quotaSchema = z
         });
       }
     }
-
-    if (value.role === 'custom' && amount(value.fiveHour) === null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['fiveHour'],
-        message: '5-hour limit must be a non-negative number'
-      });
-    }
   });
 
 type QuotaForm = z.infer<typeof quotaSchema>;
@@ -135,26 +120,24 @@ type QuotaForm = z.infer<typeof quotaSchema>;
 const emptyForm: QuotaForm = {
   name: '',
   description: '',
-  role: 'standard',
+  role: 'balanced',
   sevenDay: '',
-  fiveHour: '',
   isUnlimited: false
 };
 
-/** Detect which role matches the stored fiveHour/sevenDay ratio. Returns 'custom'
- *  if no preset is within tolerance. Empty/zero sevenDay → 'standard' (default). */
+/** The role whose ratio is nearest the stored fiveHour/sevenDay. Empty/zero
+ *  sevenDay → 'balanced' (default). */
 const detectRole = (fiveHour: string | null, sevenDay: string | null): Role => {
   const f = Number(fiveHour);
   const w = Number(sevenDay);
-  if (!Number.isFinite(w) || w <= 0) return 'standard';
-  if (!Number.isFinite(f)) return 'standard';
+  if (!Number.isFinite(w) || w <= 0) return 'balanced';
+  if (!Number.isFinite(f)) return 'balanced';
   const ratio = f / w;
-  for (const key of ['strict', 'standard', 'flexible'] as const) {
-    if (Math.abs(ratio - ROLE_RATIOS[key]) < ROLE_DETECT_TOLERANCE) {
-      return key;
-    }
-  }
-  return 'custom';
+  return (Object.keys(ROLE_RATIOS) as Role[]).reduce((best, key) =>
+    Math.abs(ratio - ROLE_RATIOS[key]) < Math.abs(ratio - ROLE_RATIOS[best])
+      ? key
+      : best
+  );
 };
 
 const fmtLimit = (v: string | null | undefined) => {
@@ -172,15 +155,10 @@ const fmtAmount = (v: string | null): string => {
 };
 
 /** The 5-hour limit a form's values imply. */
-const fiveHourOf = (
-  value: Pick<QuotaForm, 'role' | 'sevenDay' | 'fiveHour'>
-) =>
-  value.role === 'custom'
-    ? amount(value.fiveHour)
-    : (() => {
-        const weekly = amount(value.sevenDay);
-        return weekly === null ? null : weekly * ROLE_RATIOS[value.role];
-      })();
+const fiveHourOf = (value: Pick<QuotaForm, 'role' | 'sevenDay'>) => {
+  const weekly = amount(value.sevenDay);
+  return weekly === null ? null : weekly * ROLE_RATIOS[value.role];
+};
 
 const helper = createAppColumnHelper<Quota>();
 
@@ -365,7 +343,6 @@ export default function QuotasPage() {
           description: quota.description ?? '',
           role: detectRole(quota.fiveHour, quota.sevenDay),
           sevenDay: fmtAmount(quota.sevenDay),
-          fiveHour: fmtAmount(quota.fiveHour),
           isUnlimited: quota.isUnlimited
         }
       : emptyForm;
@@ -456,7 +433,6 @@ export default function QuotasPage() {
                   selector={state => ({
                     role: state.values.role,
                     sevenDay: state.values.sevenDay,
-                    fiveHour: state.values.fiveHour,
                     isUnlimited: state.values.isUnlimited
                   })}
                 >
@@ -465,7 +441,7 @@ export default function QuotasPage() {
                       <form.AppField name="role">
                         {field => (
                           <field.SelectField
-                            label="Roles"
+                            label="Pace"
                             options={ROLE_OPTIONS}
                             disabled={values.isUnlimited}
                           />
@@ -482,39 +458,25 @@ export default function QuotasPage() {
                           />
                         )}
                       </form.AppField>
-                      {values.role === 'custom' ? (
-                        <form.AppField name="fiveHour">
-                          {field => (
-                            <field.TextField
-                              label="5-hour"
-                              inputMode="decimal"
-                              placeholder="0.00"
-                              prefix="$"
-                              disabled={values.isUnlimited}
-                            />
-                          )}
-                        </form.AppField>
-                      ) : (
-                        // A preset role derives this from the weekly budget,
-                        // so it is shown rather than edited.
-                        <div className="space-y-2">
-                          <Label>5-hour</Label>
-                          <div className="relative">
-                            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
-                              $
-                            </span>
-                            <Input
-                              inputMode="decimal"
-                              placeholder="0.00"
-                              readOnly
-                              tabIndex={-1}
-                              value={fiveHourOf(values)?.toFixed(2) ?? ''}
-                              disabled={values.isUnlimited}
-                              className="pl-7"
-                            />
-                          </div>
+                      {/* The role derives this from the weekly budget, so it
+                          is shown rather than edited. */}
+                      <div className="space-y-2">
+                        <Label>5-hour</Label>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
+                            $
+                          </span>
+                          <Input
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            readOnly
+                            tabIndex={-1}
+                            value={fiveHourOf(values)?.toFixed(2) ?? ''}
+                            disabled={values.isUnlimited}
+                            className="pl-7"
+                          />
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </form.Subscribe>
