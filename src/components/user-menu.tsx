@@ -3,12 +3,12 @@ import { useSystemSettingsIfLoaded } from '@/contexts/system-settings-context';
 import { useQuery } from '@tanstack/react-query';
 import {
   ChevronsUpDown,
-  CreditCard,
   ExternalLink,
   LayoutDashboard,
   LogOut,
   Settings,
-  Shield
+  Shield,
+  Sparkles
 } from 'lucide-react';
 
 import { authClient } from '@/lib/auth-client';
@@ -145,7 +145,7 @@ export function UserMenu() {
                 onClick={() => openPlans?.()}
                 className="flex items-center gap-2"
               >
-                <CreditCard className="size-4" />
+                <Sparkles className="size-4" />
                 Upgrade plan
               </DropdownMenuItem>
             )}

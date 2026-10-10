@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { CircleAlert, Cpu, Sparkles, Users, Zap } from 'lucide-react';
+import { CircleAlert, Cpu, Plug, SquareSparkles, Users } from 'lucide-react';
 
 import { reportWindowSearchSchema } from '@/types/usage';
 import { pageTitle } from '@/lib/head';
@@ -66,7 +66,7 @@ function ConsoleHome() {
           <Card className="transition-colors hover:bg-accent">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Providers</CardTitle>
-              <Zap className="size-4 text-muted-foreground" />
+              <Plug className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{providers.total}</div>
@@ -96,7 +96,7 @@ function ConsoleHome() {
           <Card className="transition-colors hover:bg-accent">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Prompts</CardTitle>
-              <Sparkles className="size-4 text-muted-foreground" />
+              <SquareSparkles className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{prompts.total}</div>

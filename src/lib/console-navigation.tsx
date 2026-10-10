@@ -1,5 +1,4 @@
 import {
-  Banknote,
   CalendarCheck,
   CircleDollarSign,
   Cpu,
@@ -7,12 +6,13 @@ import {
   Gauge,
   LayoutGrid,
   Logs,
+  Package,
   Percent,
+  Plug,
   Settings,
-  Sparkles,
+  SquareSparkles,
   Tickets,
-  Users,
-  Zap
+  Users
 } from 'lucide-react';
 
 export const ConsoleNavigation = {
@@ -30,7 +30,7 @@ export const ConsoleNavigation = {
     {
       title: 'Providers',
       url: '/console/providers',
-      icon: Zap
+      icon: Plug
     },
     {
       title: 'Models',
@@ -45,7 +45,7 @@ export const ConsoleNavigation = {
     {
       title: 'Prompts',
       url: '/console/prompts',
-      icon: Sparkles
+      icon: SquareSparkles
     },
     {
       title: 'Quotas',
@@ -60,7 +60,7 @@ export const ConsoleNavigation = {
     {
       title: 'Plans',
       url: '/console/plans',
-      icon: CreditCard
+      icon: Package
     },
     {
       title: 'Subscriptions',
@@ -70,7 +70,7 @@ export const ConsoleNavigation = {
     {
       title: 'Payments',
       url: '/console/payments',
-      icon: Banknote
+      icon: CreditCard
     },
     {
       title: 'Refund requests',

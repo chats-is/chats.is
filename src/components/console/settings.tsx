@@ -16,8 +16,8 @@ import {
   Mic,
   PenLine,
   Percent,
-  ReceiptText,
   Search,
+  SquareSparkles,
   TicketPercent,
   Tickets,
   Type,
@@ -456,7 +456,7 @@ function ChatSettings({ form }: { form: SettingsFormApi }) {
   return (
     <SettingsList title="Chat">
       <SettingsRow
-        icon={ReceiptText}
+        icon={SquareSparkles}
         label="System Prompt"
         htmlFor="chat.systemPrompt"
         hint="Told to every chat model, after the app's own system prompt. A model's own system prompt follows it rather than replacing it."

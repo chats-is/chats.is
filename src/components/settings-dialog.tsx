@@ -2,8 +2,8 @@ import { createContext, useCallback, useContext, useState } from 'react';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { useQuery } from '@tanstack/react-query';
 import {
-  BarChart3,
   CreditCard,
+  Gauge,
   Link2,
   Settings,
   User,
@@ -46,7 +46,7 @@ const PANELS = [
   { value: 'speech', label: 'Speech', icon: Volume2 },
   { value: 'profile', label: 'Profile', icon: User },
   { value: 'billing', label: 'Billing', icon: CreditCard },
-  { value: 'usage', label: 'Usage', icon: BarChart3 },
+  { value: 'usage', label: 'Usage', icon: Gauge },
   { value: 'shared-links', label: 'Shared Links', icon: Link2 }
 ] as const;
 

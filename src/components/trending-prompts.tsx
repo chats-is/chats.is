@@ -1,7 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { useRouter } from '@tanstack/react-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { Sparkles } from 'lucide-react';
+import { SquareSparkles } from 'lucide-react';
 
 import { setPendingPrompt } from '@/lib/pending-prompt';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -112,7 +112,7 @@ export function TrendingPrompts({
   if (!prompts.length) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
-        <Sparkles className="size-12 opacity-50" />
+        <SquareSparkles className="size-12 opacity-50" />
         <p className="text-sm">
           {debouncedSearch
             ? 'No prompts match your search.'
