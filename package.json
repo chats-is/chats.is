@@ -64,7 +64,7 @@
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.102.8",
     "@tanstack/react-router": "^1.170.41",
-    "@tanstack/react-router-devtools": "^1.167.1",
+    "@tanstack/react-router-devtools": "^1.167.2",
     "@tanstack/react-router-ssr-query": "^1.167.2",
     "@tanstack/react-start": "^1.168.60",
     "@tanstack/react-table": "^9.2.4",
