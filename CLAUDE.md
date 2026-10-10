@@ -160,9 +160,9 @@ adapters beside it (`services/payment-*.ts`), and a new processor is another. Th
 parts that do not mix. What a user or admin does — buy, upgrade, cancel, resume, refund — is a
 business function that decides from the local tables and then calls the processor. What the
 processor did is told by webhook at `/api/payments/$processor/webhook`: the adapter hands over the
-object the event carries (subscription, payment, refund, dispute) and when it happened; the service
-checks it against what is kept — our user, newer than what is kept, no more refunded than was paid
-— and writes it, with the one action the result calls for (a confirmed refund ends it as the admin
+object the event carries (subscription, payment, refund, dispute); the service checks it against
+what is kept — our user, our plan's price, no more refunded than was paid — and writes it as it is,
+not put back in the order it happened, with the one action the result calls for (a confirmed refund ends it as the admin
 chose, a chargeback ends it, a second subscription bought beside the first is ended and refunded, a
 renewal reported failed past the grace days ends it). A subscription event writes the
 subscription; its `period_end` moves only when a renewal's payment is reported paid. Nothing in a

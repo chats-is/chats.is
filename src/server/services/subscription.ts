@@ -105,9 +105,13 @@ import {
  *   `canceled`, and a refund that fails puts it back.
  *
  * The processor's webhooks carry the subscription or the payment as it is
- * there, and that is applied — checked against what is kept, and in the
- * order it happened, so a webhook sent twice, or late, changes nothing. A
- * checkout come back from before its webhook is asked of the processor.
+ * there, and that is applied — checked against what is kept, so a webhook
+ * sent twice changes nothing the second time. Webhooks are not put back in
+ * the order they happened: one that comes late is applied as it is, and
+ * what keeps it from undoing more is that `ended` stays ended, a
+ * cancellation not the user's own is made again, and `period_end` moves
+ * only on a paid renewal. A checkout come back from before its webhook is
+ * asked of the processor.
  */
 
 // ============================================================================
@@ -815,9 +819,10 @@ async function settlePlan(userId: string) {
 // Keeping in step with the processor
 //
 // The processor says what happened by webhook, and what it says is applied:
-// the subscription or payment it carries, as it is there. Each event says
-// when it happened, so one that arrives after a newer one changes nothing,
-// and one sent twice changes nothing the second time.
+// the subscription or payment it carries, as it is there. One sent twice
+// changes nothing the second time. One that arrives after a newer one is
+// applied too — the event's time is not kept — and is put right by the
+// next event, or by the scheduled job once the period end has passed.
 // ============================================================================
 
 /**
