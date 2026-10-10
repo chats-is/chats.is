@@ -41,7 +41,7 @@ export function RouteError({ error }: ErrorComponentProps) {
       </h1>
 
       <p className="max-w-xl text-muted-foreground">
-        {isDevelopment && error.message
+        {isDevelopment && error instanceof Error && error.message
           ? error.message
           : 'The page could not be loaded. Try again in a moment.'}
       </p>
