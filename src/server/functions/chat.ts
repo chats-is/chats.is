@@ -1,8 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
-import { type z } from 'zod';
 
-import { type chatTypeSchema } from '@/types';
 import {
   chatCreateSchema,
   chatDetailSchema,
@@ -45,7 +43,7 @@ export const deleteAllChats = createServerFn({ method: 'POST' })
 /** How many chats the sidebar reads at a time. */
 const HISTORY_PAGE_SIZE = 25;
 
-type ListInput = { type?: z.infer<typeof chatTypeSchema>; limit?: number };
+type ListInput = { limit?: number };
 
 export const chatQueries = {
   all: () => ['chat'] as const,
@@ -72,7 +70,6 @@ export const chatQueries = {
   history: () => chatQueries.infinite({ limit: HISTORY_PAGE_SIZE }),
   detail: (input: {
     id: string;
-    type?: z.infer<typeof chatTypeSchema>;
     includeMessages?: boolean;
     includeArtifacts?: boolean;
   }) =>

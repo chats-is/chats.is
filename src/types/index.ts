@@ -15,8 +15,7 @@ export type User = {
   email: string;
   image?: string | null;
 };
-export { chatTypeSchema } from './chat';
-export type { Chat, ChatType } from './chat';
+export type { Chat } from './chat';
 export type { SystemSettings, SystemDefaults } from './system-settings';
 export type {
   Model,

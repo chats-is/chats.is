@@ -4,13 +4,9 @@ import { type Artifact } from './artifact';
 import { mediaToolsOptionsSchema } from './chat-tools';
 import { messageSchema, userMessageSchema, type ChatMessage } from './message';
 
-export const chatTypeSchema = z.enum(['chat', 'audio', 'image', 'video']);
-export type ChatType = z.infer<typeof chatTypeSchema>;
-
 export type Chat = {
   id: string;
   title: string;
-  type: ChatType;
   modelId: string;
   streamId?: string | null;
   messages: ChatMessage[];
@@ -26,7 +22,6 @@ export type Chat = {
 export const chatCreateSchema = z.object({
   id: z.string().min(1),
   title: z.string().trim().min(1).max(255),
-  type: chatTypeSchema.default('chat'),
   modelId: z.string().trim().min(1).max(255),
   messages: z.array(messageSchema)
 });
@@ -38,7 +33,6 @@ export const chatUpdateSchema = z.object({
 });
 
 export const chatListSchema = z.object({
-  type: chatTypeSchema.optional(),
   limit: z.number().min(1).default(50).optional(),
   offset: z.number().min(0).default(0).optional(),
   cursor: z.number().nullish()
@@ -46,7 +40,6 @@ export const chatListSchema = z.object({
 
 export const chatDetailSchema = z.object({
   id: z.string().min(1),
-  type: chatTypeSchema.optional(),
   includeMessages: z.boolean().default(true),
   includeArtifacts: z.boolean().default(false)
 });

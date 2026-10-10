@@ -24,8 +24,6 @@ export const Route = createFileRoute('/_chat/chat/$chatId')({
   // merely revalidating.
   pendingComponent: ChatSkeleton,
   pendingMinMs: 0,
-  // No type filter: legacy media chats (image/video/audio) open here too.
-  //
   // Awaited on the server, where the page is rendered once and should arrive
   // complete. Not awaited in the browser: a loader that blocks leaves the
   // reader looking at the chat they just left, under the address of the one

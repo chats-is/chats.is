@@ -17,7 +17,6 @@ import {
 
 import {
   type ChatMessage,
-  type ChatType,
   type ProviderType,
   type ReasoningEffort
 } from '@/types';
@@ -44,10 +43,6 @@ export const chats = createTable(
   {
     id: varchar('id', { length: 255 }).notNull().primaryKey(),
     title: varchar('title', { length: 255 }).notNull(),
-    type: varchar('type', { length: 32 })
-      .notNull()
-      .default('chat')
-      .$type<ChatType>(),
     modelId: varchar('model_id', { length: 255 }).notNull(),
     // The generation writing a reply in this chat right now: set when it
     // starts, cleared when it ends, null in between. It is the claim a
@@ -67,14 +62,8 @@ export const chats = createTable(
   },
   chat => [
     index('chat_userId_idx').on(chat.userId),
-    index('chat_type_idx').on(chat.type),
     index('chat_createdAt_idx').on(chat.createdAt),
-    index('chat_userId_createdAt_idx').on(chat.userId, chat.createdAt),
-    index('chat_userId_type_createdAt_idx').on(
-      chat.userId,
-      chat.type,
-      chat.createdAt
-    )
+    index('chat_userId_createdAt_idx').on(chat.userId, chat.createdAt)
   ]
 );
 

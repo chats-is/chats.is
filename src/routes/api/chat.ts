@@ -230,7 +230,6 @@ async function POST({
     }
   }
 
-  // No type filter: continuing a legacy media chat reuses its row.
   const chat = await chats.getChat(user.id, {
     id,
     includeMessages: false,
@@ -297,7 +296,6 @@ async function POST({
     await chats.createChat(user.id, {
       id,
       title,
-      type: 'chat',
       modelId,
       messages: [userMessage]
     });

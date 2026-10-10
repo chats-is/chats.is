@@ -27,7 +27,6 @@ export async function createChat(
     await tx.insert(chats).values({
       id: input.id,
       title: input.title,
-      type: input.type,
       modelId: input.modelId,
       userId
     });
@@ -73,10 +72,7 @@ export async function listChats(
     orderBy: (chats, { desc }) => [desc(chats.createdAt)],
     limit: limit,
     offset: offset,
-    where: and(
-      eq(chats.userId, userId),
-      input.type ? eq(chats.type, input.type) : undefined
-    ),
+    where: eq(chats.userId, userId),
     columns: {
       userId: false
     }
@@ -95,11 +91,7 @@ export async function getChat(
   input: z.infer<typeof chatDetailSchema>
 ) {
   const chat = await db.query.chats.findFirst({
-    where: and(
-      eq(chats.id, input.id),
-      eq(chats.userId, userId),
-      input.type ? eq(chats.type, input.type) : undefined
-    ),
+    where: and(eq(chats.id, input.id), eq(chats.userId, userId)),
     with: {
       model: {
         with: {
