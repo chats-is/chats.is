@@ -4,8 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   RefreshCw,
-  ShieldCheck,
-  User as UserIcon
+  User as UserIcon,
+  UserShield
 } from 'lucide-react';
 
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
@@ -18,7 +18,6 @@ import { quotaQueries } from '@/server/functions/quota';
 import { subscriptionQueries } from '@/server/functions/subscription';
 import { usageQueries } from '@/server/functions/usage';
 import { userQueries } from '@/server/functions/user';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -167,11 +166,21 @@ export default function UserDetail({ userId }: { userId: string }) {
                 <h1 className="truncate text-xl font-semibold">
                   {user.name || 'No name'}
                 </h1>
-                {/* The same icon and word the users table shows for a role. */}
-                <Badge>
-                  {user.role === 'admin' ? <ShieldCheck /> : <UserIcon />}
-                  {user.role === 'admin' ? 'Admin' : 'User'}
-                </Badge>
+                {/* The role as the users table shows it: its icon, in its
+                    colour, named on hover. */}
+                <Hint label={user.role === 'admin' ? 'Admin' : 'User'}>
+                  {user.role === 'admin' ? (
+                    <UserShield
+                      className="size-4 shrink-0 text-primary"
+                      aria-label="Admin"
+                    />
+                  ) : (
+                    <UserIcon
+                      className="size-4 shrink-0 text-muted-foreground"
+                      aria-label="User"
+                    />
+                  )}
+                </Hint>
               </div>
               <div className="truncate text-sm text-muted-foreground">
                 {user.email} · Joined <LocalTime value={user.createdAt} />

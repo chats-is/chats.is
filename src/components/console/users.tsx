@@ -6,9 +6,9 @@ import {
   ExternalLink,
   Loader2,
   Mail,
-  ShieldCheck,
   Trash2,
-  User as UserIcon
+  User as UserIcon,
+  UserShield
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,6 +36,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -43,6 +51,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { SubscriptionStatusWithDate } from '@/components/billing-status';
 import {
   createAppColumnHelper,
@@ -182,53 +195,59 @@ const userColumns = (ctx: {
         <SubscriptionStatusWithDate sub={row.original.subscription} />
       )
     }),
+    // The role as its icon, named by its tooltip; pressed, the roles to
+    // choose from.
     helper.accessor('role', {
       header: 'Role',
-      meta: { align: 'center', headClassName: 'w-32' },
+      meta: { align: 'center', headClassName: 'w-20' },
       cell: ({ row }) => {
         const user = row.original;
         const saving = ctx.updatingRoleUserId === user.id;
+        const label = user.role === 'admin' ? 'Admin' : 'User';
         return (
           <div className="flex justify-center">
-            <Select
-              value={user.role}
-              disabled={saving}
-              onValueChange={value =>
-                ctx.setRole(user, value as 'user' | 'admin')
-              }
-            >
-              <SelectTrigger className="w-28">
-                {/* Inside a SelectValue, not in place of one: the menu is
-                    positioned against the value node, and without one it is
-                    never placed — and an unplaced menu takes no choice. */}
-                <SelectValue>
-                  <div className="flex items-center gap-2">
-                    {saving ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : user.role === 'admin' ? (
-                      <ShieldCheck className="size-3" />
-                    ) : (
-                      <UserIcon className="size-3" />
-                    )}
-                    <span>{user.role === 'admin' ? 'Admin' : 'User'}</span>
-                  </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="user">
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="size-3" />
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Role: ${label}`}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : user.role === 'admin' ? (
+                        <UserShield className="size-4 text-primary" />
+                      ) : (
+                        <UserIcon className="size-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent side="top" align="center">
+                <DropdownMenuRadioGroup
+                  value={user.role}
+                  onValueChange={value => {
+                    if (value !== user.role) {
+                      ctx.setRole(user, value as 'user' | 'admin');
+                    }
+                  }}
+                >
+                  <DropdownMenuRadioItem value="user">
+                    <UserIcon className="size-4 text-muted-foreground" />
                     User
-                  </div>
-                </SelectItem>
-                <SelectItem value="admin">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="size-3" />
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="admin">
+                    <UserShield className="size-4 text-primary" />
                     Admin
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       }
