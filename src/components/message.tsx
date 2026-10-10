@@ -14,7 +14,7 @@ import {
   MediaToolPart,
   TranscribeToolPart
 } from '@/components/media-tool-part';
-import { MessageIncomplete } from '@/components/message-error';
+import { MessageError, MessageIncomplete } from '@/components/message-error';
 import { MessageMarkdown } from '@/components/message-markdown';
 import { MessageReasoning } from '@/components/message-reasoning';
 import { ModelIcon } from '@/components/model-icon';
@@ -42,6 +42,9 @@ export interface MessageProps extends Partial<
   // create_artifact tool call.
   artifacts?: Artifact[];
   onSelectArtifact?: (id: string) => void;
+  /** Refused while the chat was open: its reason is shown, not just that
+   *  nothing came back. */
+  refusedHere?: boolean;
   children: React.ReactNode;
 }
 
@@ -55,6 +58,7 @@ export function Message({
   hasVisibleArtifacts = false,
   artifacts,
   onSelectArtifact,
+  refusedHere,
   children
 }: MessageProps) {
   const hasVisibleTextContent = message.parts.some(
@@ -224,10 +228,15 @@ export function Message({
               }
 
               // A turn that failed — refused before it began, or cut off part
-              // way. The reason was shown while it happened; what is left in
-              // the thread is that nothing came back.
+              // way. Refused just now, the reason is what to act on, so it is
+              // shown; read back later, what is left is that nothing came
+              // back.
               if (part.type === 'data-error') {
-                return <MessageIncomplete key={index} />;
+                return refusedHere ? (
+                  <MessageError key={index} message={part.data.message} />
+                ) : (
+                  <MessageIncomplete key={index} />
+                );
               }
 
               if (part.type === 'tool-create_artifact') {

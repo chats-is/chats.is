@@ -619,6 +619,7 @@ export function ChatUI({
               onSelectArtifact={handleArtifactSelect}
               onReload={handleReload}
               error={error}
+              refusedHere={session.refusedHere}
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
@@ -662,6 +663,7 @@ export function ChatUI({
             onSelectArtifact={handleArtifactSelect}
             onReload={handleReload}
             error={error}
+            refusedHere={session.refusedHere}
           />
           <ArtifactsPanel
             open={isPanelOpen}

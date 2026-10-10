@@ -46,6 +46,8 @@ interface ChatPanelProps extends Pick<
   onSubmit: (attachments?: Attachment[]) => boolean;
   /** A refused or failed request, rendered at the end of the thread. */
   error?: Error;
+  /** The replies refused while this chat was open, shown with their reason. */
+  refusedHere?: ReadonlySet<string>;
   onModelChange: (modelId: string) => void;
   onOptionsChange: (options: ModelOptions) => void;
   onSelectArtifact: (artifactId: string) => void;
@@ -70,6 +72,7 @@ export function ChatPanel({
   onInputChange,
   onSubmit,
   error,
+  refusedHere,
   onModelChange,
   onOptionsChange,
   onSelectArtifact,
@@ -99,6 +102,7 @@ export function ChatPanel({
             artifacts={artifacts}
             onSelectArtifact={onSelectArtifact}
             error={error}
+            refusedHere={refusedHere}
           />
         </ScrollToBottom>
       </div>

@@ -36,6 +36,8 @@ export interface MessagesProps
    * can act on it.
    */
   error?: Error;
+  /** The replies refused while this chat was open, shown with their reason. */
+  refusedHere?: ReadonlySet<string>;
   /** Describes the media being generated, to show a shaped loading placeholder. */
 }
 
@@ -53,7 +55,8 @@ export function Messages({
   className,
   artifacts,
   onSelectArtifact,
-  error
+  error,
+  refusedHere
 }: MessagesProps) {
   if (!messages.length) {
     return null;
@@ -152,6 +155,7 @@ export function Messages({
               hasVisibleArtifacts={hasVisibleArtifacts}
               artifacts={messageArtifacts}
               onSelectArtifact={onSelectArtifact}
+              refusedHere={refusedHere?.has(message.id)}
             >
               {showActions !== false && (
                 <MessageActions

@@ -56,6 +56,14 @@ export interface ChatSession {
     onData?: ChatOnDataCallback<ChatMessage>;
     onError?: ChatOnErrorCallback;
   };
+  /**
+   * The replies refused while this session was open. Their reason is shown,
+   * since it is worth acting on now; a refusal read back later is only a turn
+   * that got no answer. Kept here, not in a page, because the refusal of a
+   * new chat's first message arrives just before the page is swapped for the
+   * chat's own.
+   */
+  refusedHere: Set<string>;
 }
 
 const sessions = new Map<string, ChatSession>();
@@ -116,7 +124,8 @@ function createSession(
     chat: undefined as unknown as Chat<ChatMessage>,
     isNew: true,
     requestBody: {},
-    handlers: {}
+    handlers: {},
+    refusedHere: new Set()
   };
 
   session.chat = new Chat<ChatMessage>({
@@ -142,7 +151,15 @@ function createSession(
         return { api: `${api}?chatId=${id}` };
       }
     }),
-    onData: dataPart => session.handlers.onData?.(dataPart),
+    onData: dataPart => {
+      // A refusal is the whole reply, so it lands on the message its `start`
+      // has just put last.
+      if (dataPart.type === 'data-error') {
+        const replyId = session.chat.lastMessage?.id;
+        if (replyId) session.refusedHere.add(replyId);
+      }
+      session.handlers.onData?.(dataPart);
+    },
     onError: error => session.handlers.onError?.(error)
   });
 
