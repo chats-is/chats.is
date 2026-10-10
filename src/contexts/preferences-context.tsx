@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useState,
   type ReactNode
 } from 'react';
@@ -68,6 +69,41 @@ interface PreferencesProviderProps {
   children: ReactNode;
 }
 
+/** A reader who has chosen nothing: no model picked, every option unset. */
+const UNCHOSEN: Preferences = {
+  // Chat
+  chatModelId: '',
+  chatReasoning: true,
+  chatEffort: '',
+  // Generation options are left empty until the user picks one. A hardcoded
+  // seed is indistinguishable from a choice the user made, and both
+  // `ModelMenu` and the server's `pickOption` prefer a selection over the
+  // model's own `uiOptions` default — so a seeded value that happened to
+  // appear in a model's allowed list silently overrode the default the admin
+  // configured for that model.
+  // Image
+  imageModelId: '',
+  imageEditModelId: '',
+  imageSize: '',
+  imageAspectRatio: '',
+  imageResolution: '',
+  // Video
+  videoModelId: '',
+  videoImageModelId: '',
+  videoEditModelId: '',
+  videoSize: '',
+  videoAspectRatio: '',
+  videoResolution: '',
+  videoDuration: undefined,
+  // Audio (TTS)
+  audioModelId: '',
+  audioVoice: '',
+  // Transcription (STT)
+  sttModelId: '',
+  mediaGeneration: true,
+  webSearch: true
+};
+
 export function PreferencesProvider({ children }: PreferencesProviderProps) {
   const {
     defaults,
@@ -78,23 +114,46 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
     sttModels
   } = useSystemSettings();
 
-  const [preferences, setPreferences] = useState<Preferences>(() => {
-    // A model id is only usable if it is still among the models the server
-    // offers — alias-aware, the way the server resolves one. Deleting or
-    // disabling a model leaves its id behind in two places: the admin's system
-    // default, and every browser that stored it as a preference. Neither is a
-    // value a selector can display, so both are treated as unset and the
-    // control shows its placeholder rather than an empty pill.
+  // What the reader chose, as stored. Empty stored values are dropped: the
+  // whole object is persisted on any write, so a modality the user never
+  // picked is saved as '' and would otherwise shadow the fallback below.
+  const [chosen, setChosen] = useState<Preferences>(() => {
+    const stored = getStoredPreferences();
+    if (!stored) return UNCHOSEN;
+    const sanitized = Object.fromEntries(
+      Object.entries(stored).filter(
+        ([, value]) => value !== '' && value !== null && value !== undefined
+      )
+    );
+    return { ...UNCHOSEN, ...sanitized };
+  });
+
+  // The model each choice comes to, settled against the models on offer now
+  // rather than once — the lists change under an open page when a plan
+  // changes. The reader's choice, else the admin's default, else the first
+  // model on offer of its kind, in the order the console sets; only with none
+  // on offer is nothing chosen, and the control shows its placeholder. An id
+  // is on offer alias-aware, the way the server resolves one; a model
+  // deleted, disabled or kept from the reader by their tier is not.
+  const preferences = useMemo<Preferences>(() => {
     const resolves = (id: unknown, models: Model[] | undefined) =>
       typeof id === 'string' &&
       !!id &&
       !!models?.some(model => modelMatchesId(model, id));
 
-    const systemDefault = (
-      id: string | null | undefined,
+    const settle = (
+      id: string,
+      systemId: string | null | undefined,
       models: Model[] | undefined
-    ) => (resolves(id, models) ? (id as string) : '');
+    ) =>
+      resolves(id, models)
+        ? id
+        : resolves(systemId, models)
+          ? (systemId as string)
+          : (models?.[0]?.modelId ?? '');
 
+    // Their own choices: only some image models can edit one, and only some
+    // video models take an image as the first frame or edit a video.
     const editModels = imageModels?.filter(model => model.supportsImageEdit);
     const animateModels = videoModels?.filter(
       model => model.supportsImageToVideo
@@ -103,86 +162,50 @@ export function PreferencesProvider({ children }: PreferencesProviderProps) {
       model => model.supportsVideoEdit
     );
 
-    const defaultPrefs: Preferences = {
-      // Chat
-      chatModelId: systemDefault(defaults.chatModelId, chatModels),
-      chatReasoning: true,
-      chatEffort: '',
-      // Generation options are left empty until the user picks one. A
-      // hardcoded seed is indistinguishable from a choice the user made, and
-      // both `ModelMenu` and the server's `pickOption` prefer a selection over
-      // the model's own `uiOptions` default — so a seeded value that happened
-      // to appear in a model's allowed list silently overrode the default the
-      // admin configured for that model.
-      // Image
-      imageModelId: systemDefault(defaults.imageModelId, imageModels),
-      // Its own choice: only some image models can edit one.
-      imageEditModelId: systemDefault(defaults.imageEditModelId, editModels),
-      imageSize: '',
-      imageAspectRatio: '',
-      imageResolution: '',
-      // Video
-      videoModelId: systemDefault(defaults.videoModelId, videoModels),
-      // Its own choice: only some video models take an image as the first frame.
-      videoImageModelId: systemDefault(
+    return {
+      ...chosen,
+      chatModelId: settle(chosen.chatModelId, defaults.chatModelId, chatModels),
+      imageModelId: settle(
+        chosen.imageModelId,
+        defaults.imageModelId,
+        imageModels
+      ),
+      imageEditModelId: settle(
+        chosen.imageEditModelId,
+        defaults.imageEditModelId,
+        editModels
+      ),
+      videoModelId: settle(
+        chosen.videoModelId,
+        defaults.videoModelId,
+        videoModels
+      ),
+      videoImageModelId: settle(
+        chosen.videoImageModelId,
         defaults.videoImageModelId,
         animateModels
       ),
-      videoEditModelId: systemDefault(
+      videoEditModelId: settle(
+        chosen.videoEditModelId,
         defaults.videoEditModelId,
         videoEditModels
       ),
-      videoSize: '',
-      videoAspectRatio: '',
-      videoResolution: '',
-      videoDuration: undefined,
-      // Audio (TTS)
-      audioModelId: systemDefault(defaults.ttsModelId, ttsModels),
-      audioVoice: '',
-      // Transcription (STT)
-      sttModelId: systemDefault(defaults.sttModelId, sttModels),
-      mediaGeneration: true,
-      webSearch: true
+      audioModelId: settle(chosen.audioModelId, defaults.ttsModelId, ttsModels),
+      sttModelId: settle(chosen.sttModelId, defaults.sttModelId, sttModels)
     };
-
-    const stored = getStoredPreferences();
-    if (stored) {
-      // Drop empty stored values: the whole prefs object is persisted on any
-      // write, so a modality the user never picked is saved as '' and would
-      // otherwise shadow a system default the admin configures later.
-      const sanitized = Object.fromEntries(
-        Object.entries(stored).filter(
-          ([, value]) => value !== '' && value !== null && value !== undefined
-        )
-      );
-
-      // Same for stored ids: dropping one falls back to the system default,
-      // exactly as it does for a user who never chose.
-      const modelKeys: Array<[keyof Preferences, Model[] | undefined]> = [
-        ['chatModelId', chatModels],
-        ['imageModelId', imageModels],
-        ['imageEditModelId', editModels],
-        ['videoModelId', videoModels],
-        ['videoImageModelId', animateModels],
-        ['videoEditModelId', videoEditModels],
-        ['audioModelId', ttsModels],
-        ['sttModelId', sttModels]
-      ];
-      for (const [key, models] of modelKeys) {
-        if (key in sanitized && !resolves(sanitized[key], models)) {
-          delete sanitized[key];
-        }
-      }
-
-      return { ...defaultPrefs, ...sanitized };
-    }
-
-    return defaultPrefs;
-  });
+  }, [
+    chosen,
+    defaults,
+    chatModels,
+    imageModels,
+    videoModels,
+    ttsModels,
+    sttModels
+  ]);
 
   const setPreference = useCallback(
     <TKey extends keyof Preferences>(key: TKey, value: Preferences[TKey]) => {
-      setPreferences(prev => {
+      setChosen(prev => {
         const newPrefs = { ...prev, [key]: value };
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(newPrefs));

@@ -8,14 +8,13 @@ import {
   type SetStateAction
 } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
-import { useSystemSettings } from '@/contexts/system-settings-context';
 import { Camera, Check, Globe, Paperclip, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type Attachment } from '@/types';
 import { uploadFile } from '@/lib/api';
 import { canCaptureScreen, captureScreenshot } from '@/lib/screenshot';
-import { cn, generateUUID, modelMatchesId } from '@/lib/utils';
+import { cn, generateUUID } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { Button } from '@/components/ui/button';
 import {
@@ -83,13 +82,10 @@ export function AddFilesMenu({
   useEffect(() => setMounted(true), []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { sttModels, defaults } = useSystemSettings();
   // The upload goes straight to blob storage under this user's own path, which
   // the token route checks against the session before it signs anything.
   const { user } = useCurrentUser();
   const { preferences, setPreference } = usePreferences();
-
-  const sttModelId = preferences.sttModelId || defaults.sttModelId || '';
 
   // What already holds a place in the message: attached, or on its way. A
   // failed upload holds none.
@@ -116,21 +112,6 @@ export function AddFilesMenu({
         return;
       }
       const userId = user.id;
-
-      // Audio is transcribed on arrival, so an audio file needs a model that
-      // can do it settled now — an upload with nothing to transcribe it would
-      // be accepted and then fail on the server. Validity, not emptiness: a
-      // stored preference can name a model that has since been deleted.
-      const hasAudio = files.some(file =>
-        AUDIO_TYPES.some(ext => file.name.toLowerCase().endsWith(ext))
-      );
-      if (
-        hasAudio &&
-        sttModels?.length &&
-        !sttModels.some(model => modelMatchesId(model, sttModelId))
-      ) {
-        setPreference('sttModelId', sttModels[0].modelId);
-      }
 
       const pending: PendingUpload[] = files.map(file => ({
         id: generateUUID(),
@@ -173,16 +154,7 @@ export function AddFilesMenu({
         })
       );
     },
-    [
-      occupied,
-      limitMessage,
-      setAttachments,
-      setUploads,
-      user?.id,
-      sttModels,
-      sttModelId,
-      setPreference
-    ]
+    [occupied, limitMessage, setAttachments, setUploads, user?.id]
   );
 
   const handleFileChange = useCallback(

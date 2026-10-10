@@ -112,10 +112,17 @@ export function ChatUI({
   }, [id, session, initialTitle]);
 
   // Track the current model (for next submission)
-  // Priority: initialChat.modelId (if valid) > preferences
-  const [currentModelId, setCurrentModelId] = useState(
-    initialChat?.modelId || preferences.chatModelId
+  // Priority: the chat's own model, or one picked here (if still on offer) >
+  // preferences — settled against the models on offer now, which change under
+  // an open page when a plan changes.
+  const [pickedModelId, setPickedModelId] = useState(
+    initialChat?.modelId ?? ''
   );
+  const currentModelId =
+    pickedModelId &&
+    chatModels?.some(model => modelMatchesId(model, pickedModelId))
+      ? pickedModelId
+      : preferences.chatModelId;
 
   // Track the display model (for showing in Messages)
   const [displayModelId, setDisplayModelId] = useState(
@@ -464,7 +471,7 @@ export function ChatUI({
   // Handle model change from ModelMenu
   const handleModelChange = useCallback(
     (newModelId: string) => {
-      setCurrentModelId(newModelId);
+      setPickedModelId(newModelId);
       setPreference('chatModelId', newModelId);
     },
     [setPreference]

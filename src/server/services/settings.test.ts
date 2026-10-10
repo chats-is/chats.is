@@ -1,4 +1,5 @@
 import { makeTestDb } from '@/test-utils/pg';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import * as schema from '@/db/schema';
@@ -77,6 +78,102 @@ describe('getSystemSettings', () => {
     ]) {
       expect(wire).not.toContain(secret);
     }
+  });
+});
+
+describe('getSystemSettings for a tier', () => {
+  beforeAll(async () => {
+    await h.db.insert(schema.models).values({
+      id: 'm2',
+      name: 'Other',
+      modelId: 'gpt-y',
+      capability: 'chat',
+      isEnabled: true
+    });
+    await h.db.insert(schema.modelProviders).values({
+      id: 'b2',
+      modelId: 'gpt-y',
+      providerId: 'p1',
+      isEnabled: true
+    });
+    await h.db
+      .insert(schema.settings)
+      .values({ id: 's-chat', key: 'default.chat.modelId', value: 'gpt-y' });
+  });
+
+  const chatIds = (s: Awaited<ReturnType<typeof getSystemSettings>>) =>
+    s.chatModels.map(m => m.modelId).sort();
+
+  it('offers every model without a tier', async () => {
+    const s = await getSystemSettings();
+    expect(chatIds(s)).toEqual(['gpt-x', 'gpt-y']);
+  });
+
+  it('offers only what an allow list names', async () => {
+    const s = await getSystemSettings({
+      modelRestrictionMode: 'allow',
+      modelIds: ['gpt-x']
+    });
+    expect(chatIds(s)).toEqual(['gpt-x']);
+  });
+
+  it('keeps out what a deny list names', async () => {
+    const s = await getSystemSettings({
+      modelRestrictionMode: 'deny',
+      modelIds: ['gpt-x']
+    });
+    expect(chatIds(s)).toEqual(['gpt-y']);
+  });
+
+  it('offers no model a call could not reach: its binding off, or its provider', async () => {
+    await h.db.insert(schema.providers).values({
+      id: 'p-off',
+      name: 'Off',
+      type: 'openai',
+      apiKey: 'k',
+      isEnabled: false
+    });
+    await h.db.insert(schema.models).values([
+      {
+        id: 'm-b',
+        name: 'Binding off',
+        modelId: 'gpt-b',
+        capability: 'chat',
+        isEnabled: true
+      },
+      {
+        id: 'm-p',
+        name: 'Provider off',
+        modelId: 'gpt-p',
+        capability: 'chat',
+        isEnabled: true
+      }
+    ]);
+    await h.db.insert(schema.modelProviders).values([
+      { id: 'b-b', modelId: 'gpt-b', providerId: 'p1', isEnabled: false },
+      { id: 'b-p', modelId: 'gpt-p', providerId: 'p-off', isEnabled: true }
+    ]);
+
+    expect(chatIds(await getSystemSettings())).toEqual(['gpt-x', 'gpt-y']);
+
+    await h.db
+      .update(schema.modelProviders)
+      .set({ isEnabled: true })
+      .where(eq(schema.modelProviders.id, 'b-b'));
+    expect(chatIds(await getSystemSettings())).toEqual([
+      'gpt-b',
+      'gpt-x',
+      'gpt-y'
+    ]);
+    await h.db.delete(schema.models).where(eq(schema.models.id, 'm-b'));
+  });
+
+  it('passes the admin’s default on as it is, for the page to settle', async () => {
+    const s = await getSystemSettings({
+      modelRestrictionMode: 'allow',
+      modelIds: ['gpt-x']
+    });
+    expect(s.defaults.chatModelId).toBe('gpt-y');
   });
 });
 

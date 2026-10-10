@@ -9,6 +9,7 @@ import {
   type WebSearchToolOutput
 } from '@/types';
 import { countWebSearches, normalizeChatUsage } from '@/lib/chat-usage';
+import { allowsModel } from '@/lib/model-access';
 import {
   getLanguageModel,
   getProviderWebSearchTool,
@@ -19,6 +20,7 @@ import {
 import { canSearchWeb, searchesForItself } from '@/lib/web-search';
 import { preflightCheck } from '@/server/services/preflight';
 import { getWebSearchSettings } from '@/server/services/settings';
+import { getUserTier } from '@/server/services/tier';
 import { recordChatUsage } from '@/server/services/usage';
 
 /**
@@ -85,8 +87,15 @@ export async function setupWebSearch(args: {
   const { mode, searchModel } = await getWebSearchSettings();
   const nothing: WebSearchSetup = { toolsFor: () => ({}), systemPrompt: '' };
 
+  // A search model the user's tier refuses is none for them: the page offers
+  // no switch for it, and every search through it would be refused.
+  const tier = await getUserTier(userId);
   const searchable =
-    searchModel && searchModel.candidates.length > 0 ? searchModel : null;
+    searchModel &&
+    searchModel.candidates.length > 0 &&
+    allowsModel(tier, searchModel.dbModel.modelId)
+      ? searchModel
+      : null;
   const rule = {
     mode,
     searchModelId: searchable?.dbModel.modelId ?? null

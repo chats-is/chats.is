@@ -16,6 +16,7 @@ import {
   DEFAULT_APP_NAME,
   DEFAULT_APP_SUBTITLE
 } from '@/lib/constant';
+import { allowsModel, type ModelRestrictionMode } from '@/lib/model-access';
 import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
@@ -293,7 +294,20 @@ function toClientModel(model: Model): Model {
   };
 }
 
-export async function getSystemSettings() {
+/**
+ * The settings every page is drawn from, with the models on offer narrowed
+ * to those the reader's tier allows — the same rule the server refuses the
+ * rest by. The admin's defaults are passed on as they are: which model a
+ * page starts on is the page's to settle, from the lists it is given. No
+ * tier given, nothing is narrowed: a share link opened by someone with no
+ * account.
+ */
+export async function getSystemSettings(
+  tier: {
+    modelRestrictionMode: ModelRestrictionMode;
+    modelIds: string[];
+  } | null = null
+) {
   const [models, values, webSearch] = await Promise.all([
     getAllModels(),
     getSettings([
@@ -311,17 +325,24 @@ export async function getSystemSettings() {
     getWebSearchSettings()
   ]);
   const allModels = models.map(toClientModel);
+  const allowed = (modelId: string) => !tier || allowsModel(tier, modelId);
+  const offered = allModels.filter(m => allowed(m.modelId));
+
+  const searchModelId =
+    webSearch.searchModel && webSearch.searchModel.candidates.length > 0
+      ? webSearch.searchModel.dbModel.modelId
+      : null;
 
   return {
     speechEnabled: values['speech.enabled'] === 'true',
     subscriptionsEnabled: values['subscriptions.enabled'] === 'true',
-    chatModels: allModels.filter(m => m.capability === 'chat'),
-    imageModels: allModels.filter(m => m.capability === 'image'),
-    videoModels: allModels.filter(m => m.capability === 'video'),
-    ttsModels: allModels.filter(
+    chatModels: offered.filter(m => m.capability === 'chat'),
+    imageModels: offered.filter(m => m.capability === 'image'),
+    videoModels: offered.filter(m => m.capability === 'video'),
+    ttsModels: offered.filter(
       m => m.capability === 'audio' && !m.supportsTranscription
     ),
-    sttModels: allModels.filter(
+    sttModels: offered.filter(
       m => m.capability === 'audio' && m.supportsTranscription
     ),
     defaults: {
@@ -336,10 +357,10 @@ export async function getSystemSettings() {
     },
     webSearch: {
       mode: webSearch.mode,
+      // A search model the tier keeps them from is one they cannot search
+      // through: the server would refuse it.
       searchModelId:
-        webSearch.searchModel && webSearch.searchModel.candidates.length > 0
-          ? webSearch.searchModel.dbModel.modelId
-          : null
+        searchModelId && allowed(searchModelId) ? searchModelId : null
     }
   };
 }

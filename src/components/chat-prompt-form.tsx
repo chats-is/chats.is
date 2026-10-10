@@ -61,12 +61,11 @@ export function ChatPromptForm({
 
   // Two distinct dead ends, both of which make a submission fail:
   //   - no chat model is configured at all;
-  //   - one exists but none is selected. `preferences.chatModelId` falls back
-  //     to '' when the admin has not set `default.chatModelId`, and a stale
-  //     preference can also name a model that no longer resolves. Either way
-  //     the request would reach /api/chat with an empty or unknown modelId and
-  //     come back as an opaque 400/403. Alias-aware, since that is how the
-  //     server resolves a modelId.
+  //   - one exists but none is selected. The page settles on a model on
+  //     offer whenever there is one, so this is the guard should it not.
+  //     Either way the request would reach /api/chat with an empty or unknown
+  //     modelId and come back as an opaque 400/403. Alias-aware, since that
+  //     is how the server resolves a modelId.
   const noModels = !chatModels || chatModels.length === 0;
   const noModelSelected =
     !noModels && !chatModels.some(model => modelMatchesId(model, modelId));

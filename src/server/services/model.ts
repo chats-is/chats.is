@@ -52,7 +52,14 @@ export const getAllModels = perRequest(
           with: { provider: true }
         }
       },
-      orderBy: (models, { asc }) => [asc(models.displayOrder)]
+      // The console's order, `id` last so it is total: models seeded together
+      // share a display order and a creation time, and the first of a kind is
+      // the one a page falls back to when the admin's default is not on offer.
+      orderBy: (models, { asc, desc }) => [
+        asc(models.displayOrder),
+        desc(models.createdAt),
+        asc(models.id)
+      ]
     });
 
     return (

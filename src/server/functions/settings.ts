@@ -6,8 +6,9 @@ import {
   settingsBulkSchema,
   settingSchema
 } from '@/types/settings';
-import { adminMiddleware } from '@/server/middleware';
+import { adminMiddleware, optionalAuthMiddleware } from '@/server/middleware';
 import * as settings from '@/server/services/settings';
+import { getUserTier } from '@/server/services/tier';
 
 export const listSettings = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
@@ -23,12 +24,16 @@ export const getAppSettings = createServerFn({ method: 'GET' }).handler(() =>
 );
 
 /**
- * Get complete system settings for client initialization
- * Includes all enabled models and default settings
+ * Get complete system settings for client initialization: the enabled
+ * models the signed-in user's tier allows, and the default settings.
  */
-export const getSystemSettings = createServerFn({ method: 'GET' }).handler(() =>
-  settings.getSystemSettings()
-);
+export const getSystemSettings = createServerFn({ method: 'GET' })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) =>
+    settings.getSystemSettings(
+      context.user ? await getUserTier(context.user.id) : null
+    )
+  );
 
 export const updateSetting = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])

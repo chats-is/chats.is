@@ -31,6 +31,7 @@ import {
   pickSize,
   pickVoice
 } from '@/lib/media-options';
+import { allowsModel } from '@/lib/model-access';
 import { resolveModelId } from '@/lib/provider';
 import { generateAndStoreSpeech } from '@/lib/speech-generation';
 import { transcribeAudio } from '@/lib/transcription';
@@ -40,9 +41,14 @@ import {
   VideoTimeoutError
 } from '@/lib/video-generation';
 import { isOwnBlobUrl } from '@/server/services/blob';
-import { findModelByModelId, usableCandidates } from '@/server/services/model';
+import {
+  findModelByModelId,
+  getAllModels,
+  usableCandidates
+} from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
 import { getMediaDefaultModelIds } from '@/server/services/settings';
+import { getUserTier } from '@/server/services/tier';
 import {
   recordAudioUsage,
   recordImageUsage,
@@ -115,9 +121,12 @@ async function resolveMediaModel(
 
 /**
  * Resolve the user-selected model, falling back to the admin default when the
- * selection no longer resolves (model disabled/deleted, providers removed, or
- * direction flag flipped) — a stale localStorage preference must not silently
- * disable a tool the system default could still serve.
+ * selection no longer resolves (model disabled/deleted, providers removed,
+ * direction flag flipped, or kept from the user by their tier), and to the
+ * first model of its kind that does when neither resolves — the order the
+ * page falls back in, so the tool is offered with the model it shows. A stale
+ * localStorage preference must not silently disable a tool another model
+ * could still serve.
  */
 async function resolveWithFallback(
   selectedId: string | null | undefined,
@@ -128,7 +137,14 @@ async function resolveWithFallback(
   const selected = await resolveMediaModel(selectedId, capability, accepts);
   if (selected) return selected;
   if (defaultId && defaultId !== selectedId) {
-    return resolveMediaModel(defaultId, capability, accepts);
+    const fallback = await resolveMediaModel(defaultId, capability, accepts);
+    if (fallback) return fallback;
+  }
+  for (const dbModel of await getAllModels()) {
+    if (dbModel.capability !== capability) continue;
+    if (accepts && !accepts(dbModel)) continue;
+    const candidates = usableCandidates(dbModel);
+    if (candidates.length > 0) return { dbModel, candidates };
   }
   return null;
 }
@@ -158,8 +174,9 @@ function optionsHint(
 /**
  * Build the media generation tools for a chat request. Each tool is only
  * registered when its media model resolves (user selection from the request
- * body, falling back to the admin-configured system default); `edit_image`
- * additionally requires the image model's `supportsImageEdit` flag.
+ * body, falling back to the admin-configured system default) to one the
+ * user's tier allows; `edit_image` additionally requires the image model's
+ * `supportsImageEdit` flag.
  *
  * Each call re-runs `preflightCheck` against its own media model and returns
  * a structured `{ status: 'error' }` output on any failure so the chat model
@@ -176,48 +193,57 @@ export async function buildMediaTools(args: {
   const { userId, chatId, assistantMessageId, mediaOptions, chatMessages } =
     args;
 
-  const defaults = await getMediaDefaultModelIds();
+  const [defaults, tier] = await Promise.all([
+    getMediaDefaultModelIds(),
+    getUserTier(userId)
+  ]);
+  // A model the user's tier refuses is none to offer a tool with: the page
+  // shows them no such model, and every call would be refused.
+  const allowed = (accepts?: (model: Model) => boolean) => (model: Model) =>
+    allowsModel(tier, model.modelId) && (!accepts || accepts(model));
   const [image, imageEdit, video, videoImage, videoEdit, audio, stt] =
     await Promise.all([
       resolveWithFallback(
         mediaOptions?.image?.modelId,
         defaults.imageModelId,
-        'image'
+        'image',
+        allowed()
       ),
       resolveWithFallback(
         mediaOptions?.imageEdit?.modelId,
         defaults.imageEditModelId,
         'image',
-        model => !!model.supportsImageEdit
+        allowed(model => !!model.supportsImageEdit)
       ),
       resolveWithFallback(
         mediaOptions?.video?.modelId,
         defaults.videoModelId,
-        'video'
+        'video',
+        allowed()
       ),
       resolveWithFallback(
         mediaOptions?.videoImage?.modelId,
         defaults.videoImageModelId,
         'video',
-        model => !!model.supportsImageToVideo
+        allowed(model => !!model.supportsImageToVideo)
       ),
       resolveWithFallback(
         mediaOptions?.videoEdit?.modelId,
         defaults.videoEditModelId,
         'video',
-        model => !!model.supportsVideoEdit
+        allowed(model => !!model.supportsVideoEdit)
       ),
       resolveWithFallback(
         mediaOptions?.audio?.modelId,
         defaults.ttsModelId,
         'audio',
-        isTtsModel
+        allowed(isTtsModel)
       ),
       resolveWithFallback(
         mediaOptions?.stt?.modelId,
         defaults.sttModelId,
         'audio',
-        isSttModel
+        allowed(isSttModel)
       )
     ]);
 

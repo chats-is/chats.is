@@ -7,6 +7,7 @@ import {
 } from '@/lib/provider';
 import { preflightCheck } from '@/server/services/preflight';
 import { getWebSearchSettings } from '@/server/services/settings';
+import { getUserTier } from '@/server/services/tier';
 import { recordChatUsage } from '@/server/services/usage';
 
 import { MAX_WEB_SEARCHES_PER_TURN, setupWebSearch } from './web-search';
@@ -38,6 +39,13 @@ vi.mock('@/server/services/settings', () => ({
 }));
 vi.mock('@/server/services/usage', () => ({
   recordChatUsage: vi.fn(async () => {})
+}));
+// On no tier, every model is allowed.
+vi.mock('@/server/services/tier', () => ({
+  getUserTier: vi.fn(async () => ({
+    modelRestrictionMode: 'allow',
+    modelIds: []
+  }))
 }));
 
 const provider = (type: Candidate['type'], id = type): Candidate =>
@@ -184,6 +192,19 @@ describe('who searches', () => {
       web_search: { own: 'openai' }
     });
     expect(search.systemPrompt).not.toBe('');
+  });
+
+  it('a search model the tier refuses is none: no tool, and no mention of one', async () => {
+    settings('auto');
+    vi.mocked(getUserTier).mockResolvedValueOnce({
+      modelRestrictionMode: 'deny',
+      modelIds: ['searcher']
+    } as Awaited<ReturnType<typeof getUserTier>>);
+    const chat = model('deepseek', {}, [provider('deepseek')]);
+    const search = await setup(chat);
+
+    expect(search.toolsFor(provider('deepseek'))).toEqual({});
+    expect(search.systemPrompt).toBe('');
   });
 });
 

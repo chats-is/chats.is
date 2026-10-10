@@ -21,6 +21,7 @@ import {
 import { formatPrice } from '@/lib/format-amount';
 import { cn } from '@/lib/utils';
 import { quotaQueries } from '@/server/functions/quota';
+import { settingsQueries } from '@/server/functions/settings';
 import {
   confirmCheckout,
   previewUpgrade,
@@ -145,9 +146,13 @@ function PlansDialog({
   const upgrade = useMutation({
     mutationFn: (planId: string) => upgradePlan({ data: { planId } }),
     onSuccess: async () => {
+      // A new plan may bring a new tier, and the models it allows.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: subscriptionQueries.all() }),
-        queryClient.invalidateQueries({ queryKey: quotaQueries.all() })
+        queryClient.invalidateQueries({ queryKey: quotaQueries.all() }),
+        queryClient.invalidateQueries({
+          queryKey: settingsQueries.key.system()
+        })
       ]);
       toast.success('Your plan has been upgraded.');
     },
@@ -506,6 +511,9 @@ export function PlansDialogProvider({
     setReturning(false);
     setOpen(false);
     void queryClient.invalidateQueries({ queryKey: quotaQueries.all() });
+    void queryClient.invalidateQueries({
+      queryKey: settingsQueries.key.system()
+    });
     toast.success(`You're subscribed to ${mine.planName ?? 'your plan'}.`);
   }, [returning, mine, queryClient]);
 
