@@ -225,6 +225,13 @@
       "when": 1791164375879,
       "tag": "0031_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791647103065,
+      "tag": "0032_chat_without_type",
+      "breakpoints": true
     }
   ]
 }
