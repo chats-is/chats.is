@@ -1488,7 +1488,12 @@ function refundLineOf(
     status: payment.status,
     paid: Number(payment.amount),
     paymentFee: payment.fee == null ? null : Number(payment.fee),
-    tax: payment.tax == null ? null : Number(payment.tax),
+    // All the tax in it, the processor's and the seller's own: a refund on
+    // auto is reckoned from both alike.
+    tax:
+      payment.tax == null && payment.sellerTax == null
+        ? null
+        : Number(payment.tax ?? 0) + Number(payment.sellerTax ?? 0),
     refunded: Number(payment.refundAmount),
     left: toAmount(left),
     // A duplicate's payment, which goes back whole whatever the refund fee.

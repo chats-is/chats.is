@@ -21,7 +21,8 @@ const stripe = {
     voidInvoice: vi.fn()
   },
   paymentIntents: { retrieve: vi.fn() },
-  refunds: { retrieve: vi.fn() }
+  refunds: { retrieve: vi.fn() },
+  tax: { settings: { retrieve: vi.fn() } }
 };
 
 vi.mock('stripe', () => ({
@@ -216,6 +217,62 @@ describe('a Stripe webhook', () => {
     expect(stripe.invoices.retrieve).toHaveBeenCalledWith('in_1', {
       expand: ['payments']
     });
+  });
+
+  it('reads the fee Stripe kept on a paid invoice, in the charge’s currency', async () => {
+    stripe.paymentIntents.retrieve.mockReset().mockResolvedValue({
+      latest_charge: {
+        balance_transaction: { fee: 698, exchange_rate: 7.84775 }
+      }
+    });
+    const lines = [
+      { amount: 1000, pricing: { price_details: { price: 'price_1' } } }
+    ];
+    expect(
+      await action('invoice.paid', invoice(lines, 'subscription_cycle'))
+    ).toEqual({
+      kind: 'payment',
+      payment: expect.objectContaining({ fee: 0.89, paid: true })
+    });
+    expect(stripe.paymentIntents.retrieve).toHaveBeenCalledWith('pi_1', {
+      expand: ['latest_charge.balance_transaction']
+    });
+
+    stripe.paymentIntents.retrieve.mockClear();
+    expect(
+      await action('invoice.payment_failed', {
+        ...invoice(lines, 'subscription_cycle'),
+        status: 'open'
+      })
+    ).toEqual({
+      kind: 'payment',
+      payment: expect.objectContaining({ fee: null, paid: false })
+    });
+    expect(stripe.paymentIntents.retrieve).not.toHaveBeenCalled();
+  });
+
+  it('keeps the tax on an invoice as the seller’s own, never as Stripe’s', async () => {
+    const taxed = {
+      ...invoice(
+        [{ amount: 1000, pricing: { price_details: { price: 'price_1' } } }],
+        'subscription_create'
+      ),
+      amount_paid: 1100,
+      total_taxes: [
+        { amount: 80, tax_behavior: 'exclusive' },
+        { amount: 20, tax_behavior: 'exclusive' }
+      ]
+    };
+    expect(await action('invoice.paid', taxed)).toEqual({
+      kind: 'payment',
+      payment: expect.objectContaining({ amount: 11, tax: null, sellerTax: 1 })
+    });
+    expect(await action('invoice.paid', { ...taxed, total_taxes: [] })).toEqual(
+      {
+        kind: 'payment',
+        payment: expect.objectContaining({ tax: null, sellerTax: null })
+      }
+    );
   });
 
   it("takes an upgrade's price from the line that charges, not the credit before it", async () => {
@@ -514,5 +571,53 @@ describe('the fee on a Stripe payment', () => {
         exchange_rate: 7.84776
       })
     ).toBe(0.89);
+  });
+});
+
+describe('a Stripe checkout', () => {
+  const input = {
+    userId: 'u1',
+    planId: 'pro',
+    priceId: 'price_1',
+    email: 'u1@test.com',
+    customerId: null as string | null,
+    origin: 'https://app',
+    successUrl: 'https://app/back?x=1',
+    cancelUrl: 'https://app/plans'
+  };
+
+  beforeEach(() => {
+    stripe.checkout.sessions.create
+      .mockReset()
+      .mockResolvedValue({ url: 'https://checkout.stripe/s_1' });
+  });
+
+  it('asks Stripe for no tax while Stripe Tax is not set up', async () => {
+    stripe.tax.settings.retrieve.mockResolvedValue({ status: 'pending' });
+    await createStripeProcessor().createCheckout(input);
+    const params = stripe.checkout.sessions.create.mock.calls[0][0];
+    expect(params).not.toHaveProperty('automatic_tax');
+    expect(params).not.toHaveProperty('customer_update');
+  });
+
+  it('has Stripe work out the tax once Stripe Tax is set up, from the address a kept customer gives', async () => {
+    stripe.tax.settings.retrieve.mockResolvedValue({ status: 'active' });
+    await createStripeProcessor().createCheckout(input);
+    expect(stripe.checkout.sessions.create.mock.calls[0][0]).toMatchObject({
+      automatic_tax: { enabled: true }
+    });
+    expect(stripe.checkout.sessions.create.mock.calls[0][0]).not.toHaveProperty(
+      'customer_update'
+    );
+
+    await createStripeProcessor().createCheckout({
+      ...input,
+      customerId: 'cus_1'
+    });
+    expect(stripe.checkout.sessions.create.mock.calls[1][0]).toMatchObject({
+      customer: 'cus_1',
+      automatic_tax: { enabled: true },
+      customer_update: { address: 'auto' }
+    });
   });
 });

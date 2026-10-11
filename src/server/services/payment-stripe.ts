@@ -122,6 +122,13 @@ function transactionIdOf(invoice: Stripe.Invoice): string | null {
   return idOf(payment?.payment_intent) ?? idOf(payment?.charge) ?? null;
 }
 
+/** The tax on an invoice, inclusive of its price or added to it — Stripe
+ *  Tax's, or a tax rate set on the subscription. Null with none. */
+function sellerTaxOf(invoice: Stripe.Invoice): number | null {
+  const tax = (invoice.total_taxes ?? []).reduce((sum, t) => sum + t.amount, 0);
+  return tax > 0 ? toAmount(tax) : null;
+}
+
 /** An invoice as a payment, as it comes in a webhook or is read. The fee
  *  is read apart, when a refund needs it. */
 function toPayment(invoice: Stripe.Invoice): ProcessorPayment | null {
@@ -147,8 +154,10 @@ function toPayment(invoice: Stripe.Invoice): ProcessorPayment | null {
     amount: toAmount(amount),
     kind: kindOf(invoice.billing_reason),
     fee: null,
-    // Tax on a Stripe invoice is the seller's to hand back, not Stripe's.
+    // Stripe is not the merchant: tax on its invoice is not its to hand back
+    // with a refund, but the seller's own to pay.
     tax: null,
+    sellerTax: sellerTaxOf(invoice),
     paid,
     invoiceUrl: invoice.hosted_invoice_url ?? null,
     billedAt:
@@ -160,7 +169,8 @@ function toPayment(invoice: Stripe.Invoice): ProcessorPayment | null {
 
 /**
  * The fee Stripe kept on a charge, from its balance transaction. Null when
- * it cannot be read; a refund then gives back all that was paid.
+ * it cannot be read; a refund asks again, and gives back all that was paid
+ * if it still cannot.
  */
 async function feeOf(stripe: Stripe, ref: string | null) {
   if (!ref) return null;
@@ -297,11 +307,27 @@ export function createStripeProcessor(): PaymentProcessor {
     async createCheckout(input) {
       const stripe = await client();
       const metadata = { userId: input.userId, planId: input.planId };
+      // Stripe Tax set up in the account taxes what is sold through it, but a
+      // checkout made through the API only when it asks to be. Taxed by where
+      // the buyer is, which the checkout asks for. A buyer who subscribed
+      // before brings their Stripe customer back, and the address given here
+      // is saved to it: Stripe refuses the checkout for a customer with no
+      // address. The subscription is taxed the same way at renewal.
+      const taxed = (await stripe.tax.settings.retrieve()).status === 'active';
+      const tax = taxed
+        ? {
+            automatic_tax: { enabled: true },
+            ...(input.customerId
+              ? { customer_update: { address: 'auto' as const } }
+              : {})
+          }
+        : {};
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         customer: input.customerId ?? undefined,
         customer_email: input.customerId ? undefined : input.email,
         line_items: [{ price: input.priceId, quantity: 1 }],
+        ...tax,
         client_reference_id: input.userId,
         metadata,
         subscription_data: { metadata },
@@ -501,13 +527,23 @@ export function createStripeProcessor(): PaymentProcessor {
       const action = actionOf(event);
       // An invoice in a webhook does not carry its payments, so not the
       // transaction that paid it, which refunds and disputes name: it is
-      // read, as `getPayment` reads it.
-      if (action.kind === 'payment' && !action.payment.transactionId) {
-        const invoice = await stripe.invoices.retrieve(
-          action.payment.externalId,
-          { expand: ['payments'] }
-        );
-        action.payment.transactionId = transactionIdOf(invoice);
+      // read, as `getPayment` reads it. Nor the fee Stripe kept on it, which
+      // the transaction's balance says: read too once it is paid, so what a
+      // payment brought in is known before anyone refunds it.
+      if (action.kind === 'payment') {
+        if (!action.payment.transactionId) {
+          const invoice = await stripe.invoices.retrieve(
+            action.payment.externalId,
+            { expand: ['payments'] }
+          );
+          action.payment.transactionId = transactionIdOf(invoice);
+        }
+        if (action.payment.paid) {
+          action.payment.fee = await feeOf(
+            stripe,
+            action.payment.transactionId
+          );
+        }
       }
       return { id: event.id, type: event.type, action };
     }

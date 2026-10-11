@@ -290,6 +290,7 @@ function invoice(overrides: Partial<ProcessorPayment> = {}) {
     kind: 'initial',
     fee: 1,
     tax: null,
+    sellerTax: null,
     paid: true,
     invoiceUrl: 'https://pay.example/in_1',
     billedAt: daysAgo(1),
@@ -1349,6 +1350,28 @@ describe('a payment', () => {
       invoiceUrl: 'https://pay.example/in_1',
       refundBy: null,
       refundRequestId: null
+    });
+  });
+
+  it('keeps a fee once known, though a later report of the payment cannot say it', async () => {
+    await subscribe();
+    expect(await paymentOf()).toMatchObject({ fee: '1.00' });
+    await pay({ fee: null });
+    expect(await paymentOf()).toMatchObject({ fee: '1.00', status: 'paid' });
+  });
+
+  it('keeps the tax that is the seller’s own apart from a merchant’s', async () => {
+    await subscribe();
+    await pay({
+      externalId: 'in_2',
+      kind: 'renewal',
+      amount: 12,
+      sellerTax: 2
+    });
+    expect(await paymentOf('in_2')).toMatchObject({
+      amount: '12.00',
+      tax: null,
+      sellerTax: '2.00'
     });
   });
 

@@ -1,0 +1,1 @@
+ALTER TABLE "payment" ADD COLUMN "seller_tax" numeric(12, 2);

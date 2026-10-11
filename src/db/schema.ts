@@ -842,10 +842,15 @@ export const payments = createTable(
     // confirms the money went back: to end it (true), or to cancel it
     // (false). Null with nothing owed — none sent, or done.
     refundEndSubscription: boolean('refund_end_subscription'),
-    // What the processor kept as its fee, and the tax in the amount. Null
-    // where it does not say.
+    // What the processor kept as its fee, and the tax in the amount that it
+    // collected as the merchant and hands back with a refund. Null where it
+    // does not say.
     fee: numeric('fee', { precision: 12, scale: 2 }),
     tax: numeric('tax', { precision: 12, scale: 2 }),
+    // The tax in the amount that is the seller's own to pay: charged through
+    // a processor that is not the merchant, such as Stripe, it reaches the
+    // seller with the rest. Null where there is none.
+    sellerTax: numeric('seller_tax', { precision: 12, scale: 2 }),
     status: varchar('status', { length: 32 }).$type<PaymentStatus>().notNull(),
     invoiceUrl: text('invoice_url'),
     // When the processor charged it.

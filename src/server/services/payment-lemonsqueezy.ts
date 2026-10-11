@@ -260,6 +260,8 @@ function toPayment(
     // Lemon Squeezy does not say its fee on an invoice.
     fee: null,
     tax: toAmount(a.tax ?? 0),
+    // It sells as the merchant: no tax is left to the seller.
+    sellerTax: null,
     paid: ['paid', 'refunded', 'partial_refund'].includes(a.status),
     invoiceUrl: a.urls.invoice_url,
     billedAt: dateOf(a.created_at) ?? new Date()

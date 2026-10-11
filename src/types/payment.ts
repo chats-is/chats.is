@@ -284,20 +284,25 @@ export function refundFeeOf(value: string | null): number | null {
  * and returns that much of the tax itself. So of `paid`, with `tax` in it,
  * the seller received `paid - tax - fee` and gives back `refund × (paid -
  * tax) / paid`; the two are equal at `paid × (paid - tax - fee) / (paid -
- * tax)`. With no tax in the processor's hands, that is `paid - fee`.
+ * tax)`. Tax that reached the seller with the rest — `sellerTax`, through
+ * Stripe — comes to the same: Stripe Tax takes back the tax on a refund in
+ * proportion to it, so the seller still owes the tax on what they keep. With
+ * no tax in the payment, that is `paid - fee`.
  */
 export function refundShareMinor(
   payment: {
     amount: number | string;
     fee: number | string | null;
     tax: number | string | null;
+    sellerTax?: number | string | null;
   },
   refundFee: number | null
 ): number {
   const paid = toMinor(payment.amount);
   if (refundFee != null) return Math.floor((paid * (100 - refundFee)) / 100);
   if (payment.fee == null) return paid;
-  const beforeTax = paid - toMinor(payment.tax ?? 0);
+  const beforeTax =
+    paid - toMinor(payment.tax ?? 0) - toMinor(payment.sellerTax ?? 0);
   if (beforeTax <= 0) return paid;
   const kept = beforeTax - toMinor(payment.fee);
   return Math.max(0, Math.floor((paid * kept) / beforeTax));
@@ -311,6 +316,7 @@ export function refundLeftMinor(
     refundAmount: number | string;
     fee: number | string | null;
     tax: number | string | null;
+    sellerTax?: number | string | null;
   },
   refundFee: number | null
 ): number {

@@ -59,7 +59,8 @@ const REQUIREMENTS: Record<PaymentProcessorId, Requirements> = {
       'Customers: Read',
       'Payment Methods: Read',
       'Customer Portal: Write',
-      'Balance Transaction Sources: Read'
+      'Balance Transaction Sources: Read',
+      'Tax Settings, Registrations: Read'
     ]
   },
   paddle: {

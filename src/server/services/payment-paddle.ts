@@ -367,6 +367,7 @@ function toPayment(txn: PaddleTransaction): ProcessorPayment | null {
     // Paddle sells as the merchant: it collects the tax and returns it with
     // a refund.
     tax: toAmount(Number(txn.details?.totals.tax ?? 0)),
+    sellerTax: null,
     paid: txn.status === 'completed' || txn.status === 'paid',
     invoiceUrl: null,
     billedAt: dateOf(txn.billed_at) ?? dateOf(txn.created_at) ?? new Date()

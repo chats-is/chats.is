@@ -172,7 +172,13 @@ whatever the webhooks did not say: subscriptions past their period end, renewals
 days, and refunds sent from here still waiting after a day. Paddle's checkout opens on `/pay/paddle`. A payment keeps the
 facts its status is reckoned from — paid, `refund_amount`, `refund_pending` while a refund waits,
 `disputed`, and the refund's id — and is kept when its user is deleted; a user's refund request is
-a `refund_request` row an admin approves or rejects. Work on one user's subscriptions, or one
+a `refund_request` row an admin approves or rejects. Tax is kept two ways: `tax` is what a
+processor that sells as the merchant (Paddle, Lemon Squeezy) collected and hands back with a
+refund; `seller_tax` is tax that reached the seller with the rest (Stripe, which is not the
+merchant), theirs to pay. A refund on auto is reckoned from both alike, since Stripe Tax takes
+back the tax on a refund in proportion to it. A Stripe
+checkout asks Stripe Tax to work it out whenever Stripe Tax is set up in the account.
+Work on one user's subscriptions, or one
 payment, runs under `withLock` (`services/db-lock.ts`), since processors send several webhooks
 about one thing at once.
 

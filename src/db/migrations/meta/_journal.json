@@ -232,6 +232,13 @@
       "when": 1791647103065,
       "tag": "0032_chat_without_type",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791677288789,
+      "tag": "0033_payment_seller_tax",
+      "breakpoints": true
     }
   ]
 }

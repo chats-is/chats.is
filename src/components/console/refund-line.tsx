@@ -16,8 +16,8 @@ export type RefundLine = Awaited<
  * How the refund of a payment is reckoned, spelled out with its numbers,
  * as `refundShareMinor` reckons it: with a refund fee, that share of what
  * was paid; on auto, what was paid less the processor's fee — and where
- * the processor holds the tax too, in proportion to what was paid before
- * tax.
+ * there is tax in it — held by the processor, or the seller's own — in
+ * proportion to what was paid before tax.
  */
 function formulaOf(line: RefundLine, refundFee: number | null): string {
   const paid = formatPrice(line.paid);

@@ -70,7 +70,7 @@ const lockKey = (processor: PaymentProcessorId, externalId: string) =>
 export function leftToRefundMinor(
   payment: Pick<
     PaymentRow,
-    'amount' | 'refundAmount' | 'fee' | 'tax' | 'status'
+    'amount' | 'refundAmount' | 'fee' | 'tax' | 'sellerTax' | 'status'
   >,
   refundFee: number | null
 ): number {
@@ -111,6 +111,7 @@ export async function recordPayment(
       kind: payment.kind,
       fee: payment.fee?.toFixed(2) ?? null,
       tax: payment.tax?.toFixed(2) ?? null,
+      sellerTax: payment.sellerTax?.toFixed(2) ?? null,
       status,
       invoiceUrl: payment.invoiceUrl,
       billedAt: payment.billedAt,
@@ -125,6 +126,8 @@ export async function recordPayment(
         .update(payments)
         .set({
           ...values,
+          // A fee once known stays, though this report of it could not say.
+          fee: values.fee ?? existing.fee,
           status: settled ? existing.status : status,
           subscriptionId: existing.subscriptionId ?? owner.subscriptionId
         })
@@ -502,11 +505,12 @@ export async function withFee(
   if (reported?.fee == null) return payment;
   const fee = reported.fee.toFixed(2);
   const tax = reported.tax?.toFixed(2) ?? payment.tax;
+  const sellerTax = reported.sellerTax?.toFixed(2) ?? payment.sellerTax;
   await db
     .update(payments)
-    .set({ fee, tax, updatedAt: new Date() })
+    .set({ fee, tax, sellerTax, updatedAt: new Date() })
     .where(eq(payments.id, payment.id));
-  return { ...payment, fee, tax };
+  return { ...payment, fee, tax, sellerTax };
 }
 
 // ============================================================================

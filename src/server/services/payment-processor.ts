@@ -65,6 +65,10 @@ export type ProcessorPayment = {
   /** The tax in `amount` that the processor collected and hands back with a
    *  refund — a processor that sells as the merchant. Null otherwise. */
   tax: number | null;
+  /** The tax in `amount` that is the seller's own to pay — charged by a
+   *  processor that is not the merchant, and paid out with the rest. Null
+   *  where there is none. */
+  sellerTax: number | null;
   paid: boolean;
   invoiceUrl: string | null;
   billedAt: Date;
