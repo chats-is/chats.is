@@ -23,6 +23,11 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
+import {
   paymentKindLabelOf,
   processorLabelOf
 } from '@/components/billing-labels';
@@ -62,6 +67,28 @@ const moneyOrDash = (value: string | null) =>
   ) : (
     formatPrice(value)
   );
+
+/**
+ * The tax in a payment, and who pays it: a processor that sells as the
+ * merchant collects it and pays it; through Stripe it reaches the seller
+ * with the rest, and is theirs to pay. A payment has one or the other.
+ */
+function TaxCell({ payment }: { payment: Row }) {
+  const value = payment.tax ?? payment.sellerTax;
+  if (value == null) return moneyOrDash(null);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>{formatPrice(value)}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {payment.tax != null
+          ? `Collected and paid by ${processorLabelOf(payment.processor)}`
+          : `Collected by ${processorLabelOf(payment.processor)}, yours to declare and pay`}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 const paymentColumns = (act: (payment: Row) => void) =>
   helper.columns([
@@ -115,7 +142,7 @@ const paymentColumns = (act: (payment: Row) => void) =>
       id: 'tax',
       header: 'Tax',
       meta: { cellClassName: 'text-sm text-muted-foreground tabular-nums' },
-      cell: ({ row }) => moneyOrDash(row.original.tax)
+      cell: ({ row }) => <TaxCell payment={row.original} />
     }),
     helper.display({
       id: 'refunded',
