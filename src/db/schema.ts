@@ -1111,6 +1111,12 @@ export const usage = createTable(
     priceMultiplier: numeric('price_multiplier', { precision: 10, scale: 4 })
       .notNull()
       .default('1'),
+    // The plan the user was on at the time, so what a plan's subscribers
+    // cost is counted against the plan they were on then, not the one they
+    // are on now. Null when they were on none.
+    planId: varchar('plan_id', { length: 255 }).references(() => plans.id, {
+      onDelete: 'set null'
+    }),
     spend: numeric('spend', { precision: 20, scale: 10 })
       .notNull()
       .default('0'),

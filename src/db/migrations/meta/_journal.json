@@ -239,6 +239,13 @@
       "when": 1791677288789,
       "tag": "0033_payment_seller_tax",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791727576348,
+      "tag": "0034_usage_plan",
+      "breakpoints": true
     }
   ]
 }

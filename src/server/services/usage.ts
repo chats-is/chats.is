@@ -41,6 +41,15 @@ function spent(cost: number, tier: UserTier) {
   };
 }
 
+/** The plan a user is on as the call is recorded; null when on none. */
+async function planOf(userId: string) {
+  const [row] = await db
+    .select({ planId: users.planId })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row?.planId ?? null;
+}
+
 /**
  * Compute cost and insert a usage row for a chat completion.
  * Safe to call inside onFinish callbacks; failures are logged but never thrown.
@@ -89,6 +98,7 @@ export async function recordChatUsage(
       reasoningTokens: input.usage.reasoningTokens ?? 0,
       webSearches: input.usage.webSearches ?? 0,
       ...spent(cost, tier),
+      planId: await planOf(input.userId),
       ...snapshot
     });
   } catch (err) {
@@ -145,6 +155,7 @@ export async function recordImageUsage(
       inputTokens: input.inputTokens ?? 0,
       outputTokens: input.outputTokens ?? 0,
       ...spent(cost, tier),
+      planId: await planOf(input.userId),
       ...snapshot
     });
   } catch (err) {
@@ -193,6 +204,7 @@ export async function recordVideoUsage(
       videoCount: input.videoCount,
       videoSeconds: (input.videoSeconds ?? 0).toString(),
       ...spent(cost, tier),
+      planId: await planOf(input.userId),
       ...snapshot
     });
   } catch (err) {
@@ -240,6 +252,7 @@ export async function recordAudioUsage(
       audioInputTokens: input.audioInputTokens ?? 0,
       audioOutputTokens: input.audioOutputTokens ?? 0,
       ...spent(cost, tier),
+      planId: await planOf(input.userId),
       ...snapshot
     });
   } catch (err) {
@@ -284,6 +297,7 @@ export async function recordTranscriptionUsage(
       capability: 'audio',
       audioSeconds: (input.audioSeconds ?? 0).toString(),
       ...spent(cost, tier),
+      planId: await planOf(input.userId),
       ...snapshot
     });
   } catch (err) {

@@ -56,6 +56,7 @@ beforeEach(async () => {
   await h.db.delete(schema.models);
   await h.db.delete(schema.providers);
   await h.db.delete(schema.users);
+  await h.db.delete(schema.plans);
   await h.db.delete(schema.quotas);
   await h.db
     .insert(schema.users)
@@ -210,6 +211,31 @@ describe('usage recording write round-trip (real Postgres)', () => {
     messageId: randomUUID(),
     providerId: 'prov1'
   };
+
+  it('records the plan the user is on, and none when on no plan', async () => {
+    await seedModel('chat', 'gpt-test', { input: '3', output: '15' });
+    const usage = { inputTokens: 1, outputTokens: 1 };
+    await recordChatUsage({ ...base, modelId: 'gpt-test', usage });
+    expect((await readUsageRow()).planId).toBeNull();
+
+    await h.db.delete(schema.usage);
+    await h.db.insert(schema.quotas).values({ id: 'q1', name: 'Q1' });
+    await h.db.insert(schema.plans).values({
+      id: 'pro',
+      name: 'Pro',
+      quotaId: 'q1',
+      processor: 'stripe',
+      interval: 'month',
+      price: '20',
+      priceId: 'price_pro'
+    });
+    await h.db
+      .update(schema.users)
+      .set({ planId: 'pro' })
+      .where(eq(schema.users.id, 'u1'));
+    await recordChatUsage({ ...base, modelId: 'gpt-test', usage });
+    expect((await readUsageRow()).planId).toBe('pro');
+  });
 
   it('chat: writes computed cost + token snapshot', async () => {
     await seedModel('chat', 'gpt-test', { input: '3', output: '15' });
