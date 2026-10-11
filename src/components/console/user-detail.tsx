@@ -130,145 +130,150 @@ export default function UserDetail({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        {back}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          aria-label="Refresh"
-        >
-          <RefreshCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
+      <section className="space-y-3">
+        <div>{back}</div>
 
-      <Card className="py-0">
-        <CardContent className="grid gap-6 p-5 md:grid-cols-2">
-          <div className="flex min-w-0 items-start gap-4">
-            <div className="size-14 shrink-0 overflow-hidden rounded-full border bg-muted">
-              {user.image ? (
-                <img
-                  src={user.image}
-                  alt={user.name || ''}
-                  width={56}
-                  height={56}
-                  className="size-full object-cover"
-                />
-              ) : (
-                <div className="flex size-full items-center justify-center text-lg font-medium text-muted-foreground">
-                  {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+        <Card className="py-0">
+          <CardContent className="grid gap-6 p-5 md:grid-cols-2">
+            <div className="flex min-w-0 items-start gap-4">
+              <div className="size-14 shrink-0 overflow-hidden rounded-full border bg-muted">
+                {user.image ? (
+                  <img
+                    src={user.image}
+                    alt={user.name || ''}
+                    width={56}
+                    height={56}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center text-lg font-medium text-muted-foreground">
+                    {user.name?.[0]?.toUpperCase() ||
+                      user.email[0].toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 space-y-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="truncate text-xl font-semibold">
+                    {user.name || 'No name'}
+                  </h1>
+                  {/* The role as the users table shows it: its icon, in its
+                      colour, named on hover. */}
+                  <Hint label={user.role === 'admin' ? 'Admin' : 'User'}>
+                    {user.role === 'admin' ? (
+                      <UserShield
+                        className="size-4 shrink-0 text-primary"
+                        aria-label="Admin"
+                      />
+                    ) : (
+                      <UserIcon
+                        className="size-4 shrink-0 text-muted-foreground"
+                        aria-label="User"
+                      />
+                    )}
+                  </Hint>
                 </div>
+                <div className="truncate text-sm text-muted-foreground">
+                  {user.email} · Joined <LocalTime value={user.createdAt} />
+                </div>
+                {/* What the user is on — plan, quota, tier — then what they
+                    have done. */}
+                <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                  {status && (
+                    <>
+                      <Hint label="Plan — from their subscription">
+                        {describeSubscription(subscription) ??
+                          status.plan?.name ??
+                          'No plan'}
+                      </Hint>
+                      <span>·</span>
+                      <Hint label="Quota — the spending limits">
+                        {status.source === 'none'
+                          ? 'No quota'
+                          : `${status.name ?? '—'}, ${sourceLabel[status.source] ?? status.source}`}
+                      </Hint>
+                      <span>·</span>
+                    </>
+                  )}
+                  <Hint label="Tier — the price multiplier and the models allowed">
+                    {user.effectiveTier.tier
+                      ? `${user.effectiveTier.tier.name} ${describeMultiplier(user.effectiveTier.priceMultiplier)}, ${sourceLabel[user.effectiveTier.source] ?? user.effectiveTier.source}`
+                      : 'No tier'}
+                  </Hint>
+                </div>
+                <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                  <span>{user.chatCount} chats</span>
+                  <span>·</span>
+                  <span>{user.messageCount} messages</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
+              {statusLoading || !status ? (
+                <>
+                  <LimitRowSkeleton />
+                  <LimitRowSkeleton />
+                </>
+              ) : status.source === 'none' ? (
+                <p className="text-sm text-muted-foreground">
+                  No quota applies to this user, so their requests are refused.
+                </p>
+              ) : status.isUnlimited ? (
+                <p className="text-sm text-muted-foreground">
+                  Unlimited — no spending limits apply.
+                </p>
+              ) : status.fiveHour || status.sevenDay ? (
+                <>
+                  {status.fiveHour && (
+                    <LimitRow label="5-hour" window={status.fiveHour} />
+                  )}
+                  {status.sevenDay && (
+                    <LimitRow label="Weekly" window={status.sevenDay} />
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Their quota sets no limits.
+                </p>
               )}
             </div>
-            <div className="min-w-0 space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="truncate text-xl font-semibold">
-                  {user.name || 'No name'}
-                </h1>
-                {/* The role as the users table shows it: its icon, in its
-                    colour, named on hover. */}
-                <Hint label={user.role === 'admin' ? 'Admin' : 'User'}>
-                  {user.role === 'admin' ? (
-                    <UserShield
-                      className="size-4 shrink-0 text-primary"
-                      aria-label="Admin"
-                    />
-                  ) : (
-                    <UserIcon
-                      className="size-4 shrink-0 text-muted-foreground"
-                      aria-label="User"
-                    />
-                  )}
-                </Hint>
-              </div>
-              <div className="truncate text-sm text-muted-foreground">
-                {user.email} · Joined <LocalTime value={user.createdAt} />
-              </div>
-              {/* What the user is on — plan, quota, tier — then what they
-                  have done. */}
-              <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-                {status && (
-                  <>
-                    <Hint label="Plan — from their subscription">
-                      {describeSubscription(subscription) ??
-                        status.plan?.name ??
-                        'No plan'}
-                    </Hint>
-                    <span>·</span>
-                    <Hint label="Quota — the spending limits">
-                      {status.source === 'none'
-                        ? 'No quota'
-                        : `${status.name ?? '—'}, ${sourceLabel[status.source] ?? status.source}`}
-                    </Hint>
-                    <span>·</span>
-                  </>
-                )}
-                <Hint label="Tier — the price multiplier and the models allowed">
-                  {user.effectiveTier.tier
-                    ? `${user.effectiveTier.tier.name} ${describeMultiplier(user.effectiveTier.priceMultiplier)}, ${sourceLabel[user.effectiveTier.source] ?? user.effectiveTier.source}`
-                    : 'No tier'}
-                </Hint>
-              </div>
-              <div className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-                <span>{user.chatCount} chats</span>
-                <span>·</span>
-                <span>{user.messageCount} messages</span>
-              </div>
-            </div>
-          </div>
+          </CardContent>
+        </Card>
+      </section>
 
-          <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
-            {statusLoading || !status ? (
-              <>
-                <LimitRowSkeleton />
-                <LimitRowSkeleton />
-              </>
-            ) : status.source === 'none' ? (
-              <p className="text-sm text-muted-foreground">
-                No quota applies to this user, so their requests are refused.
-              </p>
-            ) : status.isUnlimited ? (
-              <p className="text-sm text-muted-foreground">
-                Unlimited — no spending limits apply.
-              </p>
-            ) : status.fiveHour || status.sevenDay ? (
-              <>
-                {status.fiveHour && (
-                  <LimitRow label="5-hour" window={status.fiveHour} />
-                )}
-                {status.sevenDay && (
-                  <LimitRow label="Weekly" window={status.sevenDay} />
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Their quota sets no limits.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <DateRangeFilter
+            value={value}
+            start={window.start}
+            last={window.last}
+            onChange={setWindow}
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            aria-label="Refresh"
+          >
+            <RefreshCw
+              className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+            />
+          </Button>
+        </div>
 
-      <div>
-        <DateRangeFilter
-          value={value}
-          start={window.start}
-          last={window.last}
-          onChange={setWindow}
-        />
-      </div>
-
-      {usage ? (
-        <UsageModule
-          kpi={usage.kpi}
-          rows={usage.rows}
-          days={window.days}
-          endDay={window.last}
-        />
-      ) : (
-        <UsageModuleSkeleton />
-      )}
+        {usage ? (
+          <UsageModule
+            kpi={usage.kpi}
+            rows={usage.rows}
+            days={window.days}
+            endDay={window.last}
+          />
+        ) : (
+          <UsageModuleSkeleton />
+        )}
+      </section>
 
       <UserLogs userId={userId} from={window.start} to={until} />
     </div>
@@ -471,28 +476,32 @@ function UserLogs({
 export function UserDetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="space-y-3">
         <Skeleton className="h-5 w-28" />
-        <Skeleton className="size-9" />
-      </div>
-      <Card className="py-0">
-        <CardContent className="grid gap-6 p-5 md:grid-cols-2">
-          <div className="flex items-start gap-4">
-            <Skeleton className="size-14 rounded-full" />
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-40" />
-              <Skeleton className="h-4 w-56" />
-              <Skeleton className="h-3 w-72" />
+        <Card className="py-0">
+          <CardContent className="grid gap-6 p-5 md:grid-cols-2">
+            <div className="flex items-start gap-4">
+              <Skeleton className="size-14 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-56" />
+                <Skeleton className="h-3 w-72" />
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
-            <LimitRowSkeleton />
-            <LimitRowSkeleton />
-          </div>
-        </CardContent>
-      </Card>
-      <Skeleton className="h-9 w-36" />
-      <UsageModuleSkeleton />
+            <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
+              <LimitRowSkeleton />
+              <LimitRowSkeleton />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-9 w-36" />
+          <Skeleton className="size-9" />
+        </div>
+        <UsageModuleSkeleton />
+      </div>
       <ConsoleTableSkeleton columns={4} search={false} filters={2} />
     </div>
   );
