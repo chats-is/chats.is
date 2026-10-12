@@ -3,14 +3,7 @@ import {
   type ReasoningEffort,
   type SentEffort
 } from '@/types/model';
-
-/**
- * 'auto' is a regular option value that admins put in a model's `uiOptions`
- * (e.g. `"aspectRatios": ["auto", "16:9"]`, default `"aspectRatio": "auto"`).
- * It flows through selection like any other value; only at the provider call
- * boundary does it resolve to "omit the parameter" via `resolveAutoOption`.
- */
-export const AUTO_OPTION = 'auto';
+import { AUTO_OPTION } from '@/lib/constant';
 
 /**
  * Map the 'auto' option to undefined so the provider applies its own default.

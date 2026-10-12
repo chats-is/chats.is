@@ -1,10 +1,10 @@
 import { type ModelUIOptions } from '@/types/model';
 import {
-  AspectRatioLabels,
-  ImageSizeLabels,
-  VideoResolutionLabels
+  ASPECT_RATIO_LABELS,
+  AUTO_OPTION,
+  IMAGE_SIZE_LABELS,
+  VIDEO_RESOLUTION_LABELS
 } from '@/lib/constant';
-import { AUTO_OPTION } from '@/lib/media-options';
 import { type Vocabulary } from '@/lib/provider-vocab';
 
 /**
@@ -29,14 +29,6 @@ const LIST_KEY = {
   duration: 'durations',
   voice: 'voices'
 } as const satisfies Record<MediaOptionKey, keyof ModelUIOptions>;
-
-export const MediaOptionLabels: Record<MediaOptionKey, string> = {
-  size: 'Size',
-  aspectRatio: 'Aspect ratio',
-  resolution: 'Resolution',
-  duration: 'Duration',
-  voice: 'Voice'
-};
 
 /**
  * The values this model allows for an option, in the order the admin listed,
@@ -106,11 +98,11 @@ export function optionLabel(key: MediaOptionKey, value: string): string {
 
   switch (key) {
     case 'size':
-      return ImageSizeLabels[value] ?? value;
+      return IMAGE_SIZE_LABELS[value] ?? value;
     case 'aspectRatio':
-      return AspectRatioLabels[value] ?? value;
+      return ASPECT_RATIO_LABELS[value] ?? value;
     case 'resolution':
-      return VideoResolutionLabels[value] ?? value;
+      return VIDEO_RESOLUTION_LABELS[value] ?? value;
     case 'duration':
       return `${value}s`;
     case 'voice':

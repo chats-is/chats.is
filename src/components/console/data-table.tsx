@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-table';
 import { ChevronRight } from 'lucide-react';
 
+import { CELL_WIDTHS } from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -27,25 +28,6 @@ import { TablePagination } from '@/components/table-pagination';
  * message when there are none, and a pager under it — so the markup lives here
  * once and each page contributes only its column definitions.
  */
-
-/**
- * A run of cells of slightly varied width, so a row does not read as a grid.
- * Shared with `ConsoleTableSkeleton`, which stands in the same way before the
- * table is mounted at all.
- *
- * Ceilings rather than widths, and paired with `w-full`. A bar of a fixed width
- * cannot shrink or wrap the way the text it stands in for does, so a wide table
- * of them sets a minimum width the real rows never ask for — and the page
- * scrolls sideways until the data lands and the cells start wrapping.
- */
-export const CELL_WIDTHS = [
-  'max-w-32',
-  'max-w-24',
-  'max-w-40',
-  'max-w-20',
-  'max-w-28',
-  'max-w-16'
-];
 
 /** A pinned column is opaque, in the shade its row would have, so what
  *  scrolls under it does not show through. */

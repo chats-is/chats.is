@@ -2,16 +2,16 @@ import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 
 import { env } from '@/lib/env';
-import { getUser } from '@/server/session';
+import { optionalAuthMiddleware } from '@/server/middleware';
 
 /**
  * The signed-in user, or null. Used by the route guards, which is why it
  * answers rather than throwing: a guard decides where to send someone, and
  * that decision belongs in the route.
  */
-export const requireUser = createServerFn({ method: 'GET' }).handler(async () =>
-  getUser()
-);
+export const getSignedInUser = createServerFn({ method: 'GET' })
+  .middleware([optionalAuthMiddleware])
+  .handler(({ context }) => context.user);
 
 /** Which ways in are configured; the sign-in form shows only those. */
 export const getSignInMethods = createServerFn({ method: 'GET' }).handler(
@@ -40,6 +40,6 @@ export const sessionQueries = {
   me: () =>
     queryOptions({
       queryKey: sessionQueries.key.me(),
-      queryFn: () => requireUser()
+      queryFn: () => getSignedInUser()
     })
 };

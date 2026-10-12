@@ -3,10 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarX, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
-import {
-  PAYMENT_PROCESSORS,
-  SUBSCRIPTION_STATUS_LABELS
-} from '@/types/payment';
+import { PAYMENT_PROCESSORS, SUBSCRIPTION_STATUS_LABELS } from '@/lib/constant';
 import { formatPrice } from '@/lib/format-amount';
 import { mutating } from '@/lib/mutation';
 import { useSearchFilter } from '@/hooks/use-search-filter';

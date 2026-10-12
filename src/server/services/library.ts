@@ -3,8 +3,8 @@ import '@tanstack/react-start/server-only';
 import { and, desc, eq, ilike, isNotNull, lt, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
-import { mediaToolNames } from '@/types';
 import { type libraryPageSchema } from '@/types/library';
+import { MEDIA_PARTS_JSONPATH } from '@/lib/constant';
 import { extractLibraryMedia, type LibraryMediaItem } from '@/lib/library';
 import { db } from '@/db';
 import { artifacts, messages } from '@/db/schema';
@@ -24,11 +24,6 @@ export type LibraryItem =
       chatId: string | null;
       createdAt: Date;
     };
-
-// Single source: the media tool list lives in types/chat-tools.ts. NOTE: this
-// jsonpath also appears in the partial index that accelerates the query
-// (db/migrations) — keep them in sync when tools are added.
-const MEDIA_PARTS_JSONPATH = `$[*] ? (@.type == "file" || @.type like_regex "^tool-(${mediaToolNames.join('|')})$")`;
 
 /**
  * Where a media card's title comes from: what the message said, and failing

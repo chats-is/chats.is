@@ -11,13 +11,13 @@ import { Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
-  BILLING_INTERVALS,
   billingIntervalOf,
   canUpgrade,
   paymentProcessorSchema,
   type BillingInterval,
   type PaymentProcessorId
 } from '@/types/payment';
+import { BILLING_INTERVALS } from '@/lib/constant';
 import { formatPrice } from '@/lib/format-amount';
 import { cn } from '@/lib/utils';
 import { quotaQueries } from '@/server/functions/quota';

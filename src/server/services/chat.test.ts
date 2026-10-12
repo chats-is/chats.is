@@ -18,6 +18,7 @@ vi.mock('@/db', () => ({
     return h.db;
   }
 }));
+vi.mock('@/lib/env', () => ({ env: {} }));
 
 const {
   beginGeneration,

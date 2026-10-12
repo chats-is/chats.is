@@ -1,6 +1,6 @@
 import { Link, useLocation } from '@tanstack/react-router';
 
-import { contentTypes } from '@/lib/content-types';
+import { CONTENT_TYPES } from '@/lib/constant';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -21,7 +21,7 @@ export function NewContent() {
     <SidebarGroup className="mt-2">
       <SidebarGroupContent>
         <SidebarMenu>
-          {contentTypes.map(({ type, label, icon: Icon, path }) => {
+          {CONTENT_TYPES.map(({ type, label, icon: Icon, path }) => {
             const active = isActive(path);
             return (
               <SidebarMenuItem key={type}>

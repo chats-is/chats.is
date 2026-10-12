@@ -4,7 +4,7 @@ import { type UseChatHelpers } from '@ai-sdk/react';
 import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react';
 
 import { type ChatMessage, type Model } from '@/types';
-import { ReasoningEffortLabels } from '@/lib/constant';
+import { REASONING_EFFORT_LABELS } from '@/lib/constant';
 import { chooseValue } from '@/lib/media-settings';
 import { cn, modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -301,7 +301,7 @@ export function ModelMenu({
               <SelectTrigger className="h-9 rounded-full shadow-none">
                 <span className="text-sm">
                   {effort
-                    ? (ReasoningEffortLabels[effort] ?? effort)
+                    ? (REASONING_EFFORT_LABELS[effort] ?? effort)
                     : 'Effort'}
                 </span>
               </SelectTrigger>
@@ -311,7 +311,7 @@ export function ModelMenu({
           <SelectContent position="popper">
             {efforts.map(value => (
               <SelectItem key={value} value={value}>
-                {ReasoningEffortLabels[value] ?? value}
+                {REASONING_EFFORT_LABELS[value] ?? value}
               </SelectItem>
             ))}
           </SelectContent>

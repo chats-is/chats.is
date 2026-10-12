@@ -16,7 +16,7 @@ import {
   type VertexAuthMode,
   type VertexServiceAccountKey
 } from '@/types';
-import { ProviderTypes } from '@/lib/constant';
+import { PROVIDER_TYPES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
@@ -109,7 +109,7 @@ const EMPTY_FORM: ProviderForm = {
   apiOptions: ''
 };
 
-const PROVIDER_TYPE_OPTIONS = ProviderTypes.map(t => ({
+const PROVIDER_TYPE_OPTIONS = PROVIDER_TYPES.map(t => ({
   value: t.value,
   label: t.label
 }));

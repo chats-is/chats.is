@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import {
-  REFUND_REQUEST_STATUS_LABELS,
-  type RefundRequestStatus
-} from '@/types/payment';
+import { type RefundRequestStatus } from '@/types/payment';
+import { REFUND_REQUEST_STATUS_LABELS } from '@/lib/constant';
 import { formatPrice } from '@/lib/format-amount';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {

@@ -41,7 +41,7 @@ const LANGUAGE_ALIASES: Record<CodeLanguageKey, string[]> = {
   javascript: ['javascript', 'js', 'mjs', 'cjs'],
   jsx: ['jsx'],
   typescript: ['typescript', 'ts', 'mts', 'cts'],
-  // 'react' is an accepted artifact language (see ArtifactSystemPrompt) and
+  // 'react' is an accepted artifact language (see ARTIFACT_SYSTEM_PROMPT) and
   // means a TSX component file.
   tsx: ['tsx', 'react'],
   html: ['html', 'htm'],

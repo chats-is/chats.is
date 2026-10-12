@@ -1,7 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   tierCreateSchema,
   tierIdSchema,
@@ -9,6 +8,7 @@ import {
   tierUpdateSchema,
   userTierSchema
 } from '@/types/tier';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
 import * as tiers from '@/server/services/tier';
 

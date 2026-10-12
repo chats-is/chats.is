@@ -9,7 +9,7 @@ import {
   modelToggleSchema,
   modelUpdateSchema
 } from '@/types/model';
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
 import * as models from '@/server/services/model';
 

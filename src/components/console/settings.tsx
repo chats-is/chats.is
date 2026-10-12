@@ -28,7 +28,11 @@ import {
 import { toast } from 'sonner';
 
 import { type ModelStatus } from '@/types/model';
+import { describeMultiplier } from '@/lib/billing';
 import {
+  DEFAULT_APP_DESCRIPTION,
+  DEFAULT_APP_NAME,
+  DEFAULT_APP_SUBTITLE,
   GRACE_DAYS_CHOICES,
   GRACE_DAYS_DEFAULT,
   REFUND_DAYS_CHOICES,
@@ -36,12 +40,6 @@ import {
   REFUND_FEE_DEFAULT,
   REFUND_FEE_OPTIONS,
   REFUND_REQUESTS_CHOICES
-} from '@/types/payment';
-import { describeMultiplier } from '@/lib/billing';
-import {
-  DEFAULT_APP_DESCRIPTION,
-  DEFAULT_APP_NAME,
-  DEFAULT_APP_SUBTITLE
 } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';

@@ -1,4 +1,5 @@
-import { mediaToolNames, type ChatMessage } from '@/types';
+import { type ChatMessage } from '@/types';
+import { MEDIA_TOOL_NAMES } from '@/lib/constant';
 
 type Part = ChatMessage['parts'][number];
 
@@ -6,7 +7,7 @@ type Part = ChatMessage['parts'][number];
  *  search. An artifact is drawn from its own table, and a transcript is
  *  written out by the model, so neither counts on its own. */
 const DRAWN_TOOLS = new Set<string>(
-  [...mediaToolNames, 'web_search'].map(name => `tool-${name}`)
+  [...MEDIA_TOOL_NAMES, 'web_search'].map(name => `tool-${name}`)
 );
 
 /**

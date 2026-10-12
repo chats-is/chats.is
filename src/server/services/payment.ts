@@ -16,8 +16,6 @@ import { type z } from 'zod';
 import { pageWindow } from '@/types/pagination';
 import {
   isDuplicate,
-  PAYMENT_PROCESSORS,
-  REFUNDABLE_STATUSES,
   refundLeftMinor,
   toAmount,
   toMinor,
@@ -25,6 +23,7 @@ import {
   type PaymentProcessorId,
   type PaymentStatus
 } from '@/types/payment';
+import { PAYMENT_PROCESSORS, REFUNDABLE_STATUSES } from '@/lib/constant';
 import { formatPrice } from '@/lib/format-amount';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';

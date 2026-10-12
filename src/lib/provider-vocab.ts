@@ -1,4 +1,5 @@
 import { type ModelCapability, type ProviderType } from '@/types';
+import { EFFORTS } from '@/lib/constant';
 
 /**
  * The option fields a model can declare. Unified across every provider — a
@@ -12,21 +13,6 @@ export type VocabField =
 export type Vocabulary = Partial<
   Record<VocabField, readonly (string | number)[]>
 >;
-
-/**
- * How hard a model may be asked to think. The AI SDK takes these as-is for
- * every provider behind it, so unlike the media fields there is nothing
- * per-provider to say. `'provider-default'` is not here: it is what an
- * unset effort resolves to, never something an admin lists.
- */
-export const EFFORTS = [
-  'none',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh'
-] as const;
 
 /**
  * Every option value this app can send, by provider and capability.
@@ -46,7 +32,7 @@ export const EFFORTS = [
  * - xai resolutions: `@ai-sdk/xai` `xaiImageModelOptions`, `resolutionSchema`
  * - xai ratios and voices: docs.x.ai (its SDK types them as bare strings)
  */
-export const PROVIDER_VOCAB = {
+const PROVIDER_VOCAB = {
   openai: {
     image: { size: ['1024x1024', '1024x1536', '1536x1024'] },
     video: {

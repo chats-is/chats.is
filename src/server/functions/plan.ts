@@ -1,7 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { processorPriceLookupSchema } from '@/types/payment';
 import {
   planCreateSchema,
@@ -10,6 +9,7 @@ import {
   planListSchema,
   planUpdateSchema
 } from '@/types/plan';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
 import * as plans from '@/server/services/plan';
 import { lookupProcessorPrice } from '@/server/services/subscription';

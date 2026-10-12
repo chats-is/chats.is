@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { type ModelCapability, type ProviderType } from '@/types';
-import { ReasoningEffortLabels } from '@/lib/constant';
+import { REASONING_EFFORT_LABELS } from '@/lib/constant';
 import {
   vocabularyFor,
   type VocabField,
@@ -134,7 +134,7 @@ export function pruneToVocabulary(
 
 function chipLabel(field: VocabField, value: OptionValue): string {
   if (field === 'effort')
-    return ReasoningEffortLabels[String(value)] ?? String(value);
+    return REASONING_EFFORT_LABELS[String(value)] ?? String(value);
   if (field === 'duration') return `${value}s`;
   return String(value);
 }

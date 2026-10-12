@@ -3,7 +3,6 @@ import { getRequest } from '@tanstack/react-start/server';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { type z } from 'zod';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   approveRefundRequestSchema,
   changePlanSchema,
@@ -16,6 +15,7 @@ import {
   subscriptionListSchema
 } from '@/types/payment';
 import { userIdSchema } from '@/types/user';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import * as subscription from '@/server/services/subscription';
 

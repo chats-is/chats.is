@@ -2,11 +2,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Undo2 } from 'lucide-react';
 
-import {
-  PAYMENT_PROCESSORS,
-  PAYMENT_STATUS_LABELS,
-  paymentStatusSchema
-} from '@/types/payment';
+import { paymentStatusSchema } from '@/types/payment';
+import { PAYMENT_PROCESSORS, PAYMENT_STATUS_LABELS } from '@/lib/constant';
 import { formatPrice } from '@/lib/format-amount';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import {

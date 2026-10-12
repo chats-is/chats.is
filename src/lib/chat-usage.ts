@@ -1,5 +1,5 @@
 import { type ChatUsage } from '@/types';
-import { providerWebSearchToolNames } from '@/lib/web-search';
+import { PROVIDER_WEB_SEARCH_TOOL_NAMES } from '@/lib/constant';
 
 /**
  * The subset of the AI SDK's `LanguageModelUsage` (the `usage` object passed to
@@ -137,7 +137,7 @@ export function countWebSearches(step: SearchStepLike): number {
       part.type === 'tool-call' &&
       part.providerExecuted === true &&
       !!part.toolName &&
-      providerWebSearchToolNames.includes(part.toolName)
+      PROVIDER_WEB_SEARCH_TOOL_NAMES.includes(part.toolName)
   ).length;
 
   const google = step.providerMetadata?.google as

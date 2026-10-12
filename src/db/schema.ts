@@ -29,6 +29,7 @@ import {
   type SubscriptionReason,
   type SubscriptionStatus
 } from '@/types/payment';
+import { MEDIA_PARTS_JSONPATH } from '@/lib/constant';
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -97,7 +98,14 @@ export const messages = createTable(
     index('message_parentId_idx').on(message.parentId),
     index('message_userId_idx').on(message.userId),
     index('message_chatId_idx').on(message.chatId),
-    index('message_createdAt_idx').on(message.createdAt)
+    index('message_createdAt_idx').on(message.createdAt),
+    // The Library: a user's assistant messages that hold media, newest
+    // first, on the very condition its query asks.
+    index('message_user_id_created_at_media_idx')
+      .on(message.userId, message.createdAt.desc().nullsFirst())
+      .where(
+        sql`${message.role} = 'assistant' and jsonb_path_exists(${message.parts}, ${sql.raw(`'${MEDIA_PARTS_JSONPATH}'`)})`
+      )
   ]
 );
 
@@ -523,11 +531,11 @@ export const modelProviders = createTable(
       .defaultNow()
   },
   modelProvider => [
-    uniqueIndex('model_provider_model_provider_idx').on(
+    uniqueIndex('model_provider_model_id_provider_id_idx').on(
       modelProvider.modelId,
       modelProvider.providerId
     ),
-    index('model_provider_priority_idx').on(
+    index('model_provider_model_id_priority_idx').on(
       modelProvider.modelId,
       modelProvider.priority
     )
@@ -678,7 +686,10 @@ export const plans = createTable(
   table => [
     uniqueIndex('plan_name_interval_idx').on(table.name, table.interval),
     // A processor's price names one plan, so a webhook can tell which.
-    uniqueIndex('plan_processor_price_idx').on(table.processor, table.priceId)
+    uniqueIndex('plan_processor_price_id_idx').on(
+      table.processor,
+      table.priceId
+    )
   ]
 );
 
@@ -744,16 +755,19 @@ export const subscriptions = createTable(
       .defaultNow()
   },
   table => [
-    uniqueIndex('subscription_processor_external_idx').on(
+    uniqueIndex('subscription_processor_external_id_idx').on(
       table.processor,
       table.externalId
     ),
     // At most one in effect per user.
-    uniqueIndex('subscription_user_live_idx')
+    uniqueIndex('subscription_user_id_live_idx')
       .on(table.userId)
       .where(sql`${table.status} in ('active', 'canceled')`),
     index('subscription_user_id_idx').on(table.userId),
-    index('subscription_status_created_idx').on(table.status, table.createdAt),
+    index('subscription_status_created_at_idx').on(
+      table.status,
+      table.createdAt
+    ),
     check(
       'subscription_status_check',
       sql`(${table.status} = 'active' and ${table.canceledAt} is null and ${table.canceledBy} is null and ${table.endedAt} is null and ${table.reason} is null)
@@ -860,13 +874,16 @@ export const payments = createTable(
       .defaultNow()
   },
   table => [
-    uniqueIndex('payment_processor_external_idx').on(
+    uniqueIndex('payment_processor_external_id_idx').on(
       table.processor,
       table.externalId
     ),
     index('payment_user_id_idx').on(table.userId),
-    index('payment_transaction_idx').on(table.processor, table.transactionId),
-    index('payment_refund_request_idx').on(table.refundRequestId),
+    index('payment_processor_transaction_id_idx').on(
+      table.processor,
+      table.transactionId
+    ),
+    index('payment_refund_request_id_idx').on(table.refundRequestId),
     index('payment_billed_at_idx').on(table.billedAt),
     check(
       'payment_refunded_check',
@@ -923,11 +940,14 @@ export const refundRequests = createTable(
       .defaultNow()
   },
   table => [
-    uniqueIndex('refund_request_pending_idx')
+    uniqueIndex('refund_request_subscription_id_pending_idx')
       .on(table.subscriptionId)
       .where(sql`${table.status} = 'pending_approval'`),
     index('refund_request_user_id_idx').on(table.userId),
-    index('refund_request_status_idx').on(table.status, table.createdAt)
+    index('refund_request_status_created_at_idx').on(
+      table.status,
+      table.createdAt
+    )
   ]
 );
 
@@ -1128,7 +1148,7 @@ export const usage = createTable(
     index('usage_chat_id_idx').on(record.chatId),
     index('usage_model_id_idx').on(record.modelId),
     index('usage_created_at_idx').on(record.createdAt),
-    index('usage_user_created_idx').on(record.userId, record.createdAt)
+    index('usage_user_id_created_at_idx').on(record.userId, record.createdAt)
   ]
 );
 

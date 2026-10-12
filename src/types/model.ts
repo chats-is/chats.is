@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { EFFORTS } from '@/lib/provider-vocab';
+import { EFFORTS } from '@/lib/constant';
 
 import { paginationSchema } from './pagination';
 import { type ProviderType } from './provider';

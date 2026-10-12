@@ -1,13 +1,15 @@
 import {
-  PAYMENT_STATUS_LABELS,
-  REFUND_REQUEST_STATUS_LABELS,
-  SUBSCRIPTION_REASON_LABELS,
-  SUBSCRIPTION_STATUS_LABELS,
   type PaymentStatus,
   type RefundRequestStatus,
   type SubscriptionReason,
   type SubscriptionStatus
 } from '@/types/payment';
+import {
+  PAYMENT_STATUS_LABELS,
+  REFUND_REQUEST_STATUS_LABELS,
+  SUBSCRIPTION_REASON_LABELS,
+  SUBSCRIPTION_STATUS_LABELS
+} from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import {

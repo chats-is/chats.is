@@ -1,5 +1,35 @@
-import { type MediaToolName } from '@/types/chat-tools';
+import {
+  CalendarCheck,
+  ChartLine,
+  CircleDollarSign,
+  Cpu,
+  CreditCard,
+  Gauge,
+  LayoutGrid,
+  LibraryBig,
+  Logs,
+  MessageSquare,
+  Package,
+  Percent,
+  Plug,
+  Settings,
+  SquareSparkles,
+  Tickets,
+  Users
+} from 'lucide-react';
+
+import { type ChatMediaToolName } from '@/types/chat-tools';
 import { type ModelCapability } from '@/types/model';
+import {
+  type BillingInterval,
+  type PaymentKind,
+  type PaymentProcessorId,
+  type PaymentStatus,
+  type RefundRequestStatus,
+  type SubscriptionReason,
+  type SubscriptionStatus
+} from '@/types/payment';
+import { type MediaOptionKey } from '@/lib/media-settings';
 
 /**
  * What this installation calls itself before an admin says otherwise.
@@ -16,7 +46,7 @@ export const DEFAULT_APP_DESCRIPTION =
 /**
  * Provider types for the console
  */
-export const ProviderTypes = [
+export const PROVIDER_TYPES = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'azure', label: 'Azure OpenAI' },
   { value: 'google', label: 'Google AI' },
@@ -40,7 +70,7 @@ export const CAPABILITIES = [
 /**
  * Image size labels mapping
  */
-export const ImageSizeLabels: Record<string, string> = {
+export const IMAGE_SIZE_LABELS: Record<string, string> = {
   auto: 'Auto',
   '256x256': 'Small Square (256x256)',
   '512x512': 'Medium Square (512x512)',
@@ -60,7 +90,7 @@ export const ImageSizeLabels: Record<string, string> = {
 /**
  * Aspect ratio labels mapping
  */
-export const AspectRatioLabels: Record<string, string> = {
+export const ASPECT_RATIO_LABELS: Record<string, string> = {
   auto: 'Auto',
   '1:1': 'Square (1:1)',
   '1:4': 'Ultra Portrait (1:4)',
@@ -81,7 +111,7 @@ export const AspectRatioLabels: Record<string, string> = {
 /**
  * Reasoning effort labels mapping
  */
-export const ReasoningEffortLabels: Record<string, string> = {
+export const REASONING_EFFORT_LABELS: Record<string, string> = {
   none: 'None',
   minimal: 'Minimal',
   low: 'Low',
@@ -93,7 +123,7 @@ export const ReasoningEffortLabels: Record<string, string> = {
 /**
  * Video resolution labels mapping
  */
-export const VideoResolutionLabels: Record<string, string> = {
+export const VIDEO_RESOLUTION_LABELS: Record<string, string> = {
   auto: 'Auto',
   '480p': '480p (SD)',
   '720p': '720p (HD)',
@@ -104,7 +134,7 @@ export const VideoResolutionLabels: Record<string, string> = {
 /**
  * Vertex AI model ID mapping (Anthropic model ID -> Vertex AI model ID)
  */
-export const VertexAIModels: Record<string, string> = {
+export const VERTEX_AI_MODELS: Record<string, string> = {
   'claude-sonnet-4-5': 'claude-sonnet-4-5@20250929',
   'claude-sonnet-4-5-20250929': 'claude-sonnet-4-5@20250929',
   'claude-opus-4-5': 'claude-opus-4-5@20251101',
@@ -122,7 +152,7 @@ export const VertexAIModels: Record<string, string> = {
 /**
  * AWS Bedrock model ID mapping (Anthropic model ID -> Bedrock model ID)
  */
-export const BedrockModels: Record<string, string> = {
+export const BEDROCK_MODELS: Record<string, string> = {
   'claude-opus-4-6': 'anthropic.claude-opus-4-6-v1',
   'claude-sonnet-4-6': 'anthropic.claude-sonnet-4-6',
   'claude-sonnet-4-5': 'anthropic.claude-sonnet-4-5-20250929-v1:0',
@@ -139,10 +169,6 @@ export const BedrockModels: Record<string, string> = {
   'claude-opus-4-20250514': 'anthropic.claude-opus-4-20250514-v1:0'
 };
 
-/** Media tool names plus transcription (separate output shape, same prompt). */
-export type ChatMediaToolName =
-  MediaToolName | 'transcribe_audio' | 'edit_video';
-
 /**
  * What each media tool is for, said once — on the tool itself, as its
  * description, where the model reads it beside the parameters. The system
@@ -150,7 +176,7 @@ export type ChatMediaToolName =
  * The values a model offers (sizes, voices, durations) are appended per
  * model where the tool is registered.
  */
-export const MediaToolGuidance: Record<ChatMediaToolName, string> = {
+export const MEDIA_TOOL_GUIDANCE: Record<ChatMediaToolName, string> = {
   generate_image:
     'Create a new image from a text description. Use when the user asks for a picture, illustration, photo, logo, or any visual.',
   edit_image:
@@ -165,49 +191,7 @@ export const MediaToolGuidance: Record<ChatMediaToolName, string> = {
     "Transcribe an audio file from this conversation to text (speech-to-text). Pass that audio's URL as `audioUrl`. Use when the user asks what an audio says or to transcribe it; translating or summarising the transcript is then yours to do."
 };
 
-/** The rules that hold for every media tool; what each one is for is on the
- *  tool. Nothing when no media tool is registered. */
-export function buildMediaToolsSystemPrompt(
-  tools: ChatMediaToolName[]
-): string {
-  if (tools.length === 0) return '';
-  const has = (...names: ChatMediaToolName[]) =>
-    names.some(name => tools.includes(name));
-
-  // Each part is said only when a tool it speaks of is there: a prompt that
-  // talks of generated media with only transcription on offer has the model
-  // looking for tools it was never given.
-  const formats = has('generate_image', 'generate_video', 'text_to_speech');
-  const producesMedia = has(
-    'generate_image',
-    'edit_image',
-    'generate_video',
-    'edit_video',
-    'text_to_speech'
-  );
-  const transcribes = has('transcribe_audio');
-
-  const handling = [
-    producesMedia &&
-      'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result.',
-    transcribes &&
-      'A transcript is not displayed, so write it out yourself — quote what was said, then answer whatever was asked about it.',
-    'If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the media model that failed, or mention settings pages. Do not retry the tool on your own.'
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  return [
-    'You also have media tools; each says what it is for.',
-    formats &&
-      "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields. What you pass is a suggestion for what the user did not settle: anything they chose in the app's own settings is used instead, and where neither says anything the model's first listed value applies.",
-    handling
-  ]
-    .filter(Boolean)
-    .join('\n\n');
-}
-
-export const ArtifactSystemPrompt = [
+export const ARTIFACT_SYSTEM_PROMPT = [
   'Use the create_artifact tool for substantial, self-contained, reusable content: code files, runnable React UIs, full documents, or data tables. Do NOT use it for short snippets, brief explanations, or conversational replies — keep those inline in the chat.',
   '',
   'Always set a concise, descriptive `title` (2–6 words) — it labels the artifact in the canvas and the artifact switcher.',
@@ -230,3 +214,391 @@ export const ArtifactSystemPrompt = [
   '',
   'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.'
 ].join('\n');
+
+/** Every processor a plan can be sold through, as the console offers them. */
+export const PAYMENT_PROCESSORS: ReadonlyArray<{
+  id: PaymentProcessorId;
+  label: string;
+  /** What the processor calls the ID a plan is sold by. */
+  priceIdLabel: string;
+  priceIdPlaceholder: string;
+  /** Whether a subscription can be upgraded in place, the plan changing
+   *  only once the difference is paid. Lemon Squeezy changes the plan
+   *  whether or not that charge goes through, so it cannot. */
+  upgrades: boolean;
+  /** Whether it says what fee it kept on a payment, which a refund on
+   *  `auto` goes by. Lemon Squeezy does not. */
+  reportsFee: boolean;
+}> = [
+  {
+    id: 'stripe',
+    label: 'Stripe',
+    priceIdLabel: 'Price ID',
+    priceIdPlaceholder: 'price_...',
+    upgrades: true,
+    reportsFee: true
+  },
+  {
+    id: 'paddle',
+    label: 'Paddle',
+    priceIdLabel: 'Price ID',
+    priceIdPlaceholder: 'pri_...',
+    upgrades: true,
+    reportsFee: true
+  },
+  {
+    id: 'lemonsqueezy',
+    label: 'Lemon Squeezy',
+    priceIdLabel: 'Variant ID',
+    priceIdPlaceholder: '123456',
+    upgrades: false,
+    reportsFee: false
+  }
+];
+
+/** Every interval a plan can be billed at, shortest first, as the pages
+ *  offer them. `days` is about how long one is, to compare prices by. */
+export const BILLING_INTERVALS: ReadonlyArray<{
+  value: BillingInterval;
+  label: string;
+  /** "monthly", as in "billed monthly". */
+  adverb: string;
+  days: number;
+}> = [
+  { value: 'day', label: 'Daily', adverb: 'daily', days: 1 },
+  { value: 'week', label: 'Weekly', adverb: 'weekly', days: 7 },
+  { value: 'month', label: 'Monthly', adverb: 'monthly', days: 365.25 / 12 },
+  { value: 'year', label: 'Yearly', adverb: 'yearly', days: 365.25 }
+];
+
+export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
+  active: 'Active',
+  canceled: 'Canceled',
+  ended: 'Ended'
+};
+
+/** The statuses of a subscription in effect: it gives its user its plan. */
+export const LIVE_STATUSES: ReadonlyArray<SubscriptionStatus> = [
+  'active',
+  'canceled'
+];
+
+export const SUBSCRIPTION_REASON_LABELS: Record<SubscriptionReason, string> = {
+  canceled_by_customer: 'Canceled by customer',
+  canceled_by_admin: 'Canceled by admin',
+  refunded: 'Refunded',
+  payment_failed: 'Payment failed',
+  payment_disputed: 'Payment disputed',
+  duplicate: 'Duplicate subscription',
+  canceled_in_processor: 'Canceled in payment processor',
+  paused_in_processor: 'Paused in payment processor'
+};
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  paid: 'Paid',
+  failed: 'Failed',
+  refund_pending: 'Refund pending',
+  refunded: 'Refunded',
+  disputed: 'Disputed'
+};
+
+export const PAYMENT_KIND_LABELS: Record<PaymentKind, string> = {
+  initial: 'Initial',
+  renewal: 'Renewal',
+  upgrade: 'Upgrade'
+};
+
+export const REFUND_REQUEST_STATUS_LABELS: Record<RefundRequestStatus, string> =
+  {
+    pending_approval: 'Pending approval',
+    approved: 'Approved',
+    rejected: 'Rejected'
+  };
+
+/** A payment money can still go back from. */
+export const REFUNDABLE_STATUSES: ReadonlyArray<PaymentStatus> = ['paid'];
+
+/**
+ * What a refund keeps back of a payment (setting `refunds.fee`): `auto`, the
+ * fee the processor kept on it — nothing where the processor does not say
+ * its fee — or a percentage of what was paid.
+ */
+const REFUND_FEE_PERCENTS = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30
+] as const;
+
+export const REFUND_FEE_DEFAULT = 'auto';
+
+export const REFUND_FEE_OPTIONS: ReadonlyArray<{
+  value: string;
+  label: string;
+}> = [
+  { value: 'auto', label: 'Auto' },
+  ...REFUND_FEE_PERCENTS.map(p => ({ value: String(p), label: `${p}%` }))
+];
+
+/** How many days after a payment a user may request a refund of it
+ *  (`refunds.days`): from 1 to 15, 7 when unset. */
+const REFUND_DAYS_MAX = 15;
+
+export const REFUND_DAYS_DEFAULT = 7;
+
+export const REFUND_DAYS_CHOICES = Array.from(
+  { length: REFUND_DAYS_MAX },
+  (_, i) => String(i + 1)
+);
+
+/**
+ * How many refund requests a user can make on one subscription (setting
+ * `refunds.maxRequests`), whatever was decided on them. Unset is no limit.
+ * Once used up — the last one rejected — no more can be made.
+ */
+export const REFUND_REQUESTS_CHOICES = ['1', '2', '3', '4', '5', '6', '7'];
+
+/**
+ * How many days past its period end a subscription goes on when its renewal's
+ * payment has failed (setting `subscriptions.graceDays`): from 0 to 7, 1
+ * when unset. The processor retries the payment meanwhile; still unpaid
+ * past these days, the subscription ends — however long the
+ * processor would have gone on retrying.
+ */
+const GRACE_DAYS_MAX = 7;
+
+export const GRACE_DAYS_DEFAULT = 1;
+
+export const GRACE_DAYS_CHOICES = Array.from(
+  { length: GRACE_DAYS_MAX + 1 },
+  (_, i) => String(i)
+);
+
+export const MEDIA_TOOL_NAMES = [
+  'generate_image',
+  'edit_image',
+  'generate_video',
+  'edit_video',
+  'text_to_speech'
+] as const;
+
+/**
+ * Message parts that hold media: a file, or what a media tool made. The
+ * Library reads by it and the index on `message` is built on it, so a tool
+ * added above changes the index too, and the next migration rebuilds it.
+ */
+export const MEDIA_PARTS_JSONPATH = `$[*] ? (@.type == "file" || @.type like_regex "^tool-(${MEDIA_TOOL_NAMES.join('|')})$")`;
+
+/** One page size for the whole console, tables and logs alike. */
+export const DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * The names the providers give their own web search tool. Shared by the
+ * server, which registers them, and the usage count, which looks for them in
+ * a finished step.
+ */
+export const PROVIDER_WEB_SEARCH_TOOL_NAMES: string[] = [
+  'web_search',
+  'google_search'
+];
+
+/**
+ * 'auto' is a regular option value that admins put in a model's `uiOptions`
+ * (e.g. `"aspectRatios": ["auto", "16:9"]`, default `"aspectRatio": "auto"`).
+ * It flows through selection like any other value; only at the provider call
+ * boundary does it resolve to "omit the parameter" via `resolveAutoOption`.
+ */
+export const AUTO_OPTION = 'auto';
+
+export const CONTENT_TYPES = [
+  { type: 'chat', label: 'New Chat', icon: MessageSquare, path: '/' },
+  { type: 'library', label: 'Library', icon: LibraryBig, path: '/library' },
+  { type: 'prompts', label: 'Prompts', icon: SquareSparkles, path: '/prompts' }
+] as const;
+
+/**
+ * How hard a model may be asked to think. The AI SDK takes these as-is for
+ * every provider behind it, so unlike the media fields there is nothing
+ * per-provider to say. `'provider-default'` is not here: it is what an
+ * unset effort resolves to, never something an admin lists.
+ */
+export const EFFORTS = [
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh'
+] as const;
+
+export const CONSOLE_NAVIGATION = {
+  navMain: [
+    {
+      title: 'Overview',
+      url: '/console',
+      icon: LayoutGrid
+    },
+    {
+      title: 'Revenue',
+      url: '/console/revenue',
+      icon: ChartLine
+    },
+    {
+      title: 'Usage',
+      url: '/console/usage',
+      icon: Logs
+    },
+    {
+      title: 'Providers',
+      url: '/console/providers',
+      icon: Plug
+    },
+    {
+      title: 'Models',
+      url: '/console/models',
+      icon: Cpu
+    },
+    {
+      title: 'Pricing',
+      url: '/console/pricing',
+      icon: CircleDollarSign
+    },
+    {
+      title: 'Prompts',
+      url: '/console/prompts',
+      icon: SquareSparkles
+    },
+    {
+      title: 'Quotas',
+      url: '/console/quotas',
+      icon: Gauge
+    },
+    {
+      title: 'Tiers',
+      url: '/console/tiers',
+      icon: Percent
+    },
+    {
+      title: 'Plans',
+      url: '/console/plans',
+      icon: Package
+    },
+    {
+      title: 'Subscriptions',
+      url: '/console/subscriptions',
+      icon: CalendarCheck
+    },
+    {
+      title: 'Payments',
+      url: '/console/payments',
+      icon: CreditCard
+    },
+    {
+      title: 'Refund requests',
+      url: '/console/refund-requests',
+      icon: Tickets
+    },
+    {
+      title: 'Users',
+      url: '/console/users',
+      icon: Users
+    },
+    {
+      title: 'Settings',
+      url: '/console/settings',
+      icon: Settings
+    }
+  ]
+};
+
+export const MEDIA_OPTION_LABELS: Record<MediaOptionKey, string> = {
+  size: 'Size',
+  aspectRatio: 'Aspect ratio',
+  resolution: 'Resolution',
+  duration: 'Duration',
+  voice: 'Voice'
+};
+
+/**
+ * How a server function says the session is gone.
+ *
+ * It refuses with a bare 401, and the browser's side of the call turns a bare
+ * refusal into an `Error` carrying the body — so the body is the only thing
+ * that crosses, and it is named here for both ends to agree on.
+ */
+export const UNAUTHORIZED = 'Unauthorized';
+
+/**
+ * What each kind of upload accepts, shared by the browser (which picks the
+ * file) and the route that signs the token (which is what actually enforces
+ * it — the browser's copy is a courtesy, not a control).
+ *
+ * Uploads go straight from the browser to blob storage: a Vercel function
+ * cannot receive more than 4.5 MB of request body on any plan, which no video
+ * and few audio files fit inside.
+ */
+export const UPLOAD_CONFIG = {
+  avatar: {
+    folder: 'avatars',
+    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    maxSize: 5 * 1024 * 1024
+  },
+  attachment: {
+    folder: 'attachments',
+    allowedTypes: [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      // Audio attachments feed the chat transcribe_audio (STT) tool.
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/x-wav',
+      'audio/mp4',
+      'audio/x-m4a',
+      'audio/ogg',
+      'audio/webm',
+      'audio/flac',
+      // Video attachments feed the chat edit_video tool.
+      'video/mp4',
+      'video/quicktime',
+      'video/webm'
+    ],
+    maxSize: 10 * 1024 * 1024,
+    /** Video is the reason client uploads exist here; a clip needs the room. */
+    videoMaxSize: 100 * 1024 * 1024
+  },
+  prompts: {
+    folder: 'prompts',
+    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    maxSize: 5 * 1024 * 1024
+  }
+} as const;
+
+/**
+ * What a reader is told when none of a model's providers answered.
+ *
+ * Addressed to the person looking at a chat, not to whoever runs the install:
+ * which providers were tried and what each said goes to the log. Retrying is
+ * worth a try — unlike a model that does not resolve at all, this one failed
+ * in flight and may not next time.
+ */
+export const PROVIDER_FAILURE_MESSAGE =
+  'This model is currently unavailable. Please try again or choose a different model.';
+
+/**
+ * A run of cells of slightly varied width, so a row does not read as a grid.
+ * Shared with `ConsoleTableSkeleton`, which stands in the same way before the
+ * table is mounted at all.
+ *
+ * Ceilings rather than widths, and paired with `w-full`. A bar of a fixed width
+ * cannot shrink or wrap the way the text it stands in for does, so a wide table
+ * of them sets a minimum width the real rows never ask for — and the page
+ * scrolls sideways until the data lands and the cells start wrapping.
+ */
+export const CELL_WIDTHS = [
+  'max-w-32',
+  'max-w-24',
+  'max-w-40',
+  'max-w-20',
+  'max-w-28',
+  'max-w-16'
+];

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Link, useLocation } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { ConsoleNavigation } from '@/lib/console-navigation';
+import { CONSOLE_NAVIGATION } from '@/lib/constant';
 import { subscriptionQueries } from '@/server/functions/subscription';
 import {
   SidebarContent,
@@ -60,7 +60,7 @@ export function Sidebar({
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {ConsoleNavigation.navMain.map(item => {
+              {CONSOLE_NAVIGATION.navMain.map(item => {
                 const isActive =
                   item.url === '/console'
                     ? pathname === '/console'

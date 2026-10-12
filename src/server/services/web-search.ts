@@ -42,7 +42,7 @@ const SEARCH_INSTRUCTIONS = [
 ].join(' ');
 
 /** The rules the chat model follows when it can search. */
-export const WEB_SEARCH_GUIDANCE = [
+const WEB_SEARCH_GUIDANCE = [
   'You can search the web. Search when the answer depends on current events, recent releases, prices, live figures, or anything you cannot be sure of from memory; do not search for what you already know well.',
   'When your answer draws on a search, cite the pages it came from as markdown links in the text. Never mention which model or service performed the search.'
 ].join(' ');

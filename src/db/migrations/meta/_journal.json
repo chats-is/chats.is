@@ -246,6 +246,20 @@
       "when": 1791727576348,
       "tag": "0034_usage_plan",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791775693746,
+      "tag": "0035_index_names",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791776573617,
+      "tag": "0036_message_media_index",
+      "breakpoints": true
     }
   ]
 }

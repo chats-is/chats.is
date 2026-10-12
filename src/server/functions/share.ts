@@ -1,12 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   shareChatSchema,
   shareIdSchema,
   sharePageSchema
 } from '@/types/shared-link';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { authedMiddleware } from '@/server/middleware';
 import * as shares from '@/server/services/share';
 

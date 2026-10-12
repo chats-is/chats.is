@@ -46,8 +46,7 @@ export {
   generateVideoInputSchema,
   textToSpeechInputSchema,
   transcribeAudioInputSchema,
-  webSearchInputSchema,
-  mediaToolNames
+  webSearchInputSchema
 } from './chat-tools';
 export type {
   ChatTools,

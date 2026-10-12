@@ -1,6 +1,6 @@
 import { type RowData } from '@tanstack/react-table';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { CELL_WIDTHS, DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -12,7 +12,6 @@ import {
   TableRow
 } from '@/components/ui/table';
 import {
-  CELL_WIDTHS,
   DataTable,
   type ConsoleColumns
 } from '@/components/console/data-table';

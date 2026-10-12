@@ -13,11 +13,33 @@ import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
+import { withLock } from '@/server/services/db-lock';
 import {
   hasLiveSubscription,
   liveSubscriptionsOf
 } from '@/server/services/subscription';
 import { getUserTier } from '@/server/services/tier';
+
+/**
+ * Make a new account an admin when the install has none, so a fresh deploy
+ * has a way into /console. Counted rather than assumed, so it stays correct
+ * if the first admin is later demoted and someone else signs up.
+ *
+ * Under a lock, because counting and promoting are two statements: two
+ * people signing up to an empty install at once would each count none, and
+ * each be made admin. The second waits, then counts one.
+ */
+export async function makeFirstUserAdmin(userId: string) {
+  await withLock('first-admin', async tx => {
+    const [admins] = await tx
+      .select({ value: count() })
+      .from(users)
+      .where(eq(users.role, 'admin'));
+    if (admins?.value === 0) {
+      await tx.update(users).set({ role: 'admin' }).where(eq(users.id, userId));
+    }
+  });
+}
 
 /**
  * The signed-in user's own row.

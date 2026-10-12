@@ -2,10 +2,20 @@ import { makeTestDb } from '@/test-utils/pg';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP } from 'better-auth/plugins/email-otp';
-import { count, eq } from 'drizzle-orm';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { accounts, sessions, users, verifications } from '@/db/schema';
+
+const h = vi.hoisted(() => ({ db: undefined as any }));
+vi.mock('@/db', () => ({
+  get db() {
+    return h.db;
+  }
+}));
+vi.mock('@/lib/env', () => ({ env: {} }));
+
+const { makeFirstUserAdmin } = await import('@/server/services/user');
 
 /**
  * The auth stack against a real Postgres engine with the real migrations
@@ -53,23 +63,7 @@ function makeAuth(db: TestDb) {
       })
     ],
     databaseHooks: {
-      user: {
-        create: {
-          after: async user => {
-            const [admins] = await db
-              .select({ value: count() })
-              .from(users)
-              .where(eq(users.role, 'admin'));
-
-            if (admins?.value === 0) {
-              await db
-                .update(users)
-                .set({ role: 'admin' })
-                .where(eq(users.id, user.id));
-            }
-          }
-        }
-      }
+      user: { create: { after: user => makeFirstUserAdmin(user.id) } }
     }
   });
 }
@@ -81,6 +75,7 @@ describe('better-auth over the migrated schema', () => {
   beforeEach(async () => {
     sentCodes.length = 0;
     ({ db } = await makeTestDb());
+    h.db = db;
     auth = makeAuth(db);
   });
 

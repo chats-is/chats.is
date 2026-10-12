@@ -2,7 +2,6 @@ import { makeTestDb } from '@/test-utils/pg';
 import { eq } from 'drizzle-orm';
 import {
   afterAll,
-  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -15,7 +14,8 @@ import * as schema from '@/db/schema';
 
 const h = vi.hoisted(() => ({
   db: undefined as any,
-  del: vi.fn(async (_urls: string[]) => {})
+  del: vi.fn(async (_urls: string[]) => {}),
+  env: { BLOB_READ_WRITE_TOKEN: '' }
 }));
 vi.mock('@/db', () => ({
   get db() {
@@ -23,6 +23,7 @@ vi.mock('@/db', () => ({
   }
 }));
 vi.mock('@vercel/blob', () => ({ del: h.del }));
+vi.mock('@/lib/env', () => ({ env: h.env }));
 
 const { deleteChat } = await import('./chat');
 const { truncateAfter } = await import('./message');
@@ -58,16 +59,12 @@ afterAll(async () => {
   await client?.close?.();
 });
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
-
 beforeEach(async () => {
   // The store the URLs below are in, named by the token as the app reads it —
   // so the test does not depend on what the shell happens to carry: with a
   // real token in the environment these files were another store's, and
   // nothing was removed.
-  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_store_secret');
+  h.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_store_secret';
   h.del.mockClear();
   await h.db.delete(schema.artifacts);
   await h.db.delete(schema.messages);
@@ -167,7 +164,7 @@ describe('files follow their rows', () => {
 
 describe('isOwnBlobUrl', () => {
   it('knows this install’s store from the token it writes with', () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_AbC123_secretpart');
+    h.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_AbC123_secretpart';
 
     expect(
       isOwnBlobUrl(
@@ -195,7 +192,5 @@ describe('isOwnBlobUrl', () => {
     ]) {
       expect(carriesOnlyOwnFiles([{ type: 'file', url } as never])).toBe(false);
     }
-
-    vi.unstubAllEnvs();
   });
 });

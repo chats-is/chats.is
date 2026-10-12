@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+import {
+  BILLING_INTERVALS,
+  GRACE_DAYS_CHOICES,
+  GRACE_DAYS_DEFAULT,
+  PAYMENT_PROCESSORS,
+  REFUND_DAYS_CHOICES,
+  REFUND_DAYS_DEFAULT,
+  REFUND_FEE_OPTIONS,
+  REFUND_REQUESTS_CHOICES
+} from '@/lib/constant';
+
 import { paginationSchema } from './pagination';
 
 /**
@@ -24,66 +35,10 @@ export const paymentProcessorSchema = z.enum([
 ]);
 export type PaymentProcessorId = z.infer<typeof paymentProcessorSchema>;
 
-/** Every processor a plan can be sold through, as the console offers them. */
-export const PAYMENT_PROCESSORS: ReadonlyArray<{
-  id: PaymentProcessorId;
-  label: string;
-  /** What the processor calls the ID a plan is sold by. */
-  priceIdLabel: string;
-  priceIdPlaceholder: string;
-  /** Whether a subscription can be upgraded in place, the plan changing
-   *  only once the difference is paid. Lemon Squeezy changes the plan
-   *  whether or not that charge goes through, so it cannot. */
-  upgrades: boolean;
-  /** Whether it says what fee it kept on a payment, which a refund on
-   *  `auto` goes by. Lemon Squeezy does not. */
-  reportsFee: boolean;
-}> = [
-  {
-    id: 'stripe',
-    label: 'Stripe',
-    priceIdLabel: 'Price ID',
-    priceIdPlaceholder: 'price_...',
-    upgrades: true,
-    reportsFee: true
-  },
-  {
-    id: 'paddle',
-    label: 'Paddle',
-    priceIdLabel: 'Price ID',
-    priceIdPlaceholder: 'pri_...',
-    upgrades: true,
-    reportsFee: true
-  },
-  {
-    id: 'lemonsqueezy',
-    label: 'Lemon Squeezy',
-    priceIdLabel: 'Variant ID',
-    priceIdPlaceholder: '123456',
-    upgrades: false,
-    reportsFee: false
-  }
-];
-
 /** How often a plan is billed: every one day, week, month or year — the
  *  units every processor bills by. */
 export const billingIntervalSchema = z.enum(['day', 'week', 'month', 'year']);
 export type BillingInterval = z.infer<typeof billingIntervalSchema>;
-
-/** Every interval a plan can be billed at, shortest first, as the pages
- *  offer them. `days` is about how long one is, to compare prices by. */
-export const BILLING_INTERVALS: ReadonlyArray<{
-  value: BillingInterval;
-  label: string;
-  /** "monthly", as in "billed monthly". */
-  adverb: string;
-  days: number;
-}> = [
-  { value: 'day', label: 'Daily', adverb: 'daily', days: 1 },
-  { value: 'week', label: 'Weekly', adverb: 'weekly', days: 7 },
-  { value: 'month', label: 'Monthly', adverb: 'monthly', days: 365.25 / 12 },
-  { value: 'year', label: 'Yearly', adverb: 'yearly', days: 365.25 }
-];
 
 /** An interval as the pages name it. */
 export const billingIntervalOf = (interval: BillingInterval) =>
@@ -127,18 +82,6 @@ export const processorPriceLookupSchema = z.object({
  */
 export type SubscriptionStatus = 'active' | 'canceled' | 'ended';
 export const subscriptionStatusSchema = z.enum(['active', 'canceled', 'ended']);
-export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
-  active: 'Active',
-  canceled: 'Canceled',
-  ended: 'Ended'
-};
-
-/** The statuses of a subscription in effect: it gives its user its plan. */
-export const LIVE_STATUSES: ReadonlyArray<SubscriptionStatus> = [
-  'active',
-  'canceled'
-];
-
 /** Why a subscription is `canceled`, or `ended`. */
 export type SubscriptionReason =
   | 'canceled_by_customer'
@@ -153,17 +96,6 @@ export type SubscriptionReason =
  *  refunded in full. */
 export const isDuplicate = (reason: SubscriptionReason | null | undefined) =>
   reason === 'duplicate';
-
-export const SUBSCRIPTION_REASON_LABELS: Record<SubscriptionReason, string> = {
-  canceled_by_customer: 'Canceled by customer',
-  canceled_by_admin: 'Canceled by admin',
-  refunded: 'Refunded',
-  payment_failed: 'Payment failed',
-  payment_disputed: 'Payment disputed',
-  duplicate: 'Duplicate subscription',
-  canceled_in_processor: 'Canceled in payment processor',
-  paused_in_processor: 'Paused in payment processor'
-};
 
 /**
  * Whether a subscription can move to another plan in place: only up — to a
@@ -205,60 +137,20 @@ export const changePlanSchema = z.object({ planId: z.string().min(1) });
  */
 export type PaymentStatus =
   'paid' | 'failed' | 'refund_pending' | 'refunded' | 'disputed';
-export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  paid: 'Paid',
-  failed: 'Failed',
-  refund_pending: 'Refund pending',
-  refunded: 'Refunded',
-  disputed: 'Disputed'
-};
-
 /** What a payment was for: the one that began the subscription, one that
  *  renewed it, or the difference charged for an upgrade. */
 export type PaymentKind = 'initial' | 'renewal' | 'upgrade';
-export const PAYMENT_KIND_LABELS: Record<PaymentKind, string> = {
-  initial: 'Initial',
-  renewal: 'Renewal',
-  upgrade: 'Upgrade'
-};
-
 /**
  * A user's request for a refund, which an admin decides on. The user asks;
  * whether money goes back, and how much, is the admin's.
  */
 export type RefundRequestStatus = 'pending_approval' | 'approved' | 'rejected';
-export const REFUND_REQUEST_STATUS_LABELS: Record<RefundRequestStatus, string> =
-  {
-    pending_approval: 'Pending approval',
-    approved: 'Approved',
-    rejected: 'Rejected'
-  };
-
-/** A payment money can still go back from. */
-export const REFUNDABLE_STATUSES: ReadonlyArray<PaymentStatus> = ['paid'];
-
 /** An amount in the processors' integer units (1050), and back (10.50):
  *  amounts are counted in whole units. */
 export const toMinor = (amount: number | string) =>
   Math.round(Number(amount) * 100);
 export const toAmount = (minor: number) => minor / 100;
 
-/**
- * What a refund keeps back of a payment (setting `refunds.fee`): `auto`, the
- * fee the processor kept on it — nothing where the processor does not say
- * its fee — or a percentage of what was paid.
- */
-export const REFUND_FEE_PERCENTS = [
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30
-] as const;
-export const REFUND_FEE_DEFAULT = 'auto';
-export const REFUND_FEE_OPTIONS: ReadonlyArray<{
-  value: string;
-  label: string;
-}> = [
-  { value: 'auto', label: 'Auto' },
-  ...REFUND_FEE_PERCENTS.map(p => ({ value: String(p), label: `${p}%` }))
-];
 export const refundFeeSchema = z
   .string()
   .refine(
@@ -326,14 +218,6 @@ export function refundLeftMinor(
   );
 }
 
-/** How many days after a payment a user may request a refund of it
- *  (`refunds.days`): from 1 to 15, 7 when unset. */
-export const REFUND_DAYS_MAX = 15;
-export const REFUND_DAYS_DEFAULT = 7;
-export const REFUND_DAYS_CHOICES = Array.from(
-  { length: REFUND_DAYS_MAX },
-  (_, i) => String(i + 1)
-);
 export const refundDaysSchema = z
   .string()
   .refine(v => REFUND_DAYS_CHOICES.includes(v), 'From 1 to 15 days.');
@@ -346,12 +230,6 @@ export function refundDaysOf(value: string | null): number {
     : REFUND_DAYS_DEFAULT;
 }
 
-/**
- * How many refund requests a user can make on one subscription (setting
- * `refunds.maxRequests`), whatever was decided on them. Unset is no limit.
- * Once used up — the last one rejected — no more can be made.
- */
-export const REFUND_REQUESTS_CHOICES = ['1', '2', '3', '4', '5', '6', '7'];
 export const refundRequestsSchema = z
   .string()
   .refine(
@@ -367,19 +245,6 @@ export function refundRequestsOf(value: string | null): number | null {
     : null;
 }
 
-/**
- * How many days past its period end a subscription goes on when its renewal's
- * payment has failed (setting `subscriptions.graceDays`): from 0 to 7, 1
- * when unset. The processor retries the payment meanwhile; still unpaid
- * past these days, the subscription ends — however long the
- * processor would have gone on retrying.
- */
-export const GRACE_DAYS_MAX = 7;
-export const GRACE_DAYS_DEFAULT = 1;
-export const GRACE_DAYS_CHOICES = Array.from(
-  { length: GRACE_DAYS_MAX + 1 },
-  (_, i) => String(i)
-);
 export const graceDaysSchema = z
   .string()
   .refine(v => GRACE_DAYS_CHOICES.includes(v), 'From 0 to 7 days.');

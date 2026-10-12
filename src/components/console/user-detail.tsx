@@ -8,10 +8,9 @@ import {
   UserShield
 } from 'lucide-react';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { type BillingInterval, type SubscriptionStatus } from '@/types/payment';
 import { describeMultiplier } from '@/lib/billing';
-import { CAPABILITIES } from '@/lib/constant';
+import { CAPABILITIES, DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { quotaQueries } from '@/server/functions/quota';

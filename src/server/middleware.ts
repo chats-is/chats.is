@@ -1,6 +1,6 @@
 import { createMiddleware } from '@tanstack/react-start';
 
-import { UNAUTHORIZED } from '@/lib/auth-error';
+import { UNAUTHORIZED } from '@/lib/constant';
 
 import { getUser } from './session';
 

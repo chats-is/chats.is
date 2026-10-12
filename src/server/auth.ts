@@ -4,12 +4,12 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP } from 'better-auth/plugins/email-otp';
 import { tanstackStartCookies } from 'better-auth/tanstack-start';
-import { count, eq, sql } from 'drizzle-orm';
 
 import { sendVerificationCode } from '@/lib/email';
 import { env } from '@/lib/env';
 import { db } from '@/db';
 import { accounts, sessions, users, verifications } from '@/db/schema';
+import { makeFirstUserAdmin } from '@/server/services/user';
 
 /**
  * Two rules the app depends on, stated here because nothing else enforces them:
@@ -89,32 +89,7 @@ export const auth = betterAuth({
           if (user.name.trim()) return;
           return { data: { ...user, name: user.email.split('@')[0] } };
         },
-        after: async user => {
-          // Counted rather than assumed, so it stays correct if the first
-          // admin is later demoted and someone else signs up.
-          //
-          // Under a lock, because counting and promoting are two statements:
-          // two people signing up to an empty install at once would each
-          // count none, and each be made admin. The lock is the
-          // transaction's, so the second waits and then counts one.
-          await db.transaction(async tx => {
-            await tx.execute(
-              sql`select pg_advisory_xact_lock(hashtext('first-admin'))`
-            );
-
-            const [admins] = await tx
-              .select({ value: count() })
-              .from(users)
-              .where(eq(users.role, 'admin'));
-
-            if (admins?.value === 0) {
-              await tx
-                .update(users)
-                .set({ role: 'admin' })
-                .where(eq(users.id, user.id));
-            }
-          });
-        }
+        after: user => makeFirstUserAdmin(user.id)
       }
     }
   }

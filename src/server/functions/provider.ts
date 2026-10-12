@@ -3,7 +3,6 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { type z } from 'zod';
 
 import { modelSyncSchema } from '@/types/model';
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   providerCreateSchema,
   providerIdSchema,
@@ -12,6 +11,7 @@ import {
   providerToggleSchema,
   providerUpdateSchema
 } from '@/types/provider';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
 import * as providers from '@/server/services/provider';
 

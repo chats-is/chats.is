@@ -3,7 +3,6 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { type z } from 'zod';
 
 import { modelIdSchema } from '@/types/model';
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   pricingIdSchema,
   pricingListSchema,
@@ -12,6 +11,7 @@ import {
   syncRunSchema,
   syncTargetSchema
 } from '@/types/pricing';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
 import * as pricing from '@/server/services/pricing';
 import * as pricingSync from '@/server/services/pricing-sync';

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { type MEDIA_TOOL_NAMES } from '@/lib/constant';
+
 import { artifactTypeSchema } from './artifact';
 
 // Zod input schemas for the chat tools (create_artifact + media generation).
@@ -189,15 +191,11 @@ export type TranscribeToolOutput =
   | { status: 'done'; text: string; durationInSeconds?: number }
   | ToolErrorOutput;
 
-export const mediaToolNames = [
-  'generate_image',
-  'edit_image',
-  'generate_video',
-  'edit_video',
-  'text_to_speech'
-] as const;
+export type MediaToolName = (typeof MEDIA_TOOL_NAMES)[number];
 
-export type MediaToolName = (typeof mediaToolNames)[number];
+/** Media tool names plus transcription (separate output shape, same prompt). */
+export type ChatMediaToolName =
+  MediaToolName | 'transcribe_audio' | 'edit_video';
 
 export const webSearchInputSchema = z.object({
   query: z

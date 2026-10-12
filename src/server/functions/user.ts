@@ -1,13 +1,13 @@
 import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   profileUpdateSchema,
   userIdSchema,
   userRoleSchema,
   userSearchSchema
 } from '@/types/user';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import { PublicError } from '@/server/public-error';
 import { isOwnBlobUrl } from '@/server/services/blob';

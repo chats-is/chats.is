@@ -7,7 +7,7 @@ import {
   type PricingSyncResult,
   type ProviderType
 } from '@/types';
-import { BedrockModels, VertexAIModels } from '@/lib/constant';
+import { BEDROCK_MODELS, VERTEX_AI_MODELS } from '@/lib/constant';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, models } from '@/db/schema';
@@ -74,15 +74,15 @@ async function fetchRemote(source: PricingSource): Promise<RemoteData> {
  * Most providers map 1:1 (same name) and the modelId is used as-is. Two
  * exceptions:
  *   - `bedrock`  : remote provider is `amazon-bedrock`; the modelId must be
- *                  translated via BedrockModels (e.g. claude-opus-4-5 →
+ *                  translated via BEDROCK_MODELS (e.g. claude-opus-4-5 →
  *                  anthropic.claude-opus-4-5-20251101-v1:0).
  *   - `vertex`   : Anthropic-on-Vertex models go under `google-vertex-anthropic`
- *                  with the @date-suffixed modelId from VertexAIModels;
+ *                  with the @date-suffixed modelId from VERTEX_AI_MODELS;
  *                  Gemini-on-Vertex stays under `google-vertex` with the
  *                  modelId as-is.
  *
  * Returns null if a translation is required but not configured (e.g. a
- * Bedrock model whose modelId isn't in BedrockModels).
+ * Bedrock model whose modelId isn't in BEDROCK_MODELS).
  *
  * Both models.dev and llm-metadata use the same provider keys, so a single
  * mapping covers both sources.
@@ -93,12 +93,12 @@ function resolveRemoteRef(
 ): { providerId: string; modelId: string } | null {
   switch (type) {
     case 'bedrock': {
-      const remoteId = BedrockModels[modelId];
+      const remoteId = BEDROCK_MODELS[modelId];
       if (!remoteId) return null;
       return { providerId: 'amazon-bedrock', modelId: remoteId };
     }
     case 'vertex': {
-      const claudeId = VertexAIModels[modelId];
+      const claudeId = VERTEX_AI_MODELS[modelId];
       if (claudeId) {
         return { providerId: 'google-vertex-anthropic', modelId: claudeId };
       }

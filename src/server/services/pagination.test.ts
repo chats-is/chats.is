@@ -26,6 +26,7 @@ vi.mock('@/db', () => ({
     return h.db;
   }
 }));
+vi.mock('@/lib/env', () => ({ env: {} }));
 
 // The provider service masks keys through lib/crypto, which reads the server
 // env on import. Key handling is not what these tests are about, so it is

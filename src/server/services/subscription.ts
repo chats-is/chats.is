@@ -22,8 +22,6 @@ import { pageWindow } from '@/types/pagination';
 import {
   canUpgrade,
   isDuplicate,
-  LIVE_STATUSES,
-  REFUNDABLE_STATUSES,
   refundLeftMinor,
   toAmount,
   type approveRefundRequestSchema,
@@ -37,6 +35,7 @@ import {
   type subscriptionListSchema,
   type SubscriptionReason
 } from '@/types/payment';
+import { LIVE_STATUSES, REFUNDABLE_STATUSES } from '@/lib/constant';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import {
@@ -409,8 +408,7 @@ async function customerOf(userId: string, processor: PaymentProcessorId) {
 }
 
 /** What the user is told when the processor cannot open a checkout. */
-export const CHECKOUT_FAILED =
-  'Checkout could not be opened. Please try again.';
+const CHECKOUT_FAILED = 'Checkout could not be opened. Please try again.';
 
 /** Start buying a plan: its processor's checkout page. */
 export async function startCheckout(

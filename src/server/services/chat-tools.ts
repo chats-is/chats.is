@@ -16,15 +16,11 @@ import {
   type Model,
   type TranscribeToolOutput
 } from '@/types';
+import { type ChatMediaToolName } from '@/types/chat-tools';
 import { collectConversationMediaUrls } from '@/lib/chat-media-urls';
-import {
-  buildMediaToolsSystemPrompt,
-  MediaToolGuidance,
-  type ChatMediaToolName
-} from '@/lib/constant';
+import { AUTO_OPTION, MEDIA_TOOL_GUIDANCE } from '@/lib/constant';
 import { generateAndStoreImage } from '@/lib/image-generation';
 import {
-  AUTO_OPTION,
   pickAspectRatio,
   pickDuration,
   pickResolution,
@@ -65,7 +61,7 @@ import {
  * is minutes in which any number of them would be let through. The count is
  * what is certain before anything has been charged, so it is what is limited.
  */
-export const MAX_MEDIA_CALLS_PER_TURN = 4;
+const MAX_MEDIA_CALLS_PER_TURN = 4;
 
 /** The most a tool will read of a file it was pointed at. */
 const MAX_TOOL_MEDIA_BYTES = 25 * 1024 * 1024;
@@ -169,6 +165,48 @@ function optionsHint(
 ): string {
   const listed = values?.filter(value => value !== AUTO_OPTION);
   return listed?.length ? ` Available ${label}: ${listed.join(', ')}.` : '';
+}
+
+/** The rules that hold for every media tool; what each one is for is on the
+ *  tool. Nothing when no media tool is registered. */
+export function buildMediaToolsSystemPrompt(
+  tools: ChatMediaToolName[]
+): string {
+  if (tools.length === 0) return '';
+  const has = (...names: ChatMediaToolName[]) =>
+    names.some(name => tools.includes(name));
+
+  // Each part is said only when a tool it speaks of is there: a prompt that
+  // talks of generated media with only transcription on offer has the model
+  // looking for tools it was never given.
+  const formats = has('generate_image', 'generate_video', 'text_to_speech');
+  const producesMedia = has(
+    'generate_image',
+    'edit_image',
+    'generate_video',
+    'edit_video',
+    'text_to_speech'
+  );
+  const transcribes = has('transcribe_audio');
+
+  const handling = [
+    producesMedia &&
+      'The generated media renders automatically in the chat from the tool result — do NOT create an artifact for it, and do NOT print the raw URL or embed it in markdown. After the tool returns, add one short sentence describing the result.',
+    transcribes &&
+      'A transcript is not displayed, so write it out yourself — quote what was said, then answer whatever was asked about it.',
+    'If the tool returns an error, nothing about it is shown to the user, so tell them yourself: one plain sentence saying what could not be done, and where there is an obvious next step (trying again, wording it differently, asking for a different kind of media) offer it. Say it in your own words — do not quote the error, name the media model that failed, or mention settings pages. Do not retry the tool on your own.'
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return [
+    'You also have media tools; each says what it is for.',
+    formats &&
+      "When the user's wording implies a format, map it to one of the values listed in the tool description (e.g. portrait/竖版 → 9:16, square → 1:1, HD/高清 → a higher resolution, a stated length → the closest duration) and pass it; otherwise omit those fields. What you pass is a suggestion for what the user did not settle: anything they chose in the app's own settings is used instead, and where neither says anything the model's first listed value applies.",
+    handling
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 /**
@@ -410,7 +448,7 @@ export async function buildMediaTools(args: {
       const { dbModel } = image;
       tools.generate_image = tool({
         description:
-          MediaToolGuidance.generate_image +
+          MEDIA_TOOL_GUIDANCE.generate_image +
           optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
           optionsHint('sizes', dbModel.uiOptions?.sizes) +
           optionsHint('resolutions', dbModel.uiOptions?.resolutions),
@@ -441,7 +479,7 @@ export async function buildMediaTools(args: {
       imageEdit ?? (image?.dbModel.supportsImageEdit ? image : null);
 
     tools.edit_image = tool({
-      description: MediaToolGuidance.edit_image,
+      description: MEDIA_TOOL_GUIDANCE.edit_image,
       inputSchema: editImageInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
         if (!editor) {
@@ -476,7 +514,7 @@ export async function buildMediaTools(args: {
         // description that says "short" beside a list ending in 60 contradicts
         // it.
         (videoImage || dbModel.supportsImageToVideo
-          ? MediaToolGuidance.generate_video
+          ? MEDIA_TOOL_GUIDANCE.generate_video
           : 'Create a video from a text description.') +
         optionsHint('sizes', dbModel.uiOptions?.sizes) +
         optionsHint('aspect ratios', dbModel.uiOptions?.aspectRatios) +
@@ -589,7 +627,7 @@ export async function buildMediaTools(args: {
     const { dbModel, candidates } = videoEdit;
 
     tools.edit_video = tool({
-      description: MediaToolGuidance.edit_video,
+      description: MEDIA_TOOL_GUIDANCE.edit_video,
       inputSchema: editVideoInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
         // The provider fetches the source itself, so this checks the URL
@@ -676,7 +714,7 @@ export async function buildMediaTools(args: {
 
     tools.text_to_speech = tool({
       description:
-        MediaToolGuidance.text_to_speech +
+        MEDIA_TOOL_GUIDANCE.text_to_speech +
         optionsHint('voices', dbModel.uiOptions?.voices),
       inputSchema: textToSpeechInputSchema,
       execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
@@ -730,7 +768,7 @@ export async function buildMediaTools(args: {
     const { dbModel, candidates } = stt;
 
     tools.transcribe_audio = tool({
-      description: MediaToolGuidance.transcribe_audio,
+      description: MEDIA_TOOL_GUIDANCE.transcribe_audio,
       inputSchema: transcribeAudioInputSchema,
       execute: async (
         input,

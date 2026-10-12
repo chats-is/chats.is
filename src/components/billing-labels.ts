@@ -1,10 +1,9 @@
 import {
   billingIntervalOf,
-  PAYMENT_KIND_LABELS,
-  PAYMENT_PROCESSORS,
   type BillingInterval,
   type PaymentKind
 } from '@/types/payment';
+import { PAYMENT_KIND_LABELS, PAYMENT_PROCESSORS } from '@/lib/constant';
 
 /** A processor's name as the pages show it. */
 export function processorLabelOf(id: string): string {

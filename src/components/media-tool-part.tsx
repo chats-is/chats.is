@@ -1,7 +1,8 @@
 import { usePreferencesIfAny } from '@/contexts/preferences-context';
 import { Loader2 } from 'lucide-react';
 
-import { mediaToolNames, type ChatMessage, type MediaToolName } from '@/types';
+import { type ChatMessage, type MediaToolName } from '@/types';
+import { MEDIA_TOOL_NAMES } from '@/lib/constant';
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaLightbox } from '@/components/media-lightbox';
 import { MediaPlaceholder } from '@/components/media-placeholder';
@@ -15,7 +16,7 @@ export type MediaToolUIPart = Extract<
 export function isMediaToolPart(
   part: ChatMessage['parts'][number]
 ): part is MediaToolUIPart {
-  return mediaToolNames.some(name => part.type === `tool-${name}`);
+  return MEDIA_TOOL_NAMES.some(name => part.type === `tool-${name}`);
 }
 
 export type TranscribeToolUIPart = Extract<

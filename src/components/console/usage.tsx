@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
-import { CAPABILITIES } from '@/lib/constant';
+import { CAPABILITIES, DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
 import { usageQueries } from '@/server/functions/usage';

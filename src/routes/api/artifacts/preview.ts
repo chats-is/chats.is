@@ -5,8 +5,8 @@ import { z } from 'zod';
 
 import { type User } from '@/types';
 import { looksLikeJsx, validatePreviewImports } from '@/lib/artifact';
-import { UNAUTHORIZED } from '@/lib/auth-error';
 import { normalizeCodeLanguage } from '@/lib/code-language';
+import { UNAUTHORIZED } from '@/lib/constant';
 import { optionalAuthRequest } from '@/server/middleware';
 import { getSharedArtifact } from '@/server/services/share';
 

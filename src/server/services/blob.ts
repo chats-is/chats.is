@@ -4,6 +4,7 @@ import { del } from '@vercel/blob';
 import { and, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
 
 import { isTrustedMediaUrl } from '@/lib/chat-media-urls';
+import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env.public';
 import { db } from '@/db';
 import { artifacts, messages, prompts, users } from '@/db/schema';
@@ -23,9 +24,7 @@ import { artifacts, messages, prompts, users } from '@/db/schema';
 export function isOwnBlobUrl(url: string): boolean {
   if (!isTrustedMediaUrl(url)) return false;
 
-  const [, , , storeId = ''] = (process.env.BLOB_READ_WRITE_TOKEN ?? '').split(
-    '_'
-  );
+  const [, , , storeId = ''] = env.BLOB_READ_WRITE_TOKEN.split('_');
   if (!storeId) return true;
 
   return (

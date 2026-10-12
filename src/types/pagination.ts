@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
+
 /**
  * Paging, as every console table asks for it.
  *
@@ -9,9 +11,6 @@ import { z } from 'zod';
  * is `{ rows, total, page, pageSize }`, spelled out at each one so the row type
  * stays inferred rather than named.
  */
-
-/** One page size for the whole console, tables and logs alike. */
-export const DEFAULT_PAGE_SIZE = 10;
 
 /** `page` is 1-based, so an absent page and `?page=1` mean the same view. */
 export const paginationSchema = z.object({

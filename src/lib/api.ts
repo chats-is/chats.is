@@ -1,8 +1,9 @@
 import { upload } from '@vercel/blob/client';
 
 import { type Attachment, type Result } from '@/types';
+import { UPLOAD_CONFIG } from '@/lib/constant';
 import { publicEnv } from '@/lib/env.public';
-import { UPLOAD_CONFIG, type UploadType } from '@/lib/upload-config';
+import { type UploadType } from '@/lib/upload-config';
 import { generateUUID } from '@/lib/utils';
 
 export const createSpeech = async (

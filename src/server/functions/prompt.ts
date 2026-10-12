@@ -5,7 +5,6 @@ import {
   queryOptions
 } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   promptCreateSchema,
   promptIdSchema,
@@ -13,6 +12,7 @@ import {
   promptPageSchema,
   promptUpdateSchema
 } from '@/types/prompt';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import * as prompts from '@/server/services/prompt';
 

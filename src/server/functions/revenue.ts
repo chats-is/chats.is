@@ -1,9 +1,9 @@
 import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { revenueLossUsersSchema } from '@/types/revenue';
 import { usageRangeSchema } from '@/types/usage';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
 import * as revenue from '@/server/services/revenue';
 

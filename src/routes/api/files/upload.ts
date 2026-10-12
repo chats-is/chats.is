@@ -1,12 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 
+import { UPLOAD_CONFIG } from '@/lib/constant';
 import { publicEnv } from '@/lib/env.public';
-import {
-  isUploadType,
-  maxSizeForPathname,
-  UPLOAD_CONFIG
-} from '@/lib/upload-config';
+import { isUploadType, maxSizeForPathname } from '@/lib/upload-config';
 import { getUser } from '@/server/session';
 
 export const Route = createFileRoute('/api/files/upload')({

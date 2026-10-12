@@ -1,11 +1,11 @@
 import { useLocation } from '@tanstack/react-router';
 
-import { ConsoleNavigation } from '@/lib/console-navigation';
+import { CONSOLE_NAVIGATION } from '@/lib/constant';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export function ConsoleHeader() {
   const pathname = useLocation({ select: l => l.pathname });
-  const currentItem = ConsoleNavigation.navMain.find(item =>
+  const currentItem = CONSOLE_NAVIGATION.navMain.find(item =>
     item.url === '/console'
       ? pathname === item.url
       : pathname.startsWith(item.url)

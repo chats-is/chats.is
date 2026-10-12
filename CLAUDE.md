@@ -110,7 +110,7 @@ src/
 │   └── auth.ts, session.ts, public-error.ts
 ├── db/               schema.ts + migrations/
 ├── types/            zod schemas and types, client-safe
-├── lib/              technical utilities
+├── lib/              technical utilities; constant.ts holds the exported constants
 ├── hooks/, contexts/
 ├── components/       flat, with only artifacts/, console/ and ui/ grouped
 │   └── ui/           shadcn/ui components
@@ -126,6 +126,11 @@ schema both validates a server function and drives the form that submits to it.
 `services/` is the business layer, and business code reaches the database only from there. `functions/` is the
 surface the client calls: it validates, applies auth, and hands off to a service. A domain gets a file in each layer it
 needs, usually under the same name, so the three directories run parallel.
+
+**Types and constants.** Types and zod schemas live in `types/`. A constant that is exported for
+other files to use lives in `lib/constant.ts`; one that is not exported belongs to its own file and
+stays there. A constant is named in capitals with underscores, `BILLING_INTERVALS`, so it is told
+from a type (`BillingInterval`) or a function (`billingIntervalOf`) by its name alone.
 
 **Routing is file-based.** `src/routes/` is the only directory where the path on disk becomes a URL.
 Pages live there as layouts and routes; `routes/api/` holds the server routes that need to own the

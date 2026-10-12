@@ -6,14 +6,13 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import {
-  BILLING_INTERVALS,
   billingIntervalOf,
   billingIntervalSchema,
-  PAYMENT_PROCESSORS,
   paymentProcessorSchema,
   type PaymentProcessorId
 } from '@/types/payment';
 import { describeMultiplier } from '@/lib/billing';
+import { BILLING_INTERVALS, PAYMENT_PROCESSORS } from '@/lib/constant';
 import { formatPrice } from '@/lib/format-amount';
 import { mutating } from '@/lib/mutation';
 import { useEditRecord } from '@/hooks/use-edit-record';

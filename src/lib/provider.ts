@@ -30,8 +30,9 @@ import {
   type ProviderType,
   type VertexServiceAccountKey
 } from '@/types';
+import { PROVIDER_FAILURE_MESSAGE } from '@/lib/constant';
 
-import { BedrockModels, VertexAIModels } from './constant';
+import { BEDROCK_MODELS, VERTEX_AI_MODELS } from './constant';
 import { decrypt } from './crypto';
 import { hasOwnWebSearch } from './web-search';
 
@@ -66,14 +67,14 @@ function getProviderBaseUrl(provider: ProviderConfig) {
  * Convert model ID to Vertex AI format if needed
  */
 function toVertexModelId(modelId: string): string {
-  return VertexAIModels[modelId] || modelId;
+  return VERTEX_AI_MODELS[modelId] || modelId;
 }
 
 /**
  * Convert model ID to AWS Bedrock format if needed
  */
 function toBedrockModelId(modelId: string): string {
-  return BedrockModels[modelId] || modelId;
+  return BEDROCK_MODELS[modelId] || modelId;
 }
 
 /**
@@ -262,17 +263,6 @@ export function resolveModelId(candidate: Candidate, modelId: string): string {
   const routed = candidate.routedModelId?.trim();
   return routed || toProviderModelId(candidate.type, modelId);
 }
-
-/**
- * What a reader is told when none of a model's providers answered.
- *
- * Addressed to the person looking at a chat, not to whoever runs the install:
- * which providers were tried and what each said goes to the log. Retrying is
- * worth a try — unlike a model that does not resolve at all, this one failed
- * in flight and may not next time.
- */
-export const PROVIDER_FAILURE_MESSAGE =
-  'This model is currently unavailable. Please try again or choose a different model.';
 
 export class AllProvidersFailedError extends Error {
   constructor(

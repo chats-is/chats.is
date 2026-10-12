@@ -1,4 +1,4 @@
-import { UPLOAD_CONFIG } from '@/lib/upload-config';
+import { UPLOAD_CONFIG } from '@/lib/constant';
 
 /** Whether this browser can capture the screen — desktop ones can, phones
  *  and some embedded views cannot. */

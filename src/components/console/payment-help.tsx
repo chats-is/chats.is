@@ -1,7 +1,8 @@
 import { Fragment, useState } from 'react';
 import { Info } from 'lucide-react';
 
-import { PAYMENT_PROCESSORS, type PaymentProcessorId } from '@/types/payment';
+import { type PaymentProcessorId } from '@/types/payment';
+import { PAYMENT_PROCESSORS } from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {

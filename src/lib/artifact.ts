@@ -7,7 +7,7 @@ export type ArtifactKind = 'text' | 'code' | 'image' | 'sheet' | 'file';
  * Kept as a single source of truth so the chat tool, the artifact router and
  * the preview compile endpoint all agree on what "previewable" means.
  */
-export const PREVIEWABLE_CODE_LANGUAGES = new Set([
+const PREVIEWABLE_CODE_LANGUAGES = new Set([
   'react',
   'tsx',
   'jsx',
@@ -20,7 +20,7 @@ export const PREVIEWABLE_CODE_LANGUAGES = new Set([
  * curated set of libraries bundled from our own origin (no external CDN), so
  * previews stay fully offline.
  */
-export const PREVIEW_ALLOWED_IMPORTS = new Set([
+const PREVIEW_ALLOWED_IMPORTS = new Set([
   'react',
   'react-dom',
   'react-dom/client',
@@ -35,11 +35,11 @@ export const PREVIEW_ALLOWED_IMPORTS = new Set([
  * Matches `import ... from 'x'`, side-effect `import 'x'`, dynamic `import('x')`
  * and `require('x')`.
  */
-export const PREVIEW_IMPORT_RE =
+const PREVIEW_IMPORT_RE =
   /\bimport\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]|\bimport\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\brequire\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 /** A relative file path that ends in an extension, e.g. `components/Button.tsx`. */
-export const ARTIFACT_FILENAME_RE = /^[A-Za-z0-9._/-]+\.[A-Za-z0-9]+$/;
+const ARTIFACT_FILENAME_RE = /^[A-Za-z0-9._/-]+\.[A-Za-z0-9]+$/;
 
 export const looksLikeJsx = (code: string): boolean =>
   /<\s*[A-Za-z][\w:-]*(\s|\/?>)/.test(code) || /<>\s*/.test(code);

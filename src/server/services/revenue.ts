@@ -17,8 +17,9 @@ import {
 import { type z } from 'zod';
 
 import { pageWindow } from '@/types/pagination';
-import { BILLING_INTERVALS, billingIntervalOf } from '@/types/payment';
+import { billingIntervalOf } from '@/types/payment';
 import { type revenueLossUsersSchema } from '@/types/revenue';
+import { BILLING_INTERVALS } from '@/lib/constant';
 import { db } from '@/db';
 import { payments, plans, subscriptions, usage, users } from '@/db/schema';
 

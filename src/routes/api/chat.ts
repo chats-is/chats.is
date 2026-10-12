@@ -38,7 +38,10 @@ import {
   normalizeChatUsage,
   sumChatUsage
 } from '@/lib/chat-usage';
-import { ArtifactSystemPrompt } from '@/lib/constant';
+import {
+  ARTIFACT_SYSTEM_PROMPT,
+  PROVIDER_FAILURE_MESSAGE
+} from '@/lib/constant';
 import { fitToContext } from '@/lib/context-window';
 import { pickEffort } from '@/lib/media-options';
 import { markStopped } from '@/lib/message-content';
@@ -46,7 +49,6 @@ import {
   AllProvidersFailedError,
   getLanguageModel,
   isRetryableProviderError,
-  PROVIDER_FAILURE_MESSAGE,
   resolveModelId
 } from '@/lib/provider';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
@@ -909,7 +911,7 @@ async function POST({
         // model can still reference them via the media tools.
         const instructions = [
           systemMessage,
-          ArtifactSystemPrompt,
+          ARTIFACT_SYSTEM_PROMPT,
           mediaTools.systemPrompt,
           search.systemPrompt
         ]

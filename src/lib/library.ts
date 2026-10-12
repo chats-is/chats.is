@@ -1,8 +1,5 @@
-import {
-  mediaToolNames,
-  type ChatMessage,
-  type MediaToolOutput
-} from '@/types';
+import { type ChatMessage, type MediaToolOutput } from '@/types';
+import { MEDIA_TOOL_NAMES } from '@/lib/constant';
 
 /** A generated media entry surfaced in the Library, extracted from a
  *  persisted assistant message (file part or media tool output). */
@@ -25,7 +22,7 @@ export type LibraryMediaItem = {
 // Derived from the canonical tool list so a newly added media tool can't be
 // silently missing from the Library.
 const MEDIA_TOOL_PART_TYPES = new Set<string>(
-  mediaToolNames.map(name => `tool-${name}`)
+  MEDIA_TOOL_NAMES.map(name => `tool-${name}`)
 );
 
 function kindFromMediaType(mediaType: string): LibraryMediaItem['kind'] | null {

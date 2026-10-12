@@ -2,8 +2,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { del } from '@vercel/blob';
 
 import { type User } from '@/types';
+import { UPLOAD_CONFIG } from '@/lib/constant';
 import { publicEnv } from '@/lib/env.public';
-import { UPLOAD_CONFIG } from '@/lib/upload-config';
 import { authedRequest } from '@/server/middleware';
 import { isOwnBlobUrl } from '@/server/services/blob';
 

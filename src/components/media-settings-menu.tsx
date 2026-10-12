@@ -22,11 +22,11 @@ import {
 } from 'lucide-react';
 
 import { type ChatMessage, type Model, type ProviderType } from '@/types';
+import { MEDIA_OPTION_LABELS } from '@/lib/constant';
 import {
   allowedValues,
   chooseValue,
   defaultValue,
-  MediaOptionLabels,
   optionLabel,
   optionShape,
   type MediaOptionKey,
@@ -279,7 +279,7 @@ function MediaKind({
                 <span className="flex size-4 shrink-0 items-center justify-center">
                   <OptionIcon className="size-3.5" />
                 </span>
-                {MediaOptionLabels[row.key]}
+                {MEDIA_OPTION_LABELS[row.key]}
               </DropdownMenuLabel>
               {row.allowed.map(value => {
                 const ShapeIcon = ShapeIcons[optionShape(row.key, value)];

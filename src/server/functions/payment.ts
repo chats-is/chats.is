@@ -1,12 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   paymentIdSchema,
   paymentListSchema,
   refundPaymentSchema
 } from '@/types/payment';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import * as payment from '@/server/services/payment';
 import * as subscription from '@/server/services/subscription';

@@ -17,6 +17,7 @@ vi.mock('@/db', () => ({
     return h.db;
   }
 }));
+vi.mock('@/lib/env', () => ({ env: {} }));
 
 const { createTurn, listMessages, truncateAfter } = await import('./message');
 

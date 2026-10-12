@@ -1,7 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import {
   quotaAssignSchema,
   quotaCreateSchema,
@@ -10,6 +9,7 @@ import {
   quotaUpdateSchema,
   quotaUserSchema
 } from '@/types/quota';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import * as quotas from '@/server/services/quota';
 
