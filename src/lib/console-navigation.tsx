@@ -1,5 +1,6 @@
 import {
   CalendarCheck,
+  ChartLine,
   CircleDollarSign,
   Cpu,
   CreditCard,
@@ -21,6 +22,11 @@ export const ConsoleNavigation = {
       title: 'Overview',
       url: '/console',
       icon: LayoutGrid
+    },
+    {
+      title: 'Revenue',
+      url: '/console/revenue',
+      icon: ChartLine
     },
     {
       title: 'Usage',

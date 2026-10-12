@@ -30,6 +30,7 @@ import { Route as ConsolePromptsRouteImport } from './routes/console/prompts'
 import { Route as ConsoleProvidersRouteImport } from './routes/console/providers'
 import { Route as ConsoleQuotasRouteImport } from './routes/console/quotas'
 import { Route as ConsoleRefundRequestsRouteImport } from './routes/console/refund-requests'
+import { Route as ConsoleRevenueRouteImport } from './routes/console/revenue'
 import { Route as ConsoleSettingsRouteImport } from './routes/console/settings'
 import { Route as ConsoleSubscriptionsRouteImport } from './routes/console/subscriptions'
 import { Route as ConsoleTiersRouteImport } from './routes/console/tiers'
@@ -148,6 +149,11 @@ const ConsoleRefundRequestsRoute = ConsoleRefundRequestsRouteImport.update({
   path: '/refund-requests',
   getParentRoute: () => ConsoleRoute,
 } as any)
+const ConsoleRevenueRoute = ConsoleRevenueRouteImport.update({
+  id: '/revenue',
+  path: '/revenue',
+  getParentRoute: () => ConsoleRoute,
+} as any)
 const ConsoleSettingsRoute = ConsoleSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -235,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
   '/console/refund-requests': typeof ConsoleRefundRequestsRoute
+  '/console/revenue': typeof ConsoleRevenueRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
@@ -268,6 +275,7 @@ export interface FileRoutesByTo {
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
   '/console/refund-requests': typeof ConsoleRefundRequestsRoute
+  '/console/revenue': typeof ConsoleRevenueRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/console/providers': typeof ConsoleProvidersRoute
   '/console/quotas': typeof ConsoleQuotasRoute
   '/console/refund-requests': typeof ConsoleRefundRequestsRoute
+  '/console/revenue': typeof ConsoleRevenueRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
@@ -343,6 +352,7 @@ export interface FileRouteTypes {
     | '/console/providers'
     | '/console/quotas'
     | '/console/refund-requests'
+    | '/console/revenue'
     | '/console/settings'
     | '/console/subscriptions'
     | '/console/tiers'
@@ -376,6 +386,7 @@ export interface FileRouteTypes {
     | '/console/providers'
     | '/console/quotas'
     | '/console/refund-requests'
+    | '/console/revenue'
     | '/console/settings'
     | '/console/subscriptions'
     | '/console/tiers'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/console/providers'
     | '/console/quotas'
     | '/console/refund-requests'
+    | '/console/revenue'
     | '/console/settings'
     | '/console/subscriptions'
     | '/console/tiers'
@@ -595,6 +607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleRefundRequestsRouteImport
       parentRoute: typeof ConsoleRoute
     }
+    '/console/revenue': {
+      id: '/console/revenue'
+      path: '/revenue'
+      fullPath: '/console/revenue'
+      preLoaderRoute: typeof ConsoleRevenueRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
     '/console/settings': {
       id: '/console/settings'
       path: '/settings'
@@ -714,6 +733,7 @@ interface ConsoleRouteChildren {
   ConsoleProvidersRoute: typeof ConsoleProvidersRoute
   ConsoleQuotasRoute: typeof ConsoleQuotasRoute
   ConsoleRefundRequestsRoute: typeof ConsoleRefundRequestsRoute
+  ConsoleRevenueRoute: typeof ConsoleRevenueRoute
   ConsoleSettingsRoute: typeof ConsoleSettingsRoute
   ConsoleSubscriptionsRoute: typeof ConsoleSubscriptionsRoute
   ConsoleTiersRoute: typeof ConsoleTiersRoute
@@ -732,6 +752,7 @@ const ConsoleRouteChildren: ConsoleRouteChildren = {
   ConsoleProvidersRoute: ConsoleProvidersRoute,
   ConsoleQuotasRoute: ConsoleQuotasRoute,
   ConsoleRefundRequestsRoute: ConsoleRefundRequestsRoute,
+  ConsoleRevenueRoute: ConsoleRevenueRoute,
   ConsoleSettingsRoute: ConsoleSettingsRoute,
   ConsoleSubscriptionsRoute: ConsoleSubscriptionsRoute,
   ConsoleTiersRoute: ConsoleTiersRoute,
