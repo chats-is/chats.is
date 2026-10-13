@@ -12,7 +12,7 @@ import { type ModelCapability, type ProviderType } from '@/types';
 import { CAPABILITIES, USAGE_GROUPINGS } from '@/lib/constant';
 import { formatDate, formatShortDate } from '@/lib/format-date';
 import { tokensOf } from '@/lib/usage-breakdown';
-import { cn, formatCount, formatNumber, formatUsd } from '@/lib/utils';
+import { formatCount, formatNumber, formatUsd } from '@/lib/utils';
 import { type adminUsageStats } from '@/server/functions/usage';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -71,21 +71,50 @@ const LINES = [
   }
 ] as const;
 
-/** Each line's mark in the legend, in place of a square: a short stroke in
- *  its colour, dotted or dashed as it is drawn. */
+/**
+ * A line's mark in place of a square, and as wide as the squares beside it:
+ * a short stroke in its colour, dotted or dashed as it is drawn — three dots
+ * or two dashes at any size. Drawn as shapes, since a border that short
+ * shows no gaps, and wrapped, as the legend takes an icon's own svg for
+ * 12px of grey.
+ */
+function LineMark({
+  line,
+  size
+}: {
+  line: (typeof LINES)[number];
+  size: number;
+}) {
+  const color = `var(--color-${line.key})`;
+  const mid = size / 2;
+  return (
+    <span className="flex shrink-0">
+      <svg width={size} height={size} aria-hidden>
+        {line.dash === 'dotted'
+          ? [1, mid, size - 1].map(x => (
+              <circle key={x} cx={x} cy={mid} r={1} fill={color} />
+            ))
+          : [0, mid + 1].map(x => (
+              <rect
+                key={x}
+                x={x}
+                y={mid - 1}
+                width={mid - 1}
+                height={2}
+                fill={color}
+              />
+            ))}
+      </svg>
+    </span>
+  );
+}
+
+/** Each line's mark in the legend, as wide as its squares. */
 const LINE_MARKS = Object.fromEntries(
   LINES.map(l => [
     l.key,
-    function LineMark() {
-      return (
-        <span
-          className={cn(
-            'w-4 shrink-0 border-t-2',
-            l.dash === 'dotted' ? 'border-dotted' : 'border-dashed'
-          )}
-          style={{ borderColor: `var(--color-${l.key})` }}
-        />
-      );
+    function LegendLineMark() {
+      return <LineMark line={l} size={8} />;
     }
   ])
 );
@@ -321,6 +350,13 @@ export function DailyUsageChart({
     };
   });
   type Day = (typeof data)[number];
+  /** A row of the tooltip: a group's square, a line's mark, or neither. */
+  type TipRow = {
+    label: string;
+    value: React.ReactNode;
+    color?: string;
+    line?: (typeof LINES)[number];
+  };
   const whole = (v: number) => formatNumber(Math.round(v));
 
   return (
@@ -394,9 +430,12 @@ export function DailyUsageChart({
                       }
                       // Only the two lines come to the tooltip — the areas
                       // stay out of it — and above the first, what the day's
-                      // calls used.
+                      // calls used: each group the chart draws that used any,
+                      // in the legend's order and with its mark, then the
+                      // whole. Each row is laid out as the other daily
+                      // chart's are, a row with no mark keeping its room.
                       formatter={(value, _name, item, index) => {
-                        const { figures } = item.payload as Day;
+                        const { figures, values } = item.payload as Day;
                         const media = mediaText(figures);
                         const line = LINES.find(l => l.key === item.dataKey);
                         return (
@@ -404,17 +443,30 @@ export function DailyUsageChart({
                             {[
                               ...(index === 0
                                 ? [
+                                    ...series
+                                      .filter(s => (values[s.id] ?? 0) > 0)
+                                      .map(s => ({
+                                        label: s.label,
+                                        color: s.color,
+                                        value: whole(values[s.id])
+                                      })),
                                     {
                                       label: 'Tokens',
                                       value: whole(tokensOf(figures))
                                     },
                                     ...(media
-                                      ? [{ label: 'Media', value: media }]
+                                      ? [
+                                          {
+                                            label: 'Media',
+                                            value: media
+                                          }
+                                        ]
                                       : [])
                                   ]
                                 : []),
                               {
                                 label: line?.label ?? '',
+                                line,
                                 value:
                                   line?.key === 'cost' ? (
                                     <Amount kind="cost" value={Number(value)} />
@@ -422,17 +474,29 @@ export function DailyUsageChart({
                                     formatUsd(Number(value))
                                   )
                               }
-                            ].map(row => (
+                            ].map((row: TipRow) => (
                               <div
                                 key={row.label}
-                                className="flex items-center justify-between gap-4 leading-none"
+                                className="flex items-center gap-2"
                               >
-                                <span className="text-muted-foreground">
-                                  {row.label}
-                                </span>
-                                <span className="font-mono font-medium text-foreground tabular-nums">
-                                  {row.value}
-                                </span>
+                                {row.line ? (
+                                  <LineMark line={row.line} size={10} />
+                                ) : (
+                                  <div
+                                    className="size-2.5 shrink-0 rounded-[2px]"
+                                    style={{
+                                      background: row.color ?? 'transparent'
+                                    }}
+                                  />
+                                )}
+                                <div className="flex flex-1 items-center justify-between gap-4 leading-none">
+                                  <span className="text-muted-foreground">
+                                    {row.label}
+                                  </span>
+                                  <span className="font-mono font-medium text-foreground tabular-nums">
+                                    {row.value}
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>
