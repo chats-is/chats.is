@@ -57,9 +57,10 @@ function useWindowFromSearch() {
 }
 
 /**
- * A report window kept in the address — the overview's stats and the usage
- * log read theirs the same way. Gives the days it covers, the value for the
- * filter, the exclusive end to query up to, and the setter.
+ * A report window kept in the address — the Overview, Usage, Revenue, the
+ * Logs and a user's page read theirs the same way. Gives the days it
+ * covers, the value for the filter, the exclusive end to query up to, and
+ * the setter.
  */
 export function useReportWindow() {
   const navigate = useNavigate();

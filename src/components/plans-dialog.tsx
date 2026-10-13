@@ -53,6 +53,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LocalTime } from '@/components/local-time';
 
 type PlanForSale = Awaited<ReturnType<typeof listPlansForSale>>[number];
@@ -313,24 +314,19 @@ function IntervalSwitch({
   onChange: (value: BillingInterval) => void;
 }) {
   return (
-    <div className="inline-flex h-8 items-center rounded-full border bg-muted/50 p-0.5">
-      {options.map(option => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => onChange(option)}
-          aria-pressed={value === option}
-          className={cn(
-            'inline-flex h-7 items-center rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors',
-            value === option
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          {billingIntervalOf(option).label}
-        </button>
-      ))}
-    </div>
+    <Tabs value={value} onValueChange={v => onChange(v as BillingInterval)}>
+      <TabsList className="rounded-full border bg-muted/50 p-0.5 group-data-[orientation=horizontal]/tabs:h-8">
+        {options.map(option => (
+          <TabsTrigger
+            key={option}
+            value={option}
+            className="rounded-full px-3"
+          >
+            {billingIntervalOf(option).label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }
 

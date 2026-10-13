@@ -1,6 +1,26 @@
 import { type UsageRowLike } from '@/types';
 import { effectiveMultiplier } from '@/lib/billing';
-import { formatNumber, formatUsd, parseNumber } from '@/lib/utils';
+import { formatCount, formatNumber, formatUsd, parseNumber } from '@/lib/utils';
+
+/** Every token a day's or a window's calls used. The buckets are stored
+ *  apart — input is the uncached part only, output the text only (see
+ *  normalizeChatUsage) — so the total is their sum, and matches what the
+ *  usage log counts per row. */
+export function tokensOf(t: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+}) {
+  return (
+    t.inputTokens +
+    t.cacheReadTokens +
+    t.cacheWriteTokens +
+    t.outputTokens +
+    t.reasoningTokens
+  );
+}
 
 /** One billed item of a usage row: how much, at what rate, for how much. */
 export type UsageItem = {
@@ -16,9 +36,6 @@ const num = (v: string | number | null | undefined) => parseNumber(v) ?? 0;
 const has = (v: string | null | undefined) => v != null && v !== '';
 /** To the ten places a cost is stored with, as the cost engine rounds. */
 const round = (n: number) => Math.round(n * 1e10) / 1e10;
-
-const count = (n: number, one: string) =>
-  `${formatNumber(n)} ${one}${n === 1 ? '' : 's'}`;
 
 /**
  * What a usage row was billed for, item by item, from the quantities and the
@@ -49,7 +66,7 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
     const rate = priced(price);
     items.push({
       label,
-      quantity: count(quantity, unit),
+      quantity: formatCount(quantity, unit),
       rate: `${formatUsd(rate)} / 1M ${unit}s`,
       subtotal: round((quantity * (rate ?? 0)) / 1_000_000)
     });
@@ -66,7 +83,9 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
     items.push({
       label,
       quantity:
-        unit === 's' ? `${formatNumber(quantity)} s` : count(quantity, unit),
+        unit === 's'
+          ? `${formatNumber(quantity)} s`
+          : formatCount(quantity, unit),
       rate: `${formatUsd(rate)} / ${unit}`,
       subtotal: round(quantity * (rate ?? 0))
     });
@@ -134,7 +153,7 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
 export function usageSummary(row: UsageRowLike): string {
   switch (row.capability) {
     case 'chat':
-      return count(
+      return formatCount(
         num(row.inputTokens) +
           num(row.cacheReadTokens) +
           num(row.cacheWriteTokens) +
@@ -145,18 +164,18 @@ export function usageSummary(row: UsageRowLike): string {
     case 'image': {
       // Billed on tokens, it says so, so the items beneath add up to it.
       const tokens = num(row.inputTokens) + num(row.outputTokens);
-      const images = count(num(row.imageCount), 'image');
+      const images = formatCount(num(row.imageCount), 'image');
       return num(row.imagePrice) > 0 || tokens === 0
         ? images
-        : `${images} · ${count(tokens, 'token')}`;
+        : `${images} · ${formatCount(tokens, 'token')}`;
     }
     case 'video':
       return num(row.videoSeconds) > 0
         ? `${formatNumber(num(row.videoSeconds))} s`
-        : count(num(row.videoCount), 'video');
+        : formatCount(num(row.videoCount), 'video');
     case 'audio':
       return num(row.audioCharacters) > 0
-        ? count(num(row.audioCharacters), 'char')
+        ? formatCount(num(row.audioCharacters), 'char')
         : `${formatNumber(num(row.audioSeconds))} s`;
   }
 }

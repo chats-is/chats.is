@@ -44,6 +44,11 @@ export function formatNumber(n: number): string {
   return Number(n).toLocaleString();
 }
 
+/** A count and what it counts, one or many (e.g. 1 → "1 image", 3 → "3 images"). */
+export function formatCount(n: number, one: string): string {
+  return `${formatNumber(n)} ${one}${n === 1 ? '' : 's'}`;
+}
+
 /**
  * Format a USD amount preserving full precision (matches the `numeric(20,10)`
  * DB scale) with trailing zeros trimmed, so displayed cost/price always equals
@@ -63,8 +68,8 @@ export function formatUsd(v: string | number | null | undefined): string {
  *
  * Runs in the browser, so `new Date(y, m, d)` resolves against the user's local
  * timezone — the returned Date is an absolute instant. Sent to the server as
- * `from` for a pure `createdAt >= from` (timestamptz) comparison, so the KPI
- * window and the local-day chart buckets cover exactly the same N calendar days.
+ * `from` for a pure `createdAt >= from` (timestamptz) comparison, so the
+ * totals and the days of a report cover exactly the same N calendar days.
  */
 export function reportWindowStart(days: number): Date {
   const now = new Date();

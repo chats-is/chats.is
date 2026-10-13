@@ -1,7 +1,7 @@
 import { type RowData } from '@tanstack/react-table';
 
 import { CELL_WIDTHS, DEFAULT_PAGE_SIZE } from '@/lib/constant';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -145,24 +145,31 @@ export function ConsoleTableSkeleton<TData extends RowData>({
   );
 }
 
-/** The console home, whose page is a grid of counts. */
-export function ConsoleCardsSkeleton({ count = 4 }: { count?: number }) {
+/**
+ * One chart's card while its days are on their way, as tall as the chart
+ * that comes: a daily line chart's, or with `grouped`, the daily usage
+ * chart's — its switch of grouping beside the title, and a taller chart.
+ */
+export function ChartSkeleton({ grouped = false }: { grouped?: boolean }) {
+  if (grouped) {
+    return (
+      <Card className="py-0">
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-8 w-60 rounded-full" />
+          </div>
+          <Skeleton className="h-64 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: count }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="size-4 rounded" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Skeleton className="h-7 w-12" />
-              <Skeleton className="h-3 w-24" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+    <Card className="py-0">
+      <CardContent className="space-y-3 p-4">
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-52 w-full" />
+      </CardContent>
+    </Card>
   );
 }

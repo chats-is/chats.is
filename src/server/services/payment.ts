@@ -29,7 +29,7 @@ import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { payments, subscriptions, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
-import { lockIn, withLock, type Tx } from '@/server/services/db-lock';
+import { lockIn, withLock, type Tx } from '@/server/services/db-utils';
 import {
   getPaymentProcessor,
   withRetry,

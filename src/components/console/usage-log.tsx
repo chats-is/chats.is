@@ -12,7 +12,7 @@ import { LocalTime } from '@/components/local-time';
 
 /**
  * The usage log, as the console shows it wherever it shows one: a line per
- * call, opening onto what that call was billed for. The usage page lists
+ * call, opening onto what that call was billed for. The Logs list
  * everyone's; a user's page lists theirs, without the user column.
  */
 
@@ -85,15 +85,6 @@ export const usageLogColumns = ({
       meta: { align: 'right', cellClassName: 'whitespace-nowrap tabular-nums' },
       cell: ({ row }) => usageSummary(row.original)
     }),
-    helper.accessor('spend', {
-      header: 'Spend',
-      meta: {
-        align: 'right',
-        headClassName: 'w-36',
-        cellClassName: 'font-mono whitespace-nowrap'
-      },
-      cell: ({ row }) => formatUsd(row.original.spend)
-    }),
     helper.accessor('cost', {
       header: 'Cost',
       meta: {
@@ -102,6 +93,15 @@ export const usageLogColumns = ({
         cellClassName: 'font-mono whitespace-nowrap text-muted-foreground'
       },
       cell: ({ row }) => formatUsd(row.original.cost)
+    }),
+    helper.accessor('spend', {
+      header: 'Spend',
+      meta: {
+        align: 'right',
+        headClassName: 'w-36',
+        cellClassName: 'font-mono whitespace-nowrap'
+      },
+      cell: ({ row }) => formatUsd(row.original.spend)
     })
   ]);
 

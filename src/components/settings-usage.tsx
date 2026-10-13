@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { quotaQueries } from '@/server/functions/quota';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Countdown } from '@/components/usage-limit-alert';
-import { LimitsSkeleton } from '@/components/usage-module';
 
 export function SettingsUsage() {
   const queryClient = useQueryClient();
@@ -118,5 +118,31 @@ function QuotaWindowRow({
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Skeleton placeholder for the Limits section (two quota cards), shown while
+ * the quota snapshot loads.
+ */
+function LimitsSkeleton() {
+  return (
+    <section className="space-y-3">
+      <Skeleton className="h-5 w-16" />
+      <div className="space-y-5">
+        {[0, 1].map(i => (
+          <div key={i} className="space-y-2">
+            <div className="flex justify-between">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-1.5 flex-1" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

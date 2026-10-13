@@ -2,9 +2,9 @@ import { useRef, useState } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Plus, Search } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChatHeader } from '@/components/chat-header';
 import { MyPrompts } from '@/components/my-prompts';
 import { TrendingPrompts } from '@/components/trending-prompts';
@@ -60,24 +60,23 @@ export function PromptsView() {
       >
         <div className="mx-auto w-full max-w-5xl space-y-4 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex h-9 shrink-0 items-center rounded-full border bg-muted/50 p-1">
-              {VIEW_TABS.map(tab => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setView(tab.value)}
-                  aria-current={view === tab.value ? 'page' : undefined}
-                  className={cn(
-                    'inline-flex h-7 items-center rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors',
-                    view === tab.value
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              value={view}
+              onValueChange={v => setView(v as View)}
+              className="shrink-0"
+            >
+              <TabsList className="rounded-full border bg-muted/50 p-0.5 group-data-[orientation=horizontal]/tabs:h-9">
+                {VIEW_TABS.map(tab => (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="rounded-full px-3"
+                  >
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
 
             <div className="relative min-w-40 flex-1">
               <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />

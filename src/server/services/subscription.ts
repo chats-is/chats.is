@@ -46,7 +46,7 @@ import {
   users
 } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
-import { withLock, type Executor, type Tx } from '@/server/services/db-lock';
+import { withLock, type Executor, type Tx } from '@/server/services/db-utils';
 import {
   applyRefund,
   attachPayments,

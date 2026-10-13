@@ -1,4 +1,5 @@
 import { makeTestDb } from '@/test-utils/pg';
+import { eq } from 'drizzle-orm';
 import {
   afterAll,
   beforeAll,
@@ -247,6 +248,33 @@ describe('adminRevenue', () => {
         [0, 0, 2]
       ]
     );
+  });
+
+  it('leaves a subscription cancelled by the close out of the MRR', async () => {
+    await subscribe('a', day(-30));
+    await subscribe('b', day(-30));
+    await subscribe('c', day(-30));
+    // b cancelled in the window, c only after it: c still renews then.
+    await h.db
+      .update(schema.subscriptions)
+      .set({
+        status: 'canceled',
+        canceledAt: day(5),
+        reason: 'canceled_by_customer'
+      })
+      .where(eq(schema.subscriptions.userId, 'b'));
+    await h.db
+      .update(schema.subscriptions)
+      .set({
+        status: 'canceled',
+        canceledAt: day(12),
+        reason: 'canceled_by_customer'
+      })
+      .where(eq(schema.subscriptions.userId, 'c'));
+
+    const pro = planRow(await adminRevenue(day(0), END), 'pro')!;
+    expect(pro).toMatchObject({ subscribers: 3, canceled: 1 });
+    expect(pro.mrr).toBeCloseTo(40);
   });
 
   it('counts a call against the plan it kept, and one with none as free', async () => {

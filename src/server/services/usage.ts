@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, countDistinct, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -9,14 +9,14 @@ import {
   type RecordImageUsageInput,
   type RecordTranscriptionUsageInput,
   type RecordVideoUsageInput,
-  type UsageRow,
   type UserTier
 } from '@/types';
 import { type usageLogFilterSchema } from '@/types/usage';
 import { applyMultiplier } from '@/lib/billing';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
-import { providers, tiers, usage, users } from '@/db/schema';
+import { models, providers, tiers, usage, users } from '@/db/schema';
+import { dayOf, sumOf } from '@/server/services/db-utils';
 import {
   calculateAudioCost,
   calculateChatCost,
@@ -310,133 +310,173 @@ export async function recordTranscriptionUsage(
 //
 // `since` is an absolute instant the browser computed from its own local
 // calendar-day boundary. Nothing here does timezone maths: it filters
-// `createdAt >= since` on a timestamptz column, a pure instant comparison,
-// which keeps the KPI window and the browser's local-day chart buckets
-// aligned so the total equals the sum of the bars.
+// `createdAt >= since` on a timestamptz column, and numbers the days every
+// 86,400 seconds from `since` (`dayOf`), so each is one of the browser's
+// local days and the totals equal the sum of the days.
 // =========================================================================
 
-// `from` is an absolute instant computed client-side from the user's LOCAL
-// calendar-day boundary (start of (today - N + 1) at local 00:00). The server
-// does no timezone math — it filters `createdAt >= from` on the timestamptz
-// column, a pure instant comparison. This keeps the KPI window and the
-// browser's local-day chart buckets aligned (KPI total == sum of bars).
-
-// =============================================================================
-// KPI tile aggregate — TZ-independent (sums over the whole window)
-// =============================================================================
-async function queryKpi(args: { since: Date; until?: Date; userId?: string }) {
-  const baseWhere = and(
-    gte(usage.createdAt, args.since),
-    args.until ? lt(usage.createdAt, args.until) : undefined,
-    args.userId ? eq(usage.userId, args.userId) : undefined
+/**
+ * The console's usage from `since` to `until` — everyone's, or one user's:
+ * each day's, and each day's for every model, provider and capability, which
+ * the cards and the table add up. SQL sums the calls once, by day, model,
+ * provider and capability together, and those few rows are added up here
+ * into each of the four. A day is every 86,400 seconds from `since`,
+ * numbered from 1, and only the days and groups with calls come. With them,
+ * the install's models and providers in the order they were added, which
+ * fixes the colour each is drawn in.
+ */
+export async function adminUsageStats(
+  since: Date,
+  until?: Date,
+  userId?: string
+) {
+  const used = db.$with('used').as(
+    db
+      .select({
+        day: dayOf(since, usage.createdAt).as('day'),
+        modelId: usage.modelId,
+        providerId: usage.providerId,
+        // The provider that served the call, as the row recorded it.
+        providerName: sql<string | null>`${providers.name}`.as('provider_name'),
+        capability: usage.capability,
+        spend: usage.spend,
+        cost: usage.cost,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+        reasoningTokens: usage.reasoningTokens,
+        imageCount: usage.imageCount,
+        videoCount: usage.videoCount
+      })
+      .from(usage)
+      .leftJoin(providers, eq(providers.id, usage.providerId))
+      .where(
+        and(
+          gte(usage.createdAt, since),
+          until ? lt(usage.createdAt, until) : undefined,
+          userId ? eq(usage.userId, userId) : undefined
+        )
+      )
   );
-  const rows = await db
-    .select({
-      totalSpend: sql<string>`coalesce(sum(${usage.spend}), 0)`,
-      totalCost: sql<string>`coalesce(sum(${usage.cost}), 0)`,
-      requests: sql<number>`count(*)`,
-      inputTokens: sql<number>`coalesce(sum(${usage.inputTokens}), 0)`,
-      outputTokens: sql<number>`coalesce(sum(${usage.outputTokens}), 0)`,
-      cacheReadTokens: sql<number>`coalesce(sum(${usage.cacheReadTokens}), 0)`,
-      cacheWriteTokens: sql<number>`coalesce(sum(${usage.cacheWriteTokens}), 0)`,
-      reasoningTokens: sql<number>`coalesce(sum(${usage.reasoningTokens}), 0)`
-    })
-    .from(usage)
-    .where(baseWhere);
-  const row = rows[0];
+  const figures = {
+    spend: sumOf(used.spend),
+    cost: sumOf(used.cost),
+    inputTokens: sumOf(used.inputTokens),
+    outputTokens: sumOf(used.outputTokens),
+    cacheReadTokens: sumOf(used.cacheReadTokens),
+    cacheWriteTokens: sumOf(used.cacheWriteTokens),
+    reasoningTokens: sumOf(used.reasoningTokens),
+    images: sumOf(used.imageCount),
+    videos: sumOf(used.videoCount),
+    // The calls that spoke or heard speech, however much of it.
+    audios:
+      sql<number>`count(*) filter (where ${used.capability} = 'audio')`.mapWith(
+        Number
+      )
+  };
+
+  const [rows, modelsAdded, providersAdded] = await Promise.all([
+    db
+      .with(used)
+      .select({
+        day: used.day,
+        modelId: used.modelId,
+        providerId: used.providerId,
+        providerName: used.providerName,
+        capability: used.capability,
+        ...figures
+      })
+      .from(used)
+      .groupBy(
+        used.day,
+        used.modelId,
+        used.providerId,
+        used.providerName,
+        used.capability
+      ),
+    db
+      .select({ modelId: models.modelId })
+      .from(models)
+      .orderBy(models.createdAt, models.id),
+    db
+      .select({ id: providers.id, type: providers.type })
+      .from(providers)
+      .orderBy(providers.createdAt, providers.id)
+  ]);
+
+  const names = Object.keys(figures) as Array<keyof typeof figures>;
+  type Figures = Record<keyof typeof figures, number>;
+  type Sum<TKey> = TKey & { day: number } & Figures;
+  /** The rows added up by day and by what `by` takes from each. */
+  const sumBy = <TKey extends object>(
+    by: (r: (typeof rows)[number]) => TKey
+  ) => {
+    const sums = new Map<string, Sum<TKey>>();
+    for (const r of rows) {
+      const head = { day: r.day, ...by(r) };
+      const id = JSON.stringify(head);
+      const sum =
+        sums.get(id) ??
+        ({
+          ...head,
+          ...Object.fromEntries(names.map(n => [n, 0]))
+        } as Sum<TKey>);
+      for (const n of names) sum[n] += r[n];
+      sums.set(id, sum);
+    }
+    return [...sums.values()];
+  };
+
   return {
-    totalSpend: row?.totalSpend ?? '0',
-    totalCost: row?.totalCost ?? '0',
-    requests: Number(row?.requests ?? 0),
-    inputTokens: Number(row?.inputTokens ?? 0),
-    outputTokens: Number(row?.outputTokens ?? 0),
-    cacheReadTokens: Number(row?.cacheReadTokens ?? 0),
-    cacheWriteTokens: Number(row?.cacheWriteTokens ?? 0),
-    reasoningTokens: Number(row?.reasoningTokens ?? 0)
+    days: sumBy(() => ({})),
+    models: sumBy(r => ({ key: r.modelId })),
+    providers: sumBy(r => ({ key: r.providerId, name: r.providerName })),
+    capabilities: sumBy(r => ({ key: r.capability })),
+    catalog: {
+      models: modelsAdded.map(m => m.modelId),
+      providers: providersAdded
+    }
   };
 }
 
-// =============================================================================
-// Raw rows — no day bucketing happens here. The browser will group these by
-// its own local calendar day, which is the only TZ-aware authority in the
-// pipeline (and the same TZ used to render the Logs table — guarantees the
-// chart and the Logs agree on which day a record belongs to).
-// =============================================================================
-
-async function queryUsageRows(args: {
-  since: Date;
-  until?: Date;
-  userId?: string;
-}): Promise<UsageRow[]> {
-  const where = and(
-    gte(usage.createdAt, args.since),
-    args.until ? lt(usage.createdAt, args.until) : undefined,
-    args.userId ? eq(usage.userId, args.userId) : undefined
+/**
+ * How many users called a model from `since` to `until`: over the whole of
+ * it, and on each of its days that had any. A user active on several days
+ * is one user of the whole.
+ */
+export async function activeUsers(since: Date, until?: Date) {
+  const used = db.$with('used').as(
+    db
+      .select({
+        day: dayOf(since, usage.createdAt).as('day'),
+        userId: usage.userId
+      })
+      .from(usage)
+      .where(
+        and(
+          gte(usage.createdAt, since),
+          until ? lt(usage.createdAt, until) : undefined
+        )
+      )
   );
+  // Each day's and the whole's in one read: the grouping by no column is
+  // the whole, and comes even with no calls.
   const rows = await db
+    .with(used)
     .select({
-      id: usage.id,
-      createdAt: usage.createdAt,
-      modelId: usage.modelId,
-      providerId: providers.id,
-      providerName: providers.name,
-      providerModelId: usage.providerModelId,
-      capability: usage.capability,
-      cost: usage.cost,
-      spend: usage.spend,
-      priceMultiplier: usage.priceMultiplier,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      cacheReadTokens: usage.cacheReadTokens,
-      cacheWriteTokens: usage.cacheWriteTokens,
-      reasoningTokens: usage.reasoningTokens,
-      webSearches: usage.webSearches
+      day: used.day,
+      whole: sql<number>`grouping(${used.day})`.mapWith(Number),
+      activeUsers: countDistinct(used.userId)
     })
-    .from(usage)
-    // The provider that actually served the call, as the row recorded it —
-    // not whichever one the model is bound to today.
-    .leftJoin(providers, eq(providers.id, usage.providerId))
-    .where(where)
-    .orderBy(usage.createdAt);
-  return rows.map(r => ({
-    id: r.id,
-    createdAt: r.createdAt,
-    modelId: r.modelId,
-    providerId: r.providerId,
-    providerName: r.providerName,
-    providerModelId: r.providerModelId,
-    capability: r.capability,
-    cost: r.cost ?? '0',
-    spend: r.spend ?? '0',
-    priceMultiplier: r.priceMultiplier ?? '1',
-    inputTokens: Number(r.inputTokens ?? 0),
-    outputTokens: Number(r.outputTokens ?? 0),
-    cacheReadTokens: Number(r.cacheReadTokens ?? 0),
-    cacheWriteTokens: Number(r.cacheWriteTokens ?? 0),
-    reasoningTokens: Number(r.reasoningTokens ?? 0),
-    webSearches: Number(r.webSearches ?? 0)
-  }));
-}
-
-/** A KPI tile and the rows behind it — what every usage screen asks for. */
-export async function adminUsageByUser(
-  userId: string,
-  since: Date,
-  until?: Date
-) {
-  const [kpi, rows] = await Promise.all([
-    queryKpi({ since, until, userId }),
-    queryUsageRows({ since, until, userId })
-  ]);
-  return { kpi, rows };
-}
-
-export async function adminListUsage(since: Date, until?: Date) {
-  const [kpi, rows] = await Promise.all([
-    queryKpi({ since, until }),
-    queryUsageRows({ since, until })
-  ]);
-  return { kpi, rows };
+    .from(used)
+    .groupBy(sql`grouping sets ((${used.day}), ())`);
+  return {
+    total: rows.find(r => r.whole === 1)?.activeUsers ?? 0,
+    days: rows
+      .filter(r => r.whole === 0)
+      .map(r => ({ day: r.day, activeUsers: r.activeUsers }))
+  };
 }
 
 /** Distinct models one user has spent on — the filter list on their detail

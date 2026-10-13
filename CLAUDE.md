@@ -101,7 +101,7 @@ src/
 │   ├── _chat.tsx     pathless layout: the app shell and its providers
 │   ├── _chat/        chat, library, prompts
 │   ├── console.tsx   admin layout, with the admin gate
-│   ├── console/      providers, models, pricing, plans, quotas, tiers, users, usage, settings
+│   ├── console/      providers, models, pricing, plans, quotas, tiers, users, revenue, usage, logs, settings
 │   └── api/          server routes: chat, speech, artifacts, files, auth
 ├── server/
 │   ├── functions/    RPC endpoints
@@ -184,7 +184,7 @@ merchant), theirs to pay. A refund on auto is reckoned from both alike, since St
 back the tax on a refund in proportion to it. A Stripe
 checkout asks Stripe Tax to work it out whenever Stripe Tax is set up in the account.
 Work on one user's subscriptions, or one
-payment, runs under `withLock` (`services/db-lock.ts`), since processors send several webhooks
+payment, runs under `withLock` (`services/db-utils.ts`), since processors send several webhooks
 about one thing at once.
 
 Tests sit beside their subject as `foo.ts` and `foo.test.ts`.

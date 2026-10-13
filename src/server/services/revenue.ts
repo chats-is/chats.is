@@ -22,6 +22,7 @@ import { type revenueLossUsersSchema } from '@/types/revenue';
 import { BILLING_INTERVALS } from '@/lib/constant';
 import { db } from '@/db';
 import { payments, plans, subscriptions, usage, users } from '@/db/schema';
+import { dayOf, sumOf } from '@/server/services/db-utils';
 
 /*
  * The Revenue page's figures, summed in SQL so that only they leave the
@@ -37,12 +38,14 @@ import { payments, plans, subscriptions, usage, users } from '@/db/schema';
  *   from when it was charged to the period end it names, or one interval of
  *   its plan where it names none. Cash is the net of the payments charged in
  *   the window.
- * - Cost is what the window's calls cost; consumption what users used, at
+ * - Cost is what the window's calls cost; spend what users spent on them, at
  *   their tier's price. Profit is revenue less cost.
  * - A subscription is in effect from when it began until it ended. A
  *   duplicate — a second one bought beside the first, ended and refunded —
- *   never was one. Subscribers and MRR are those in effect at the window's
- *   close; started and churned, those that began and ended in it.
+ *   never was one. Subscribers are those in effect at the window's close,
+ *   and MRR those of them still to renew: one cancelled by then is in
+ *   effect until it ends, but brings in no more. Started and churned are
+ *   those that began and ended in the window.
  *
  * A window is two timestamps, `from` and `to`, as every report's is; its
  * days are every 86,400 seconds from `from`. Each table is read once, and
@@ -69,13 +72,6 @@ const seconds = (d: Date) => d.getTime() / 1000;
 /** An instant as epoch seconds. */
 const epochOf = (instant: SQLWrapper) =>
   sql<number>`extract(epoch from ${instant})::float8`;
-
-/** Which day of the window an instant falls on, from 1; before it, 0 or less. */
-const dayOf = (w: Window, instant: SQLWrapper) =>
-  sql<number>`(floor((${epochOf(instant)} - ${seconds(w.since)}::float8) / ${DAY_SECONDS}) + 1)::int`;
-
-const sumOf = (value: SQLWrapper) =>
-  sql<number>`coalesce(sum(${value}), 0)::float8`.mapWith(Number);
 
 /** A plan's interval in days, as `BILLING_INTERVALS` gives it. */
 const intervalDays = sql<number>`(case ${plans.interval} ${sql.join(
@@ -113,12 +109,13 @@ function paidIn(w: Window) {
         end)::float8`.as('net'),
         starts: epochOf(payments.billedAt).as('starts'),
         ends: epochOf(periodEnd).as('ends'),
-        billedDay: dayOf(w, payments.billedAt).as('billed_day'),
-        firstDay: dayOf(w, sql`greatest(${payments.billedAt}, ${w.since})`).as(
-          'first_day'
-        ),
+        billedDay: dayOf(w.since, payments.billedAt).as('billed_day'),
+        firstDay: dayOf(
+          w.since,
+          sql`greatest(${payments.billedAt}, ${w.since})`
+        ).as('first_day'),
         lastDay: dayOf(
-          w,
+          w.since,
           sql`least(${periodEnd}, ${w.end}) - interval '1 microsecond'`
         ).as('last_day')
       })
@@ -170,7 +167,7 @@ function usedIn(w: Window) {
     db
       .select({
         userId: usage.userId,
-        day: dayOf(w, usage.createdAt).as('day'),
+        day: dayOf(w.since, usage.createdAt).as('day'),
         planId: usage.planId,
         cost: sql<number>`coalesce(${usage.cost}, 0)::float8`.as('cost'),
         spend: sql<number>`coalesce(${usage.spend}, 0)::float8`.as('spend')
@@ -183,18 +180,23 @@ function usedIn(w: Window) {
 /**
  * The subscriptions in effect at some point of the window: the day each
  * began (0 or less, before the window), the day it ended (none while still
- * in effect at the window's close), and its price as a month.
+ * in effect at the window's close), whether it was cancelled by the close,
+ * and its price as a month.
  */
 function subscribedIn(w: Window) {
   return db.$with('subscribed').as(
     db
       .select({
         planId: subscriptions.planId,
-        startedDay: dayOf(w, subscriptions.createdAt).as('started_day'),
+        startedDay: dayOf(w.since, subscriptions.createdAt).as('started_day'),
         endedDay: sql<
           number | null
         >`case when ${subscriptions.endedAt} < ${w.end}
-          then ${dayOf(w, subscriptions.endedAt)} end`.as('ended_day'),
+          then ${dayOf(w.since, subscriptions.endedAt)} end`.as('ended_day'),
+        canceled:
+          sql<boolean>`coalesce(${subscriptions.canceledAt} < ${w.end}, false)`.as(
+            'canceled'
+          ),
         monthly: sql<number>`${plans.price}::float8 * ${MONTH_DAYS}::float8
           / ${intervalDays}`.as('monthly')
       })
@@ -260,11 +262,17 @@ export async function adminRevenue(since: Date, until?: Date) {
         planId: subscribed.planId,
         startedDay: subscribed.startedDay,
         endedDay: subscribed.endedDay,
+        canceled: subscribed.canceled,
         count: count(),
         monthly: sumOf(subscribed.monthly)
       })
       .from(subscribed)
-      .groupBy(subscribed.planId, subscribed.startedDay, subscribed.endedDay)
+      .groupBy(
+        subscribed.planId,
+        subscribed.startedDay,
+        subscribed.endedDay,
+        subscribed.canceled
+      )
   ]);
 
   const dayRows = Array.from({ length: dayCountOf(w) }, (_, i) => ({
@@ -278,6 +286,7 @@ export async function adminRevenue(since: Date, until?: Date) {
   const emptyPlan = (planId: string | null) => ({
     planId,
     subscribers: 0,
+    canceled: 0,
     mrr: 0,
     started: 0,
     churned: 0,
@@ -314,7 +323,8 @@ export async function adminRevenue(since: Date, until?: Date) {
     const plan = planOf(r.planId);
     if (r.endedDay == null) {
       plan.subscribers += r.count;
-      plan.mrr += r.monthly;
+      if (r.canceled) plan.canceled += r.count;
+      else plan.mrr += r.monthly;
     } else {
       plan.churned += r.count;
       dayRows[r.endedDay - 1].churned += r.count;

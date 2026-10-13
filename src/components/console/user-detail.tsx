@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useCanGoBack, useRouter } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { addDays } from 'date-fns';
 import {
   ArrowLeft,
   RefreshCw,
@@ -39,12 +40,15 @@ import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 import { UsageItems, usageLogColumns } from '@/components/console/usage-log';
 import {
+  UsageReport,
+  UsageReportSkeleton
+} from '@/components/console/usage-report';
+import {
   DateRangeFilter,
   useReportWindow
 } from '@/components/date-range-filter';
 import { LocalTime } from '@/components/local-time';
 import { Countdown } from '@/components/usage-limit-alert';
-import { UsageModule, UsageModuleSkeleton } from '@/components/usage-module';
 
 const sourceLabel: Record<string, string> = {
   override: 'set on the user',
@@ -68,8 +72,8 @@ export default function UserDetail({ userId }: { userId: string }) {
   const { data: status, isLoading: statusLoading } = useQuery(
     quotaQueries.byUser({ userId })
   );
-  const { data: usage } = useQuery(
-    usageQueries.byUser({ userId, from: window.start, to: until })
+  const usage = useQuery(
+    usageQueries.stats({ userId, from: window.start, to: until })
   );
   const { data: subscription } = useQuery(subscriptionQueries.user(userId));
 
@@ -129,9 +133,9 @@ export default function UserDetail({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-3">
-        <div>{back}</div>
+      <ConsoleToolbar>{back}</ConsoleToolbar>
 
+      <section>
         <Card className="py-0">
           <CardContent className="grid gap-6 p-5 md:grid-cols-2">
             <div className="flex min-w-0 items-start gap-4">
@@ -262,15 +266,22 @@ export default function UserDetail({ userId }: { userId: string }) {
           </Button>
         </div>
 
-        {usage ? (
-          <UsageModule
-            kpi={usage.kpi}
-            rows={usage.rows}
-            days={window.days}
-            endDay={window.last}
-          />
+        {usage.data ? (
+          <div
+            className={cn(
+              'space-y-4 transition-opacity',
+              usage.isPlaceholderData && 'pointer-events-none opacity-60'
+            )}
+          >
+            <UsageReport
+              stats={usage.data}
+              dates={Array.from({ length: window.days }, (_, i) =>
+                addDays(window.start, i)
+              )}
+            />
+          </div>
         ) : (
-          <UsageModuleSkeleton />
+          <UsageReportSkeleton />
         )}
       </section>
 
@@ -475,31 +486,29 @@ function UserLogs({
 export function UserDetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <Skeleton className="h-5 w-28" />
-        <Card className="py-0">
-          <CardContent className="grid gap-6 p-5 md:grid-cols-2">
-            <div className="flex items-start gap-4">
-              <Skeleton className="size-14 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-4 w-56" />
-                <Skeleton className="h-3 w-72" />
-              </div>
+      <Skeleton className="h-5 w-28" />
+      <Card className="py-0">
+        <CardContent className="grid gap-6 p-5 md:grid-cols-2">
+          <div className="flex items-start gap-4">
+            <Skeleton className="size-14 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-4 w-56" />
+              <Skeleton className="h-3 w-72" />
             </div>
-            <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
-              <LimitRowSkeleton />
-              <LimitRowSkeleton />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          <div className="flex flex-col justify-center gap-4 md:border-l md:pl-6">
+            <LimitRowSkeleton />
+            <LimitRowSkeleton />
+          </div>
+        </CardContent>
+      </Card>
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <Skeleton className="h-9 w-36" />
           <Skeleton className="size-9" />
         </div>
-        <UsageModuleSkeleton />
+        <UsageReportSkeleton />
       </div>
       <ConsoleTableSkeleton columns={4} search={false} filters={2} />
     </div>

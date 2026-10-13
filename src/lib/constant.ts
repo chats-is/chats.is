@@ -1,5 +1,6 @@
 import {
   CalendarCheck,
+  ChartColumn,
   ChartLine,
   CircleDollarSign,
   Cpu,
@@ -55,6 +56,13 @@ export const PROVIDER_TYPES = [
   { value: 'bedrock', label: 'AWS Bedrock' },
   { value: 'xai', label: 'xAI' },
   { value: 'deepseek', label: 'DeepSeek' }
+] as const;
+
+/** What the console's usage figures are broken down by. */
+export const USAGE_GROUPINGS = [
+  { id: 'model', label: 'Model' },
+  { id: 'provider', label: 'Provider' },
+  { id: 'capability', label: 'Capability' }
 ] as const;
 
 /**
@@ -428,6 +436,18 @@ export const EFFORTS = [
   'xhigh'
 ] as const;
 
+/**
+ * The console's colours for money, the same in the cards, the tables and
+ * the charts: money coming in, money going out, and what is left — green
+ * while it is a profit, red once it is a loss. What users spent is plain.
+ */
+export const AMOUNT_COLORS = {
+  revenue: { bar: '#3b82f6', text: 'text-blue-600 dark:text-blue-400' },
+  cost: { bar: '#f59e0b', text: 'text-amber-600 dark:text-amber-400' },
+  profit: 'text-emerald-600 dark:text-emerald-400',
+  loss: 'text-destructive'
+} as const;
+
 export const CONSOLE_NAVIGATION = {
   navMain: [
     {
@@ -443,7 +463,7 @@ export const CONSOLE_NAVIGATION = {
     {
       title: 'Usage',
       url: '/console/usage',
-      icon: Logs
+      icon: ChartColumn
     },
     {
       title: 'Providers',
@@ -499,6 +519,11 @@ export const CONSOLE_NAVIGATION = {
       title: 'Users',
       url: '/console/users',
       icon: Users
+    },
+    {
+      title: 'Logs',
+      url: '/console/logs',
+      icon: Logs
     },
     {
       title: 'Settings',

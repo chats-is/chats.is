@@ -1,21 +1,33 @@
 import { createServerFn } from '@tanstack/react-start';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
+import { usageRangeSchema } from '@/types/usage';
 import { adminMiddleware } from '@/server/middleware';
 import * as overview from '@/server/services/overview';
 
-/** The counts behind the console's home page. */
-export const getConsoleOverview = createServerFn({ method: 'GET' })
+/** The console's home page over a window. */
+export const adminOverview = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .handler(() => overview.getConsoleOverview());
+  .validator(usageRangeSchema)
+  .handler(({ data }) => overview.adminOverview(data.from, data.to));
 
 export const overviewQueries = {
+  all: () => ['overview'] as const,
   /** Key prefixes, shared by the readers and by anything that invalidates
    *  them, so the two can never drift apart. */
-  key: { console: () => ['overview', 'console'] as const },
-  console: () =>
+  key: {
+    report: () => ['overview', 'report'] as const
+  },
+  report: (input: { from: Date; to?: Date }) =>
     queryOptions({
-      queryKey: overviewQueries.key.console(),
-      queryFn: () => getConsoleOverview()
+      queryKey: [
+        ...overviewQueries.key.report(),
+        input.from.toISOString(),
+        input.to?.toISOString() ?? null
+      ] as const,
+      queryFn: () => adminOverview({ data: input }),
+      // A new window changes the key; the last one stays on screen until
+      // the new one lands, rather than the page blanking.
+      placeholderData: keepPreviousData
     })
 };

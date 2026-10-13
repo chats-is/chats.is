@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { count, eq, like, or, sql } from 'drizzle-orm';
+import { and, count, eq, gte, like, lt, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { pageWindow } from '@/types/pagination';
@@ -13,7 +13,7 @@ import { db } from '@/db';
 import { accounts, chats, messages, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
-import { withLock } from '@/server/services/db-lock';
+import { dayOf, withLock } from '@/server/services/db-utils';
 import {
   hasLiveSubscription,
   liveSubscriptionsOf
@@ -242,4 +242,41 @@ export async function getUserStats() {
     total: Number(totalUsers[0]?.count || 0),
     admins: Number(adminCount[0]?.count || 0)
   };
+}
+
+/**
+ * Who signed up from `since` to `until`: everyone signed up by its close and
+ * those who signed up in it, summed in SQL, and how many signed up on each
+ * of its days that had any.
+ */
+export async function userSummary(since: Date, until?: Date) {
+  const joined = db.$with('joined').as(
+    db
+      .select({ day: dayOf(since, users.createdAt).as('day') })
+      .from(users)
+      .where(
+        and(
+          gte(users.createdAt, since),
+          until ? lt(users.createdAt, until) : undefined
+        )
+      )
+  );
+  const [[total], days] = await Promise.all([
+    db
+      .select({
+        users: count(),
+        newUsers:
+          sql<number>`count(*) filter (where ${gte(users.createdAt, since)})`.mapWith(
+            Number
+          )
+      })
+      .from(users)
+      .where(until ? lt(users.createdAt, until) : undefined),
+    db
+      .with(joined)
+      .select({ day: joined.day, newUsers: count() })
+      .from(joined)
+      .groupBy(joined.day)
+  ]);
+  return { total, days };
 }

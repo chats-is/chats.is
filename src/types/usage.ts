@@ -52,45 +52,8 @@ export type RecordTranscriptionUsageInput = RecordUsageBase & {
   audioSeconds?: number;
 };
 
-/** Raw row shape returned from `usage` router queries. The browser owns
- *  "which local day this row belongs to" (see `bucketByLocalDay`). */
-export type UsageRow = {
-  id: string;
-  createdAt: Date | string;
-  modelId: string | null;
-  providerId: string | null;
-  providerName: string | null;
-  providerModelId: string | null;
-  capability: 'chat' | 'image' | 'video' | 'audio';
-  /** What the call cost. */
-  cost: string | number;
-  /** What the user spent: `cost` × `priceMultiplier`. */
-  spend: string | number;
-  priceMultiplier: string | number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  reasoningTokens: number;
-  webSearches: number;
-};
-
-/** Aggregated KPI tile values for the period — admin shape (with cost). */
-export type UsageKpi = {
-  /** What users spent over the period. */
-  totalSpend: string;
-  /** What it cost; the difference is the margin. */
-  totalCost: string;
-  requests: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  reasoningTokens: number;
-};
-
 /** Minimal row shape the usage breakdown (`lib/usage-breakdown.ts`) reads.
- *  Compatible with `UsageRow` but only the fields it actually reads. */
+ *  Only the fields it actually reads. */
 export type UsageRowLike = {
   capability: 'chat' | 'image' | 'video' | 'audio';
   inputTokens?: number | null;
@@ -126,34 +89,6 @@ export type UsageRowLike = {
   audioSecondsPrice?: string | null;
 };
 
-/** Sum-by-group for a single day, used by the daily stacked bar chart. */
-export type DailyGroup = {
-  key: string;
-  label: string;
-  spend: string;
-  cost: string;
-  requests: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  reasoningTokens: number;
-};
-
-/** Daily bucket: the day key + the per-group sums for that day. */
-export type DailyDay = {
-  day: string;
-  groups: DailyGroup[];
-};
-
-/**
- * What the usage server functions accept.
- *
- * `from` is an absolute instant the browser computed from its own local
- * calendar-day boundary. Nothing on the server does timezone maths — it
- * filters on a timestamptz column — which keeps the KPI window and the
- * browser's local-day chart buckets aligned.
- */
 /** A report window in the address: a preset of the last N days, or a range
  *  of local calendar days as `'YYYY-MM-DD'`, both ends included. */
 const dayKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -163,14 +98,22 @@ export const reportWindowSearchSchema = z.object({
   to: dayKeySchema.optional()
 });
 
-/** A report window: from `from`, up to but not including `to` when given. */
+/**
+ * A report window: from `from`, up to but not including `to` when given.
+ *
+ * `from` is an absolute instant the browser computed from its own local
+ * calendar-day boundary. Nothing on the server does timezone maths — it
+ * filters on a timestamptz column — which keeps the totals and the
+ * browser's local days aligned.
+ */
 export const usageRangeSchema = z.object({
   from: z.date(),
   to: z.date().optional()
 });
 
-export const usageByUserRangeSchema = usageRangeSchema.extend({
-  userId: z.string().min(1)
+/** The usage figures over a window: everyone's, or one user's. */
+export const usageStatsSchema = usageRangeSchema.extend({
+  userId: z.string().min(1).optional()
 });
 
 export const usageUserSchema = z.object({ userId: z.string().min(1) });

@@ -73,9 +73,5 @@ export type {
   RecordVideoUsageInput,
   RecordAudioUsageInput,
   RecordTranscriptionUsageInput,
-  UsageRow,
-  UsageKpi,
-  UsageRowLike,
-  DailyGroup,
-  DailyDay
+  UsageRowLike
 } from './usage';

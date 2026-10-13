@@ -22,6 +22,7 @@ import { Route as ApiCronRouteImport } from './routes/api/cron'
 import { Route as ApiFilesRouteRouteImport } from './routes/api/files/route'
 import { Route as ApiSpeechRouteImport } from './routes/api/speech'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
+import { Route as ConsoleLogsRouteImport } from './routes/console/logs'
 import { Route as ConsoleModelsRouteImport } from './routes/console/models'
 import { Route as ConsolePaymentsRouteImport } from './routes/console/payments'
 import { Route as ConsolePlansRouteImport } from './routes/console/plans'
@@ -107,6 +108,11 @@ const ApiSpeechRoute = ApiSpeechRouteImport.update({
 const ConsoleIndexRoute = ConsoleIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsoleLogsRoute = ConsoleLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
   getParentRoute: () => ConsoleRoute,
 } as any)
 const ConsoleModelsRoute = ConsoleModelsRouteImport.update({
@@ -233,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/console/logs': typeof ConsoleLogsRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/console/logs': typeof ConsoleLogsRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/console/logs': typeof ConsoleLogsRoute
   '/console/models': typeof ConsoleModelsRoute
   '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
@@ -344,6 +353,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/cron'
     | '/api/speech'
+    | '/console/logs'
     | '/console/models'
     | '/console/payments'
     | '/console/plans'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/cron'
     | '/api/speech'
+    | '/console/logs'
     | '/console/models'
     | '/console/payments'
     | '/console/plans'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/cron'
     | '/api/speech'
+    | '/console/logs'
     | '/console/models'
     | '/console/payments'
     | '/console/plans'
@@ -549,6 +561,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/console/'
       preLoaderRoute: typeof ConsoleIndexRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/logs': {
+      id: '/console/logs'
+      path: '/logs'
+      fullPath: '/console/logs'
+      preLoaderRoute: typeof ConsoleLogsRouteImport
       parentRoute: typeof ConsoleRoute
     }
     '/console/models': {
@@ -725,6 +744,7 @@ const ChatRouteChildren: ChatRouteChildren = {
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface ConsoleRouteChildren {
+  ConsoleLogsRoute: typeof ConsoleLogsRoute
   ConsoleModelsRoute: typeof ConsoleModelsRoute
   ConsolePaymentsRoute: typeof ConsolePaymentsRoute
   ConsolePlansRoute: typeof ConsolePlansRoute
@@ -744,6 +764,7 @@ interface ConsoleRouteChildren {
 }
 
 const ConsoleRouteChildren: ConsoleRouteChildren = {
+  ConsoleLogsRoute: ConsoleLogsRoute,
   ConsoleModelsRoute: ConsoleModelsRoute,
   ConsolePaymentsRoute: ConsolePaymentsRoute,
   ConsolePlansRoute: ConsolePlansRoute,

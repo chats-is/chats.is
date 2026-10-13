@@ -3,28 +3,22 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { type z } from 'zod';
 
 import {
-  usageByUserRangeSchema,
   usageLogFilterSchema,
-  usageRangeSchema,
+  usageStatsSchema,
   usageUserSchema
 } from '@/types/usage';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
 import * as usage from '@/server/services/usage';
 
-/** /console/users/[id] — admin view of one user. */
-export const adminUsageByUser = createServerFn({ method: 'GET' })
+/** The console's usage over a window — on the Usage page everyone's, on a
+ *  user's page theirs. */
+export const adminUsageStats = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
-  .validator(usageByUserRangeSchema)
+  .validator(usageStatsSchema)
   .handler(({ data }) =>
-    usage.adminUsageByUser(data.userId, data.from, data.to)
+    usage.adminUsageStats(data.from, data.to, data.userId)
   );
-
-/** The console overview's stats — admin view across everyone. */
-export const adminListUsage = createServerFn({ method: 'GET' })
-  .middleware([adminMiddleware])
-  .validator(usageRangeSchema)
-  .handler(({ data }) => usage.adminListUsage(data.from, data.to));
 
 export const adminUserModels = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
@@ -45,29 +39,22 @@ export const usageQueries = {
   /** Key prefixes, shared by the readers and by anything that
    *  invalidates them, so the two can never drift apart. */
   key: {
-    byUser: () => ['usage', 'byUser'] as const,
-    adminList: () => ['usage', 'adminList'] as const,
+    stats: () => ['usage', 'stats'] as const,
     userModels: () => ['usage', 'userModels'] as const,
     log: () => ['usage', 'log'] as const
   },
-  byUser: (input: { userId: string; from: Date; to?: Date }) =>
+  stats: (input: { from: Date; to?: Date; userId?: string }) =>
     queryOptions({
       queryKey: [
-        ...usageQueries.key.byUser(),
-        input.userId,
+        ...usageQueries.key.stats(),
+        input.userId ?? null,
         input.from.toISOString(),
         input.to?.toISOString() ?? null
       ] as const,
-      queryFn: () => adminUsageByUser({ data: input })
-    }),
-  adminList: (input: { from: Date; to?: Date }) =>
-    queryOptions({
-      queryKey: [
-        ...usageQueries.key.adminList(),
-        input.from.toISOString(),
-        input.to?.toISOString() ?? null
-      ] as const,
-      queryFn: () => adminListUsage({ data: input })
+      queryFn: () => adminUsageStats({ data: input }),
+      // A new window changes the key; the last one stays on screen until
+      // the new one lands, rather than the page blanking.
+      placeholderData: keepPreviousData
     }),
   userModels: (input: { userId: string }) =>
     queryOptions({
