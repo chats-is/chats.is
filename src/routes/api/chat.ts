@@ -26,11 +26,7 @@ import {
   type User
 } from '@/types';
 import { chatRequestSchema } from '@/types/chat';
-import {
-  artifactKindFromType,
-  assertArtifactPayload,
-  type ArtifactKind
-} from '@/lib/artifact';
+import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
 import {
@@ -61,6 +57,7 @@ import {
   generateUUID
 } from '@/lib/utils';
 import { authedRequest } from '@/server/middleware';
+import { buildArtifact } from '@/server/services/artifact';
 import { carriesOnlyOwnFiles, isOwnBlobUrl } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
 import { buildMediaTools } from '@/server/services/chat-tools';
@@ -648,30 +645,6 @@ async function POST({
         const createArtifactSchema = createArtifactInputSchema;
         type CreateArtifactInput = z.infer<typeof createArtifactSchema>;
 
-        const createArtifactRecord = (
-          input: CreateArtifactInput,
-          artifactId: string
-        ): Artifact => {
-          const now = new Date();
-
-          return {
-            id: artifactId,
-            chatId: id,
-            messageId: assistantMessageId,
-            title: input.title,
-            type: input.type,
-            language: input.language ?? null,
-            content: input.content ?? null,
-            fileUrl: input.fileUrl ?? null,
-            fileName: input.fileName ?? null,
-            mimeType: input.mimeType ?? null,
-            size: input.size ?? null,
-            status: 'done',
-            createdAt: now,
-            updatedAt: now
-          };
-        };
-
         type ToolArtifactStreamState = {
           artifactId: string;
           rawInput: string;
@@ -687,6 +660,23 @@ async function POST({
         };
 
         const toolArtifactStates = new Map<string, ToolArtifactStreamState>();
+
+        // A call that showed its artifact on the canvas as it streamed, and
+        // then failed — its input did not parse, or `execute` threw — leaves
+        // nothing kept. Successful calls remove their own state, so what is
+        // left when a step ends is exactly those, and the canvas is told to
+        // drop them before the model's next step makes the artifact again.
+        const discardUnfinishedArtifacts = () => {
+          for (const state of toolArtifactStates.values()) {
+            if (state.started) {
+              emitTransient({
+                type: 'data-discard',
+                data: { id: state.artifactId }
+              });
+            }
+          }
+          toolArtifactStates.clear();
+        };
 
         const emitToolArtifactUpdate = async (toolCallId: string) => {
           const state = toolArtifactStates.get(toolCallId);
@@ -862,18 +852,14 @@ async function POST({
               await emitToolArtifactUpdate(toolCallId);
             },
             execute: async (input, options?: { toolCallId?: string }) => {
-              assertArtifactPayload(input);
-              // The model is not told about file artifacts, and has no way
-              // to make a file; a `fileUrl` it sends anyway is an address of
-              // its own choosing, which must not become a file of ours.
-              if (input.fileUrl && !isOwnBlobUrl(input.fileUrl)) {
-                throw new Error('fileUrl must be a file stored by this app');
-              }
               const streamState = options?.toolCallId
                 ? toolArtifactStates.get(options.toolCallId)
                 : undefined;
-              const artifactId = streamState?.artifactId ?? generateUUID();
-              const artifact = createArtifactRecord(input, artifactId);
+              const artifact = buildArtifact(input, {
+                id: streamState?.artifactId ?? generateUUID(),
+                chatId: id,
+                messageId: assistantMessageId
+              });
               if (!completedArtifacts.has(artifact.id)) {
                 completedArtifactOrder.push(artifact.id);
               }
@@ -1004,6 +990,7 @@ async function POST({
                 webSearches: countWebSearches(step)
               });
               servedBy = failoverProvider;
+              discardUnfinishedArtifacts();
             }
           });
 
@@ -1063,10 +1050,14 @@ async function POST({
             generateMessageId: () => assistantMessageId,
             sendReasoning: isReasoning,
             // Without this the inner stream uses the SDK's default, which
-            // reports every failure as "An error occurred." — the outer
-            // handler never sees it, so the reason is lost before it can be
-            // shown or written to the message.
-            onError: recordStreamError,
+            // reports every failure as "An error occurred.", and the reason
+            // is lost before it can be shown or written to the message.
+            //
+            // Only the words, not the verdict. The SDK asks this for a tool
+            // that threw too — a compile error the model is about to fix is
+            // not a broken turn. A stream that really failed sends an error
+            // chunk, and the outer `onError` marks the turn from that.
+            onError: streamErrorMessage,
             messageMetadata: ({ part }) => {
               if (part.type === 'start') {
                 const now = new Date();

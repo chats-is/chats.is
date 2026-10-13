@@ -7,21 +7,17 @@ import {
   useState
 } from 'react';
 import { useMatch } from '@tanstack/react-router';
-import { AlertCircle, LoaderCircle } from 'lucide-react';
+import { AlertCircle, LoaderCircle, Wrench } from 'lucide-react';
 
 import { type Artifact } from '@/types';
+import { buildPreviewFiles, getArtifactVirtualPath } from '@/lib/artifact';
 import { normalizeCodeLanguage } from '@/lib/code-language';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { artifactRegistry } from '@/components/artifacts/registry';
 import { MessageMarkdown } from '@/components/message-markdown';
 
 type PreviewStatus = 'idle' | 'loading' | 'ready' | 'error';
-
-type PreviewFile = {
-  path: string;
-  code: string;
-  language?: string;
-};
 
 type PreviewRuntimeResponse = {
   entryPath?: string;
@@ -70,12 +66,47 @@ const isHtmlLikeArtifact = (artifact: Artifact) => {
   );
 };
 
+type PreviewLog = { level: string; message: string };
+
+/**
+ * Hands an error to the chat to be fixed. Once per press of a given error: a
+ * double press would send the message twice before the turn has begun and
+ * the panel has taken the button away.
+ */
+const FixButton = ({
+  error,
+  onFix
+}: {
+  error: string;
+  onFix: (error: string) => void;
+}) => {
+  const [sentFor, setSentFor] = useState<string | null>(null);
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 shrink-0 gap-1.5 font-sans text-xs"
+      disabled={sentFor === error}
+      onClick={() => {
+        setSentFor(error);
+        onFix(error);
+      }}
+    >
+      <Wrench className="size-3.5" />
+      Try fixing
+    </Button>
+  );
+};
+
 const StatusPanel = ({
   status,
-  error
+  error,
+  onFix
 }: {
   status: PreviewStatus;
   error: string | null;
+  onFix?: (error: string) => void;
 }) => {
   if (status === 'loading') {
     return (
@@ -92,6 +123,11 @@ const StatusPanel = ({
         <div className="mb-2 flex items-center gap-2 font-medium">
           <AlertCircle className="size-4" />
           Preview failed
+          {error && onFix && (
+            <span className="ml-auto">
+              <FixButton error={error} onFix={onFix} />
+            </span>
+          )}
         </div>
         <pre className="font-mono text-xs wrap-break-word whitespace-pre-wrap">
           {error}
@@ -103,120 +139,90 @@ const StatusPanel = ({
   return null;
 };
 
-function sanitizePathSegment(value: string) {
-  return value
-    .trim()
-    .replace(/\\/g, '/')
-    .split('/')
-    .filter(Boolean)
-    .join('/')
-    .replace(/[^A-Za-z0-9._/-]/g, '-');
+/**
+ * What a preview frame logs, kept for its console. Only from `frameRef`'s
+ * own window: any frame can post a message to this page. An error opens the
+ * console, so a failure is not left hidden behind a closed panel.
+ */
+function usePreviewLogs(
+  frameRef: React.RefObject<HTMLIFrameElement | null>,
+  onConsoleOpenChange?: (open: boolean) => void
+) {
+  const [logs, setLogs] = useState<PreviewLog[]>([]);
+  // The listener is bound once; the latest setter is read through a ref.
+  const openRef = useRef(onConsoleOpenChange);
+  openRef.current = onConsoleOpenChange;
+
+  useEffect(() => {
+    const handleMessage = (
+      event: MessageEvent<{ type?: string; level?: string; message?: string }>
+    ) => {
+      if (event.source !== frameRef.current?.contentWindow) return;
+      if (event.data?.type !== 'artifact-preview-log' || !event.data.message) {
+        return;
+      }
+      const { level, message } = event.data;
+      setLogs(prev => [...prev, { level: level ?? 'log', message }].slice(-50));
+      if (level === 'error') {
+        openRef.current?.(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [frameRef]);
+
+  return { logs, clearLogs: useCallback(() => setLogs([]), []) };
 }
 
-function looksLikeJsx(code: string) {
-  return /<\s*[A-Za-z][\w:-]*(\s|\/?>)/.test(code) || /<>\s*/.test(code);
-}
+function PreviewConsole({
+  logs,
+  onFix
+}: {
+  logs: PreviewLog[];
+  onFix?: (error: string) => void;
+}) {
+  const lastError = logs
+    .filter(entry => entry.level === 'error')
+    .at(-1)?.message;
 
-function getArtifactFileExtension(artifact: Artifact) {
-  const normalized = normalizeCodeLanguage(artifact.language);
-  const rawLanguage = artifact.language?.toLowerCase().trim();
-  const content = artifact.content ?? '';
-
-  if (artifact.fileName?.includes('.')) {
-    return artifact.fileName.split('.').pop() ?? 'tsx';
-  }
-
-  if (rawLanguage === 'react') return 'tsx';
-  if (normalized === 'typescript') return looksLikeJsx(content) ? 'tsx' : 'ts';
-  if (normalized === 'javascript') return looksLikeJsx(content) ? 'jsx' : 'js';
-  if (normalized === 'tsx' || normalized === 'jsx') return normalized;
-  if (normalized) return normalized;
-  return 'tsx';
-}
-
-function hasPathExtension(value: string) {
-  const lastSegment = value.split('/').pop() ?? value;
-  return /\.[A-Za-z0-9]+$/.test(lastSegment);
-}
-
-function extractLeadingFileName(value: string) {
-  const trimmed = value.trim();
-  const match = trimmed.match(
-    /^([A-Za-z0-9_-][A-Za-z0-9._/-]*\.(?:tsx|ts|jsx|js|css|html|json|md))(?=$|\s|[-:])/
+  return (
+    <div className="max-h-40 shrink-0 overflow-auto border-t bg-muted/30 p-2 font-mono text-xs">
+      {lastError && onFix && (
+        <div className="mb-1 flex justify-end">
+          <FixButton error={lastError} onFix={onFix} />
+        </div>
+      )}
+      {logs.length > 0 ? (
+        logs.map((entry, index) => (
+          <pre
+            key={index}
+            className={cn(
+              'wrap-break-word whitespace-pre-wrap',
+              entry.level === 'error' && 'text-destructive',
+              entry.level === 'warn' && 'text-amber-600 dark:text-amber-500'
+            )}
+          >
+            {entry.message}
+          </pre>
+        ))
+      ) : (
+        <div className="text-muted-foreground">No console output.</div>
+      )}
+    </div>
   );
-  return match?.[1] ?? null;
-}
-
-function extractDefaultExportName(code: string) {
-  const patterns = [
-    /export\s+default\s+function\s+([A-Z]\w*)/,
-    /export\s+default\s+class\s+([A-Z]\w*)/,
-    /const\s+([A-Z]\w*)\s*=.*?[\r\n]+\s*export\s+default\s+\1/s,
-    /function\s+([A-Z]\w*)\s*\([\s\S]*?[\r\n]+\s*export\s+default\s+\1/s
-  ];
-
-  for (const pattern of patterns) {
-    const match = code.match(pattern);
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-
-  return null;
-}
-
-function getArtifactVirtualPath(artifact: Artifact) {
-  const candidate = sanitizePathSegment(
-    artifact.fileName ||
-      extractLeadingFileName(artifact.title) ||
-      artifact.title ||
-      artifact.id
-  );
-  const extension = getArtifactFileExtension(artifact);
-
-  if (hasPathExtension(candidate)) {
-    return candidate.startsWith('/') ? candidate : `/${candidate}`;
-  }
-
-  return `/${candidate || artifact.id}.${extension}`;
-}
-
-function getArtifactVirtualPaths(artifact: Artifact) {
-  const extension = getArtifactFileExtension(artifact);
-  const paths = new Set<string>([getArtifactVirtualPath(artifact)]);
-  const exportName = extractDefaultExportName(artifact.content ?? '');
-
-  if (exportName) {
-    paths.add(`/${exportName}.${extension}`);
-  }
-
-  return Array.from(paths);
-}
-
-// Each artifact is an independent, self-contained file, so the preview is built
-// from ONLY the selected artifact. (Merging every code artifact in the chat
-// collided their identical entry paths — e.g. multiple `index.tsx` — and made
-// switching show the wrong one.)
-function buildPreviewFiles(artifact: Artifact): PreviewFile[] {
-  if (artifact.type !== 'code' || !artifact.content) {
-    return [];
-  }
-
-  return getArtifactVirtualPaths(artifact).map(path => ({
-    path,
-    code: artifact.content ?? '',
-    language: artifact.language ?? undefined
-  }));
 }
 
 function ReactArtifactPreview({
   artifact,
   consoleOpen,
-  onConsoleOpenChange
+  onConsoleOpenChange,
+  onFix
 }: {
   artifact: Artifact;
   consoleOpen?: boolean;
   onConsoleOpenChange?: (open: boolean) => void;
+  onFix?: (error: string) => void;
 }) {
   // Use the live content directly (not deferred): the preview is never shown
   // while streaming, so changes are discrete (artifact switches, entering
@@ -249,17 +255,9 @@ function ReactArtifactPreview({
     entryPath: string;
   } | null>(null);
   const fallbackRef = useRef<number | null>(null);
-  const [logs, setLogs] = useState<{ level: string; message: string }[]>([]);
-  // Console open state is controlled when the parent passes onConsoleOpenChange
-  // (the artifact header owns the toggle), otherwise managed locally.
+  const { logs, clearLogs } = usePreviewLogs(iframeRef, onConsoleOpenChange);
+  // The artifact header owns the console toggle.
   const isConsoleOpen = consoleOpen ?? false;
-  const setConsoleOpen = (open: boolean) => {
-    onConsoleOpenChange?.(open);
-  };
-  // The message listener effect runs once; read the latest setter via a ref so
-  // error auto-open isn't stuck with a stale closure.
-  const setConsoleOpenRef = useRef(setConsoleOpen);
-  setConsoleOpenRef.current = setConsoleOpen;
 
   // The single place that pushes the latest compiled result into the frame.
   // Called both when a new result compiles AND when the frame (re)announces it
@@ -267,7 +265,7 @@ function ReactArtifactPreview({
   const postToFrame = useCallback(() => {
     const payload = compiledRef.current;
     if (!frameReadyRef.current || !payload) return;
-    setLogs([]);
+    clearLogs();
     iframeRef.current?.contentWindow?.postMessage(
       {
         type: 'artifact-preview-render',
@@ -280,7 +278,7 @@ function ReactArtifactPreview({
     // If the frame never reports back that it rendered, don't leave the loading
     // overlay stuck forever.
     fallbackRef.current = window.setTimeout(() => setStatus('ready'), 6000);
-  }, []);
+  }, [clearLogs]);
   const previewFiles = useMemo(
     () => buildPreviewFiles({ ...artifact, content }),
     [artifact, content]
@@ -385,9 +383,7 @@ function ReactArtifactPreview({
   }, [requestBody]);
 
   useEffect(() => {
-    const handleMessage = (
-      event: MessageEvent<{ type?: string; level?: string; message?: string }>
-    ) => {
+    const handleMessage = (event: MessageEvent<{ type?: string }>) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
       if (event.data?.type === 'artifact-preview-frame-ready') {
         // The frame (re)loaded and can receive content; push the latest result.
@@ -399,18 +395,6 @@ function ReactArtifactPreview({
         // New content is on screen — only now lift the loading overlay.
         if (fallbackRef.current) window.clearTimeout(fallbackRef.current);
         setStatus('ready');
-        return;
-      }
-      if (event.data?.type === 'artifact-preview-log' && event.data.message) {
-        const { level, message } = event.data;
-        setLogs(prev =>
-          [...prev, { level: level ?? 'log', message }].slice(-50)
-        );
-        // Auto-open on errors so failures aren't hidden; the user can still
-        // close it again afterwards.
-        if (level === 'error') {
-          setConsoleOpenRef.current(true);
-        }
       }
     };
 
@@ -445,30 +429,12 @@ function ReactArtifactPreview({
             className="min-h-0 w-full flex-1 bg-white"
             src="/artifact-preview-frame"
           />
-          {isConsoleOpen && (
-            <div className="max-h-40 shrink-0 overflow-auto border-t bg-muted/30 p-2 font-mono text-xs">
-              {logs.length > 0 ? (
-                logs.map((entry, index) => (
-                  <pre
-                    key={index}
-                    className={cn(
-                      'wrap-break-word whitespace-pre-wrap',
-                      entry.level === 'error' && 'text-destructive',
-                      entry.level === 'warn' &&
-                        'text-amber-600 dark:text-amber-500'
-                    )}
-                  >
-                    {entry.message}
-                  </pre>
-                ))
-              ) : (
-                <div className="text-muted-foreground">No console output.</div>
-              )}
-            </div>
-          )}
+          {isConsoleOpen && <PreviewConsole logs={logs} onFix={onFix} />}
         </>
       ) : (
-        status !== 'ready' && <StatusPanel status={status} error={error} />
+        status !== 'ready' && (
+          <StatusPanel status={status} error={error} onFix={onFix} />
+        )
       )}
       {hasPreview && status === 'loading' && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background text-sm text-muted-foreground">
@@ -490,20 +456,58 @@ export function supportsArtifactRuntimePreview(artifact: Artifact) {
   return false;
 }
 
-export function isReactCodePreview(artifact: Artifact) {
+function isReactCodePreview(artifact: Artifact) {
   return artifact.type === 'code' && isPreviewableCodeLanguage(artifact);
 }
 
-export function ArtifactRuntimePreview({
-  artifact,
+/** Whether the artifact's preview has a console: it runs in a frame of ours. */
+export function hasPreviewConsole(artifact: Artifact) {
+  return isReactCodePreview(artifact) || isHtmlLikeArtifact(artifact);
+}
+
+// Runs ahead of the artifact's own scripts and says what goes wrong to the
+// page, in the messages the React frame sends — so an HTML artifact has the
+// same console, and the same fix, as a React one.
+const HTML_ERROR_REPORTER = `<script>(function () {
+  function send(level, message) {
+    try { parent.postMessage({ type: 'artifact-preview-log', level: level, message: message }, '*'); } catch (e) {}
+  }
+  function text(args) {
+    return Array.prototype.map.call(args, function (arg) {
+      if (arg instanceof Error) return arg.message;
+      if (typeof arg === 'string') return arg;
+      try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+    }).join(' ');
+  }
+  window.addEventListener('error', function (event) {
+    send('error', event.message || 'Script error');
+  });
+  window.addEventListener('unhandledrejection', function (event) {
+    send('error', text([event.reason]));
+  });
+  ['error', 'warn'].forEach(function (level) {
+    var original = console[level];
+    console[level] = function () {
+      send(level, text(arguments));
+      original.apply(console, arguments);
+    };
+  });
+})();</script>`;
+
+function HtmlArtifactPreview({
+  content,
   consoleOpen,
-  onConsoleOpenChange
+  onConsoleOpenChange,
+  onFix
 }: {
-  artifact: Artifact;
+  content: string;
   consoleOpen?: boolean;
   onConsoleOpenChange?: (open: boolean) => void;
+  onFix?: (error: string) => void;
 }) {
   const iframeTitle = useId();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { logs, clearLogs } = usePreviewLogs(iframeRef, onConsoleOpenChange);
   const htmlSource = useMemo(() => {
     // Inject a strict CSP so self-contained HTML/SVG previews can use inline
     // script/style but cannot reach the network (no exfiltration). The meta must
@@ -514,7 +518,6 @@ export function ArtifactRuntimePreview({
       "style-src 'unsafe-inline'; img-src data: blob:; font-src data:; " +
       "connect-src 'none'";
     const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
-    const content = artifact.content ?? '';
 
     // The policy goes in a head of our own, ahead of everything the artifact
     // wrote. Finding the artifact's <head> to put it in means reading HTML
@@ -523,9 +526,40 @@ export function ArtifactRuntimePreview({
     // none. A parser that meets a second <html>, <head> or <body> keeps their
     // contents and folds their attributes into the ones it has, so the
     // document renders as written, under a policy it had no part in placing.
-    return `<!DOCTYPE html><html><head>${meta}</head><body>${content}</body></html>`;
-  }, [artifact.content]);
+    return `<!DOCTYPE html><html><head>${meta}${HTML_ERROR_REPORTER}</head><body>${content}</body></html>`;
+  }, [content]);
 
+  // New source is a new page: what the last one logged no longer applies.
+  useEffect(() => {
+    clearLogs();
+  }, [htmlSource, clearLogs]);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <iframe
+        ref={iframeRef}
+        title={`artifact-preview-${iframeTitle}`}
+        sandbox="allow-scripts"
+        className="min-h-0 w-full flex-1 bg-white"
+        srcDoc={htmlSource}
+      />
+      {consoleOpen && <PreviewConsole logs={logs} onFix={onFix} />}
+    </div>
+  );
+}
+
+export function ArtifactRuntimePreview({
+  artifact,
+  consoleOpen,
+  onConsoleOpenChange,
+  onFix
+}: {
+  artifact: Artifact;
+  consoleOpen?: boolean;
+  onConsoleOpenChange?: (open: boolean) => void;
+  /** Absent where nobody can send a message: a share page. */
+  onFix?: (error: string) => void;
+}) {
   if (artifact.type === 'markdown') {
     return (
       <div className="h-full overflow-auto rounded-md border bg-background p-4">
@@ -544,11 +578,11 @@ export function ArtifactRuntimePreview({
 
   if (isHtmlLikeArtifact(artifact)) {
     return (
-      <iframe
-        title={`artifact-preview-${iframeTitle}`}
-        sandbox="allow-scripts"
-        className="size-full min-h-0 bg-white"
-        srcDoc={htmlSource}
+      <HtmlArtifactPreview
+        content={artifact.content ?? ''}
+        consoleOpen={consoleOpen}
+        onConsoleOpenChange={onConsoleOpenChange}
+        onFix={onFix}
       />
     );
   }
@@ -559,6 +593,7 @@ export function ArtifactRuntimePreview({
         artifact={artifact}
         consoleOpen={consoleOpen}
         onConsoleOpenChange={onConsoleOpenChange}
+        onFix={onFix}
       />
     );
   }

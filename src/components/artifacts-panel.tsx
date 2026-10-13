@@ -12,7 +12,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 import { ArtifactViewer } from '@/components/artifact-viewer';
-import { isReactCodePreview } from '@/components/artifacts/runtime-preview';
+import { hasPreviewConsole } from '@/components/artifacts/runtime-preview';
 
 interface ArtifactsPanelProps {
   open: boolean;
@@ -21,6 +21,8 @@ interface ArtifactsPanelProps {
   selectedId?: string | null;
   onSelect: (id: string) => void;
   desktopContainerClassName?: string;
+  /** Asks the chat to fix a preview's error; absent on a share page. */
+  onFix?: (artifact: Artifact, error: string) => void;
 }
 
 export function ArtifactsPanel({
@@ -29,7 +31,8 @@ export function ArtifactsPanel({
   artifacts,
   selectedId,
   onSelect,
-  desktopContainerClassName
+  desktopContainerClassName,
+  onFix
 }: ArtifactsPanelProps) {
   // The source/preview choice is a persistent preference: switching artifacts
   // keeps the current view (a JSON/code artifact viewed as source stays source
@@ -67,7 +70,7 @@ export function ArtifactsPanel({
   const showConsole =
     effectiveViewMode === 'preview' &&
     !!selected &&
-    isReactCodePreview(selected);
+    hasPreviewConsole(selected);
   const consoleButton = showConsole ? (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -142,6 +145,7 @@ export function ArtifactsPanel({
             onViewModeChange={setViewMode}
             consoleOpen={consoleOpen}
             onConsoleOpenChange={setConsoleOpen}
+            onFix={onFix}
           />
         </div>
       </div>

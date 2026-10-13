@@ -49,6 +49,8 @@ interface ArtifactViewerProps {
   extraActions?: React.ReactNode;
   consoleOpen?: boolean;
   onConsoleOpenChange?: (open: boolean) => void;
+  /** Asks the chat to fix an error in the artifact's preview. */
+  onFix?: (artifact: Artifact, error: string) => void;
 }
 
 const isFileArtifact = (artifact?: Artifact) =>
@@ -65,7 +67,8 @@ export function ArtifactViewer({
   onViewModeChange,
   extraActions,
   consoleOpen,
-  onConsoleOpenChange
+  onConsoleOpenChange,
+  onFix
 }: ArtifactViewerProps) {
   const { copyToClipboard } = useCopyToClipboard();
   const [uncontrolledViewMode, setUncontrolledViewMode] = useState<
@@ -150,6 +153,7 @@ export function ArtifactViewer({
         artifact={artifact}
         consoleOpen={consoleOpen}
         onConsoleOpenChange={onConsoleOpenChange}
+        onFix={onFix && (error => onFix(artifact, error))}
       />
     </div>
   );

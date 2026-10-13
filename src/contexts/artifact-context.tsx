@@ -336,6 +336,24 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // The call that streamed it failed, and the model is told why; the
+      // artifact it makes next replaces this one, so this one goes.
+      if (type === 'data-discard') {
+        const id = getDataArtifactId(data);
+        if (!id) return;
+        if (doneTimersRef.current[id]) {
+          clearTimeout(doneTimersRef.current[id]);
+          delete doneTimersRef.current[id];
+        }
+        setArtifacts(prev => {
+          if (!prev[id]) return prev;
+          const { [id]: _discarded, ...rest } = prev;
+          return rest;
+        });
+        setActiveId(current => (current === id ? null : current));
+        return;
+      }
+
       if (type === 'data-textDelta' && data) {
         if (!data.id || !data.artifactType) return;
         const id = data.id;

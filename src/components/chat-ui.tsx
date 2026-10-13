@@ -510,17 +510,22 @@ export function ChatUI({
     [regenerate, updateDisplayModelOptimistically]
   );
 
+  // Last line of defence behind the form's own disabled state: an empty or
+  // unresolvable model would only earn a 400 from /api/chat. Alias-aware,
+  // because that is how the server resolves it — matching on modelId alone
+  // would reject a chat stored under an older id.
+  const hasUsableModel = useCallback(() => {
+    if (!chatModels?.some(model => modelMatchesId(model, currentModelId))) {
+      toast.error('Select a model before sending.');
+      return false;
+    }
+    return true;
+  }, [chatModels, currentModelId]);
+
   const handleSubmit = useCallback(
     (attachments?: Attachment[]) => {
       if (!input.trim()) return false;
-      // Last line of defence behind the form's own disabled state: an empty or
-      // unresolvable model would only earn a 400 from /api/chat. Alias-aware,
-      // because that is how the server resolves it — matching on modelId alone
-      // would reject a chat stored under an older id.
-      if (!chatModels?.some(model => modelMatchesId(model, currentModelId))) {
-        toast.error('Select a model before sending.');
-        return false;
-      }
+      if (!hasUsableModel()) return false;
       updateDisplayModelOptimistically();
       sendMessage({
         text: input,
@@ -533,14 +538,23 @@ export function ChatUI({
       });
       return true;
     },
-    [
-      input,
-      chatModels,
-      currentModelId,
-      sendMessage,
-      updateDisplayModelOptimistically
-    ]
+    [input, hasUsableModel, sendMessage, updateDisplayModelOptimistically]
   );
+
+  // A preview's error, sent as the reader's own message: the model sees the
+  // error, and which artifact it is in, and answers with the fix.
+  const handleFix = useCallback(
+    (artifact: Artifact, error: string) => {
+      if (!hasUsableModel()) return;
+      updateDisplayModelOptimistically();
+      sendMessage({
+        text: `Fix this error in the artifact "${artifact.title}" (id: ${artifact.id}):\n\n\`\`\`\n${error}\n\`\`\``
+      });
+    },
+    [hasUsableModel, sendMessage, updateDisplayModelOptimistically]
+  );
+  // Only between turns: while one is under way the input is closed too.
+  const canFix = status === 'ready' || status === 'error';
 
   const handleArtifactSelect = useCallback(
     (artifactId: string) => {
@@ -636,6 +650,7 @@ export function ChatUI({
               selectedId={activeId}
               onSelect={handleArtifactSelect}
               desktopContainerClassName="h-full w-full min-w-0 max-w-none border-l-0"
+              onFix={canFix ? handleFix : undefined}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -671,6 +686,7 @@ export function ChatUI({
             artifacts={artifactList}
             selectedId={activeId}
             onSelect={handleArtifactSelect}
+            onFix={canFix ? handleFix : undefined}
           />
         </div>
       )}

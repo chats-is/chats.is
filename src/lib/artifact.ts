@@ -1,4 +1,5 @@
 import { type ArtifactType } from '@/types';
+import { normalizeCodeLanguage } from '@/lib/code-language';
 
 export type ArtifactKind = 'text' | 'code' | 'image' | 'sheet' | 'file';
 
@@ -151,4 +152,126 @@ export const assertArtifactPayload = (input: ArtifactPayloadInput): void => {
   if (looksLikeJsx(input.content) && !/\.(tsx|jsx)$/i.test(fileName)) {
     throw new Error('Files containing JSX must use a .tsx or .jsx fileName');
   }
+};
+
+/** What naming and building an artifact's preview needs of it. */
+type PreviewArtifact = {
+  id: string;
+  title: string;
+  type: ArtifactType;
+  language?: string | null;
+  fileName?: string | null;
+  content?: string | null;
+};
+
+/** One file of a preview: a virtual path and the source behind it. */
+export type PreviewFile = {
+  path: string;
+  code: string;
+  language?: string;
+};
+
+const sanitizePathSegment = (value: string) =>
+  value
+    .trim()
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter(Boolean)
+    .join('/')
+    .replace(/[^A-Za-z0-9._/-]/g, '-');
+
+const getArtifactFileExtension = (artifact: PreviewArtifact) => {
+  const normalized = normalizeCodeLanguage(artifact.language);
+  const rawLanguage = artifact.language?.toLowerCase().trim();
+  const content = artifact.content ?? '';
+
+  if (artifact.fileName?.includes('.')) {
+    return artifact.fileName.split('.').pop() ?? 'tsx';
+  }
+
+  if (rawLanguage === 'react') return 'tsx';
+  if (normalized === 'typescript') return looksLikeJsx(content) ? 'tsx' : 'ts';
+  if (normalized === 'javascript') return looksLikeJsx(content) ? 'jsx' : 'js';
+  if (normalized === 'tsx' || normalized === 'jsx') return normalized;
+  if (normalized) return normalized;
+  return 'tsx';
+};
+
+const hasPathExtension = (value: string) => {
+  const lastSegment = value.split('/').pop() ?? value;
+  return /\.[A-Za-z0-9]+$/.test(lastSegment);
+};
+
+const extractLeadingFileName = (value: string) => {
+  const trimmed = value.trim();
+  const match = trimmed.match(
+    /^([A-Za-z0-9_-][A-Za-z0-9._/-]*\.(?:tsx|ts|jsx|js|css|html|json|md))(?=$|\s|[-:])/
+  );
+  return match?.[1] ?? null;
+};
+
+const extractDefaultExportName = (code: string) => {
+  const patterns = [
+    /export\s+default\s+function\s+([A-Z]\w*)/,
+    /export\s+default\s+class\s+([A-Z]\w*)/,
+    /const\s+([A-Z]\w*)\s*=.*?[\r\n]+\s*export\s+default\s+\1/s,
+    /function\s+([A-Z]\w*)\s*\([\s\S]*?[\r\n]+\s*export\s+default\s+\1/s
+  ];
+
+  for (const pattern of patterns) {
+    const match = code.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+};
+
+/**
+ * The path a preview is entered at. Here rather than beside the preview, so
+ * the server compiling a new artifact builds exactly what the browser will.
+ */
+export const getArtifactVirtualPath = (artifact: PreviewArtifact) => {
+  const candidate = sanitizePathSegment(
+    artifact.fileName ||
+      extractLeadingFileName(artifact.title) ||
+      artifact.title ||
+      artifact.id
+  );
+  const extension = getArtifactFileExtension(artifact);
+
+  if (hasPathExtension(candidate)) {
+    return candidate.startsWith('/') ? candidate : `/${candidate}`;
+  }
+
+  return `/${candidate || artifact.id}.${extension}`;
+};
+
+const getArtifactVirtualPaths = (artifact: PreviewArtifact) => {
+  const extension = getArtifactFileExtension(artifact);
+  const paths = new Set<string>([getArtifactVirtualPath(artifact)]);
+  const exportName = extractDefaultExportName(artifact.content ?? '');
+
+  if (exportName) {
+    paths.add(`/${exportName}.${extension}`);
+  }
+
+  return Array.from(paths);
+};
+
+// Each artifact is an independent, self-contained file, so the preview is built
+// from ONLY the selected artifact. (Merging every code artifact in the chat
+// collided their identical entry paths — e.g. multiple `index.tsx` — and made
+// switching show the wrong one.)
+export const buildPreviewFiles = (artifact: PreviewArtifact): PreviewFile[] => {
+  if (artifact.type !== 'code' || !artifact.content) {
+    return [];
+  }
+
+  return getArtifactVirtualPaths(artifact).map(path => ({
+    path,
+    code: artifact.content ?? '',
+    language: artifact.language ?? undefined
+  }));
 };

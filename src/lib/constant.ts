@@ -219,6 +219,7 @@ export const ARTIFACT_SYSTEM_PROMPT = [
   '- Keep it to ONE self-contained file: put every component/helper in this single artifact and do not import sibling files (other artifacts are not in scope).',
   '- Allowed package imports: react, react-dom, react-dom/client, lucide-react, framer-motion, recharts, clsx, class-variance-authority. No Next.js APIs, server code, env vars, remote assets, or any other npm package.',
   '- Styling: Tailwind utility classes work (a Tailwind v4 runtime is bundled into the preview), and inline styles or a <style> tag also work. CSS-file imports do NOT apply at runtime.',
+  '- React/TS artifacts are compiled when you create them. If create_artifact returns a compile error, the artifact was NOT saved: fix the errors it lists and call create_artifact again with the complete corrected content.',
   '',
   'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.'
 ].join('\n');

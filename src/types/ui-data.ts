@@ -92,4 +92,8 @@ export type CustomUIDataTypes = {
   finish: {
     id: string;
   };
+  /** An artifact that streamed onto the canvas but was never kept. */
+  discard: {
+    id: string;
+  };
 };

@@ -443,11 +443,19 @@ export function ArtifactPreviewFrameClient() {
           );
         }
       } catch (error) {
-        setState({
-          status: 'error',
-          message:
-            error instanceof Error ? error.message : 'Failed to render preview'
-        });
+        const message =
+          error instanceof Error ? error.message : 'Failed to render preview';
+        setState({ status: 'error', message });
+        // Thrown while the module ran — a name never defined, a missing
+        // default export — and caught here, so neither the error listener nor
+        // the patched console sees it. Said to the parent like any other, so
+        // it reaches the console and can be fixed from there.
+        try {
+          window.parent.postMessage(
+            { type: 'artifact-preview-log', level: 'error', message },
+            '*'
+          );
+        } catch {}
       }
     };
 
