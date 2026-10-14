@@ -239,6 +239,12 @@ export const PREVIEW_PACKAGES = [
 
 const PREVIEW_SHADCN_PREFIX = '@/components/ui/';
 
+/**
+ * The one host an HTML artifact may load scripts, stylesheets and fonts from,
+ * as Claude's may. Its preview lets this through and nothing else.
+ */
+export const HTML_PREVIEW_CDN = 'https://cdnjs.cloudflare.com';
+
 const PREVIEW_LIBRARY_LIST = PREVIEW_PACKAGES.filter(
   pkg => !pkg.name.startsWith(PREVIEW_SHADCN_PREFIX)
 )
@@ -276,7 +282,7 @@ export const ARTIFACT_SYSTEM_PROMPT = [
   '- Styling: Tailwind utility classes work (a Tailwind v4 runtime is bundled into the preview), and inline styles or a <style> tag also work. CSS-file imports do NOT apply at runtime.',
   '- React/TS artifacts are compiled when you create or update them. If the tool returns a compile error, nothing was saved: fix the errors it lists and call the tool again.',
   '',
-  'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.',
+  `HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. A library's script or stylesheet can be loaded only from ${HTML_PREVIEW_CDN} (e.g. ${HTML_PREVIEW_CDN}/ajax/libs/d3/7.9.0/d3.min.js); any other host — another CDN, fetch, external images or fonts — is blocked. Preview runs sandboxed with no access to the host page.`,
   '',
   'Diagrams: Mermaid renders in Preview — type "code", language "mermaid", with only the diagram source as `content` (no ``` fence).'
 ].join('\n');

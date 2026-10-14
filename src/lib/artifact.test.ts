@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   artifactKindFromType,
   assertArtifactPayload,
+  blockedHtmlResources,
   getArtifactKind,
   isPreviewableCodeArtifact,
   isRelativeImport,
@@ -221,6 +222,60 @@ describe('assertArtifactPayload', () => {
         language: 'tsx',
         fileName: 'index.tsx',
         content: 'export default () => <div />;'
+      })
+    ).not.toThrow();
+  });
+});
+
+describe('blockedHtmlResources', () => {
+  it('lets the CDN through and lists every other host', () => {
+    const html = `
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+      <script src="https://d3js.org/d3.v7.min.js"></script>
+      <script src='//cdn.jsdelivr.net/npm/chart.js'></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter" rel="stylesheet">
+      <script>const inline = 1;</script>
+    `;
+    expect(blockedHtmlResources(html)).toEqual([
+      'https://d3js.org/d3.v7.min.js',
+      '//cdn.jsdelivr.net/npm/chart.js',
+      'https://fonts.googleapis.com/css2?family=Inter'
+    ]);
+  });
+
+  it('counts a protocol-relative CDN address as blocked', () => {
+    expect(
+      blockedHtmlResources(
+        '<script src="//cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>'
+      )
+    ).toHaveLength(1);
+  });
+});
+
+describe('assertArtifactPayload, for HTML', () => {
+  it('refuses a script from another host, naming it', () => {
+    expect(() =>
+      assertArtifactPayload({
+        type: 'html',
+        content: '<script src="https://d3js.org/d3.v7.min.js"></script>'
+      })
+    ).toThrow(/only from https:\/\/cdnjs\.cloudflare\.com[\s\S]*d3js\.org/);
+  });
+
+  it('keeps a page that loads from the CDN, or nothing', () => {
+    expect(() =>
+      assertArtifactPayload({
+        type: 'html',
+        content:
+          '<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>'
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertArtifactPayload({
+        type: 'code',
+        language: 'svg',
+        content: '<svg/>'
       })
     ).not.toThrow();
   });

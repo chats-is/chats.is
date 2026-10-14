@@ -10,8 +10,13 @@ import { useMatch } from '@tanstack/react-router';
 import { LoaderCircle, Wrench, X } from 'lucide-react';
 
 import { type Artifact, type PreviewPackage } from '@/types';
-import { buildPreviewFiles, getArtifactVirtualPath } from '@/lib/artifact';
+import {
+  buildPreviewFiles,
+  getArtifactVirtualPath,
+  isHtmlPreviewArtifact
+} from '@/lib/artifact';
 import { normalizeCodeLanguage } from '@/lib/code-language';
+import { HTML_PREVIEW_CDN } from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { artifactRegistry } from '@/components/artifacts/registry';
@@ -65,20 +70,6 @@ const isPreviewableCodeLanguage = (artifact: Artifact) => {
 const isMermaidArtifact = (artifact: Artifact) =>
   artifact.type === 'code' &&
   artifact.language?.toLowerCase().trim() === 'mermaid';
-
-const isHtmlLikeArtifact = (artifact: Artifact) => {
-  if (artifact.type === 'html') return true;
-  if (
-    artifact.type === 'code' &&
-    normalizeCodeLanguage(artifact.language) === 'svg'
-  ) {
-    return true;
-  }
-  return (
-    artifact.type === 'code' &&
-    normalizeCodeLanguage(artifact.language) === 'html'
-  );
-};
 
 /**
  * Why a preview failed, floated over it: a build that did not compile, or a
@@ -419,7 +410,7 @@ function FrameArtifactPreview({
 }
 
 export function supportsArtifactRuntimePreview(artifact: Artifact) {
-  if (isHtmlLikeArtifact(artifact)) return true;
+  if (isHtmlPreviewArtifact(artifact)) return true;
   if (artifact.type === 'markdown') return true;
   if (artifact.type === 'json') return true;
   if (artifact.type === 'code' && isPreviewableCodeLanguage(artifact)) {
@@ -447,13 +438,15 @@ function HtmlArtifactPreview({
   const { failure, clearFailure } = usePreviewFailure(iframeRef);
   const htmlSource = useMemo(() => {
     // Inject a strict CSP so self-contained HTML/SVG previews can use inline
-    // script/style but cannot reach the network (no exfiltration). The meta must
-    // sit inside <head> to be honored — placing it before <!DOCTYPE>/<html>
-    // would force quirks mode and be ignored.
+    // script/style, and a library's script, stylesheet or font from the one
+    // CDN, but cannot otherwise reach the network: no fetch, no other host
+    // (no exfiltration beyond what a request for a library's file could
+    // carry). The meta must sit inside <head> to be honored — placing it
+    // before <!DOCTYPE>/<html> would force quirks mode and be ignored.
     const csp =
-      "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; " +
-      "style-src 'unsafe-inline'; img-src data: blob:; font-src data:; " +
-      "connect-src 'none'";
+      `default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' ${HTML_PREVIEW_CDN}; ` +
+      `style-src 'unsafe-inline' ${HTML_PREVIEW_CDN}; img-src data: blob:; ` +
+      `font-src data: ${HTML_PREVIEW_CDN}; connect-src 'none'`;
     const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
 
     // The policy goes in a head of our own, ahead of everything the artifact
@@ -509,7 +502,7 @@ export function ArtifactRuntimePreview({
     );
   }
 
-  if (isHtmlLikeArtifact(artifact)) {
+  if (isHtmlPreviewArtifact(artifact)) {
     return (
       <HtmlArtifactPreview content={artifact.content ?? ''} onFix={onFix} />
     );

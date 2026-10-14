@@ -1,6 +1,6 @@
 import { type ArtifactType, type PreviewPackage } from '@/types';
 import { normalizeCodeLanguage } from '@/lib/code-language';
-import { PREVIEW_PACKAGES } from '@/lib/constant';
+import { HTML_PREVIEW_CDN, PREVIEW_PACKAGES } from '@/lib/constant';
 
 export type ArtifactKind = 'text' | 'code' | 'image' | 'sheet' | 'file';
 
@@ -89,6 +89,40 @@ export const previewPackageImports = (code: string): PreviewPackage[] =>
     )
   );
 
+/**
+ * The scripts and stylesheets an HTML page loads from anywhere but
+ * HTML_PREVIEW_CDN — which its preview would block. Addresses on the page's
+ * own (opaque, sandboxed) origin load nothing either, so only absolute and
+ * protocol-relative ones are counted; a protocol-relative one resolves to
+ * http against the app and is blocked too.
+ */
+const HTML_RESOURCE_RE =
+  /<script\b[^>]*?\bsrc\s*=\s*["']?([^"'\s>]+)|<link\b[^>]*?\bhref\s*=\s*["']?([^"'\s>]+)/gi;
+
+export const blockedHtmlResources = (html: string): string[] =>
+  Array.from(
+    new Set(
+      Array.from(
+        html.matchAll(HTML_RESOURCE_RE),
+        match => match[1] ?? match[2] ?? ''
+      ).filter(
+        url =>
+          /^(https?:)?\/\//i.test(url) &&
+          !url.startsWith(`${HTML_PREVIEW_CDN}/`)
+      )
+    )
+  );
+
+/** Previewed as a page in the HTML frame: HTML itself, or SVG. */
+export const isHtmlPreviewArtifact = (input: {
+  type: ArtifactType;
+  language?: string | null;
+}): boolean => {
+  if (input.type === 'html') return true;
+  const language = normalizeCodeLanguage(input.language);
+  return input.type === 'code' && (language === 'html' || language === 'svg');
+};
+
 /** Maps an artifact `type` to the UI/render kind. */
 export const artifactKindFromType = (
   type?: ArtifactType | null
@@ -139,6 +173,16 @@ export const assertArtifactPayload = (input: ArtifactPayloadInput): void => {
 
   if (input.content == null) {
     throw new Error('content is required for non-file artifacts');
+  }
+
+  if (isHtmlPreviewArtifact(input)) {
+    const blocked = blockedHtmlResources(input.content);
+    if (blocked.length > 0) {
+      throw new Error(
+        `HTML artifacts can load scripts and stylesheets only from ${HTML_PREVIEW_CDN}; the preview blocks every other host. Load the library from its ${HTML_PREVIEW_CDN}/ajax/libs/… address, or put the code inline. Blocked: ${blocked.join(', ')}`
+      );
+    }
+    return;
   }
 
   if (!isPreviewableCodeArtifact(input)) {
