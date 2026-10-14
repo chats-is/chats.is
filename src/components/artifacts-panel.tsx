@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { PanelBottomClose, PanelBottomOpen, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 
 import { type Artifact } from '@/types';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,6 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 import { ArtifactViewer } from '@/components/artifact-viewer';
-import { hasPreviewConsole } from '@/components/artifacts/runtime-preview';
 
 interface ArtifactsPanelProps {
   open: boolean;
@@ -38,7 +37,6 @@ export function ArtifactsPanel({
   // keeps the current view (a JSON/code artifact viewed as source stays source
   // after switching) instead of snapping back to a per-artifact default.
   const [viewMode, setViewMode] = useState<'source' | 'preview'>('preview');
-  const [consoleOpen, setConsoleOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 768px)');
 
   // Newest first, so the artifact switcher and default selection favour the most
@@ -61,39 +59,6 @@ export function ArtifactsPanel({
   const effectiveViewMode: 'source' | 'preview' = isStreaming
     ? 'source'
     : viewMode;
-
-  // Console is per-artifact; reset it when the artifact changes.
-  useEffect(() => {
-    setConsoleOpen(false);
-  }, [selected?.id]);
-
-  const showConsole =
-    effectiveViewMode === 'preview' &&
-    !!selected &&
-    hasPreviewConsole(selected);
-  const consoleButton = showConsole ? (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            'size-7 text-muted-foreground',
-            consoleOpen && 'text-foreground'
-          )}
-          onClick={() => setConsoleOpen(o => !o)}
-        >
-          {consoleOpen ? (
-            <PanelBottomClose className="size-4" />
-          ) : (
-            <PanelBottomOpen className="size-4" />
-          )}
-          <span className="sr-only">Toggle console</span>
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Console</TooltipContent>
-    </Tooltip>
-  ) : null;
 
   if (!open) {
     return null;
@@ -133,7 +98,6 @@ export function ArtifactsPanel({
             hideContent={true}
             viewMode={effectiveViewMode}
             onViewModeChange={setViewMode}
-            extraActions={consoleButton}
           />
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
@@ -143,8 +107,6 @@ export function ArtifactsPanel({
             hideHeader={true}
             viewMode={effectiveViewMode}
             onViewModeChange={setViewMode}
-            consoleOpen={consoleOpen}
-            onConsoleOpenChange={setConsoleOpen}
             onFix={onFix}
           />
         </div>

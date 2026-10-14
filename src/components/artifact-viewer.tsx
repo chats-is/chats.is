@@ -46,9 +46,6 @@ interface ArtifactViewerProps {
   hideContent?: boolean;
   viewMode?: 'source' | 'preview';
   onViewModeChange?: (mode: 'source' | 'preview') => void;
-  extraActions?: React.ReactNode;
-  consoleOpen?: boolean;
-  onConsoleOpenChange?: (open: boolean) => void;
   /** Asks the chat to fix an error in the artifact's preview. */
   onFix?: (artifact: Artifact, error: string) => void;
 }
@@ -65,9 +62,6 @@ export function ArtifactViewer({
   hideContent,
   viewMode: controlledViewMode,
   onViewModeChange,
-  extraActions,
-  consoleOpen,
-  onConsoleOpenChange,
   onFix
 }: ArtifactViewerProps) {
   const { copyToClipboard } = useCopyToClipboard();
@@ -151,8 +145,6 @@ export function ArtifactViewer({
     <div className="h-full min-h-0 overflow-auto rounded-md bg-background">
       <ArtifactRuntimePreview
         artifact={artifact}
-        consoleOpen={consoleOpen}
-        onConsoleOpenChange={onConsoleOpenChange}
         onFix={onFix && (error => onFix(artifact, error))}
       />
     </div>
@@ -297,7 +289,6 @@ export function ArtifactViewer({
             {statusIndicator}
           </div>
           <div className="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-2">
-            {extraActions}
             {canCopyContent && (
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -7,7 +7,7 @@ import {
   useState
 } from 'react';
 import { useMatch } from '@tanstack/react-router';
-import { AlertCircle, LoaderCircle, Wrench } from 'lucide-react';
+import { LoaderCircle, Wrench, X } from 'lucide-react';
 
 import { type Artifact } from '@/types';
 import { buildPreviewFiles, getArtifactVirtualPath } from '@/lib/artifact';
@@ -66,105 +66,98 @@ const isHtmlLikeArtifact = (artifact: Artifact) => {
   );
 };
 
-type PreviewLog = { level: string; message: string };
-
 /**
- * Hands an error to the chat to be fixed. Once per press of a given error: a
- * double press would send the message twice before the turn has begun and
- * the panel has taken the button away.
+ * Why a preview failed, floated over it: a build that did not compile, or a
+ * page that threw. It can be put away — a page that threw may still show
+ * most of itself — and the same error stays away until it is a new one.
+ *
+ * Where a message can be sent, it offers to have the error fixed. Once per
+ * error: a double press would send it twice before the turn has begun and
+ * the panel has taken the offer away.
  */
-const FixButton = ({
+function PreviewErrorCard({
   error,
   onFix
 }: {
   error: string;
-  onFix: (error: string) => void;
-}) => {
+  onFix?: (error: string) => void;
+}) {
+  const [dismissed, setDismissed] = useState<string | null>(null);
   const [sentFor, setSentFor] = useState<string | null>(null);
 
+  if (dismissed === error) return null;
+
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="h-7 shrink-0 gap-1.5 font-sans text-xs"
-      disabled={sentFor === error}
-      onClick={() => {
-        setSentFor(error);
-        onFix(error);
-      }}
+    <div
+      role="alert"
+      className="absolute bottom-4 left-4 z-20 w-[min(28rem,calc(100%-2rem))] rounded-xl border bg-background p-5 shadow-lg"
     >
-      <Wrench className="size-3.5" />
-      Try fixing
-    </Button>
-  );
-};
-
-const StatusPanel = ({
-  status,
-  error,
-  onFix
-}: {
-  status: PreviewStatus;
-  error: string | null;
-  onFix?: (error: string) => void;
-}) => {
-  if (status === 'loading') {
-    return (
-      <div className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
-        <LoaderCircle className="mr-2 size-4 animate-spin" />
-        Building preview...
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-        <div className="mb-2 flex items-center gap-2 font-medium">
-          <AlertCircle className="size-4" />
-          Preview failed
-          {error && onFix && (
-            <span className="ml-auto">
-              <FixButton error={error} onFix={onFix} />
-            </span>
-          )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Error running artifact</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            An error occurred while running the generated artifact.
+          </p>
         </div>
-        <pre className="font-mono text-xs wrap-break-word whitespace-pre-wrap">
-          {error}
-        </pre>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-mt-1 -mr-2 size-7 shrink-0 text-muted-foreground"
+          onClick={() => setDismissed(error)}
+        >
+          <X className="size-4" />
+          <span className="sr-only">Dismiss</span>
+        </Button>
       </div>
-    );
-  }
-
-  return null;
-};
+      <pre
+        className={cn(
+          'mt-3 max-h-48 overflow-auto rounded-lg bg-muted p-3 font-mono text-xs',
+          // A compile error runs to several lines, a caret under each column
+          // it names, and wrapping would move the carets; a thrown message is
+          // one line, and wraps.
+          error.includes('\n')
+            ? 'whitespace-pre'
+            : 'wrap-break-word whitespace-pre-wrap'
+        )}
+      >
+        {error}
+      </pre>
+      {onFix && (
+        <div className="mt-3 flex justify-end">
+          <Button
+            size="sm"
+            className="gap-1.5"
+            disabled={sentFor === error}
+            onClick={() => {
+              setSentFor(error);
+              onFix(error);
+            }}
+          >
+            <Wrench className="size-3.5" />
+            Try fixing
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
- * What a preview frame logs, kept for its console. Only from `frameRef`'s
- * own window: any frame can post a message to this page. An error opens the
- * console, so a failure is not left hidden behind a closed panel.
+ * The error a preview frame reported failing with. Only from `frameRef`'s
+ * own window: any frame can post a message to this page.
  */
-function usePreviewLogs(
-  frameRef: React.RefObject<HTMLIFrameElement | null>,
-  onConsoleOpenChange?: (open: boolean) => void
+function usePreviewFailure(
+  frameRef: React.RefObject<HTMLIFrameElement | null>
 ) {
-  const [logs, setLogs] = useState<PreviewLog[]>([]);
-  // The listener is bound once; the latest setter is read through a ref.
-  const openRef = useRef(onConsoleOpenChange);
-  openRef.current = onConsoleOpenChange;
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     const handleMessage = (
-      event: MessageEvent<{ type?: string; level?: string; message?: string }>
+      event: MessageEvent<{ type?: string; message?: string }>
     ) => {
       if (event.source !== frameRef.current?.contentWindow) return;
-      if (event.data?.type !== 'artifact-preview-log' || !event.data.message) {
-        return;
-      }
-      const { level, message } = event.data;
-      setLogs(prev => [...prev, { level: level ?? 'log', message }].slice(-50));
-      if (level === 'error') {
-        openRef.current?.(true);
+      if (event.data?.type === 'artifact-preview-error' && event.data.message) {
+        setFailure(event.data.message);
       }
     };
 
@@ -172,56 +165,17 @@ function usePreviewLogs(
     return () => window.removeEventListener('message', handleMessage);
   }, [frameRef]);
 
-  return { logs, clearLogs: useCallback(() => setLogs([]), []) };
-}
-
-function PreviewConsole({
-  logs,
-  onFix
-}: {
-  logs: PreviewLog[];
-  onFix?: (error: string) => void;
-}) {
-  const lastError = logs
-    .filter(entry => entry.level === 'error')
-    .at(-1)?.message;
-
-  return (
-    <div className="max-h-40 shrink-0 overflow-auto border-t bg-muted/30 p-2 font-mono text-xs">
-      {lastError && onFix && (
-        <div className="mb-1 flex justify-end">
-          <FixButton error={lastError} onFix={onFix} />
-        </div>
-      )}
-      {logs.length > 0 ? (
-        logs.map((entry, index) => (
-          <pre
-            key={index}
-            className={cn(
-              'wrap-break-word whitespace-pre-wrap',
-              entry.level === 'error' && 'text-destructive',
-              entry.level === 'warn' && 'text-amber-600 dark:text-amber-500'
-            )}
-          >
-            {entry.message}
-          </pre>
-        ))
-      ) : (
-        <div className="text-muted-foreground">No console output.</div>
-      )}
-    </div>
-  );
+  return {
+    failure,
+    clearFailure: useCallback(() => setFailure(null), [])
+  };
 }
 
 function ReactArtifactPreview({
   artifact,
-  consoleOpen,
-  onConsoleOpenChange,
   onFix
 }: {
   artifact: Artifact;
-  consoleOpen?: boolean;
-  onConsoleOpenChange?: (open: boolean) => void;
   onFix?: (error: string) => void;
 }) {
   // Use the live content directly (not deferred): the preview is never shown
@@ -255,9 +209,7 @@ function ReactArtifactPreview({
     entryPath: string;
   } | null>(null);
   const fallbackRef = useRef<number | null>(null);
-  const { logs, clearLogs } = usePreviewLogs(iframeRef, onConsoleOpenChange);
-  // The artifact header owns the console toggle.
-  const isConsoleOpen = consoleOpen ?? false;
+  const { failure, clearFailure } = usePreviewFailure(iframeRef);
 
   // The single place that pushes the latest compiled result into the frame.
   // Called both when a new result compiles AND when the frame (re)announces it
@@ -265,7 +217,7 @@ function ReactArtifactPreview({
   const postToFrame = useCallback(() => {
     const payload = compiledRef.current;
     if (!frameReadyRef.current || !payload) return;
-    clearLogs();
+    clearFailure();
     iframeRef.current?.contentWindow?.postMessage(
       {
         type: 'artifact-preview-render',
@@ -278,7 +230,7 @@ function ReactArtifactPreview({
     // If the frame never reports back that it rendered, don't leave the loading
     // overlay stuck forever.
     fallbackRef.current = window.setTimeout(() => setStatus('ready'), 6000);
-  }, [clearLogs]);
+  }, [clearFailure]);
   const previewFiles = useMemo(
     () => buildPreviewFiles({ ...artifact, content }),
     [artifact, content]
@@ -413,6 +365,11 @@ function ReactArtifactPreview({
     postToFrame();
   }, [compiledFiles, entryPath, postToFrame]);
 
+  // A build that failed, or a page that threw once built; neither while a new
+  // build is on its way.
+  const shownError =
+    status === 'loading' ? null : status === 'error' ? error : failure;
+
   // Keep the iframe mounted once we have a compiled result so re-compiles (e.g.
   // switching artifacts) update it in place via postMessage instead of tearing
   // down and reloading the frame (which is slow and shows stale content).
@@ -429,11 +386,13 @@ function ReactArtifactPreview({
             className="min-h-0 w-full flex-1 bg-white"
             src="/artifact-preview-frame"
           />
-          {isConsoleOpen && <PreviewConsole logs={logs} onFix={onFix} />}
         </>
       ) : (
-        status !== 'ready' && (
-          <StatusPanel status={status} error={error} onFix={onFix} />
+        status === 'loading' && (
+          <div className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
+            <LoaderCircle className="mr-2 size-4 animate-spin" />
+            Building preview...
+          </div>
         )
       )}
       {hasPreview && status === 'loading' && (
@@ -442,6 +401,7 @@ function ReactArtifactPreview({
           Building preview...
         </div>
       )}
+      {shownError && <PreviewErrorCard error={shownError} onFix={onFix} />}
     </div>
   );
 }
@@ -456,58 +416,23 @@ export function supportsArtifactRuntimePreview(artifact: Artifact) {
   return false;
 }
 
-function isReactCodePreview(artifact: Artifact) {
-  return artifact.type === 'code' && isPreviewableCodeLanguage(artifact);
-}
-
-/** Whether the artifact's preview has a console: it runs in a frame of ours. */
-export function hasPreviewConsole(artifact: Artifact) {
-  return isReactCodePreview(artifact) || isHtmlLikeArtifact(artifact);
-}
-
-// Runs ahead of the artifact's own scripts and says what goes wrong to the
-// page, in the messages the React frame sends — so an HTML artifact has the
-// same console, and the same fix, as a React one.
-const HTML_ERROR_REPORTER = `<script>(function () {
-  function send(level, message) {
-    try { parent.postMessage({ type: 'artifact-preview-log', level: level, message: message }, '*'); } catch (e) {}
-  }
-  function text(args) {
-    return Array.prototype.map.call(args, function (arg) {
-      if (arg instanceof Error) return arg.message;
-      if (typeof arg === 'string') return arg;
-      try { return JSON.stringify(arg); } catch (e) { return String(arg); }
-    }).join(' ');
-  }
-  window.addEventListener('error', function (event) {
-    send('error', event.message || 'Script error');
-  });
-  window.addEventListener('unhandledrejection', function (event) {
-    send('error', text([event.reason]));
-  });
-  ['error', 'warn'].forEach(function (level) {
-    var original = console[level];
-    console[level] = function () {
-      send(level, text(arguments));
-      original.apply(console, arguments);
-    };
-  });
-})();</script>`;
+// Runs ahead of the artifact's own scripts and reports an error nothing
+// caught, in the message the React frame sends — so an HTML artifact shows
+// its errors, and offers their fix, as a React one does.
+const HTML_ERROR_REPORTER = `<script>window.addEventListener('error', function (event) {
+  try { parent.postMessage({ type: 'artifact-preview-error', message: event.message || 'Script error' }, '*'); } catch (e) {}
+});</script>`;
 
 function HtmlArtifactPreview({
   content,
-  consoleOpen,
-  onConsoleOpenChange,
   onFix
 }: {
   content: string;
-  consoleOpen?: boolean;
-  onConsoleOpenChange?: (open: boolean) => void;
   onFix?: (error: string) => void;
 }) {
   const iframeTitle = useId();
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { logs, clearLogs } = usePreviewLogs(iframeRef, onConsoleOpenChange);
+  const { failure, clearFailure } = usePreviewFailure(iframeRef);
   const htmlSource = useMemo(() => {
     // Inject a strict CSP so self-contained HTML/SVG previews can use inline
     // script/style but cannot reach the network (no exfiltration). The meta must
@@ -529,34 +454,30 @@ function HtmlArtifactPreview({
     return `<!DOCTYPE html><html><head>${meta}${HTML_ERROR_REPORTER}</head><body>${content}</body></html>`;
   }, [content]);
 
-  // New source is a new page: what the last one logged no longer applies.
+  // New source is a new page: what the last one threw no longer applies.
   useEffect(() => {
-    clearLogs();
-  }, [htmlSource, clearLogs]);
+    clearFailure();
+  }, [htmlSource, clearFailure]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative size-full min-h-0">
       <iframe
         ref={iframeRef}
         title={`artifact-preview-${iframeTitle}`}
         sandbox="allow-scripts"
-        className="min-h-0 w-full flex-1 bg-white"
+        className="size-full min-h-0 bg-white"
         srcDoc={htmlSource}
       />
-      {consoleOpen && <PreviewConsole logs={logs} onFix={onFix} />}
+      {failure && <PreviewErrorCard error={failure} onFix={onFix} />}
     </div>
   );
 }
 
 export function ArtifactRuntimePreview({
   artifact,
-  consoleOpen,
-  onConsoleOpenChange,
   onFix
 }: {
   artifact: Artifact;
-  consoleOpen?: boolean;
-  onConsoleOpenChange?: (open: boolean) => void;
   /** Absent where nobody can send a message: a share page. */
   onFix?: (error: string) => void;
 }) {
@@ -578,24 +499,12 @@ export function ArtifactRuntimePreview({
 
   if (isHtmlLikeArtifact(artifact)) {
     return (
-      <HtmlArtifactPreview
-        content={artifact.content ?? ''}
-        consoleOpen={consoleOpen}
-        onConsoleOpenChange={onConsoleOpenChange}
-        onFix={onFix}
-      />
+      <HtmlArtifactPreview content={artifact.content ?? ''} onFix={onFix} />
     );
   }
 
   if (artifact.type === 'code' && isPreviewableCodeLanguage(artifact)) {
-    return (
-      <ReactArtifactPreview
-        artifact={artifact}
-        consoleOpen={consoleOpen}
-        onConsoleOpenChange={onConsoleOpenChange}
-        onFix={onFix}
-      />
-    );
+    return <ReactArtifactPreview artifact={artifact} onFix={onFix} />;
   }
 
   return (

@@ -128,36 +128,15 @@ class PreviewErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Preview crashed while rendering';
-    this.props.onError(message);
-    // Forward the caught render error as an error log so the parent surfaces it
-    // (and auto-opens the console) — React doesn't reliably route ErrorBoundary
-    // catches through the patched console.error, especially in production.
-    try {
-      window.parent.postMessage(
-        { type: 'artifact-preview-log', level: 'error', message },
-        '*'
-      );
-    } catch {}
+    this.props.onError(
+      error instanceof Error ? error.message : 'Preview crashed while rendering'
+    );
   }
 
   render() {
     return this.state.hasError ? null : this.props.children;
   }
 }
-
-const PreviewErrorView = ({ message }: { message: string }) => (
-  <div className="min-h-screen bg-white p-4 text-red-700">
-    <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-      <pre className="text-xs wrap-break-word whitespace-pre-wrap">
-        {message}
-      </pre>
-    </div>
-  </div>
-);
 
 const normalizePath = (value: string) => {
   const parts: string[] = [];
@@ -217,64 +196,23 @@ export function ArtifactPreviewFrameClient() {
     void import('@tailwindcss/browser');
   }, []);
 
-  // Surface uncaught runtime/async errors (the ErrorBoundary only catches
-  // errors thrown during render) and forward console output to the parent.
+  // An error nothing caught — thrown from a handler or a timer once the
+  // component is up. The ErrorBoundary only sees what is thrown while
+  // rendering.
   useEffect(() => {
-    const forward = (level: 'error' | 'warn' | 'log', args: unknown[]) => {
-      const message = args
-        .map(arg =>
-          arg instanceof Error
-            ? arg.message
-            : typeof arg === 'string'
-              ? arg
-              : (() => {
-                  try {
-                    return JSON.stringify(arg);
-                  } catch {
-                    return String(arg);
-                  }
-                })()
-        )
-        .join(' ');
-      window.parent.postMessage(
-        { type: 'artifact-preview-log', level, message },
-        '*'
-      );
-    };
-
     const onError = (event: ErrorEvent) => {
       setRuntimeError(event.message || 'Runtime error in preview');
-      forward('error', [event.message]);
     };
-    const onRejection = (event: PromiseRejectionEvent) => {
-      const reason = event.reason;
-      forward('error', [reason instanceof Error ? reason.message : reason]);
-    };
-
-    const original = { error: console.error, warn: console.warn };
-    console.error = (...args: unknown[]) => {
-      forward('error', args);
-      original.error(...args);
-    };
-    console.warn = (...args: unknown[]) => {
-      forward('warn', args);
-      original.warn(...args);
-    };
-
     window.addEventListener('error', onError);
-    window.addEventListener('unhandledrejection', onRejection);
-
-    return () => {
-      window.removeEventListener('error', onError);
-      window.removeEventListener('unhandledrejection', onRejection);
-      console.error = original.error;
-      console.warn = original.warn;
-    };
+    return () => window.removeEventListener('error', onError);
   }, []);
 
   // Tell the parent once a preview has actually rendered (or errored), so it can
   // keep its loading state up until the NEW content is on screen instead of
   // hiding it the moment compilation finishes (which would flash the old one).
+  //
+  // A preview that failed says why, once: the parent shows the error, and
+  // offers to have it fixed, outside the sandbox where it can.
   useEffect(() => {
     if (
       runtimeError ||
@@ -283,6 +221,14 @@ export function ArtifactPreviewFrameClient() {
       state.status === 'error'
     ) {
       window.parent.postMessage({ type: 'artifact-preview-rendered' }, '*');
+    }
+    const failure =
+      runtimeError ?? (state.status === 'error' ? state.message : null);
+    if (failure) {
+      window.parent.postMessage(
+        { type: 'artifact-preview-error', message: failure },
+        '*'
+      );
     }
   }, [state, runtimeError]);
 
@@ -443,19 +389,11 @@ export function ArtifactPreviewFrameClient() {
           );
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Failed to render preview';
-        setState({ status: 'error', message });
-        // Thrown while the module ran — a name never defined, a missing
-        // default export — and caught here, so neither the error listener nor
-        // the patched console sees it. Said to the parent like any other, so
-        // it reaches the console and can be fixed from there.
-        try {
-          window.parent.postMessage(
-            { type: 'artifact-preview-log', level: 'error', message },
-            '*'
-          );
-        } catch {}
+        setState({
+          status: 'error',
+          message:
+            error instanceof Error ? error.message : 'Failed to render preview'
+        });
       }
     };
 
@@ -467,12 +405,9 @@ export function ArtifactPreviewFrameClient() {
     };
   }, []);
 
-  if (runtimeError) {
-    return <PreviewErrorView message={runtimeError} />;
-  }
-
-  if (state.status === 'error') {
-    return <PreviewErrorView message={state.message} />;
+  // The parent shows the error; the page stays blank behind it.
+  if (runtimeError || state.status === 'error') {
+    return <div className="min-h-screen bg-white" />;
   }
 
   if (state.status === 'element' || state.status === 'component') {
