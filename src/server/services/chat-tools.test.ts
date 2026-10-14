@@ -1,16 +1,23 @@
+import { type InferUIMessageChunk } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type Model } from '@/types';
+import { type Artifact, type ChatMessage, type Model } from '@/types';
+import { getArtifact } from '@/server/services/artifact';
 import { findModelByModelId, getAllModels } from '@/server/services/model';
 import { getMediaDefaultModelIds } from '@/server/services/settings';
 import { getUserTier } from '@/server/services/tier';
 
-import { buildMediaTools, buildMediaToolsSystemPrompt } from './chat-tools';
+import {
+  buildArtifactTools,
+  buildMediaTools,
+  buildMediaToolsSystemPrompt
+} from './chat-tools';
 
 /**
- * Which media tools a reply is offered, and on which model. The models, the
- * admin's defaults and the user's tier are mocked at their module boundaries;
- * the generators are never reached, since nothing here calls a tool.
+ * Which media tools a reply is offered, and on which model; and what one
+ * reply's artifact tools keep. The models, the admin's defaults and the
+ * user's tier are mocked at their module boundaries; the generators are never
+ * reached, since no media tool is called here.
  */
 
 vi.mock('@/lib/image-generation', () => ({ generateAndStoreImage: vi.fn() }));
@@ -35,6 +42,13 @@ vi.mock('@/server/services/settings', () => ({
   getMediaDefaultModelIds: vi.fn()
 }));
 vi.mock('@/server/services/tier', () => ({ getUserTier: vi.fn() }));
+// The artifacts of earlier replies are read from the database; what a call
+// makes of them is the real thing.
+vi.mock('@/db', () => ({ db: {} }));
+vi.mock('@/server/services/artifact', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/server/services/artifact')>()),
+  getArtifact: vi.fn()
+}));
 
 const image = (modelId: string): Model =>
   ({
@@ -157,5 +171,218 @@ describe('buildMediaToolsSystemPrompt', () => {
     expect(prompt).toContain('generated media renders');
     expect(prompt).not.toContain('map it to one of the values');
     expect(prompt).not.toContain('A transcript is not displayed');
+  });
+});
+
+describe('the artifact tools of one reply', () => {
+  const at = new Date('2026-01-01T00:00:00Z');
+  const earlier = (id: string, content: string, chatId = 'c1'): Artifact => ({
+    id,
+    chatId,
+    messageId: 'm0',
+    title: id,
+    type: 'markdown',
+    content,
+    createdAt: at,
+    updatedAt: at
+  });
+  const inDatabase = (...artifacts: Artifact[]) =>
+    vi
+      .mocked(getArtifact)
+      .mockImplementation(
+        async (_userId, id) =>
+          (artifacts.find(a => a.id === id) ?? null) as Awaited<
+            ReturnType<typeof getArtifact>
+          >
+      );
+
+  // What the SDK hands a tool with each call.
+  const call = (toolCallId: string) => ({
+    toolCallId,
+    messages: [],
+    context: {}
+  });
+
+  const reply = () => {
+    const parts: InferUIMessageChunk<ChatMessage>[] = [];
+    const artifacts = buildArtifactTools({
+      userId: 'u1',
+      chatId: 'c1',
+      messageId: 'm1',
+      emit: part => parts.push(part)
+    });
+    let calls = 0;
+    const options = () => call(`call${++calls}`);
+    return {
+      ...artifacts,
+      parts,
+      create: (input: {
+        title: string;
+        type: 'markdown' | 'code';
+        content: string;
+        language?: string;
+        fileName?: string;
+      }) =>
+        artifacts.tools.create_artifact.execute(input, options()) as Promise<{
+          id: string;
+        }>,
+      update: (id: string, oldStr: string, newStr: string) =>
+        artifacts.tools.update_artifact.execute(
+          { id, oldStr, newStr },
+          options()
+        ) as Promise<{ id: string }>
+    };
+  };
+
+  it('keeps what create_artifact makes, and draws it on the canvas', async () => {
+    const r = reply();
+    const { id } = await r.create({
+      title: 'Notes',
+      type: 'markdown',
+      content: '# Hi'
+    });
+
+    expect(r.kept()).toMatchObject([
+      { id, title: 'Notes', content: '# Hi', chatId: 'c1', messageId: 'm1' }
+    ]);
+    expect(r.parts.map(part => part.type)).toEqual([
+      'data-id',
+      'data-title',
+      'data-kind',
+      'data-clear',
+      'data-textDelta',
+      'data-finish',
+      'data-artifact'
+    ]);
+  });
+
+  it('makes one copy of an earlier reply’s artifact, changed by every call that follows the id it returned', async () => {
+    const original = earlier('old', 'one two three');
+    inDatabase(original);
+    const r = reply();
+
+    const first = await r.update('old', 'one', 'ONE');
+    const second = await r.update(first.id, 'two', 'TWO');
+    const third = await r.update(second.id, 'three', 'THREE');
+
+    expect(new Set([first.id, second.id, third.id]).size).toBe(1);
+    expect(r.kept()).toMatchObject([
+      { id: first.id, content: 'ONE TWO THREE', messageId: 'm1' }
+    ]);
+    expect(original.content).toBe('one two three');
+  });
+
+  it('changes the same copy when every call names the earlier reply’s id', async () => {
+    inDatabase(earlier('old', 'one two three'));
+    const r = reply();
+
+    await r.update('old', 'one', 'ONE');
+    await r.update('old', 'two', 'TWO');
+    await r.update('old', 'three', 'THREE');
+
+    expect(r.kept()).toMatchObject([{ content: 'ONE TWO THREE' }]);
+  });
+
+  it('takes calls made at once in turn, so none starts from the earlier reply’s artifact again', async () => {
+    inDatabase(earlier('old', 'one two three'));
+    const r = reply();
+
+    const ids = await Promise.all([
+      r.update('old', 'one', 'ONE'),
+      r.update('old', 'two', 'TWO'),
+      r.update('old', 'three', 'THREE')
+    ]);
+
+    expect(new Set(ids.map(result => result.id)).size).toBe(1);
+    expect(r.kept()).toMatchObject([{ content: 'ONE TWO THREE' }]);
+    expect(getArtifact).toHaveBeenCalledOnce();
+  });
+
+  it('changes what this reply made in place, keeping its id and when it was made', async () => {
+    const r = reply();
+    const made = await r.create({
+      title: 'Notes',
+      type: 'markdown',
+      content: 'one two'
+    });
+    const [{ createdAt }] = r.kept();
+
+    const changed = await r.update(made.id, 'two', 'TWO');
+
+    expect(changed.id).toBe(made.id);
+    expect(r.kept()).toMatchObject([
+      { id: made.id, content: 'one TWO', createdAt }
+    ]);
+    expect(getArtifact).not.toHaveBeenCalled();
+  });
+
+  it('makes a copy of each earlier artifact it changes', async () => {
+    inDatabase(earlier('counter', 'count'), earlier('timer', 'time'));
+    const r = reply();
+
+    await Promise.all([
+      r.update('counter', 'count', 'count, reset'),
+      r.update('timer', 'time', 'time, lap'),
+      r.update('timer', 'lap', 'lap, clear')
+    ]);
+
+    expect(r.kept()).toMatchObject([
+      { title: 'counter', content: 'count, reset' },
+      { title: 'timer', content: 'time, lap, clear' }
+    ]);
+  });
+
+  it('keeps nothing of a call that fails, and goes on to the next', async () => {
+    inDatabase(earlier('old', 'one two'));
+    const r = reply();
+
+    const [failed, done] = await Promise.allSettled([
+      r.update('old', 'missing', 'x'),
+      r.update('old', 'two', 'TWO')
+    ]);
+
+    expect(failed.status).toBe('rejected');
+    expect(done.status).toBe('fulfilled');
+    expect(r.kept()).toMatchObject([{ content: 'one TWO' }]);
+  });
+
+  it('refuses an artifact of another chat', async () => {
+    inDatabase(earlier('elsewhere', 'one', 'c2'));
+    const r = reply();
+
+    await expect(r.update('elsewhere', 'one', 'ONE')).rejects.toThrow(
+      'No artifact in this chat has id elsewhere'
+    );
+    expect(r.kept()).toEqual([]);
+  });
+
+  it('takes back from the canvas an artifact that streamed onto it and was not kept', async () => {
+    const r = reply();
+    const create = r.tools.create_artifact;
+    const streaming = call('streamed');
+    const input = {
+      title: 'Broken',
+      type: 'code' as const,
+      language: 'tsx',
+      fileName: 'index.tsx',
+      content: 'export default function App() {\n  return <div>;\n}\n'
+    };
+
+    await create.onInputStart!(streaming);
+    await create.onInputDelta!({
+      ...streaming,
+      inputTextDelta: JSON.stringify(input)
+    });
+    const streamed = r.parts.find(part => part.type === 'data-id');
+    await expect(create.execute(input, streaming)).rejects.toThrow(
+      'did not compile'
+    );
+    r.discardUnfinished();
+
+    expect(r.kept()).toEqual([]);
+    expect(r.parts.at(-1)).toEqual({
+      type: 'data-discard',
+      data: { id: streamed && 'data' in streamed ? streamed.data : undefined }
+    });
   });
 });

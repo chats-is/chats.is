@@ -7,31 +7,21 @@ import {
   generateText,
   isStepCount,
   JsonToSseTransformStream,
-  parsePartialJson,
   smoothStream,
   streamText,
-  tool,
   UI_MESSAGE_STREAM_HEADERS
 } from 'ai';
 
 import {
-  createArtifactInputSchema,
-  updateArtifactInputSchema,
-  type Artifact,
   type ChatErrorKind,
   type ChatMessage,
   type ChatUsage,
-  type CreateArtifactInput,
   type MessageMetadata,
   type Provider,
   type User
 } from '@/types';
 import { chatRequestSchema } from '@/types/chat';
-import {
-  artifactKindFromType,
-  dataPartForModel,
-  type ArtifactKind
-} from '@/lib/artifact';
+import { dataPartForModel } from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
 import {
@@ -62,14 +52,12 @@ import {
   generateUUID
 } from '@/lib/utils';
 import { authedRequest } from '@/server/middleware';
-import {
-  buildArtifact,
-  editArtifact,
-  getArtifact
-} from '@/server/services/artifact';
 import { carriesOnlyOwnFiles } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
-import { buildMediaTools } from '@/server/services/chat-tools';
+import {
+  buildArtifactTools,
+  buildMediaTools
+} from '@/server/services/chat-tools';
 import * as messages from '@/server/services/message';
 import { findModelByModelId, usableCandidates } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
@@ -494,12 +482,8 @@ async function POST({
     ]
       .filter((part): part is string => !!part?.trim())
       .join('\n\n');
-    const completedArtifacts = new Map<string, Artifact>();
-    const completedArtifactOrder: string[] = [];
-    // An earlier reply's artifact, by id, to the one this reply made of it.
-    const replyCopies = new Map<string, string>();
-    // The update_artifact call this reply is on; the next waits for it.
-    let pendingEdit: Promise<unknown> = Promise.resolve();
+    // Made with the stream's writer, and read once the reply is over.
+    let replyArtifacts: ReturnType<typeof buildArtifactTools> | undefined;
 
     // A stream that fails part-way still persists what it had written, and the
     // SDK's error chunk never becomes a message part — so without this the
@@ -563,282 +547,13 @@ async function POST({
             transient: true
           } as Parameters<typeof writer.write>[0]);
 
-        const emitArtifactDelta = (artifact: Artifact) => {
-          emitTransient({ type: 'data-id', data: artifact.id });
-          const kind = artifactKindFromType(artifact.type);
-          emitTransient({
-            type: 'data-title',
-            data: { id: artifact.id, title: artifact.title }
-          });
-          emitTransient({
-            type: 'data-kind',
-            data: {
-              id: artifact.id,
-              kind,
-              artifactType: artifact.type
-            }
-          });
-          emitTransient({
-            type: 'data-clear',
-            data: { id: artifact.id }
-          });
-          if (['code', 'json', 'html'].includes(artifact.type)) {
-            emitTransient({
-              type: 'data-codeDelta',
-              data: {
-                id: artifact.id,
-                title: artifact.title,
-                delta: artifact.content ?? '',
-                mode: 'replace',
-                language: artifact.language ?? undefined,
-                artifactType: artifact.type
-              }
-            });
-            emitTransient({
-              type: 'data-finish',
-              data: { id: artifact.id }
-            });
-            return;
-          }
-          emitTransient({
-            type: 'data-textDelta',
-            data: {
-              id: artifact.id,
-              title: artifact.title,
-              delta: artifact.content ?? '',
-              mode: 'replace',
-              artifactType: artifact.type
-            }
-          });
-          emitTransient({
-            type: 'data-finish',
-            data: { id: artifact.id }
-          });
-        };
-
-        type ToolArtifactStreamState = {
-          artifactId: string;
-          rawInput: string;
-          started: boolean;
-          lastTitle: string;
-          lastKind: ArtifactKind;
-          lastType?: CreateArtifactInput['type'];
-          lastContent: string;
-        };
-
-        const toolArtifactStates = new Map<string, ToolArtifactStreamState>();
-
-        // A call that showed its artifact on the canvas as it streamed, and
-        // then failed — its input did not parse, or `execute` threw — leaves
-        // nothing kept. Successful calls remove their own state, so what is
-        // left when a step ends is exactly those, and the canvas is told to
-        // drop them before the model's next step makes the artifact again.
-        const discardUnfinishedArtifacts = () => {
-          for (const state of toolArtifactStates.values()) {
-            if (state.started) {
-              emitTransient({
-                type: 'data-discard',
-                data: { id: state.artifactId }
-              });
-            }
-          }
-          toolArtifactStates.clear();
-        };
-
-        const emitToolArtifactUpdate = async (toolCallId: string) => {
-          const state = toolArtifactStates.get(toolCallId);
-          if (!state) return;
-
-          const { value } = await parsePartialJson(state.rawInput);
-          const input = (value ?? {}) as Partial<CreateArtifactInput>;
-          const artifactType = input.type;
-          if (!artifactType) return;
-          const title = input.title?.trim() || 'Untitled';
-          const kind = artifactKindFromType(artifactType);
-
-          if (!state.started) {
-            emitTransient({ type: 'data-id', data: state.artifactId });
-            emitTransient({
-              type: 'data-title',
-              data: { id: state.artifactId, title }
-            });
-            emitTransient({
-              type: 'data-kind',
-              data: {
-                id: state.artifactId,
-                kind,
-                artifactType
-              }
-            });
-            emitTransient({
-              type: 'data-clear',
-              data: { id: state.artifactId }
-            });
-            state.started = true;
-            state.lastTitle = title;
-            state.lastKind = kind;
-            state.lastType = artifactType;
-          } else {
-            if (title !== state.lastTitle) {
-              emitTransient({
-                type: 'data-title',
-                data: { id: state.artifactId, title }
-              });
-              state.lastTitle = title;
-            }
-            if (kind !== state.lastKind || artifactType !== state.lastType) {
-              emitTransient({
-                type: 'data-kind',
-                data: {
-                  id: state.artifactId,
-                  kind,
-                  artifactType
-                }
-              });
-              state.lastKind = kind;
-              state.lastType = artifactType;
-            }
-          }
-
-          const nextContent = input.content ?? '';
-          if (nextContent !== state.lastContent) {
-            const isAppend = nextContent.startsWith(state.lastContent);
-            const delta = isAppend
-              ? nextContent.slice(state.lastContent.length)
-              : nextContent;
-
-            emitTransient({
-              type:
-                kind === 'code' || kind === 'sheet'
-                  ? 'data-codeDelta'
-                  : 'data-textDelta',
-              data: {
-                id: state.artifactId,
-                title,
-                delta,
-                mode: isAppend ? 'append' : 'replace',
-                artifactType,
-                ...(kind === 'code' || kind === 'sheet'
-                  ? {
-                      language:
-                        artifactType === 'json'
-                          ? 'json'
-                          : (input.language ?? undefined)
-                    }
-                  : {})
-              }
-            });
-            state.lastContent = nextContent;
-          }
-        };
-
-        const artifactTools = {
-          create_artifact: tool({
-            description:
-              'Create a new artifact: code, a document (markdown, html or text), or a data table (json).',
-            inputSchema: createArtifactInputSchema,
-            onInputStart: ({ toolCallId }) => {
-              toolArtifactStates.set(toolCallId, {
-                artifactId: generateUUID(),
-                rawInput: '',
-                started: false,
-                lastTitle: 'Untitled',
-                lastKind: 'text',
-                lastType: undefined,
-                lastContent: ''
-              });
-            },
-            onInputDelta: async ({ toolCallId, inputTextDelta }) => {
-              const state = toolArtifactStates.get(toolCallId);
-              if (!state) return;
-              state.rawInput += inputTextDelta;
-              await emitToolArtifactUpdate(toolCallId);
-            },
-            execute: async (input, options?: { toolCallId?: string }) => {
-              const streamState = options?.toolCallId
-                ? toolArtifactStates.get(options.toolCallId)
-                : undefined;
-              const artifact = buildArtifact(input, {
-                id: streamState?.artifactId ?? generateUUID(),
-                chatId: id,
-                messageId: assistantMessageId
-              });
-              if (!completedArtifacts.has(artifact.id)) {
-                completedArtifactOrder.push(artifact.id);
-              }
-              completedArtifacts.set(artifact.id, artifact);
-              if (!streamState?.started) {
-                emitArtifactDelta(artifact);
-              } else {
-                emitTransient({
-                  type: 'data-finish',
-                  data: { id: artifact.id }
-                });
-              }
-              emitTransient({
-                type: 'data-artifact',
-                data: artifact
-              });
-              if (options?.toolCallId) {
-                toolArtifactStates.delete(options.toolCallId);
-              }
-
-              return { id: artifact.id };
-            }
-          }),
-          // A change to an artifact already in the chat — made this turn,
-          // or by an earlier reply — written as only the passage that
-          // changes. Not streamed onto the canvas as it is written: the
-          // passages are short, and only the whole result means anything.
-          //
-          // An earlier reply's artifact is left as it was, and this reply
-          // gets its own copy; every later change in this reply goes to that
-          // copy, whichever of the two ids it names, so one change made in
-          // several calls is one artifact, not one per call. The SDK runs the
-          // calls of one step at once, so they are taken in turn: each sees
-          // the copy the one before it made.
-          update_artifact: tool({
-            description:
-              "Change part of an artifact already in this chat: replace oldStr, which must appear in it exactly once, with newStr. The change is kept as this reply's version of the artifact; an earlier reply's stays as it was.",
-            inputSchema: updateArtifactInputSchema,
-            execute: input => {
-              const edit = pendingEdit.then(async () => {
-                const ownId = completedArtifacts.has(input.id)
-                  ? input.id
-                  : replyCopies.get(input.id);
-                const source =
-                  (ownId && completedArtifacts.get(ownId)) ||
-                  (await getArtifact(user.id, input.id));
-                if (!source || source.chatId !== id) {
-                  throw new Error(
-                    `No artifact in this chat has id ${input.id}`
-                  );
-                }
-                const edited = editArtifact(source, input, {
-                  id: ownId ?? generateUUID(),
-                  chatId: id,
-                  messageId: assistantMessageId
-                });
-                const artifact = ownId
-                  ? { ...edited, createdAt: source.createdAt }
-                  : edited;
-                if (!ownId) {
-                  completedArtifactOrder.push(artifact.id);
-                  replyCopies.set(input.id, artifact.id);
-                }
-                completedArtifacts.set(artifact.id, artifact);
-                emitArtifactDelta(artifact);
-                emitTransient({
-                  type: 'data-artifact',
-                  data: artifact
-                });
-                return { id: artifact.id };
-              });
-              pendingEdit = edit.catch(() => {});
-              return edit;
-            }
-          })
-        };
+        const artifactTools = buildArtifactTools({
+          userId: user.id,
+          chatId: id,
+          messageId: assistantMessageId,
+          emit: emitTransient
+        });
+        replyArtifacts = artifactTools;
 
         // Transient: both are signals for the client (title/URL/sidebar, and
         // associating artifacts with this message), not content. Accumulating
@@ -900,7 +615,7 @@ async function POST({
             instructions,
             messages: modelMessages,
             tools: {
-              ...artifactTools,
+              ...artifactTools.tools,
               ...mediaTools.tools,
               // Which search a model gets depends on who serves it: its
               // provider's own where it has one, else the delegate tool.
@@ -950,7 +665,7 @@ async function POST({
                 webSearches: countWebSearches(step)
               });
               servedBy = failoverProvider;
-              discardUnfinishedArtifacts();
+              artifactTools.discardUnfinished();
             }
           });
 
@@ -1211,10 +926,6 @@ async function POST({
         ];
       }
 
-      const persistedArtifacts = completedArtifactOrder
-        .map(artifactId => completedArtifacts.get(artifactId))
-        .filter((artifact): artifact is Artifact => Boolean(artifact));
-
       await messages.createTurn(user.id, {
         chatId: id,
         message: {
@@ -1226,7 +937,7 @@ async function POST({
           createdAt: responseMessage.metadata?.createdAt ?? finishedAt,
           updatedAt: responseMessage.metadata?.updatedAt ?? finishedAt
         },
-        artifacts: persistedArtifacts
+        artifacts: replyArtifacts?.kept() ?? []
       });
 
       // Update chat model if changed
