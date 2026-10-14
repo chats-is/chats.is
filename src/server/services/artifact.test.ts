@@ -116,8 +116,7 @@ describe('buildArtifact', () => {
       title: 'Counter',
       type: 'code',
       language: 'tsx',
-      fileName: 'index.tsx',
-      status: 'done'
+      fileName: 'index.tsx'
     });
   });
 

@@ -586,7 +586,6 @@ async function POST({
                 title: artifact.title,
                 delta: artifact.content ?? '',
                 mode: 'replace',
-                status: 'done',
                 language: artifact.language ?? undefined,
                 artifactType: artifact.type
               }
@@ -604,7 +603,6 @@ async function POST({
               title: artifact.title,
               delta: artifact.content ?? '',
               mode: 'replace',
-              status: 'done',
               artifactType: artifact.type
             }
           });
@@ -715,7 +713,6 @@ async function POST({
                 title,
                 delta,
                 mode: isAppend ? 'append' : 'replace',
-                status: 'streaming',
                 artifactType,
                 ...(kind === 'code' || kind === 'sheet'
                   ? {

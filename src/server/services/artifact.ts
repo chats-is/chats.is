@@ -228,7 +228,6 @@ export function buildArtifact(
     language: input.language ?? null,
     content: input.content,
     fileName: input.fileName ?? null,
-    status: 'done',
     createdAt: now,
     updatedAt: now
   };

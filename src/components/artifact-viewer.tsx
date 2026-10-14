@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  CheckCircle2,
-  CodeXml,
-  Copy,
-  Download,
-  Eye,
-  LoaderCircle,
-  X
-} from 'lucide-react';
+import { CodeXml, Copy, Download, Eye, LoaderCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type Artifact } from '@/types';
@@ -76,13 +68,13 @@ export function ArtifactViewer({
   const artifactId = artifact?.id;
   const artifactContent = artifact?.content;
 
-  // Keep the streaming/done view scrolled to the bottom. Declared before the
+  // Keep the streaming view scrolled to the bottom. Declared before the
   // early return below so the hook order stays stable when `artifact` toggles
   // between defined and undefined (Rules of Hooks).
   useEffect(() => {
     if (hideContent) return;
     if (!contentRef.current) return;
-    if (status !== 'streaming' && status !== 'done') return;
+    if (status !== 'streaming') return;
 
     requestAnimationFrame(() => {
       if (!contentRef.current) return;
@@ -102,7 +94,6 @@ export function ArtifactViewer({
   const kind = getArtifactKind(artifact);
   const registry = artifactRegistry[kind];
   const isStreaming = artifact.status === 'streaming';
-  const isDone = artifact.status === 'done';
   const supportsPreview =
     !isStreaming && supportsArtifactRuntimePreview(artifact);
   const languageLabel =
@@ -112,18 +103,6 @@ export function ArtifactViewer({
   const headerActionButtonClassName = 'size-7 text-muted-foreground';
   const isHeaderActionDisabled = isStreaming;
   const canDownload = Boolean(artifact.content);
-
-  const statusIndicator = isStreaming ? (
-    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
-      <LoaderCircle className="size-3 animate-spin" />
-      Streaming...
-    </span>
-  ) : isDone ? (
-    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-normal text-emerald-600 dark:text-emerald-400">
-      <CheckCircle2 className="size-3" />
-      Done
-    </span>
-  ) : null;
 
   // Source view = the registry's raw text form; preview view = the runtime
   // preview (iframe / markdown / sheet table). The registry owns both per kind,
@@ -235,6 +214,9 @@ export function ArtifactViewer({
         <div className="relative flex gap-3">
           <div className="flex max-w-full min-w-0 items-center gap-2 pr-28">
             {viewModeButtons}
+            {isStreaming && (
+              <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" />
+            )}
             {artifacts.length > 1 ? (
               <Select
                 value={artifact.id}
@@ -274,7 +256,6 @@ export function ArtifactViewer({
                 </div>
               </div>
             )}
-            {statusIndicator}
           </div>
           <div className="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-2">
             {canShare && (

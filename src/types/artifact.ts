@@ -24,7 +24,7 @@ export type Artifact = {
   language?: string | null;
   content?: string | null;
   fileName?: string | null;
-  status?: 'streaming' | 'done' | 'idle';
+  status?: 'streaming' | 'idle';
   createdAt: Date;
   updatedAt: Date;
 };

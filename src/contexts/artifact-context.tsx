@@ -2,7 +2,6 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState
@@ -25,7 +24,7 @@ export type ArtifactState = {
   fileName?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
-  status: 'streaming' | 'done' | 'idle';
+  status: 'streaming' | 'idle';
 };
 
 type DataStreamPart = {
@@ -98,9 +97,6 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const currentMessageIdRef = useRef<string | null>(null);
-  const doneTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>(
-    {}
-  );
 
   const openArtifact = useCallback((id: string) => {
     setActiveId(id);
@@ -118,36 +114,6 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const scheduleIdleStatus = useCallback((id: string) => {
-    if (doneTimersRef.current[id]) {
-      clearTimeout(doneTimersRef.current[id]);
-    }
-
-    doneTimersRef.current[id] = setTimeout(() => {
-      setArtifacts(prev => {
-        const artifact = prev[id];
-        if (!artifact || artifact.status !== 'done') {
-          return prev;
-        }
-
-        return {
-          ...prev,
-          [id]: mergeArtifactState(artifact, {
-            id,
-            status: 'idle'
-          })
-        };
-      });
-      delete doneTimersRef.current[id];
-    }, 1800);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      Object.values(doneTimersRef.current).forEach(clearTimeout);
-    };
-  }, []);
-
   const setArtifactsFromServer = useCallback(
     (
       list: Artifact[],
@@ -162,11 +128,10 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
             const nextArtifact = toStateFromArtifact(artifact);
 
             acc[artifact.id] =
-              prevArtifact?.status === 'streaming' ||
-              prevArtifact?.status === 'done'
+              prevArtifact?.status === 'streaming'
                 ? mergeArtifactState(nextArtifact, {
                     id: artifact.id,
-                    status: prevArtifact.status
+                    status: 'streaming'
                   })
                 : nextArtifact;
             return acc;
@@ -206,9 +171,8 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
           [artifact.id]: mergeArtifactState(artifact, {
             id: artifact.id,
             status:
-              prev[artifact.id]?.status === 'streaming' ||
-              prev[artifact.id]?.status === 'done'
-                ? prev[artifact.id]?.status
+              prev[artifact.id]?.status === 'streaming'
+                ? 'streaming'
                 : artifact.status
           })
         }));
@@ -224,10 +188,6 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
       if (type === 'data-id') {
         const id = String(data);
         if (!id) return;
-        if (doneTimersRef.current[id]) {
-          clearTimeout(doneTimersRef.current[id]);
-          delete doneTimersRef.current[id];
-        }
         upsertArtifact({
           id,
           chatId,
@@ -320,10 +280,9 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
             id,
             chatId,
             messageId: currentMessageIdRef.current,
-            status: 'done'
+            status: 'idle'
           })
         }));
-        scheduleIdleStatus(id);
         return;
       }
 
@@ -332,10 +291,6 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
       if (type === 'data-discard') {
         const id = getDataArtifactId(data);
         if (!id) return;
-        if (doneTimersRef.current[id]) {
-          clearTimeout(doneTimersRef.current[id]);
-          delete doneTimersRef.current[id];
-        }
         setArtifacts(prev => {
           if (!prev[id]) return prev;
           const { [id]: _discarded, ...rest } = prev;
@@ -364,7 +319,7 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
               type: data.artifactType,
               kind: artifactKindFromType(data.artifactType),
               content: nextContent,
-              status: data.status ?? 'streaming'
+              status: 'streaming'
             })
           };
         });
@@ -391,13 +346,13 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
               kind: artifactKindFromType(data.artifactType),
               content: nextContent,
               language: data.language ?? previous?.language ?? null,
-              status: data.status ?? 'streaming'
+              status: 'streaming'
             })
           };
         });
       }
     },
-    [scheduleIdleStatus, upsertArtifact]
+    [upsertArtifact]
   );
 
   const value = useMemo(

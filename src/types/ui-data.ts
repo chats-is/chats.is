@@ -43,7 +43,6 @@ export type CustomUIDataTypes = {
     id: string;
     delta: string;
     mode?: 'append' | 'replace';
-    status?: 'streaming' | 'done';
     title?: string;
     artifactType: ArtifactType;
   };
@@ -51,7 +50,6 @@ export type CustomUIDataTypes = {
     id: string;
     delta: string;
     mode?: 'append' | 'replace';
-    status?: 'streaming' | 'done';
     title?: string;
     language?: string;
     artifactType: ArtifactType;
