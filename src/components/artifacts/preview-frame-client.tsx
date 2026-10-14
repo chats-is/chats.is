@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as classVarianceAuthority from 'class-variance-authority';
 import * as clsx from 'clsx';
 import * as framerMotion from 'framer-motion';
 import * as lucideReact from 'lucide-react';
+import { createRoot, type Root } from 'react-dom/client';
 import * as recharts from 'recharts';
 
 import { type PreviewPackage } from '@/types';
@@ -198,6 +199,49 @@ class PreviewErrorBoundary extends React.Component<
   render() {
     return this.state.hasError ? null : this.props.children;
   }
+}
+
+/**
+ * Draws the artifact in a React root of its own, apart from the frame's.
+ *
+ * The frame is a page of the app, and TanStack Start wraps the app in
+ * StrictMode, which in development runs every effect twice. Code that
+ * cleans up through a ref — as a three.js or d3 preview tends to — then
+ * draws twice in development and once in production: two cubes where the
+ * code makes one. Its own root runs it as production does, and keeps the
+ * app's router and caches out of its reach.
+ */
+function ArtifactRoot({ children }: { children: React.ReactNode }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<Root | null>(null);
+
+  useEffect(() => {
+    // An element of its own each time: StrictMode mounts this twice, and a
+    // root being let go must not take the next one's drawing with it.
+    const host = document.createElement('div');
+    containerRef.current?.appendChild(host);
+    const root = createRoot(host);
+    rootRef.current = root;
+    return () => {
+      rootRef.current = null;
+      // Not while React is still committing the frame's own tree.
+      setTimeout(() => {
+        root.unmount();
+        host.remove();
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    rootRef.current?.render(children);
+  }, [children]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="min-h-screen bg-white p-4 text-slate-900"
+    />
+  );
 }
 
 const normalizePath = (value: string) => {
@@ -514,7 +558,7 @@ export function ArtifactPreviewFrameClient() {
     const Component =
       state.status === 'component' ? state.component : undefined;
     return (
-      <div className="min-h-screen bg-white p-4 text-slate-900">
+      <ArtifactRoot>
         <PreviewErrorBoundary resetKey={renderNonce} onError={setRuntimeError}>
           {state.status === 'element' ? (
             state.element
@@ -522,7 +566,7 @@ export function ArtifactPreviewFrameClient() {
             <Component />
           ) : null}
         </PreviewErrorBoundary>
-      </div>
+      </ArtifactRoot>
     );
   }
 
