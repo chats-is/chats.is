@@ -71,6 +71,20 @@ const isMermaidArtifact = (artifact: Artifact) =>
   artifact.type === 'code' &&
   artifact.language?.toLowerCase().trim() === 'mermaid';
 
+/** What the card says of each way the code can fail. */
+const PREVIEW_ERROR_TEXT = {
+  // It never ran: what is wrong was found before it could.
+  build: {
+    title: "Couldn't build the code",
+    detail: 'The code has an error that stops it from running.'
+  },
+  // It ran, and threw.
+  run: {
+    title: 'Error running the code',
+    detail: 'The code ran into an error while running.'
+  }
+} as const;
+
 /**
  * Why a preview failed, floated over it: a build that did not compile, or a
  * page that threw. It can be put away — a page that threw may still show
@@ -82,9 +96,11 @@ const isMermaidArtifact = (artifact: Artifact) =>
  */
 function PreviewErrorCard({
   error,
+  kind,
   onFix
 }: {
   error: string;
+  kind: keyof typeof PREVIEW_ERROR_TEXT;
   onFix?: (error: string) => void;
 }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -99,9 +115,11 @@ function PreviewErrorCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold">Code error</div>
+          <div className="text-sm font-semibold">
+            {PREVIEW_ERROR_TEXT[kind].title}
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            The code ran into an error.
+            {PREVIEW_ERROR_TEXT[kind].detail}
           </p>
         </div>
         <Button
@@ -404,7 +422,14 @@ function FrameArtifactPreview({
           Building preview...
         </div>
       )}
-      {shownError && <PreviewErrorCard error={shownError} onFix={onFix} />}
+      {shownError && (
+        <PreviewErrorCard
+          error={shownError}
+          // A diagram that fails has failed to parse: it never drew.
+          kind={status === 'error' || isMermaid ? 'build' : 'run'}
+          onFix={onFix}
+        />
+      )}
     </div>
   );
 }
@@ -479,7 +504,7 @@ function HtmlArtifactPreview({
         className="size-full min-h-0 bg-white"
         srcDoc={htmlSource}
       />
-      {failure && <PreviewErrorCard error={failure} onFix={onFix} />}
+      {failure && <PreviewErrorCard error={failure} kind="run" onFix={onFix} />}
     </div>
   );
 }
