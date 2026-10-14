@@ -14,13 +14,19 @@ import { defineConfig, type Plugin } from 'vite';
  * given by a route rule; in development the scripts are served by Vite itself,
  * whose own list of allowed origins is switched off by the Nitro plugin, so it
  * is given here. Nothing the dev server hands out is a secret.
+ *
+ * To every read, not only the frame's. The page around the frame loads the
+ * same modules first, with no Origin, and the browser keeps that copy and
+ * hands it to the frame — which, finding no leave on it, runs nothing and
+ * says nothing, and the preview never starts. The build's rule is on every
+ * asset for the same reason.
  */
 const sandboxMayLoadModules = (): Plugin => ({
   name: 'sandbox-may-load-modules',
   apply: 'serve',
   configureServer(server) {
     server.middlewares.use((req, res, next) => {
-      if (req.headers.origin === 'null') {
+      if (req.method === 'GET' || req.method === 'HEAD') {
         res.setHeader('access-control-allow-origin', '*');
       }
       next();
