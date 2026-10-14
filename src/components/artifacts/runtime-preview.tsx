@@ -488,7 +488,7 @@ export function ArtifactRuntimePreview({
 }) {
   if (artifact.type === 'markdown') {
     return (
-      <div className="h-full overflow-auto rounded-md border bg-background p-4">
+      <div className="h-full overflow-auto border bg-background p-4">
         <MessageMarkdown content={artifact.content ?? ''} />
       </div>
     );
@@ -496,7 +496,7 @@ export function ArtifactRuntimePreview({
 
   if (artifact.type === 'json') {
     return (
-      <div className="h-full overflow-auto rounded-md border bg-background">
+      <div className="h-full overflow-auto border bg-background">
         {artifactRegistry.sheet.renderContent(artifact)}
       </div>
     );
@@ -516,7 +516,7 @@ export function ArtifactRuntimePreview({
   }
 
   return (
-    <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+    <div className="border border-dashed p-6 text-sm text-muted-foreground">
       Preview is not available for this artifact.
     </div>
   );

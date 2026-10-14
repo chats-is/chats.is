@@ -142,7 +142,7 @@ export function ArtifactViewer({
   );
 
   const previewContent = (
-    <div className="h-full min-h-0 overflow-auto rounded-md bg-background">
+    <div className="h-full min-h-0 overflow-auto bg-background">
       <ArtifactRuntimePreview
         artifact={artifact}
         onFix={onFix && (error => onFix(artifact, error))}
