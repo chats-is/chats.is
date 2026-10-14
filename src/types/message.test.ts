@@ -5,7 +5,7 @@ import { userMessageSchema } from './message';
 const message = (parts: unknown[]) => ({ id: 'm1', role: 'user', parts });
 
 describe('userMessageSchema', () => {
-  it("takes a preview's error with whose preview it came from", () => {
+  it("takes a code's error with the artifact it came from", () => {
     expect(
       userMessageSchema.safeParse(
         message([
@@ -27,7 +27,7 @@ describe('userMessageSchema', () => {
     ).toBe(false);
   });
 
-  it('refuses a preview error without an artifact', () => {
+  it('refuses an artifact reference without an id', () => {
     expect(
       userMessageSchema.safeParse(
         message([

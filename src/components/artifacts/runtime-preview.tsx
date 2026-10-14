@@ -99,9 +99,9 @@ function PreviewErrorCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold">Error running artifact</div>
+          <div className="text-sm font-semibold">Code error</div>
           <p className="mt-1 text-sm text-muted-foreground">
-            An error occurred while running the generated artifact.
+            The code ran into an error.
           </p>
         </div>
         <Button

@@ -541,9 +541,9 @@ export function ChatUI({
     [input, hasUsableModel, sendMessage, updateDisplayModelOptimistically]
   );
 
-  // A preview's error, sent as the reader's own message. What they see is
-  // the error alone, in no language of ours and with no word for what the
-  // preview is; which preview it came from goes with it unseen, for the
+  // A code's error, sent as the reader's own message. What they see is
+  // the error alone, in no language of ours and with no word for what
+  // holds the code; which one it came from goes with it unseen, for the
   // model to fix that one.
   const handleFix = useCallback(
     (artifact: Artifact, error: string) => {

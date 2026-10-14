@@ -96,7 +96,7 @@ export type CustomUIDataTypes = {
   };
   /**
    * The artifact a reader's message is about, sent with it unseen — with a
-   * preview's error, today. The message shows the reader's text alone; they
+   * code's error, today. The message shows the reader's text alone; they
    * need not know an "artifact" from a preview, and the model is told the
    * rest (the chat route's `convertDataPart`).
    */

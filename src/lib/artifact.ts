@@ -342,9 +342,13 @@ export const buildPreviewFiles = (artifact: PreviewArtifact): PreviewFile[] => {
 
 /**
  * What the model is given for a data part of a message. The artifact a
- * reader's message is about — a preview's error, sent from Try fixing —
+ * reader's message is about — its code's error, sent from Try fixing —
  * becomes the instruction the reader never saw; every other data part is
  * the page's, not the model's, and is left out.
+ *
+ * The error is the code's, not the preview's, which only shows it. And
+ * the reader knows no artifact, id or tool, so the reply must not name
+ * them, or it says what the instruction said.
  */
 export const dataPartForModel = (
   part: DataUIPart<CustomUIDataTypes>
@@ -352,6 +356,6 @@ export const dataPartForModel = (
   part.type === 'data-artifactRef'
     ? {
         type: 'text',
-        text: `The text above is an error from the preview of the artifact with id ${part.data.id}. Fix that artifact with update_artifact, and answer in the language of the conversation.`
+        text: `The text above is an error that the code of the artifact with id ${part.data.id} raised. Call update_artifact on that artifact now to fix the code: only the call changes it, and saying it is fixed does not. Then tell the user what was wrong and what you changed, in the language of the conversation — calling it by its title or by what it is (the page, the chart, the component), and not mentioning artifacts, ids or tool names to them.`
       }
     : undefined;

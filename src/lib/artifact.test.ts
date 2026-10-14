@@ -286,7 +286,7 @@ describe('assertArtifactPayload, for HTML', () => {
 });
 
 describe('dataPartForModel', () => {
-  it('tells the model which artifact a preview error came from, and how to fix it', () => {
+  it('tells the model whose code the error is, and how to fix it', () => {
     const part = dataPartForModel({
       type: 'data-artifactRef',
       data: { id: 'artifact-1' }
@@ -332,7 +332,7 @@ describe('a fix message, as the chat route hands it to the model', () => {
       { type: 'text', text: 'undefinedThing is not defined' },
       {
         type: 'text',
-        text: expect.stringContaining('artifact with id artifact-1')
+        text: expect.stringContaining('artifact with id artifact-1 raised')
       }
     ]);
   });
