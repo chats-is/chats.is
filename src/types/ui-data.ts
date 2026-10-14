@@ -56,23 +56,6 @@ export type CustomUIDataTypes = {
     language?: string;
     artifactType: ArtifactType;
   };
-  imageDelta: {
-    id: string;
-    url: string;
-    status?: 'streaming' | 'done';
-    title?: string;
-    artifactType: ArtifactType;
-  };
-  fileDelta: {
-    id: string;
-    url: string;
-    status?: 'streaming' | 'done';
-    title?: string;
-    fileName?: string | null;
-    mimeType?: string | null;
-    size?: number | null;
-    artifactType: ArtifactType;
-  };
   messageId: string;
   id: string;
   title: {
@@ -81,7 +64,7 @@ export type CustomUIDataTypes = {
   };
   kind: {
     id: string;
-    kind: 'text' | 'code' | 'image' | 'sheet' | 'file';
+    kind: 'text' | 'code' | 'sheet';
     artifactType: ArtifactType;
   };
   clear: {

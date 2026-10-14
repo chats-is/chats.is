@@ -134,15 +134,10 @@ export const artifacts = createTable(
     title: varchar('title', { length: 255 }).notNull(),
     type: varchar('type', { length: 32 })
       .notNull()
-      .$type<
-        'code' | 'markdown' | 'html' | 'json' | 'text' | 'image' | 'file'
-      >(),
+      .$type<'code' | 'markdown' | 'html' | 'json' | 'text'>(),
     language: varchar('language', { length: 64 }),
     content: text('content'),
-    fileUrl: text('file_url'),
     fileName: varchar('file_name', { length: 255 }),
-    mimeType: varchar('mime_type', { length: 255 }),
-    size: integer('size'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

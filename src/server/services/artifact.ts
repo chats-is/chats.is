@@ -227,10 +227,7 @@ export function buildArtifact(
     type: input.type,
     language: input.language ?? null,
     content: input.content,
-    fileUrl: null,
     fileName: input.fileName ?? null,
-    mimeType: null,
-    size: null,
     status: 'done',
     createdAt: now,
     updatedAt: now
@@ -252,17 +249,7 @@ export function editArtifact(
   edit: UpdateArtifactInput,
   owner: { id: string; chatId: string; messageId: string }
 ): Artifact {
-  if (
-    source.content == null ||
-    source.type === 'image' ||
-    source.type === 'file'
-  ) {
-    throw new Error(
-      'Only a text artifact can be edited, and this one is a file'
-    );
-  }
-
-  const content = source.content;
+  const content = source.content ?? '';
   const at = content.indexOf(edit.oldStr);
   if (at === -1) {
     throw new Error(

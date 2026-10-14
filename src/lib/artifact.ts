@@ -8,7 +8,7 @@ import {
 import { normalizeCodeLanguage } from '@/lib/code-language';
 import { HTML_PREVIEW_CDN, PREVIEW_PACKAGES } from '@/lib/constant';
 
-export type ArtifactKind = 'text' | 'code' | 'image' | 'sheet' | 'file';
+export type ArtifactKind = 'text' | 'code' | 'sheet';
 
 /**
  * Languages whose `code` artifacts are eligible for the live React/TS preview.
@@ -133,8 +133,6 @@ export const isHtmlPreviewArtifact = (input: {
 export const artifactKindFromType = (
   type?: ArtifactType | null
 ): ArtifactKind => {
-  if (type === 'image') return 'image';
-  if (type === 'file') return 'file';
   if (type === 'json') return 'sheet';
   if (type === 'code' || type === 'html') return 'code';
   return 'text';
@@ -157,8 +155,7 @@ export const isPreviewableCodeArtifact = (input: {
 export type ArtifactPayloadInput = {
   type: ArtifactType;
   language?: string | null;
-  content?: string | null;
-  fileUrl?: string | null;
+  content: string;
   fileName?: string | null;
 };
 
@@ -168,19 +165,6 @@ export type ArtifactPayloadInput = {
  * `create_artifact` and any server-side artifact creation path.
  */
 export const assertArtifactPayload = (input: ArtifactPayloadInput): void => {
-  const isFileArtifact = input.type === 'image' || input.type === 'file';
-
-  if (isFileArtifact) {
-    if (!input.fileUrl) {
-      throw new Error('fileUrl is required for file/image artifacts');
-    }
-    return;
-  }
-
-  if (input.content == null) {
-    throw new Error('content is required for non-file artifacts');
-  }
-
   if (isHtmlPreviewArtifact(input)) {
     const blocked = blockedHtmlResources(input.content);
     if (blocked.length > 0) {

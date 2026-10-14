@@ -53,9 +53,6 @@ interface ArtifactViewerProps {
   canShare?: boolean;
 }
 
-const isFileArtifact = (artifact?: Artifact) =>
-  artifact?.type === 'image' || artifact?.type === 'file';
-
 export function ArtifactViewer({
   artifact,
   artifacts = [],
@@ -78,7 +75,6 @@ export function ArtifactViewer({
   const status = artifact?.status;
   const artifactId = artifact?.id;
   const artifactContent = artifact?.content;
-  const artifactFileUrl = artifact?.fileUrl;
 
   // Keep the streaming/done view scrolled to the bottom. Declared before the
   // early return below so the hook order stays stable when `artifact` toggles
@@ -92,7 +88,7 @@ export function ArtifactViewer({
       if (!contentRef.current) return;
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     });
-  }, [artifactContent, artifactFileUrl, artifactId, hideContent, status]);
+  }, [artifactContent, artifactId, hideContent, status]);
 
   if (!artifact) {
     return (
@@ -102,8 +98,7 @@ export function ArtifactViewer({
     );
   }
 
-  const isFile = isFileArtifact(artifact);
-  const canCopyContent = !isFile && !!(artifact.content ?? '').trim();
+  const canCopyContent = !!(artifact.content ?? '').trim();
   const kind = getArtifactKind(artifact);
   const registry = artifactRegistry[kind];
   const isStreaming = artifact.status === 'streaming';
@@ -116,7 +111,7 @@ export function ArtifactViewer({
       : '';
   const headerActionButtonClassName = 'size-7 text-muted-foreground';
   const isHeaderActionDisabled = isStreaming;
-  const canDownload = Boolean(artifact.fileUrl || artifact.content);
+  const canDownload = Boolean(artifact.content);
 
   const statusIndicator = isStreaming ? (
     <span className="inline-flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
@@ -161,17 +156,6 @@ export function ArtifactViewer({
       : sourceContent;
 
   const handleDownload = () => {
-    if (artifact.fileUrl) {
-      const link = document.createElement('a');
-      link.href = artifact.fileUrl;
-      link.target = '_blank';
-      link.download = artifact.fileName || artifact.title;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    }
-
     if (!artifact.content) {
       toast.error('Nothing to download');
       return;

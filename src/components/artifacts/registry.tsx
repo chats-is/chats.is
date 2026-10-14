@@ -1,4 +1,4 @@
-import { Code2, File, FileText, Image as ImageIcon, Table } from 'lucide-react';
+import { Code2, FileText, Table } from 'lucide-react';
 
 import { type Artifact } from '@/types';
 import { getArtifactKind, type ArtifactKind } from '@/lib/artifact';
@@ -8,14 +8,6 @@ import { MessageMarkdown } from '@/components/message-markdown';
 
 export { getArtifactLanguageLabel } from '@/lib/code-language';
 export { getArtifactKind, type ArtifactKind } from '@/lib/artifact';
-
-const isImageMime = (mimeType?: string | null) =>
-  !!mimeType && mimeType.startsWith('image/');
-const isVideoMime = (mimeType?: string | null) =>
-  !!mimeType && mimeType.startsWith('video/');
-const isAudioMime = (mimeType?: string | null) =>
-  !!mimeType && mimeType.startsWith('audio/');
-const isPdfMime = (mimeType?: string | null) => mimeType === 'application/pdf';
 
 const formatCell = (value: unknown): string => {
   if (value == null) return '';
@@ -120,79 +112,6 @@ function SheetContent({ artifact }: { artifact: Artifact }) {
   );
 }
 
-const renderImageContent = (artifact: Artifact) =>
-  artifact.fileUrl ? (
-    <img
-      className="max-h-[480px] w-auto rounded-md"
-      src={artifact.fileUrl}
-      alt={artifact.title}
-    />
-  ) : (
-    <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-      Image URL unavailable.
-    </div>
-  );
-
-const renderFileContent = (artifact: Artifact) => {
-  if (artifact.fileUrl && isImageMime(artifact.mimeType)) {
-    return (
-      <img
-        className="max-h-[480px] w-auto rounded-md"
-        src={artifact.fileUrl}
-        alt={artifact.title}
-      />
-    );
-  }
-
-  if (artifact.fileUrl && isVideoMime(artifact.mimeType)) {
-    return (
-      <video
-        className="max-h-[480px] w-auto rounded-md"
-        controls
-        src={artifact.fileUrl}
-      />
-    );
-  }
-
-  if (artifact.fileUrl && isAudioMime(artifact.mimeType)) {
-    return <audio className="w-full" controls src={artifact.fileUrl} />;
-  }
-
-  if (artifact.fileUrl && isPdfMime(artifact.mimeType)) {
-    return (
-      <iframe
-        className="h-[70vh] w-full rounded-md border"
-        src={artifact.fileUrl}
-        title={artifact.title}
-      />
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3 text-sm">
-      <div className="truncate">{artifact.fileName || 'File'}</div>
-      {artifact.mimeType && (
-        <div className="text-xs text-muted-foreground">{artifact.mimeType}</div>
-      )}
-      {!artifact.fileUrl && (
-        <div className="text-xs text-muted-foreground">
-          File URL unavailable.
-        </div>
-      )}
-      {artifact.fileUrl && (
-        <a
-          href={artifact.fileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-primary"
-        >
-          Download
-        </a>
-      )}
-    </div>
-  );
-};
-
 export const artifactRegistry: Record<
   ArtifactKind,
   {
@@ -200,7 +119,7 @@ export const artifactRegistry: Record<
     icon: typeof FileText;
     renderPreview: (artifact: Artifact) => React.ReactNode;
     renderContent: (artifact: Artifact) => React.ReactNode;
-    /** Raw text form shown in the source view (media kinds reuse renderContent). */
+    /** Raw text form shown in the source view. */
     renderSource: (artifact: Artifact) => React.ReactNode;
   }
 > = {
@@ -262,44 +181,5 @@ export const artifactRegistry: Record<
     },
     renderContent: artifact => <SheetContent artifact={artifact} />,
     renderSource: artifact => renderRawSource(artifact, 'json')
-  },
-  image: {
-    label: 'Image',
-    icon: ImageIcon,
-    renderPreview: artifact =>
-      artifact.fileUrl ? (
-        <img
-          className="h-20 w-full rounded-md object-cover"
-          src={artifact.fileUrl}
-          alt={artifact.title}
-        />
-      ) : (
-        <div className="text-xs text-muted-foreground">No image</div>
-      ),
-    renderContent: renderImageContent,
-    renderSource: renderImageContent
-  },
-  file: {
-    label: 'File',
-    icon: File,
-    renderPreview: artifact => {
-      if (artifact.fileUrl && isImageMime(artifact.mimeType)) {
-        return (
-          <img
-            className="h-20 w-full rounded-md object-cover"
-            src={artifact.fileUrl}
-            alt={artifact.title}
-          />
-        );
-      }
-      return (
-        <div className="text-xs text-muted-foreground">
-          {artifact.fileName ||
-            (artifact.fileUrl ? 'File' : 'File URL unavailable')}
-        </div>
-      );
-    },
-    renderContent: renderFileContent,
-    renderSource: renderFileContent
   }
 };

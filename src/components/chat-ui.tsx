@@ -271,10 +271,7 @@ export function ChatUI({
       type: artifact.type,
       language: artifact.language ?? null,
       content: artifact.content ?? null,
-      fileUrl: artifact.fileUrl ?? null,
       fileName: artifact.fileName ?? null,
-      mimeType: artifact.mimeType ?? null,
-      size: artifact.size ?? null,
       createdAt: artifact.createdAt,
       updatedAt: artifact.updatedAt
     }))
@@ -581,10 +578,7 @@ export function ChatUI({
           type: artifact.type,
           language: artifact.language ?? null,
           content: artifact.content,
-          fileUrl: artifact.url ?? null,
           fileName: artifact.fileName ?? null,
-          mimeType: artifact.mimeType ?? null,
-          size: artifact.size ?? null,
           status: artifact.status,
           createdAt: artifact.createdAt ?? new Date(),
           updatedAt: artifact.updatedAt ?? new Date()

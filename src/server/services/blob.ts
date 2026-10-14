@@ -1,13 +1,13 @@
 import '@tanstack/react-start/server-only';
 
 import { del } from '@vercel/blob';
-import { and, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
 
 import { isTrustedMediaUrl } from '@/lib/chat-media-urls';
 import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env.public';
 import { db } from '@/db';
-import { artifacts, messages, prompts, users } from '@/db/schema';
+import { messages, prompts, users } from '@/db/schema';
 
 /**
  * Whether `url` is a file in this install's own blob store.
@@ -68,11 +68,11 @@ export function carriesOnlyOwnFiles(parts: Array<{ type: string }>): boolean {
 
 /** `db`, or the transaction the caller is in — a read made beside an open
  *  transaction waits on a second connection, and does not see its writes. */
-type Executor = Pick<typeof db, 'execute' | 'selectDistinct'>;
+type Executor = Pick<typeof db, 'execute'>;
 
 /**
- * The files behind a set of messages: what was attached to them, what their
- * tools produced, and what their artifacts point at.
+ * The files behind a set of messages: what was attached to them, and what
+ * their tools produced.
  *
  * Read in SQL, from the `parts` JSON, because the caller is about to delete
  * those rows and may be deleting every message a user ever sent — not
@@ -94,15 +94,9 @@ export async function blobUrlsOfMessages(
     where ${which}
   `);
 
-  const onArtifacts = await executor
-    .selectDistinct({ url: artifacts.fileUrl })
-    .from(artifacts)
-    .innerJoin(messages, eq(artifacts.messageId, messages.id))
-    .where(and(which, isNotNull(artifacts.fileUrl)));
-
   return [
     ...new Set(
-      [...inParts.rows, ...onArtifacts]
+      inParts.rows
         .map(row => row.url)
         .filter((url): url is string => typeof url === 'string')
     )
@@ -143,13 +137,6 @@ export async function removeBlobs(userId: string, urls: string[]) {
         )
         .limit(1);
       if (inMessage) continue;
-
-      const [onArtifact] = await db
-        .select({ id: artifacts.id })
-        .from(artifacts)
-        .where(and(eq(artifacts.userId, userId), eq(artifacts.fileUrl, url)))
-        .limit(1);
-      if (onArtifact) continue;
 
       // A message can name any file of its owner's — their avatar, a picture
       // on one of their prompts — and deleting the chat must not take those.

@@ -29,7 +29,7 @@ export function DocumentPreview({
     kind === 'code' || kind === 'text'
       ? getArtifactLanguageLabel(artifact)
       : '';
-  const canDownload = Boolean(artifact.fileUrl || artifact.content);
+  const canDownload = Boolean(artifact.content);
 
   const handleDownload = () => downloadArtifact(artifact);
 

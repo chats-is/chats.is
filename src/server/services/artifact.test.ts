@@ -202,14 +202,4 @@ describe('editArtifact', () => {
       editArtifact(source, { id: 'a1', oldStr: '</div>', newStr: '' }, reply)
     ).toThrow('did not compile');
   });
-
-  it('refuses a file artifact', () => {
-    expect(() =>
-      editArtifact(
-        { ...source, type: 'image', content: null },
-        { id: 'a1', oldStr: 'x', newStr: 'y' },
-        reply
-      )
-    ).toThrow('Only a text artifact');
-  });
 });

@@ -66,7 +66,6 @@ beforeEach(async () => {
   // nothing was removed.
   h.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_store_secret';
   h.del.mockClear();
-  await h.db.delete(schema.artifacts);
   await h.db.delete(schema.messages);
   await h.db.delete(schema.chats);
   await h.db.delete(schema.users);
@@ -115,15 +114,6 @@ beforeEach(async () => {
       parts: [file(mine('shared.png'))]
     }
   ]);
-  await h.db.insert(schema.artifacts).values({
-    id: 'art',
-    chatId: 'c1',
-    messageId: 'a1',
-    userId: USER,
-    title: 'File',
-    type: 'file',
-    fileUrl: mine('artifact.pdf')
-  });
 });
 
 const deleted = () => (h.del.mock.calls[0]?.[0] ?? []).slice().sort();
@@ -133,16 +123,14 @@ describe('files follow their rows', () => {
     await deleteChat(USER, 'c1');
 
     expect(deleted()).toEqual(
-      [mine('artifact.pdf'), mine('attached.png'), mine('generated.png')].sort()
+      [mine('attached.png'), mine('generated.png')].sort()
     );
   });
 
   it('removes what a regenerate cuts away, and keeps what is left standing', async () => {
     await truncateAfter(USER, { chatId: 'c1', messageId: 'u1' });
 
-    expect(deleted()).toEqual(
-      [mine('artifact.pdf'), mine('generated.png')].sort()
-    );
+    expect(deleted()).toEqual([mine('generated.png')]);
     expect(
       await h.db
         .select()

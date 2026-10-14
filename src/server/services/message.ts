@@ -364,10 +364,7 @@ export async function createTurn(
           type: artifact.type,
           language: artifact.language ?? null,
           content: artifact.content ?? null,
-          fileUrl: artifact.fileUrl ?? null,
           fileName: artifact.fileName ?? null,
-          mimeType: artifact.mimeType ?? null,
-          size: artifact.size ?? null,
           createdAt: artifact.createdAt,
           updatedAt: artifact.updatedAt
         }))

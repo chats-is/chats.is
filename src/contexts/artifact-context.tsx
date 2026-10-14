@@ -22,10 +22,7 @@ export type ArtifactState = {
   kind: ArtifactKind;
   content: string;
   language?: string | null;
-  url?: string | null;
   fileName?: string | null;
-  mimeType?: string | null;
-  size?: number | null;
   createdAt?: Date;
   updatedAt?: Date;
   status: 'streaming' | 'done' | 'idle';
@@ -71,10 +68,7 @@ const toStateFromArtifact = (artifact: Artifact): ArtifactState => ({
   kind: artifactKindFromType(artifact.type),
   content: artifact.content ?? '',
   language: artifact.language ?? null,
-  url: artifact.fileUrl ?? null,
   fileName: artifact.fileName ?? null,
-  mimeType: artifact.mimeType ?? null,
-  size: artifact.size ?? null,
   createdAt: artifact.createdAt ? new Date(artifact.createdAt) : new Date(),
   updatedAt: artifact.updatedAt ? new Date(artifact.updatedAt) : new Date(),
   status: 'idle',
@@ -92,10 +86,7 @@ const mergeArtifactState = (
   kind: next.kind ?? previous?.kind ?? 'text',
   content: next.content ?? previous?.content ?? '',
   language: next.language ?? previous?.language ?? null,
-  url: next.url ?? previous?.url ?? null,
   fileName: next.fileName ?? previous?.fileName ?? null,
-  mimeType: next.mimeType ?? previous?.mimeType ?? null,
-  size: next.size ?? previous?.size ?? null,
   createdAt: next.createdAt ?? previous?.createdAt ?? new Date(),
   updatedAt: next.updatedAt ?? previous?.updatedAt ?? new Date(),
   status: next.status ?? previous?.status ?? 'idle',
@@ -404,47 +395,6 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
             })
           };
         });
-        return;
-      }
-
-      if (type === 'data-imageDelta' && data) {
-        if (!data.id || !data.artifactType) return;
-        const id = data.id;
-        setArtifacts(prev => ({
-          ...prev,
-          [id]: mergeArtifactState(prev[id], {
-            id,
-            chatId,
-            messageId: currentMessageIdRef.current,
-            title: data.title,
-            type: data.artifactType,
-            kind: 'image',
-            url: data.url ?? prev[id]?.url ?? null,
-            status: data.status ?? 'streaming'
-          })
-        }));
-        return;
-      }
-
-      if (type === 'data-fileDelta' && data) {
-        if (!data.id || !data.artifactType) return;
-        const id = data.id;
-        setArtifacts(prev => ({
-          ...prev,
-          [id]: mergeArtifactState(prev[id], {
-            id,
-            chatId,
-            messageId: currentMessageIdRef.current,
-            title: data.title,
-            type: data.artifactType,
-            kind: 'file',
-            url: data.url ?? prev[id]?.url ?? null,
-            fileName: data.fileName ?? prev[id]?.fileName ?? null,
-            mimeType: data.mimeType ?? prev[id]?.mimeType ?? null,
-            size: data.size ?? prev[id]?.size ?? null,
-            status: data.status ?? 'streaming'
-          })
-        }));
       }
     },
     [scheduleIdleStatus, upsertArtifact]

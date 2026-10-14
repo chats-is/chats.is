@@ -111,10 +111,7 @@ export async function listLibrary(
         content: sql<
           string | null
         >`left(${artifacts.content}, ${ARTIFACT_PREVIEW_CHARS})`,
-        fileUrl: artifacts.fileUrl,
         fileName: artifacts.fileName,
-        mimeType: artifacts.mimeType,
-        size: artifacts.size,
         createdAt: artifacts.createdAt,
         updatedAt: artifacts.updatedAt
       })

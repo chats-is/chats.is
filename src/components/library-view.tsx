@@ -4,9 +4,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Code2,
   Download,
-  File,
   FileText,
-  Image as ImageIcon,
   LibraryBig,
   MessageSquare,
   Pause,
@@ -146,41 +144,13 @@ const ARTIFACT_KIND_META: Record<
 > = {
   text: { label: 'Text', icon: FileText },
   code: { label: 'Code', icon: Code2 },
-  sheet: { label: 'Sheet', icon: Table },
-  image: { label: 'Image', icon: ImageIcon },
-  file: { label: 'File', icon: File }
+  sheet: { label: 'Sheet', icon: Table }
 };
 
 /** Large content preview filling the artifact card (Library-local). */
 function ArtifactCardPreview({ artifact }: { artifact: Artifact }) {
   const kind = artifactKindFromType(artifact.type);
 
-  if (kind === 'image' && artifact.fileUrl) {
-    return (
-      <img
-        className="h-full w-full rounded-md object-cover"
-        src={artifact.fileUrl}
-        alt={artifact.title}
-      />
-    );
-  }
-  if (kind === 'file') {
-    if (artifact.fileUrl && artifact.mimeType?.startsWith('image/')) {
-      return (
-        <img
-          className="h-full w-full rounded-md object-cover"
-          src={artifact.fileUrl}
-          alt={artifact.title}
-        />
-      );
-    }
-    return (
-      <div className="text-xs text-muted-foreground">
-        {artifact.fileName ||
-          (artifact.fileUrl ? 'File' : 'File URL unavailable')}
-      </div>
-    );
-  }
   if (kind === 'sheet') {
     try {
       const rows = JSON.parse(artifact.content ?? '[]');

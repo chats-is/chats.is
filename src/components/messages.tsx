@@ -65,13 +65,8 @@ export function Messages({
   const hasVisibleMessageContent = (message: ChatMessage) =>
     hasVisibleContent(message.parts);
 
-  const hasVisibleArtifactContent = (artifact: Artifact) => {
-    if (artifact.type === 'image' || artifact.type === 'file') {
-      return Boolean(artifact.fileUrl);
-    }
-
-    return (artifact.content ?? '').length > 0;
-  };
+  const hasVisibleArtifactContent = (artifact: Artifact) =>
+    (artifact.content ?? '').length > 0;
 
   // One card per artifact, under the message that created it, showing the
   // artifact's CURRENT (latest) content. Older versions are reached via the

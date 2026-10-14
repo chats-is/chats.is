@@ -13,14 +13,8 @@ export function downloadFileFromUrl(url: string, filename?: string) {
   document.body.removeChild(link);
 }
 
-/** Download an artifact: file artifacts via their URL, text artifacts as a
- *  generated file from the content. */
+/** Download an artifact as a file made from its content. */
 export function downloadArtifact(artifact: Artifact) {
-  if (artifact.fileUrl) {
-    downloadFileFromUrl(artifact.fileUrl, artifact.fileName || artifact.title);
-    return;
-  }
-
   if (!artifact.content) {
     toast.error('Nothing to download');
     return;

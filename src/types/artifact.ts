@@ -7,9 +7,7 @@ export const artifactTypeSchema = z.enum([
   'markdown',
   'html',
   'json',
-  'text',
-  'image',
-  'file'
+  'text'
 ]);
 export type ArtifactType = z.infer<typeof artifactTypeSchema>;
 
@@ -25,10 +23,7 @@ export type Artifact = {
   type: ArtifactType;
   language?: string | null;
   content?: string | null;
-  fileUrl?: string | null;
   fileName?: string | null;
-  mimeType?: string | null;
-  size?: number | null;
   status?: 'streaming' | 'done' | 'idle';
   createdAt: Date;
   updatedAt: Date;

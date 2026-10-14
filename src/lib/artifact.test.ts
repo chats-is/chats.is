@@ -21,8 +21,6 @@ import { PREVIEW_PACKAGES } from './constant';
 
 describe('artifactKindFromType', () => {
   it('maps each artifact type to its UI kind', () => {
-    expect(artifactKindFromType('image')).toBe('image');
-    expect(artifactKindFromType('file')).toBe('file');
     expect(artifactKindFromType('json')).toBe('sheet');
     expect(artifactKindFromType('code')).toBe('code');
     expect(artifactKindFromType('html')).toBe('code');
@@ -39,7 +37,6 @@ describe('artifactKindFromType', () => {
 describe('getArtifactKind', () => {
   it('delegates to the type of the artifact-like object', () => {
     expect(getArtifactKind({ type: 'json' })).toBe('sheet');
-    expect(getArtifactKind({ type: 'image' })).toBe('image');
   });
 });
 
@@ -157,20 +154,6 @@ describe('isPreviewableCodeArtifact', () => {
 });
 
 describe('assertArtifactPayload', () => {
-  it('requires fileUrl for file/image artifacts', () => {
-    expect(() => assertArtifactPayload({ type: 'image' })).toThrow(/fileUrl/);
-    expect(() =>
-      assertArtifactPayload({ type: 'file', fileUrl: 'https://x/y.pdf' })
-    ).not.toThrow();
-  });
-
-  it('requires content for non-file artifacts', () => {
-    expect(() => assertArtifactPayload({ type: 'text' })).toThrow(/content/);
-    expect(() =>
-      assertArtifactPayload({ type: 'markdown', content: '# hi' })
-    ).not.toThrow();
-  });
-
   it('allows non-previewable code without a fileName', () => {
     expect(() =>
       assertArtifactPayload({
