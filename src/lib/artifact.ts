@@ -1,4 +1,10 @@
-import { type ArtifactType, type PreviewPackage } from '@/types';
+import { type DataUIPart, type TextPart } from 'ai';
+
+import {
+  type ArtifactType,
+  type CustomUIDataTypes,
+  type PreviewPackage
+} from '@/types';
 import { normalizeCodeLanguage } from '@/lib/code-language';
 import { HTML_PREVIEW_CDN, PREVIEW_PACKAGES } from '@/lib/constant';
 
@@ -333,3 +339,19 @@ export const buildPreviewFiles = (artifact: PreviewArtifact): PreviewFile[] => {
     language: artifact.language ?? undefined
   }));
 };
+
+/**
+ * What the model is given for a data part of a message. The artifact a
+ * reader's message is about — a preview's error, sent from Try fixing —
+ * becomes the instruction the reader never saw; every other data part is
+ * the page's, not the model's, and is left out.
+ */
+export const dataPartForModel = (
+  part: DataUIPart<CustomUIDataTypes>
+): TextPart | undefined =>
+  part.type === 'data-artifactRef'
+    ? {
+        type: 'text',
+        text: `The text above is an error from the preview of the artifact with id ${part.data.id}. Fix that artifact with update_artifact, and answer in the language of the conversation.`
+      }
+    : undefined;

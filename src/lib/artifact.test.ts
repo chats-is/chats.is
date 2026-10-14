@@ -1,9 +1,13 @@
+import { convertToModelMessages } from 'ai';
 import { describe, expect, it } from 'vitest';
+
+import { type ChatMessage } from '@/types';
 
 import {
   artifactKindFromType,
   assertArtifactPayload,
   blockedHtmlResources,
+  dataPartForModel,
   getArtifactKind,
   isPreviewableCodeArtifact,
   isRelativeImport,
@@ -278,5 +282,58 @@ describe('assertArtifactPayload, for HTML', () => {
         content: '<svg/>'
       })
     ).not.toThrow();
+  });
+});
+
+describe('dataPartForModel', () => {
+  it('tells the model which artifact a preview error came from, and how to fix it', () => {
+    const part = dataPartForModel({
+      type: 'data-artifactRef',
+      data: { id: 'artifact-1' }
+    });
+
+    expect(part?.type).toBe('text');
+    expect(part?.text).toContain('artifact-1');
+    expect(part?.text).toContain('update_artifact');
+  });
+
+  it("leaves out every data part that is the page's", () => {
+    expect(
+      dataPartForModel({
+        type: 'data-error',
+        data: { kind: 'incomplete', message: 'This response was interrupted.' }
+      })
+    ).toBeUndefined();
+    expect(
+      dataPartForModel({ type: 'data-discard', data: { id: 'artifact-1' } })
+    ).toBeUndefined();
+  });
+});
+
+describe('a fix message, as the chat route hands it to the model', () => {
+  it('is the error the reader saw, then the instruction they did not', async () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [
+          { type: 'text', text: 'undefinedThing is not defined' },
+          { type: 'data-artifactRef', data: { id: 'artifact-1' } }
+        ]
+      }
+    ];
+
+    const [message] = await convertToModelMessages<ChatMessage>(messages, {
+      convertDataPart: dataPartForModel
+    });
+
+    expect(message.role).toBe('user');
+    expect(message.content).toEqual([
+      { type: 'text', text: 'undefinedThing is not defined' },
+      {
+        type: 'text',
+        text: expect.stringContaining('artifact with id artifact-1')
+      }
+    ]);
   });
 });

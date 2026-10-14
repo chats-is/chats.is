@@ -27,7 +27,11 @@ import {
   type User
 } from '@/types';
 import { chatRequestSchema } from '@/types/chat';
-import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
+import {
+  artifactKindFromType,
+  dataPartForModel,
+  type ArtifactKind
+} from '@/lib/artifact';
 import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
 import {
@@ -964,16 +968,9 @@ async function POST({
             // by the providers behind it. Left in, one interrupted turn would
             // fail every turn after it in that chat.
             ignoreIncompleteToolCalls: true,
-            // The reader sent a preview's error and saw only the error; the
-            // model is told what it is and which artifact to fix. Every other
-            // data part is the page's, not the model's.
-            convertDataPart: part =>
-              part.type === 'data-artifactRef'
-                ? {
-                    type: 'text',
-                    text: `The text above is an error from the preview of the artifact with id ${part.data.id}. Fix that artifact with update_artifact, and answer in the language of the conversation.`
-                  }
-                : undefined
+            // What a reader sent unseen is told to the model; every other
+            // data part is the page's.
+            convertDataPart: dataPartForModel
           }
         );
         promptTokens =
