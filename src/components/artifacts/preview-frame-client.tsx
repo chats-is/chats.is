@@ -13,10 +13,13 @@ import { type PreviewPackage } from '@/types';
 // one too many.
 //
 // Most are loaded the first time a preview imports them. The five the app
-// uses itself are bundled with the frame, as they were: loaded on demand,
-// they changed how the build shares code between the app's own pages, and
-// moved a date picker, the form library and more into the chunk every page
-// loads — some 300 kB more for everyone, measured, for a preview's sake.
+// uses itself are bundled with the frame instead, each for a cost measured
+// on the build: lucide-react loaded on demand — whole, through a wrapper,
+// from its CommonJS file or icon by icon — moves a date picker, the form
+// library and more into the chunk every page loads (+300 kB); recharts and
+// framer-motion loaded whole make the app's pages download all of each
+// rather than the part they use (+200 kB); clsx and cva are too small for
+// it to matter. Bundled here, they cost nothing outside a preview.
 const PREVIEW_PACKAGE_LOADERS = {
   'lucide-react': async () => lucideReact,
   recharts: async () => recharts,
