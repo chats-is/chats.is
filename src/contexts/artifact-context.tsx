@@ -208,8 +208,8 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
       if (!part?.type?.startsWith('data-')) return;
       const { type, data } = part;
 
-      if (type === 'data-artifact' && data?.artifact) {
-        const artifact = toStateFromArtifact(data.artifact);
+      if (type === 'data-artifact' && data) {
+        const artifact = toStateFromArtifact(data);
         setArtifacts(prev => ({
           ...prev,
           [artifact.id]: mergeArtifactState(artifact, {

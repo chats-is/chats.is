@@ -38,9 +38,7 @@ export type CustomUIDataTypes = {
    */
   error: { kind: ChatErrorKind; message: string };
   appendMessage: string;
-  artifact: {
-    artifact: Artifact;
-  };
+  artifact: Artifact;
   textDelta: {
     id: string;
     delta: string;
@@ -94,6 +92,15 @@ export type CustomUIDataTypes = {
   };
   /** An artifact that streamed onto the canvas but was never kept. */
   discard: {
+    id: string;
+  };
+  /**
+   * The artifact a reader's message is about, sent with it unseen — with a
+   * preview's error, today. The message shows the reader's text alone; they
+   * need not know an "artifact" from a preview, and the model is told the
+   * rest (the chat route's `convertDataPart`).
+   */
+  artifactRef: {
     id: string;
   };
 };

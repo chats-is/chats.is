@@ -70,9 +70,17 @@ export const messageSchema = z.object({
  * (`carriesOnlyOwnFiles`); a message already stored is resent as it stands,
  * and one from before this store existed must still be able to be.
  */
+/** The artifact a message is about, sent with it unseen. */
+const artifactRefPartSchema = z.object({
+  type: z.literal('data-artifactRef'),
+  data: z.object({ id: z.string().min(1).max(255) })
+});
+
 export const userMessageSchema = messageSchema.extend({
   role: z.literal('user'),
-  parts: z.array(z.union([textUIPartSchema, fileUIPartSchema])).min(1)
+  parts: z
+    .array(z.union([textUIPartSchema, fileUIPartSchema, artifactRefPartSchema]))
+    .min(1)
 });
 
 /** What the message server functions accept. */

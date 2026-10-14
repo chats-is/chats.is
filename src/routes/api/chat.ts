@@ -879,7 +879,7 @@ async function POST({
               }
               emitTransient({
                 type: 'data-artifact',
-                data: { artifact }
+                data: artifact
               });
               if (options?.toolCallId) {
                 toolArtifactStates.delete(options.toolCallId);
@@ -913,7 +913,7 @@ async function POST({
               emitArtifactDelta(artifact);
               emitTransient({
                 type: 'data-artifact',
-                data: { artifact }
+                data: artifact
               });
               return { id: artifact.id };
             }
@@ -954,15 +954,27 @@ async function POST({
           );
         }
 
-        const modelMessages = await convertToModelMessages(
+        const modelMessages = await convertToModelMessages<ChatMessage>(
           maskUnsupportedFileParts(fitted.messages, {
             supportsVision: dbModel.supportsVision
           }),
-          // A turn cut short mid-call is stored with the call and no result,
-          // and a call without a result is refused outright — by the SDK, and
-          // by the providers behind it. Left in, one interrupted turn would
-          // fail every turn after it in that chat.
-          { ignoreIncompleteToolCalls: true }
+          {
+            // A turn cut short mid-call is stored with the call and no result,
+            // and a call without a result is refused outright — by the SDK, and
+            // by the providers behind it. Left in, one interrupted turn would
+            // fail every turn after it in that chat.
+            ignoreIncompleteToolCalls: true,
+            // The reader sent a preview's error and saw only the error; the
+            // model is told what it is and which artifact to fix. Every other
+            // data part is the page's, not the model's.
+            convertDataPart: part =>
+              part.type === 'data-artifactRef'
+                ? {
+                    type: 'text',
+                    text: `The text above is an error from the preview of the artifact with id ${part.data.id}. Fix that artifact with update_artifact, and answer in the language of the conversation.`
+                  }
+                : undefined
+          }
         );
         promptTokens =
           estimateTokens(instructions) +

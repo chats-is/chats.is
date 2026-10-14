@@ -541,15 +541,19 @@ export function ChatUI({
     [input, hasUsableModel, sendMessage, updateDisplayModelOptimistically]
   );
 
-  // A preview's error, sent as the reader's own message: the model sees the
-  // error, and which artifact it is in, and answers with the fix. No code
-  // fence: a reader's message is shown as written, not as Markdown.
+  // A preview's error, sent as the reader's own message. What they see is
+  // the error alone, in no language of ours and with no word for what the
+  // preview is; which preview it came from goes with it unseen, for the
+  // model to fix that one.
   const handleFix = useCallback(
     (artifact: Artifact, error: string) => {
       if (!hasUsableModel()) return;
       updateDisplayModelOptimistically();
       sendMessage({
-        text: `Fix this error in the artifact "${artifact.title}" (id: ${artifact.id}):\n\n${error}`
+        parts: [
+          { type: 'text', text: error },
+          { type: 'data-artifactRef', data: { id: artifact.id } }
+        ]
       });
     },
     [hasUsableModel, sendMessage, updateDisplayModelOptimistically]
