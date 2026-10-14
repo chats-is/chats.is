@@ -31,10 +31,27 @@ describe('compilePreview', () => {
       ]
     });
 
-    expect(result).toMatchObject({ entryPath: '/index.tsx' });
+    expect(result).toMatchObject({ entryPath: '/index.tsx', imports: [] });
     expect('files' in result && result.files['/index.tsx']).toContain(
       'exports.default = App'
     );
+  });
+
+  it('says which packages the frame has to load', () => {
+    const result = compilePreview({
+      entryPath: '/index.tsx',
+      files: [
+        {
+          path: '/index.tsx',
+          code: "import * as d3 from 'd3';\nimport { Button } from '@/components/ui/button';\nexport default () => <Button>{d3.max([1, 2])}</Button>;",
+          language: 'tsx'
+        }
+      ]
+    });
+
+    expect(result).toMatchObject({
+      imports: ['d3', '@/components/ui/button']
+    });
   });
 
   it('says where a syntax error is, with the line and a caret', () => {
@@ -75,13 +92,13 @@ describe('compilePreview', () => {
       files: [
         {
           path: '/index.tsx',
-          code: "import _ from 'lodash';\nexport default () => null;",
+          code: "import moment from 'moment';\nexport default () => null;",
           language: 'tsx'
         }
       ]
     });
 
-    expect('error' in result && result.error).toContain('lodash');
+    expect('error' in result && result.error).toContain('moment');
   });
 });
 

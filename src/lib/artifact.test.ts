@@ -8,8 +8,10 @@ import {
   isRelativeImport,
   isStyleImport,
   looksLikeJsx,
+  previewPackageImports,
   validatePreviewImports
 } from './artifact';
+import { PREVIEW_PACKAGES } from './constant';
 
 describe('artifactKindFromType', () => {
   it('maps each artifact type to its UI kind', () => {
@@ -74,34 +76,57 @@ describe('validatePreviewImports', () => {
     expect(validatePreviewImports(code)).toEqual([]);
   });
 
-  it('allows the curated bundled libraries', () => {
-    const code = `
-      import { Home } from 'lucide-react';
-      import { motion } from 'framer-motion';
-      import { LineChart } from 'recharts';
-      import clsx from 'clsx';
-      import { cva } from 'class-variance-authority';
-    `;
+  it('allows every curated package, as the model writes it', () => {
+    const code = PREVIEW_PACKAGES.map(
+      pkg => `import * as m from '${pkg.name}';`
+    ).join('\n');
     expect(validatePreviewImports(code)).toEqual([]);
   });
 
   it('flags disallowed package imports (deduped)', () => {
     const code = `
       import { format } from 'date-fns';
-      import x from 'lodash';
-      import y from 'lodash';
+      import x from 'moment';
+      import y from 'moment';
       const z = require('axios');
     `;
     const result = validatePreviewImports(code);
     expect(result).toContain('date-fns');
-    expect(result).toContain('lodash');
+    expect(result).toContain('moment');
     expect(result).toContain('axios');
-    expect(result.filter(s => s === 'lodash')).toHaveLength(1);
+    expect(result.filter(s => s === 'moment')).toHaveLength(1);
+  });
+
+  it('flags a package path the frame does not load', () => {
+    const code = `
+      import Chart from 'chart.js';
+      import { Calendar } from '@/components/ui/calendar';
+    `;
+    expect(validatePreviewImports(code)).toEqual([
+      'chart.js',
+      '@/components/ui/calendar'
+    ]);
   });
 
   it('flags dynamic import() of a disallowed package', () => {
     const code = "const m = await import('got');";
     expect(validatePreviewImports(code)).toEqual(['got']);
+  });
+});
+
+describe('previewPackageImports', () => {
+  it('lists the curated packages the code imports, once each', () => {
+    const code = `
+      import React from 'react';
+      import * as d3 from 'd3';
+      import { Button } from '@/components/ui/button';
+      import { select } from 'd3';
+      import { Helper } from './helper';
+    `;
+    expect(previewPackageImports(code)).toEqual([
+      'd3',
+      '@/components/ui/button'
+    ]);
   });
 });
 

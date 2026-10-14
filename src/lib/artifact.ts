@@ -1,5 +1,6 @@
-import { type ArtifactType } from '@/types';
+import { type ArtifactType, type PreviewPackage } from '@/types';
 import { normalizeCodeLanguage } from '@/lib/code-language';
+import { PREVIEW_PACKAGES } from '@/lib/constant';
 
 export type ArtifactKind = 'text' | 'code' | 'image' | 'sheet' | 'file';
 
@@ -17,20 +18,20 @@ const PREVIEWABLE_CODE_LANGUAGES = new Set([
 ]);
 
 /**
- * The bare package specifiers the sandboxed preview can resolve. React plus a
- * curated set of libraries bundled from our own origin (no external CDN), so
- * previews stay fully offline.
+ * The bare package specifiers the sandboxed preview can resolve: React, and
+ * the curated packages the frame loads from our own origin as they are
+ * needed (no external CDN), so previews stay fully offline.
  */
-const PREVIEW_ALLOWED_IMPORTS = new Set([
+const PREVIEW_ALLOWED_IMPORTS = new Set<string>([
   'react',
   'react-dom',
   'react-dom/client',
-  'lucide-react',
-  'framer-motion',
-  'recharts',
-  'clsx',
-  'class-variance-authority'
+  ...PREVIEW_PACKAGES.map(pkg => pkg.name)
 ]);
+
+const PREVIEW_PACKAGE_NAMES = new Set<string>(
+  PREVIEW_PACKAGES.map(pkg => pkg.name)
+);
 
 /**
  * Matches `import ... from 'x'`, side-effect `import 'x'`, dynamic `import('x')`
@@ -53,27 +54,40 @@ export const isStyleImport = (specifier: string): boolean =>
   /\.scss($|\?)/.test(specifier) ||
   /\.sass($|\?)/.test(specifier);
 
+const importSpecifiers = (code: string): string[] =>
+  Array.from(
+    code.matchAll(PREVIEW_IMPORT_RE),
+    match => (match[1] || match[2] || match[3] || match[4]) ?? ''
+  ).filter(Boolean);
+
 /**
  * Returns the unsupported (non-react, non-relative, non-style) import specifiers
  * found in `code`. An empty array means every import is allowed in the preview.
  */
-export const validatePreviewImports = (code: string): string[] => {
-  const unsupported: string[] = [];
+export const validatePreviewImports = (code: string): string[] =>
+  Array.from(
+    new Set(
+      importSpecifiers(code).filter(
+        specifier =>
+          !PREVIEW_ALLOWED_IMPORTS.has(specifier) &&
+          !isRelativeImport(specifier) &&
+          !isStyleImport(specifier)
+      )
+    )
+  );
 
-  for (const match of code.matchAll(PREVIEW_IMPORT_RE)) {
-    const specifier = match[1] || match[2] || match[3] || match[4];
-    if (
-      specifier &&
-      !PREVIEW_ALLOWED_IMPORTS.has(specifier) &&
-      !isRelativeImport(specifier) &&
-      !isStyleImport(specifier)
-    ) {
-      unsupported.push(specifier);
-    }
-  }
-
-  return Array.from(new Set(unsupported));
-};
+/**
+ * The curated packages `code` imports, for the frame to load before it runs
+ * the code: it loads a package only when a preview asks for it.
+ */
+export const previewPackageImports = (code: string): PreviewPackage[] =>
+  Array.from(
+    new Set(
+      importSpecifiers(code).filter((specifier): specifier is PreviewPackage =>
+        PREVIEW_PACKAGE_NAMES.has(specifier)
+      )
+    )
+  );
 
 /** Maps an artifact `type` to the UI/render kind. */
 export const artifactKindFromType = (
@@ -145,7 +159,7 @@ export const assertArtifactPayload = (input: ArtifactPayloadInput): void => {
   const unsupportedImports = validatePreviewImports(input.content);
   if (unsupportedImports.length > 0) {
     throw new Error(
-      `Previewable React/code artifacts only support react imports and relative imports. Unsupported imports: ${unsupportedImports.join(', ')}`
+      `Previewable React/code artifacts can import only React and the packages listed in the instructions. Unsupported imports: ${unsupportedImports.join(', ')}`
     );
   }
 

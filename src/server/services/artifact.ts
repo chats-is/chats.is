@@ -6,6 +6,7 @@ import ts from 'typescript';
 import {
   type Artifact,
   type CreateArtifactInput,
+  type PreviewPackage,
   type UpdateArtifactInput
 } from '@/types';
 import {
@@ -14,6 +15,7 @@ import {
   getArtifactVirtualPath,
   isPreviewableCodeArtifact,
   looksLikeJsx,
+  previewPackageImports,
   validatePreviewImports,
   type PreviewFile
 } from '@/lib/artifact';
@@ -52,10 +54,14 @@ export async function listArtifacts(userId: string, chatId: string) {
   });
 }
 
-/** A preview compiled for the sandboxed frame: its entry and each file as CommonJS. */
+/**
+ * A preview compiled for the sandboxed frame: its entry, each file as
+ * CommonJS, and the packages they import, which the frame loads first.
+ */
 export type CompiledPreview = {
   entryPath: string;
   files: Record<string, string>;
+  imports: PreviewPackage[];
 };
 
 // Same canonicalization the client uses (react→tsx etc. via the shared alias
@@ -99,6 +105,7 @@ export function compilePreview(input: {
 }): CompiledPreview | { error: string } {
   const { entryPath, files } = input;
   const compiledFiles: Record<string, string> = {};
+  const imports = new Set<PreviewPackage>();
   const errors: string[] = [];
   // An artifact is previewed under two paths with the same source, so each
   // source is compiled once — and its errors said once, not once per path.
@@ -133,7 +140,7 @@ export function compilePreview(input: {
     const unsupportedImports = validatePreviewImports(file.code);
     if (unsupportedImports.length > 0) {
       errors.push(
-        `${file.path}: Only react imports are supported. Unsupported imports: ${unsupportedImports.join(', ')}`
+        `${file.path}: Only React and the listed packages can be imported. Unsupported imports: ${unsupportedImports.join(', ')}`
       );
       compiledByCode.set(file.code, null);
       continue;
@@ -166,6 +173,7 @@ export function compilePreview(input: {
 
     compiledFiles[file.path] = output.outputText;
     compiledByCode.set(file.code, output.outputText);
+    for (const pkg of previewPackageImports(file.code)) imports.add(pkg);
   }
 
   if (!hasEntry) {
@@ -180,7 +188,7 @@ export function compilePreview(input: {
     return { error: `Preview does not support ${entryPath}` };
   }
 
-  return { entryPath, files: compiledFiles };
+  return { entryPath, files: compiledFiles, imports: [...imports] };
 }
 
 /**

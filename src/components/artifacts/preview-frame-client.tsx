@@ -1,26 +1,67 @@
 import React, { useEffect, useState } from 'react';
-import * as classVarianceAuthority from 'class-variance-authority';
-import clsx from 'clsx';
-import * as framerMotion from 'framer-motion';
-import * as lucideReact from 'lucide-react';
-import * as recharts from 'recharts';
 
-// Curated libraries bundled from our own origin and handed to the sandbox's
-// require(), so previews can use them while staying fully offline (no CDN).
-// `__esModule: true` makes the compiled CommonJS interop helpers treat these as
-// ES modules instead of re-wrapping the default export.
-const wrapModule = (mod: Record<string, unknown>) => ({
-  __esModule: true,
-  ...mod,
-  default: (mod as { default?: unknown }).default ?? mod
-});
+import { type PreviewPackage } from '@/types';
 
-const PREVIEW_PACKAGE_MODULES: Record<string, unknown> = {
-  'lucide-react': wrapModule(lucideReact),
-  'framer-motion': wrapModule(framerMotion),
-  recharts: wrapModule(recharts),
-  clsx: { __esModule: true, default: clsx, clsx },
-  'class-variance-authority': wrapModule(classVarianceAuthority)
+// The curated packages, each loaded from our own origin the first time a
+// preview imports it (no CDN, so previews stay fully offline), and handed to
+// the sandbox's require(). One for every entry of PREVIEW_PACKAGES — the
+// `satisfies` refuses to build with one missing or one too many.
+const PREVIEW_PACKAGE_LOADERS = {
+  'lucide-react': () => import('lucide-react'),
+  recharts: () => import('recharts'),
+  'framer-motion': () => import('framer-motion'),
+  clsx: () => import('clsx'),
+  'class-variance-authority': () => import('class-variance-authority'),
+  lodash: () => import('lodash'),
+  d3: () => import('d3'),
+  'chart.js/auto': () => import('chart.js/auto'),
+  'plotly.js-dist-min': () => import('plotly.js-dist-min'),
+  three: () => import('three'),
+  mathjs: () => import('mathjs'),
+  papaparse: () => import('papaparse'),
+  xlsx: () => import('xlsx'),
+  '@/components/ui/avatar': () => import('@/components/ui/avatar'),
+  '@/components/ui/badge': () => import('@/components/ui/badge'),
+  '@/components/ui/button': () => import('@/components/ui/button'),
+  '@/components/ui/card': () => import('@/components/ui/card'),
+  '@/components/ui/checkbox': () => import('@/components/ui/checkbox'),
+  '@/components/ui/dialog': () => import('@/components/ui/dialog'),
+  '@/components/ui/input': () => import('@/components/ui/input'),
+  '@/components/ui/label': () => import('@/components/ui/label'),
+  '@/components/ui/progress': () => import('@/components/ui/progress'),
+  '@/components/ui/select': () => import('@/components/ui/select'),
+  '@/components/ui/separator': () => import('@/components/ui/separator'),
+  '@/components/ui/skeleton': () => import('@/components/ui/skeleton'),
+  '@/components/ui/switch': () => import('@/components/ui/switch'),
+  '@/components/ui/table': () => import('@/components/ui/table'),
+  '@/components/ui/tabs': () => import('@/components/ui/tabs'),
+  '@/components/ui/textarea': () => import('@/components/ui/textarea')
+} satisfies Record<PreviewPackage, () => Promise<object>>;
+
+// What the compiled CommonJS gets for a package. `__esModule: true` makes its
+// interop helpers take the module as it is rather than wrap it again. A
+// CommonJS package (lodash, Papa Parse, Plotly) arrives as its exports under
+// `default`, so those are spread in too, for a named import to find.
+const wrapModule = (mod: object) => {
+  const namespace = mod as Record<string, unknown>;
+  const exports = namespace.default;
+  return {
+    ...(exports &&
+    (typeof exports === 'object' || typeof exports === 'function')
+      ? exports
+      : {}),
+    ...namespace,
+    __esModule: true,
+    default: exports ?? namespace
+  };
+};
+
+const loadedPackages = new Map<PreviewPackage, unknown>();
+
+const loadPackage = async (name: PreviewPackage) => {
+  if (!loadedPackages.has(name)) {
+    loadedPackages.set(name, wrapModule(await PREVIEW_PACKAGE_LOADERS[name]()));
+  }
 };
 
 type RenderState =
@@ -38,6 +79,10 @@ type RenderState =
   | {
       status: 'component';
       component: React.ComponentType;
+    }
+  | {
+      status: 'markup';
+      html: string;
     };
 
 /**
@@ -87,11 +132,14 @@ function installMemoryStorage() {
   }
 }
 
-type PreviewMessage = {
-  type: 'artifact-preview-render';
-  entryPath: string;
-  files: Record<string, string>;
-};
+type PreviewMessage =
+  | {
+      type: 'artifact-preview-render';
+      entryPath: string;
+      files: Record<string, string>;
+      imports?: PreviewPackage[];
+    }
+  | { type: 'artifact-preview-mermaid'; source: string };
 
 // Catches errors thrown while rendering the previewed component so a runtime
 // crash surfaces as a readable message instead of a blank frame. Resets itself
@@ -192,7 +240,16 @@ export function ArtifactPreviewFrameClient() {
   // Load the bundled Tailwind v4 browser runtime (served from our own origin,
   // no external CDN) so utility classes in previewed components are styled.
   // Imported lazily on the client because it touches `window`/`document`.
+  //
+  // Its preflight comes after the app's stylesheet and puts every border back
+  // to the text colour, so a shadcn/ui card is drawn in black. Given to the
+  // runtime itself, the app's border colour follows its preflight again.
   useEffect(() => {
+    const style = document.createElement('style');
+    style.setAttribute('type', 'text/tailwindcss');
+    style.textContent =
+      '@layer base { *, ::after, ::before, ::backdrop { border-color: var(--border); } }';
+    document.head.appendChild(style);
     void import('@tailwindcss/browser');
   }, []);
 
@@ -218,6 +275,7 @@ export function ArtifactPreviewFrameClient() {
       runtimeError ||
       state.status === 'element' ||
       state.status === 'component' ||
+      state.status === 'markup' ||
       state.status === 'error'
     ) {
       window.parent.postMessage({ type: 'artifact-preview-rendered' }, '*');
@@ -234,13 +292,21 @@ export function ArtifactPreviewFrameClient() {
 
   useEffect(() => {
     installMemoryStorage();
+    // Which render is current: one that waited on a package or on Mermaid
+    // gives way to any sent after it.
+    let latestRender = 0;
 
-    const handleMessage = (event: MessageEvent<PreviewMessage>) => {
+    const handleMessage = async (event: MessageEvent<PreviewMessage>) => {
       // Only accept render instructions from the embedding parent window.
       // Defense in depth: the frame is already sandboxed to an opaque origin,
       // but this rejects messages from any other window/script.
       if (event.source !== window.parent) return;
-      if (event.data?.type !== 'artifact-preview-render') return;
+      if (
+        event.data?.type !== 'artifact-preview-render' &&
+        event.data?.type !== 'artifact-preview-mermaid'
+      ) {
+        return;
+      }
       // This page runs whatever it is sent. That is only safe inside the
       // sandbox the app puts it in, where the origin is opaque. The sandbox is
       // an attribute of the embedding iframe, though, not of this page — so
@@ -248,10 +314,27 @@ export function ArtifactPreviewFrameClient() {
       // would then run as this origin. Opaque or nothing.
       if (window.origin !== 'null') return;
 
+      const render = ++latestRender;
+      const message = event.data;
       setRuntimeError(null);
       setRenderNonce(nonce => nonce + 1);
 
       try {
+        if (message.type === 'artifact-preview-mermaid') {
+          const { default: mermaid } = await import('mermaid');
+          mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+          const { svg } = await mermaid.render(
+            `mermaid-${render}`,
+            message.source
+          );
+          if (render !== latestRender) return;
+          setState({ status: 'markup', html: svg });
+          return;
+        }
+
+        await Promise.all((message.imports ?? []).map(loadPackage));
+        if (render !== latestRender) return;
+
         let sideEffectRendered = false;
         const renderElement = (element: React.ReactElement) => {
           sideEffectRendered = true;
@@ -269,7 +352,7 @@ export function ArtifactPreviewFrameClient() {
             return moduleCache.get(modulePath);
           }
 
-          const code = event.data.files[modulePath];
+          const code = message.files[modulePath];
           if (!code) {
             throw new Error(`Module not found: ${modulePath}`);
           }
@@ -308,8 +391,8 @@ export function ArtifactPreviewFrameClient() {
                 }
               };
             }
-            if (specifier in PREVIEW_PACKAGE_MODULES) {
-              return PREVIEW_PACKAGE_MODULES[specifier];
+            if (loadedPackages.has(specifier as PreviewPackage)) {
+              return loadedPackages.get(specifier as PreviewPackage);
             }
             if (specifier.startsWith('./') || specifier.startsWith('../')) {
               if (specifier.endsWith('.css')) {
@@ -319,7 +402,7 @@ export function ArtifactPreviewFrameClient() {
               const resolvedPath = resolveImportPath(
                 specifier,
                 modulePath,
-                event.data.files
+                message.files
               );
               if (!resolvedPath) {
                 throw new Error(`Unsupported import: ${specifier}`);
@@ -360,7 +443,7 @@ export function ArtifactPreviewFrameClient() {
           return exported;
         };
 
-        const exported = executeModule(event.data.entryPath) as
+        const exported = executeModule(message.entryPath) as
           Record<string, unknown> | undefined;
 
         if (sideEffectRendered) {
@@ -389,6 +472,7 @@ export function ArtifactPreviewFrameClient() {
           );
         }
       } catch (error) {
+        if (render !== latestRender) return;
         setState({
           status: 'error',
           message:
@@ -397,11 +481,13 @@ export function ArtifactPreviewFrameClient() {
       }
     };
 
-    window.addEventListener('message', handleMessage);
+    const onMessage = (event: MessageEvent<PreviewMessage>) =>
+      void handleMessage(event);
+    window.addEventListener('message', onMessage);
     window.parent.postMessage({ type: 'artifact-preview-frame-ready' }, '*');
 
     return () => {
-      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('message', onMessage);
     };
   }, []);
 
@@ -423,6 +509,17 @@ export function ArtifactPreviewFrameClient() {
           ) : null}
         </PreviewErrorBoundary>
       </div>
+    );
+  }
+
+  // A Mermaid diagram, as the SVG Mermaid drew — sanitised by it, on its
+  // strict level, and shown in the sandbox like everything else here.
+  if (state.status === 'markup') {
+    return (
+      <div
+        className="flex min-h-screen justify-center bg-white p-4"
+        dangerouslySetInnerHTML={{ __html: state.html }}
+      />
     );
   }
 

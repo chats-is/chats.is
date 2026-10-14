@@ -37,7 +37,7 @@ export type {
 export type { Result } from './result';
 export type { SharedLink } from './shared-link';
 export { artifactTypeSchema } from './artifact';
-export type { Artifact, ArtifactType } from './artifact';
+export type { Artifact, ArtifactType, PreviewPackage } from './artifact';
 export {
   createArtifactInputSchema,
   updateArtifactInputSchema,

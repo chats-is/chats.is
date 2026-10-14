@@ -9,7 +9,7 @@ import {
 import { useMatch } from '@tanstack/react-router';
 import { LoaderCircle, Wrench, X } from 'lucide-react';
 
-import { type Artifact } from '@/types';
+import { type Artifact, type PreviewPackage } from '@/types';
 import { buildPreviewFiles, getArtifactVirtualPath } from '@/lib/artifact';
 import { normalizeCodeLanguage } from '@/lib/code-language';
 import { cn } from '@/lib/utils';
@@ -22,12 +22,22 @@ type PreviewStatus = 'idle' | 'loading' | 'ready' | 'error';
 type PreviewRuntimeResponse = {
   entryPath?: string;
   files?: Record<string, string>;
+  imports?: PreviewPackage[];
   error?: string;
 };
 
 // Memoize compiled output by request body so identical content (common while
 // streaming re-renders the same files) doesn't re-hit the compile endpoint.
-type CompiledPreview = { entryPath: string; files: Record<string, string> };
+type CompiledPreview = {
+  entryPath: string;
+  files: Record<string, string>;
+  imports: PreviewPackage[];
+};
+
+/** What the frame is sent to show: a compiled build, or a Mermaid diagram. */
+type FramePayload =
+  | ({ type: 'artifact-preview-render' } & CompiledPreview)
+  | { type: 'artifact-preview-mermaid'; source: string };
 const PREVIEW_CACHE_MAX = 64;
 const previewResultCache = new Map<string, CompiledPreview>();
 
@@ -51,6 +61,10 @@ const isPreviewableCodeLanguage = (artifact: Artifact) => {
     rawLanguage === 'react'
   );
 };
+
+const isMermaidArtifact = (artifact: Artifact) =>
+  artifact.type === 'code' &&
+  artifact.language?.toLowerCase().trim() === 'mermaid';
 
 const isHtmlLikeArtifact = (artifact: Artifact) => {
   if (artifact.type === 'html') return true;
@@ -171,7 +185,11 @@ function usePreviewFailure(
   };
 }
 
-function ReactArtifactPreview({
+/**
+ * A preview drawn in the sandboxed frame: a React artifact, compiled on the
+ * server first, or a Mermaid diagram, which the frame draws from its source.
+ */
+function FrameArtifactPreview({
   artifact,
   onFix
 }: {
@@ -191,23 +209,17 @@ function ReactArtifactPreview({
     shouldThrow: false,
     select: match => match.params.id
   });
+  const isMermaid = isMermaidArtifact(artifact);
   const [status, setStatus] = useState<PreviewStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [compiledFiles, setCompiledFiles] = useState<Record<
-    string,
-    string
-  > | null>(null);
-  const [entryPath, setEntryPath] = useState<string | null>(null);
+  const [payload, setPayload] = useState<FramePayload | null>(null);
   const iframeTitle = useId();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Frame handshake state lives in refs so the once-bound message listener and
   // the post helper always see the latest values (no stale closures, no race
   // between the iframe load event and the frame's "ready" message).
   const frameReadyRef = useRef(false);
-  const compiledRef = useRef<{
-    files: Record<string, string>;
-    entryPath: string;
-  } | null>(null);
+  const payloadRef = useRef<FramePayload | null>(null);
   const fallbackRef = useRef<number | null>(null);
   const { failure, clearFailure } = usePreviewFailure(iframeRef);
 
@@ -215,17 +227,10 @@ function ReactArtifactPreview({
   // Called both when a new result compiles AND when the frame (re)announces it
   // is ready — so no ordering can leave the frame without content.
   const postToFrame = useCallback(() => {
-    const payload = compiledRef.current;
-    if (!frameReadyRef.current || !payload) return;
+    const latest = payloadRef.current;
+    if (!frameReadyRef.current || !latest) return;
     clearFailure();
-    iframeRef.current?.contentWindow?.postMessage(
-      {
-        type: 'artifact-preview-render',
-        entryPath: payload.entryPath,
-        files: payload.files
-      },
-      '*'
-    );
+    iframeRef.current?.contentWindow?.postMessage(latest, '*');
     if (fallbackRef.current) window.clearTimeout(fallbackRef.current);
     // If the frame never reports back that it rendered, don't leave the loading
     // overlay stuck forever.
@@ -258,11 +263,19 @@ function ReactArtifactPreview({
   );
 
   useEffect(() => {
+    // A diagram needs no build: its source goes to the frame as it is.
+    if (isMermaid) {
+      const source = content.trim();
+      setStatus(source ? 'loading' : 'idle');
+      setError(null);
+      setPayload(source ? { type: 'artifact-preview-mermaid', source } : null);
+      return;
+    }
+
     if (!requestBody) {
       setStatus('idle');
       setError(null);
-      setCompiledFiles(null);
-      setEntryPath(null);
+      setPayload(null);
       return;
     }
 
@@ -284,8 +297,7 @@ function ReactArtifactPreview({
       if (cachedResult) {
         if (cancelled) return;
         setError(null);
-        setCompiledFiles(cachedResult.files);
-        setEntryPath(cachedResult.entryPath);
+        setPayload({ type: 'artifact-preview-render', ...cachedResult });
         return;
       }
 
@@ -307,19 +319,19 @@ function ReactArtifactPreview({
       if (!response.ok || !result?.files || !result?.entryPath) {
         setStatus('error');
         setError(result?.error ?? 'Failed to build preview');
-        setCompiledFiles(null);
-        setEntryPath(null);
+        setPayload(null);
         return;
       }
 
-      previewCacheSet(requestBody, {
+      const compiled = {
         entryPath: result.entryPath,
-        files: result.files
-      });
+        files: result.files,
+        imports: result.imports ?? []
+      };
+      previewCacheSet(requestBody, compiled);
 
       setError(null);
-      setCompiledFiles(result.files);
-      setEntryPath(result.entryPath);
+      setPayload({ type: 'artifact-preview-render', ...compiled });
     };
 
     // Short debounce just to coalesce the few dep changes that fire together.
@@ -332,7 +344,7 @@ function ReactArtifactPreview({
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [requestBody]);
+  }, [requestBody, isMermaid, content]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<{ type?: string }>) => {
@@ -357,13 +369,13 @@ function ReactArtifactPreview({
     };
   }, [postToFrame]);
 
-  // When a new result compiles, stash it and push it to the frame (a no-op until
-  // the frame has announced ready, after which the ready handler pushes it).
+  // When there is something new to show, stash it and push it to the frame (a
+  // no-op until the frame has announced ready, after which the ready handler
+  // pushes it).
   useEffect(() => {
-    compiledRef.current =
-      compiledFiles && entryPath ? { files: compiledFiles, entryPath } : null;
+    payloadRef.current = payload;
     postToFrame();
-  }, [compiledFiles, entryPath, postToFrame]);
+  }, [payload, postToFrame]);
 
   // A build that failed, or a page that threw once built; neither while a new
   // build is on its way.
@@ -373,7 +385,7 @@ function ReactArtifactPreview({
   // Keep the iframe mounted once we have a compiled result so re-compiles (e.g.
   // switching artifacts) update it in place via postMessage instead of tearing
   // down and reloading the frame (which is slow and shows stale content).
-  const hasPreview = Boolean(compiledFiles && entryPath);
+  const hasPreview = Boolean(payload);
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -381,7 +393,7 @@ function ReactArtifactPreview({
         <>
           <iframe
             ref={iframeRef}
-            title={`artifact-react-preview-${iframeTitle}`}
+            title={`artifact-frame-preview-${iframeTitle}`}
             sandbox="allow-scripts"
             className="min-h-0 w-full flex-1 bg-white"
             src="/artifact-preview-frame"
@@ -413,7 +425,7 @@ export function supportsArtifactRuntimePreview(artifact: Artifact) {
   if (artifact.type === 'code' && isPreviewableCodeLanguage(artifact)) {
     return true;
   }
-  return false;
+  return isMermaidArtifact(artifact);
 }
 
 // Runs ahead of the artifact's own scripts and reports an error nothing
@@ -503,8 +515,11 @@ export function ArtifactRuntimePreview({
     );
   }
 
-  if (artifact.type === 'code' && isPreviewableCodeLanguage(artifact)) {
-    return <ReactArtifactPreview artifact={artifact} onFix={onFix} />;
+  if (
+    artifact.type === 'code' &&
+    (isPreviewableCodeLanguage(artifact) || isMermaidArtifact(artifact))
+  ) {
+    return <FrameArtifactPreview artifact={artifact} onFix={onFix} />;
   }
 
   return (

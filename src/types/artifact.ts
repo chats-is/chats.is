@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { type PREVIEW_PACKAGES } from '@/lib/constant';
+
 export const artifactTypeSchema = z.enum([
   'code',
   'markdown',
@@ -10,6 +12,9 @@ export const artifactTypeSchema = z.enum([
   'file'
 ]);
 export type ArtifactType = z.infer<typeof artifactTypeSchema>;
+
+/** A package a React artifact's preview can import, as the model writes it. */
+export type PreviewPackage = (typeof PREVIEW_PACKAGES)[number]['name'];
 
 export type Artifact = {
   id: string;

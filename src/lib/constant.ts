@@ -199,6 +199,58 @@ export const MEDIA_TOOL_GUIDANCE: Record<ChatMediaToolName, string> = {
     "Transcribe an audio file from this conversation to text (speech-to-text). Pass that audio's URL as `audioUrl`. Use when the user asks what an audio says or to transcribe it; translating or summarising the transcript is then yours to do."
 };
 
+/**
+ * What a React artifact's preview can import besides React, each as the
+ * model writes it, with what it is for. The one list the import check, the
+ * model's prompt and the frame's loaders all follow — the frame refuses to
+ * build without a loader for every one.
+ */
+export const PREVIEW_PACKAGES = [
+  { name: 'lucide-react', use: 'icons' },
+  { name: 'recharts', use: 'charts' },
+  { name: 'framer-motion', use: 'animation' },
+  { name: 'clsx', use: 'class names' },
+  { name: 'class-variance-authority', use: 'component variants' },
+  { name: 'lodash', use: 'utilities' },
+  { name: 'd3', use: 'data visualisation' },
+  { name: 'chart.js/auto', use: 'Chart.js charts' },
+  { name: 'plotly.js-dist-min', use: 'Plotly charts' },
+  { name: 'three', use: '3D' },
+  { name: 'mathjs', use: 'math' },
+  { name: 'papaparse', use: 'CSV parsing' },
+  { name: 'xlsx', use: 'spreadsheets (SheetJS)' },
+  { name: '@/components/ui/avatar', use: 'shadcn/ui' },
+  { name: '@/components/ui/badge', use: 'shadcn/ui' },
+  { name: '@/components/ui/button', use: 'shadcn/ui' },
+  { name: '@/components/ui/card', use: 'shadcn/ui' },
+  { name: '@/components/ui/checkbox', use: 'shadcn/ui' },
+  { name: '@/components/ui/dialog', use: 'shadcn/ui' },
+  { name: '@/components/ui/input', use: 'shadcn/ui' },
+  { name: '@/components/ui/label', use: 'shadcn/ui' },
+  { name: '@/components/ui/progress', use: 'shadcn/ui' },
+  { name: '@/components/ui/select', use: 'shadcn/ui' },
+  { name: '@/components/ui/separator', use: 'shadcn/ui' },
+  { name: '@/components/ui/skeleton', use: 'shadcn/ui' },
+  { name: '@/components/ui/switch', use: 'shadcn/ui' },
+  { name: '@/components/ui/table', use: 'shadcn/ui' },
+  { name: '@/components/ui/tabs', use: 'shadcn/ui' },
+  { name: '@/components/ui/textarea', use: 'shadcn/ui' }
+] as const;
+
+const PREVIEW_SHADCN_PREFIX = '@/components/ui/';
+
+const PREVIEW_LIBRARY_LIST = PREVIEW_PACKAGES.filter(
+  pkg => !pkg.name.startsWith(PREVIEW_SHADCN_PREFIX)
+)
+  .map(pkg => `${pkg.name} (${pkg.use})`)
+  .join(', ');
+
+const PREVIEW_SHADCN_LIST = PREVIEW_PACKAGES.filter(pkg =>
+  pkg.name.startsWith(PREVIEW_SHADCN_PREFIX)
+)
+  .map(pkg => pkg.name.slice(PREVIEW_SHADCN_PREFIX.length))
+  .join(', ');
+
 export const ARTIFACT_SYSTEM_PROMPT = [
   'Use the create_artifact tool for substantial, self-contained, reusable content: code files, runnable React UIs, full documents, or data tables. Do NOT use it for short snippets, brief explanations, or conversational replies — keep those inline in the chat.',
   '',
@@ -219,11 +271,14 @@ export const ARTIFACT_SYSTEM_PROMPT = [
   '- Every code artifact must set an exact relative `fileName`; name the entry file index.tsx.',
   '- Any file containing JSX must use a .tsx or .jsx fileName.',
   '- Keep it to ONE self-contained file: put every component/helper in this single artifact and do not import sibling files (other artifacts are not in scope).',
-  '- Allowed package imports: react, react-dom, react-dom/client, lucide-react, framer-motion, recharts, clsx, class-variance-authority. No Next.js APIs, server code, env vars, remote assets, or any other npm package.',
+  `- Allowed package imports, written exactly so: react, react-dom, react-dom/client, ${PREVIEW_LIBRARY_LIST}. No Next.js APIs, server code, env vars, remote assets, or any other npm package.`,
+  `- shadcn/ui components, from ${PREVIEW_SHADCN_PREFIX}<name>: ${PREVIEW_SHADCN_LIST} — e.g. import { Button } from '${PREVIEW_SHADCN_PREFIX}button'.`,
   '- Styling: Tailwind utility classes work (a Tailwind v4 runtime is bundled into the preview), and inline styles or a <style> tag also work. CSS-file imports do NOT apply at runtime.',
   '- React/TS artifacts are compiled when you create or update them. If the tool returns a compile error, nothing was saved: fix the errors it lists and call the tool again.',
   '',
-  'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.'
+  'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.',
+  '',
+  'Diagrams: Mermaid renders in Preview — type "code", language "mermaid", with only the diagram source as `content` (no ``` fence).'
 ].join('\n');
 
 /** Every processor a plan can be sold through, as the console offers them. */
