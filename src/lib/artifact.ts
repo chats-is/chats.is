@@ -356,6 +356,26 @@ export const dataPartForModel = (
   part.type === 'data-artifactRef'
     ? {
         type: 'text',
-        text: `The text above is an error that the code of the artifact with id ${part.data.id} raised. Call update_artifact on that artifact now to fix the code: only the call changes it, and saying it is fixed does not. Then tell the user what was wrong and what you changed, in the language of the conversation — calling it by its title or by what it is (the page, the chart, the component), and not mentioning artifacts, ids or tool names to them.`
+        text: `The text above is an error that the code of the artifact with id ${part.data.id} raised. Call update_artifact on that artifact now to fix the code: only the call changes it, and saying it is fixed does not. Then tell the user what was wrong and what you changed, in the language the user writes in — the error text is the program's, not theirs — calling it by its title or by what it is (the page, the chart, the component), and not mentioning artifacts, ids or tool names to them.`
       }
     : undefined;
+
+/**
+ * What a preview says was thrown: its type and message, as JavaScript
+ * writes them — `ReferenceError: x is not defined` — since the type tells
+ * the reader, and the model, what kind of mistake it is. A plain `Error`
+ * adds nothing, so its message stands alone. A browser's "Uncaught " is
+ * dropped from a message that carries one.
+ */
+export const describeThrown = (thrown: unknown, fallback: string): string => {
+  if (thrown instanceof Error) {
+    const message = thrown.message || fallback;
+    return thrown.name && thrown.name !== 'Error'
+      ? `${thrown.name}: ${message}`
+      : message;
+  }
+  if (typeof thrown === 'string' && thrown) {
+    return thrown.replace(/^Uncaught\s+/, '');
+  }
+  return fallback;
+};

@@ -258,9 +258,9 @@ const PREVIEW_SHADCN_LIST = PREVIEW_PACKAGES.filter(pkg =>
   .join(', ');
 
 export const ARTIFACT_SYSTEM_PROMPT = [
-  'Use the create_artifact tool for substantial, self-contained, reusable content: code files, runnable React UIs, full documents, or data tables. Do NOT use it for short snippets, brief explanations, or conversational replies — keep those inline in the chat.',
+  'Use the create_artifact tool for substantial, self-contained, reusable content: code files, runnable React UIs, full documents, or data tables. Do NOT use it for a short snippet that illustrates an explanation, a brief answer, or a conversational reply — keep those inline in the chat.',
   '',
-  'When the user asks you to draw, plot, chart or visualise something, or to build something to look at or use, make an artifact that Preview can show — React with the packages listed below, an HTML page, SVG or Mermaid — not code in a language Preview cannot run (Python, R, …), unless they ask for that language.',
+  'When the user asks you to draw, plot, chart or visualise something, or to make something to look at or use — a page, a chart, a game, a calculator, a counter — make it with create_artifact, however small, as an artifact Preview can show: React with the packages listed below, an HTML page, SVG or Mermaid. Never paste its code into your reply instead, and use a language Preview cannot run (Python, R, …) only when they ask for it.',
   '',
   'Always set a concise, descriptive `title` (2–6 words) — it labels the artifact in the canvas and the artifact switcher.',
   '',

@@ -8,6 +8,7 @@ import {
   assertArtifactPayload,
   blockedHtmlResources,
   dataPartForModel,
+  describeThrown,
   getArtifactKind,
   isPreviewableCodeArtifact,
   isRelativeImport,
@@ -335,5 +336,40 @@ describe('a fix message, as the chat route hands it to the model', () => {
         text: expect.stringContaining('artifact with id artifact-1 raised')
       }
     ]);
+  });
+});
+
+describe('describeThrown', () => {
+  it('says the type of what was thrown with its message', () => {
+    expect(
+      describeThrown(new ReferenceError('undefinedThing is not defined'), 'x')
+    ).toBe('ReferenceError: undefinedThing is not defined');
+    expect(
+      describeThrown(
+        new TypeError("Cannot read properties of undefined (reading 'map')"),
+        'x'
+      )
+    ).toBe("TypeError: Cannot read properties of undefined (reading 'map')");
+  });
+
+  it('leaves out a plain Error, whose type says nothing', () => {
+    expect(describeThrown(new Error('Parse error on line 3'), 'x')).toBe(
+      'Parse error on line 3'
+    );
+  });
+
+  it("drops a browser's Uncaught from a message, and falls back when nothing was said", () => {
+    expect(
+      describeThrown(
+        'Uncaught ReferenceError: missingFunction is not defined',
+        'x'
+      )
+    ).toBe('ReferenceError: missingFunction is not defined');
+    expect(describeThrown(undefined, 'Runtime error in preview')).toBe(
+      'Runtime error in preview'
+    );
+    expect(describeThrown(new RangeError(''), 'fallback')).toBe(
+      'RangeError: fallback'
+    );
   });
 });

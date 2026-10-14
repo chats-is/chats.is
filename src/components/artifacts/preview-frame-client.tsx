@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import * as recharts from 'recharts';
 
 import { type PreviewPackage } from '@/types';
+import { describeThrown } from '@/lib/artifact';
 
 // The curated packages, from our own origin (no CDN, so previews stay fully
 // offline), handed to the sandbox's require(). One for every entry of
@@ -192,7 +193,7 @@ class PreviewErrorBoundary extends React.Component<
 
   componentDidCatch(error: unknown) {
     this.props.onError(
-      error instanceof Error ? error.message : 'Preview crashed while rendering'
+      describeThrown(error, 'Preview crashed while rendering')
     );
   }
 
@@ -316,7 +317,9 @@ export function ArtifactPreviewFrameClient() {
   // rendering.
   useEffect(() => {
     const onError = (event: ErrorEvent) => {
-      setRuntimeError(event.message || 'Runtime error in preview');
+      setRuntimeError(
+        describeThrown(event.error ?? event.message, 'Runtime error in preview')
+      );
     };
     window.addEventListener('error', onError);
     return () => window.removeEventListener('error', onError);
@@ -533,8 +536,7 @@ export function ArtifactPreviewFrameClient() {
         if (render !== latestRender) return;
         setState({
           status: 'error',
-          message:
-            error instanceof Error ? error.message : 'Failed to render preview'
+          message: describeThrown(error, 'Failed to render preview')
         });
       }
     };

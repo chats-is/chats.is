@@ -422,8 +422,14 @@ export function supportsArtifactRuntimePreview(artifact: Artifact) {
 // Runs ahead of the artifact's own scripts and reports an error nothing
 // caught, in the message the React frame sends — so an HTML artifact shows
 // its errors, and offers their fix, as a React one does.
+// It says what was thrown as describeThrown does: type and message, the
+// type left out when it is a plain Error, and no "Uncaught ".
 const HTML_ERROR_REPORTER = `<script>window.addEventListener('error', function (event) {
-  try { parent.postMessage({ type: 'artifact-preview-error', message: event.message || 'Script error' }, '*'); } catch (e) {}
+  var thrown = event.error;
+  var message = thrown && thrown.message
+    ? (thrown.name && thrown.name !== 'Error' ? thrown.name + ': ' : '') + thrown.message
+    : String(event.message || 'Script error').replace(/^Uncaught\\s+/, '');
+  try { parent.postMessage({ type: 'artifact-preview-error', message: message }, '*'); } catch (e) {}
 });</script>`;
 
 function HtmlArtifactPreview({
