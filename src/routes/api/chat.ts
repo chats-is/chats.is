@@ -496,6 +496,10 @@ async function POST({
       .join('\n\n');
     const completedArtifacts = new Map<string, Artifact>();
     const completedArtifactOrder: string[] = [];
+    // An earlier reply's artifact, by id, to the one this reply made of it.
+    const replyCopies = new Map<string, string>();
+    // The update_artifact call this reply is on; the next waits for it.
+    let pendingEdit: Promise<unknown> = Promise.resolve();
 
     // A stream that fails part-way still persists what it had written, and the
     // SDK's error chunk never becomes a message part — so without this the
@@ -786,30 +790,52 @@ async function POST({
           // or by an earlier reply — written as only the passage that
           // changes. Not streamed onto the canvas as it is written: the
           // passages are short, and only the whole result means anything.
+          //
+          // An earlier reply's artifact is left as it was, and this reply
+          // gets its own copy; every later change in this reply goes to that
+          // copy, whichever of the two ids it names, so one change made in
+          // several calls is one artifact, not one per call. The SDK runs the
+          // calls of one step at once, so they are taken in turn: each sees
+          // the copy the one before it made.
           update_artifact: tool({
             description:
-              'Change part of an artifact already in this chat: replace oldStr, which must appear in it exactly once, with newStr. Makes a new artifact for this reply; the earlier one stays as it was.',
+              "Change part of an artifact already in this chat: replace oldStr, which must appear in it exactly once, with newStr. The change is kept as this reply's version of the artifact; an earlier reply's stays as it was.",
             inputSchema: updateArtifactInputSchema,
-            execute: async input => {
-              const source =
-                completedArtifacts.get(input.id) ??
-                (await getArtifact(user.id, input.id));
-              if (!source || source.chatId !== id) {
-                throw new Error(`No artifact in this chat has id ${input.id}`);
-              }
-              const artifact = editArtifact(source, input, {
-                id: generateUUID(),
-                chatId: id,
-                messageId: assistantMessageId
+            execute: input => {
+              const edit = pendingEdit.then(async () => {
+                const ownId = completedArtifacts.has(input.id)
+                  ? input.id
+                  : replyCopies.get(input.id);
+                const source =
+                  (ownId && completedArtifacts.get(ownId)) ||
+                  (await getArtifact(user.id, input.id));
+                if (!source || source.chatId !== id) {
+                  throw new Error(
+                    `No artifact in this chat has id ${input.id}`
+                  );
+                }
+                const edited = editArtifact(source, input, {
+                  id: ownId ?? generateUUID(),
+                  chatId: id,
+                  messageId: assistantMessageId
+                });
+                const artifact = ownId
+                  ? { ...edited, createdAt: source.createdAt }
+                  : edited;
+                if (!ownId) {
+                  completedArtifactOrder.push(artifact.id);
+                  replyCopies.set(input.id, artifact.id);
+                }
+                completedArtifacts.set(artifact.id, artifact);
+                emitArtifactDelta(artifact);
+                emitTransient({
+                  type: 'data-artifact',
+                  data: artifact
+                });
+                return { id: artifact.id };
               });
-              completedArtifactOrder.push(artifact.id);
-              completedArtifacts.set(artifact.id, artifact);
-              emitArtifactDelta(artifact);
-              emitTransient({
-                type: 'data-artifact',
-                data: artifact
-              });
-              return { id: artifact.id };
+              pendingEdit = edit.catch(() => {});
+              return edit;
             }
           })
         };
