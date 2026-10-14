@@ -238,10 +238,7 @@ function ArtifactRoot({ children }: { children: React.ReactNode }) {
   }, [children]);
 
   return (
-    <div
-      ref={containerRef}
-      className="min-h-screen bg-white p-4 text-slate-900"
-    />
+    <div ref={containerRef} className="min-h-screen bg-white text-slate-900" />
   );
 }
 
