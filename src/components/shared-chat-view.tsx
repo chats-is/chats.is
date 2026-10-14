@@ -51,7 +51,11 @@ export function SharedChatView({
         <span className="max-w-full truncate font-semibold">{title}</span>
         <span className="text-xs text-muted-foreground">{subtitle}</span>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* Positioned, so what the messages place absolutely — a button's
+          screen-reader label among them — is placed in here and clipped
+          with the rest. Left to the body, a label at the foot of a long
+          thread makes the window taller, and it scrolls as a whole. */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         <Messages
           modelId={modelId}
           messages={messages}
