@@ -178,14 +178,23 @@ export const chatsRelations = relations(chats, ({ one, many }) => ({
   artifacts: many(artifacts)
 }));
 
+/**
+ * A share link: of a whole chat, or of one artifact on its own — never both.
+ * An artifact's link leaves `chat_id` empty, so nothing that opens a shared
+ * chat can be handed one and show the chat it came from; the artifact's own
+ * cascade takes the link when the artifact goes, its chat with it.
+ */
 export const shares = createTable(
   'share',
   {
     id: varchar('id', { length: 255 }).notNull().primaryKey(),
     chatId: varchar('chat_id', { length: 255 })
-      .notNull()
       .unique()
       .references(() => chats.id, { onDelete: 'cascade' }),
+    artifactId: varchar('artifact_id', { length: 255 }).references(
+      () => artifacts.id,
+      { onDelete: 'cascade' }
+    ),
     userId: varchar('user_id', { length: 255 })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -194,14 +203,22 @@ export const shares = createTable(
       .defaultNow()
   },
   share => [
-    index('share_chatId_idx').on(share.chatId),
-    index('share_userId_idx').on(share.userId)
+    index('share_userId_idx').on(share.userId),
+    uniqueIndex('share_artifact_id_idx').on(share.artifactId),
+    check(
+      'share_chat_id_artifact_id_check',
+      sql`(${share.chatId} is null) <> (${share.artifactId} is null)`
+    )
   ]
 );
 
 export const sharesRelations = relations(shares, ({ one }) => ({
   user: one(users, { fields: [shares.userId], references: [users.id] }),
-  chat: one(chats, { fields: [shares.chatId], references: [chats.id] })
+  chat: one(chats, { fields: [shares.chatId], references: [chats.id] }),
+  artifact: one(artifacts, {
+    fields: [shares.artifactId],
+    references: [artifacts.id]
+  })
 }));
 
 export const users = createTable(

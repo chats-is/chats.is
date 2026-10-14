@@ -36,6 +36,7 @@ import {
   ArtifactRuntimePreview,
   supportsArtifactRuntimePreview
 } from '@/components/artifacts/runtime-preview';
+import { ShareArtifactButton } from '@/components/artifacts/share-artifact-button';
 
 interface ArtifactViewerProps {
   artifact?: Artifact;
@@ -48,6 +49,8 @@ interface ArtifactViewerProps {
   onViewModeChange?: (mode: 'source' | 'preview') => void;
   /** Asks the chat to fix an error in the artifact's preview. */
   onFix?: (artifact: Artifact, error: string) => void;
+  /** Offers to share the artifact on its own: in the chat, between turns. */
+  canShare?: boolean;
 }
 
 const isFileArtifact = (artifact?: Artifact) =>
@@ -62,7 +65,8 @@ export function ArtifactViewer({
   hideContent,
   viewMode: controlledViewMode,
   onViewModeChange,
-  onFix
+  onFix,
+  canShare
 }: ArtifactViewerProps) {
   const { copyToClipboard } = useCopyToClipboard();
   const [uncontrolledViewMode, setUncontrolledViewMode] = useState<
@@ -289,6 +293,13 @@ export function ArtifactViewer({
             {statusIndicator}
           </div>
           <div className="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-2">
+            {canShare && (
+              <ShareArtifactButton
+                artifactId={artifact.id}
+                disabled={isHeaderActionDisabled}
+                className={headerActionButtonClassName}
+              />
+            )}
             {canCopyContent && (
               <Tooltip>
                 <TooltipTrigger asChild>

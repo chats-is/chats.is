@@ -211,13 +211,20 @@ function FrameArtifactPreview({
   // from different content versions, producing a mismatched/failed compile.
   const content = artifact.content ?? '';
   // On a share page there is no session, and the link stands in for one: the
-  // request names it and the artifact, and the server checks that the one is
-  // in the chat the other opens. The link's id is in the address.
-  const shareId = useMatch({
+  // request names it and the artifact, and the server checks that the link
+  // opens that artifact — its chat's link, or the artifact's own. The link's
+  // id is in the address.
+  const chatShareId = useMatch({
     from: '/share/$id',
     shouldThrow: false,
     select: match => match.params.id
   });
+  const artifactShareId = useMatch({
+    from: '/artifact/$id',
+    shouldThrow: false,
+    select: match => match.params.id
+  });
+  const shareId = chatShareId ?? artifactShareId;
   const isMermaid = isMermaidArtifact(artifact);
   const [status, setStatus] = useState<PreviewStatus>('idle');
   const [error, setError] = useState<string | null>(null);

@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 import {
+  shareArtifactSchema,
   shareChatSchema,
   shareIdSchema,
   sharePageSchema
@@ -17,6 +18,13 @@ export const createShare = createServerFn({ method: 'POST' })
     shares.createShare(context.user.id, data.chatId)
   );
 
+export const createArtifactShare = createServerFn({ method: 'POST' })
+  .middleware([authedMiddleware])
+  .validator(shareArtifactSchema)
+  .handler(({ data, context }) =>
+    shares.createArtifactShare(context.user.id, data.artifactId)
+  );
+
 export const listShares = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(sharePageSchema)
@@ -26,6 +34,11 @@ export const listShares = createServerFn({ method: 'GET' })
 export const getSharedChat = createServerFn({ method: 'GET' })
   .validator(shareIdSchema)
   .handler(({ data }) => shares.getSharedChat(data.id));
+
+/** Public by design: an artifact's link is readable by whoever holds it. */
+export const getSharedArtifactPage = createServerFn({ method: 'GET' })
+  .validator(shareIdSchema)
+  .handler(({ data }) => shares.getSharedArtifactPage(data.id));
 
 export const deleteShare = createServerFn({ method: 'POST' })
   .middleware([authedMiddleware])

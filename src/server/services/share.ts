@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { pageWindow } from '@/types/pagination';
@@ -29,7 +29,7 @@ export async function createShare(userId: string, chatId: string) {
 
   const existingShare = await db.query.shares.findFirst({
     where: and(eq(shares.chatId, chatId), eq(shares.userId, userId)),
-    columns: { chatId: false, userId: false }
+    columns: { id: true, createdAt: true }
   });
 
   if (existingShare) {
@@ -48,6 +48,38 @@ export async function createShare(userId: string, chatId: string) {
       id: shares.id,
       createdAt: shares.createdAt
     });
+
+  return result[0];
+}
+
+/**
+ * Share one artifact on its own, or hand back the link it already has — as
+ * a chat is shared twice by sharing it once. The link opens that artifact
+ * and nothing of the chat it is in: the row names the artifact alone.
+ */
+export async function createArtifactShare(userId: string, artifactId: string) {
+  const artifact = await db.query.artifacts.findFirst({
+    where: and(eq(artifacts.id, artifactId), eq(artifacts.userId, userId)),
+    columns: { id: true }
+  });
+
+  if (!artifact) {
+    throw new PublicError('Artifact not found');
+  }
+
+  const existingShare = await db.query.shares.findFirst({
+    where: and(eq(shares.artifactId, artifactId), eq(shares.userId, userId)),
+    columns: { id: true, createdAt: true }
+  });
+
+  if (existingShare) {
+    return existingShare;
+  }
+
+  const result = await db
+    .insert(shares)
+    .values({ id: generateUUID(), artifactId, userId })
+    .returning({ id: shares.id, createdAt: shares.createdAt });
 
   return result[0];
 }
@@ -75,10 +107,14 @@ export async function listShares(
           columns: {
             userId: false
           }
+        },
+        artifact: {
+          columns: { id: true, title: true, type: true }
         }
       },
       columns: {
         chatId: false,
+        artifactId: false,
         userId: false
       }
     }),
@@ -100,8 +136,9 @@ export async function listShares(
  * holds it.
  */
 export async function getSharedChat(id: string) {
+  // A chat's link only: an artifact's opens that artifact and no more.
   const link = await db.query.shares.findFirst({
-    where: eq(shares.id, id),
+    where: and(eq(shares.id, id), isNull(shares.artifactId)),
     columns: { userId: true }
   });
   if (!link) return undefined;
@@ -112,7 +149,7 @@ export async function getSharedChat(id: string) {
   const owner = link.userId;
 
   const share = await db.query.shares.findFirst({
-    where: eq(shares.id, id),
+    where: and(eq(shares.id, id), isNull(shares.artifactId)),
     with: {
       chat: {
         with: {
@@ -144,29 +181,58 @@ export async function getSharedChat(id: string) {
 }
 
 /**
- * One artifact of a shared chat, for compiling its preview.
+ * One artifact a share link opens, for compiling its preview.
  *
  * The person reading a share link has no session, and the preview of a React
  * artifact is built on the server. So the request names the link and the
- * artifact, and this says whether that pairing is real: the artifact is in
- * the chat the link opens, and was made by the person who shared it. What
- * comes back is the artifact's own source, so the caller can hold the request
- * to it — a share link is not a licence to compile whatever is sent.
+ * artifact, and this says whether that pairing is real: the link is that
+ * artifact's own, or the artifact is in the chat the link opens — made, either
+ * way, by the person who shared it. What comes back is the artifact's own
+ * source, so the caller can hold the request to it — a share link is not a
+ * licence to compile whatever is sent.
  */
 export async function getSharedArtifact(shareId: string, artifactId: string) {
   const link = await db.query.shares.findFirst({
     where: eq(shares.id, shareId),
-    columns: { chatId: true, userId: true }
+    columns: { chatId: true, artifactId: true, userId: true }
   });
   if (!link) return undefined;
+
+  const inLink = link.artifactId
+    ? eq(artifacts.id, link.artifactId)
+    : link.chatId
+      ? eq(artifacts.chatId, link.chatId)
+      : undefined;
+  if (!inLink) return undefined;
 
   return await db.query.artifacts.findFirst({
     where: and(
       eq(artifacts.id, artifactId),
-      eq(artifacts.chatId, link.chatId),
+      inLink,
       eq(artifacts.userId, link.userId)
     ),
     columns: { id: true, content: true }
+  });
+}
+
+/**
+ * The artifact behind an artifact's share link, or undefined — for the page
+ * that shows it alone. Nothing of its chat comes with it: not the chat, not
+ * the messages, not who made it.
+ */
+export async function getSharedArtifactPage(id: string) {
+  const link = await db.query.shares.findFirst({
+    where: eq(shares.id, id),
+    columns: { artifactId: true, userId: true }
+  });
+  if (!link?.artifactId) return undefined;
+
+  return await db.query.artifacts.findFirst({
+    where: and(
+      eq(artifacts.id, link.artifactId),
+      eq(artifacts.userId, link.userId)
+    ),
+    columns: { userId: false, chatId: false, messageId: false }
   });
 }
 

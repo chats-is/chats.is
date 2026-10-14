@@ -2,10 +2,15 @@ import { useState } from 'react';
 import { Link, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { type SharedLink } from '@/types';
 import { cn } from '@/lib/utils';
 import { useSharedLinks } from '@/hooks/use-shared-links';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  artifactRegistry,
+  getArtifactKind
+} from '@/components/artifacts/registry';
 import { LocalTime } from '@/components/local-time';
 import { LocalTablePagination } from '@/components/table-pagination';
 
@@ -33,6 +38,28 @@ function PendingRows() {
         </tr>
       ))}
     </>
+  );
+}
+
+/** Where a link opens, and how it is named: a chat's, or one artifact's alone. */
+function SharedLinkName({ sharedLink }: { sharedLink: SharedLink }) {
+  const artifact = sharedLink.artifact;
+  const Icon = artifact
+    ? artifactRegistry[getArtifactKind(artifact)].icon
+    : Link;
+
+  return (
+    <a
+      href={artifact ? `/artifact/${sharedLink.id}` : `/share/${sharedLink.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex min-w-0 items-center text-blue-500 hover:underline"
+    >
+      <Icon className="mr-1 size-4 shrink-0" />
+      <span className="truncate">
+        {artifact ? artifact.title : sharedLink.chat?.title}
+      </span>
+    </a>
   );
 }
 
@@ -70,7 +97,8 @@ export function SharedLinks() {
       <div>
         <h1 className="text-xl font-semibold">Shared Links</h1>
         <p className="text-sm text-muted-foreground">
-          Conversations you've shared — anyone with the link can open them.
+          Conversations you've shared, and what you've shared from them on its
+          own — anyone with the link can open them.
         </p>
       </div>
 
@@ -101,17 +129,7 @@ export function SharedLinks() {
                 sharedLinks.map(sharedLink => (
                   <tr key={sharedLink.id} className="border-b">
                     <td className="p-3">
-                      <a
-                        href={`/share/${sharedLink.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex min-w-0 items-center text-blue-500 hover:underline"
-                      >
-                        <Link className="mr-1 size-4 shrink-0" />
-                        <span className="truncate">
-                          {sharedLink.chat?.title}
-                        </span>
-                      </a>
+                      <SharedLinkName sharedLink={sharedLink} />
                     </td>
                     <td className="p-3">
                       <LocalTime value={sharedLink.createdAt} />

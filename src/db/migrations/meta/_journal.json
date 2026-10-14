@@ -260,6 +260,13 @@
       "when": 1791776573617,
       "tag": "0036_message_media_index",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791980506898,
+      "tag": "0037_artifact_share",
+      "breakpoints": true
     }
   ]
 }

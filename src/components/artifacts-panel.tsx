@@ -22,6 +22,8 @@ interface ArtifactsPanelProps {
   desktopContainerClassName?: string;
   /** Asks the chat to fix a preview's error; absent on a share page. */
   onFix?: (artifact: Artifact, error: string) => void;
+  /** Offers to share an artifact on its own; not on a share page. */
+  canShare?: boolean;
 }
 
 export function ArtifactsPanel({
@@ -31,7 +33,8 @@ export function ArtifactsPanel({
   selectedId,
   onSelect,
   desktopContainerClassName,
-  onFix
+  onFix,
+  canShare
 }: ArtifactsPanelProps) {
   // The source/preview choice is a persistent preference: switching artifacts
   // keeps the current view (a JSON/code artifact viewed as source stays source
@@ -98,6 +101,7 @@ export function ArtifactsPanel({
             hideContent={true}
             viewMode={effectiveViewMode}
             onViewModeChange={setViewMode}
+            canShare={canShare}
           />
         </div>
         <div className="min-h-0 flex-1 overflow-auto">

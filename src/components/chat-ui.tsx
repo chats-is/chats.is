@@ -558,8 +558,9 @@ export function ChatUI({
     },
     [hasUsableModel, sendMessage, updateDisplayModelOptimistically]
   );
-  // Only between turns: while one is under way the input is closed too.
-  const canFix = status === 'ready' || status === 'error';
+  // Only between turns: while one is under way the input is closed too, and
+  // what it is making is not stored yet, so it cannot be shared.
+  const betweenTurns = status === 'ready' || status === 'error';
 
   const handleArtifactSelect = useCallback(
     (artifactId: string) => {
@@ -655,7 +656,8 @@ export function ChatUI({
               selectedId={activeId}
               onSelect={handleArtifactSelect}
               desktopContainerClassName="h-full w-full min-w-0 max-w-none border-l-0"
-              onFix={canFix ? handleFix : undefined}
+              onFix={betweenTurns ? handleFix : undefined}
+              canShare={betweenTurns}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -691,7 +693,8 @@ export function ChatUI({
             artifacts={artifactList}
             selectedId={activeId}
             onSelect={handleArtifactSelect}
-            onFix={canFix ? handleFix : undefined}
+            onFix={betweenTurns ? handleFix : undefined}
+            canShare={betweenTurns}
           />
         </div>
       )}

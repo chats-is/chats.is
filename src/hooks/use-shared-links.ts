@@ -41,7 +41,8 @@ export function useSharedLinks(page: number = 1, pageSize?: number) {
   const sharedLinks = data?.rows.map(share => ({
     id: share.id,
     createdAt: share.createdAt,
-    chat: share.chat
+    chat: share.chat,
+    artifact: share.artifact
   }));
 
   return {
