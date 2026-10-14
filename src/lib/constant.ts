@@ -209,7 +209,9 @@ export const ARTIFACT_SYSTEM_PROMPT = [
   '- markdown / html / text: rendered or plain documents.',
   '- json: structured data; an array of row objects (or arrays) renders as a table.',
   '',
-  'Always put the COMPLETE content in `content`. Never truncate or use placeholders like "// rest unchanged". Each create_artifact call produces a separate artifact; to revise something, create a new artifact with the full updated content.',
+  'Always put the COMPLETE content in `content`. Never truncate or use placeholders like "// rest unchanged".',
+  '',
+  'To change an artifact that is already in this chat — a fix, a tweak, an addition — call update_artifact with its id (the id its tool call returned) and replace only the part that changes: `oldStr` must be copied exactly from the artifact and appear in it exactly once, and `newStr` replaces it. Call it once per separate change. Use create_artifact again only for something new, or when most of an artifact is being rewritten.',
   '',
   'Live Preview is available for html, markdown, SVG (type code, language svg), and React/TS code. To make React/TS code previewable, follow this contract exactly:',
   '- Use type "code" with `language` one of react/tsx/jsx/typescript/javascript.',
@@ -219,7 +221,7 @@ export const ARTIFACT_SYSTEM_PROMPT = [
   '- Keep it to ONE self-contained file: put every component/helper in this single artifact and do not import sibling files (other artifacts are not in scope).',
   '- Allowed package imports: react, react-dom, react-dom/client, lucide-react, framer-motion, recharts, clsx, class-variance-authority. No Next.js APIs, server code, env vars, remote assets, or any other npm package.',
   '- Styling: Tailwind utility classes work (a Tailwind v4 runtime is bundled into the preview), and inline styles or a <style> tag also work. CSS-file imports do NOT apply at runtime.',
-  '- React/TS artifacts are compiled when you create them. If create_artifact returns a compile error, the artifact was NOT saved: fix the errors it lists and call create_artifact again with the complete corrected content.',
+  '- React/TS artifacts are compiled when you create or update them. If the tool returns a compile error, nothing was saved: fix the errors it lists and call the tool again.',
   '',
   'HTML artifacts (type "html") must be a single self-contained document; inline <style>/<script> are fine. Preview runs sandboxed with no access to the host page.'
 ].join('\n');

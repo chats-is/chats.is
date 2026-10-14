@@ -40,6 +40,7 @@ export { artifactTypeSchema } from './artifact';
 export type { Artifact, ArtifactType } from './artifact';
 export {
   createArtifactInputSchema,
+  updateArtifactInputSchema,
   generateImageInputSchema,
   editImageInputSchema,
   editVideoInputSchema,
@@ -51,6 +52,7 @@ export {
 export type {
   ChatTools,
   CreateArtifactInput,
+  UpdateArtifactInput,
   MediaToolName,
   MediaToolOutput,
   MediaToolsOptions,

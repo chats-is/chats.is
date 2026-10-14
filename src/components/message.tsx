@@ -38,8 +38,8 @@ export interface MessageProps extends Partial<
   isLastMessage?: boolean;
   supportsReasoning?: boolean | null;
   hasVisibleArtifacts?: boolean;
-  // Artifacts this message produced, rendered inline at the position of their
-  // create_artifact tool call.
+  // Artifacts this message produced, rendered inline at the position of the
+  // tool call that made each — create_artifact or update_artifact.
   artifacts?: Artifact[];
   onSelectArtifact?: (id: string) => void;
   /** Refused while the chat was open: its reason is shown, not just that
@@ -47,6 +47,10 @@ export interface MessageProps extends Partial<
   refusedHere?: boolean;
   children: React.ReactNode;
 }
+
+/** A call that makes an artifact, and so has a card where it was made. */
+const isArtifactToolPart = (part: ChatMessage['parts'][number]) =>
+  part.type === 'tool-create_artifact' || part.type === 'tool-update_artifact';
 
 export function Message({
   status,
@@ -125,7 +129,7 @@ export function Message({
     !hasFilePart &&
     !hasMediaToolPart;
 
-  // Match each create_artifact tool call (by its position in `parts`) to the
+  // Match each artifact tool call (by its position in `parts`) to the
   // artifact it produced, so the card renders inline exactly where the model
   // generated it. Two passes: id matches first (settled/persisted parts carry
   // `output.id`), then leftover artifacts fill the unmatched tool parts in
@@ -143,7 +147,7 @@ export function Message({
     const fallbackPartIndexes: number[] = [];
 
     message.parts.forEach((part, index) => {
-      if (part.type !== 'tool-create_artifact') return;
+      if (!isArtifactToolPart(part)) return;
       const outputId = (part as any).output?.id as string | undefined;
       const artifact = outputId ? artifactsById.get(outputId) : undefined;
       if (artifact && !usedArtifactIds.has(artifact.id)) {
@@ -239,7 +243,7 @@ export function Message({
                 );
               }
 
-              if (part.type === 'tool-create_artifact') {
+              if (isArtifactToolPart(part)) {
                 const artifact = partArtifact.get(index);
                 return artifact ? (
                   <React.Fragment key={index}>

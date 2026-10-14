@@ -5,7 +5,8 @@ vi.mock('@/lib/env', () => ({
   env: { BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_store123_secret' }
 }));
 
-const { buildArtifact, compilePreview } = await import('./artifact');
+const { buildArtifact, compilePreview, editArtifact } =
+  await import('./artifact');
 
 const owner = { id: 'a1', chatId: 'c1', messageId: 'm1' };
 
@@ -137,5 +138,74 @@ describe('buildArtifact', () => {
         owner
       )
     ).toThrow('fileUrl must be a file stored by this app');
+  });
+});
+
+describe('editArtifact', () => {
+  const source = {
+    id: 'a1',
+    chatId: 'c1',
+    messageId: 'm1',
+    title: 'Counter',
+    type: 'code' as const,
+    language: 'tsx',
+    fileName: 'index.tsx',
+    content:
+      'export default function App() {\n  return <div>{undefinedThing}</div>;\n}\n',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+  const reply = { id: 'a2', chatId: 'c1', messageId: 'm2' };
+
+  it('makes a new artifact for the reply, with the passage replaced', () => {
+    const edited = editArtifact(
+      source,
+      {
+        id: 'a1',
+        oldStr: 'export default function App() {\n',
+        newStr: 'export default function App() {\n  const undefinedThing = 0;\n'
+      },
+      reply
+    );
+
+    expect(edited).toMatchObject({
+      id: 'a2',
+      messageId: 'm2',
+      title: 'Counter',
+      fileName: 'index.tsx',
+      content:
+        'export default function App() {\n  const undefinedThing = 0;\n  return <div>{undefinedThing}</div>;\n}\n'
+    });
+    // The artifact it came from is left as it was.
+    expect(source.content).toContain('return <div>{undefinedThing}</div>');
+    expect(source.content).not.toContain('const undefinedThing');
+  });
+
+  it('tells the model the artifact as it is when the passage is not in it', () => {
+    expect(() =>
+      editArtifact(source, { id: 'a1', oldStr: 'not there', newStr: '' }, reply)
+    ).toThrow(/oldStr was not found[\s\S]*return <div>\{undefinedThing\}/);
+  });
+
+  it('refuses a passage that appears more than once', () => {
+    expect(() =>
+      editArtifact(source, { id: 'a1', oldStr: 'div', newStr: 'span' }, reply)
+    ).toThrow('more than once');
+  });
+
+  it('keeps nothing that does not compile', () => {
+    expect(() =>
+      editArtifact(source, { id: 'a1', oldStr: '</div>', newStr: '' }, reply)
+    ).toThrow('did not compile');
+  });
+
+  it('refuses a file artifact', () => {
+    expect(() =>
+      editArtifact(
+        { ...source, type: 'image', content: null },
+        { id: 'a1', oldStr: 'x', newStr: 'y' },
+        reply
+      )
+    ).toThrow('Only a text artifact');
   });
 });

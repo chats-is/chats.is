@@ -4,7 +4,7 @@ import { type MEDIA_TOOL_NAMES } from '@/lib/constant';
 
 import { artifactTypeSchema } from './artifact';
 
-// Zod input schemas for the chat tools (create_artifact + media generation).
+// Zod input schemas for the chat tools (artifacts + media generation).
 // Shared by the server (streamText tool definitions) and the client (tool
 // part type narrowing via ChatTools).
 
@@ -20,6 +20,22 @@ export const createArtifactInputSchema = z.object({
 });
 
 export type CreateArtifactInput = z.infer<typeof createArtifactInputSchema>;
+
+export const updateArtifactInputSchema = z.object({
+  id: z
+    .string()
+    .min(1)
+    .describe('The id of the artifact to change, as its tool call returned it'),
+  oldStr: z
+    .string()
+    .min(1)
+    .describe(
+      'Text copied exactly from the artifact, appearing in it exactly once'
+    ),
+  newStr: z.string().describe('What replaces oldStr')
+});
+
+export type UpdateArtifactInput = z.infer<typeof updateArtifactInputSchema>;
 
 /**
  * What the user has pinned in the media menu, sent with each turn. Every field
@@ -218,6 +234,7 @@ export type WebSearchToolOutput =
 /** Tool map for `UIMessage`'s third generic — narrows `tool-*` part types. */
 export type ChatTools = {
   create_artifact: { input: CreateArtifactInput; output: { id: string } };
+  update_artifact: { input: UpdateArtifactInput; output: { id: string } };
   generate_image: { input: GenerateImageInput; output: MediaToolOutput };
   edit_image: { input: EditImageInput; output: MediaToolOutput };
   generate_video: { input: GenerateVideoInput; output: MediaToolOutput };

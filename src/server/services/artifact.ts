@@ -3,7 +3,11 @@ import '@tanstack/react-start/server-only';
 import { and, eq } from 'drizzle-orm';
 import ts from 'typescript';
 
-import { type Artifact, type CreateArtifactInput } from '@/types';
+import {
+  type Artifact,
+  type CreateArtifactInput,
+  type UpdateArtifactInput
+} from '@/types';
 import {
   assertArtifactPayload,
   buildPreviewFiles,
@@ -86,7 +90,7 @@ const describeDiagnostic = (path: string, diagnostic: ts.Diagnostic) => {
  *
  * Syntax only: `transpileModule` checks no types, so a name that is never
  * defined compiles and fails in the frame. What it catches, it catches before
- * anything runs — for the preview endpoint, and for `create_artifact` before
+ * anything runs — for the preview endpoint, and for the artifact tools before
  * an artifact is kept.
  */
 export function compilePreview(input: {
@@ -180,8 +184,9 @@ export function compilePreview(input: {
 }
 
 /**
- * The artifact a `create_artifact` call makes, checked as the tool must
- * check it: a throw here is what the model is told, and nothing is kept.
+ * The artifact a `create_artifact` call makes — or an `update_artifact` call,
+ * through `editArtifact` — checked as the tool must check it: a throw here is
+ * what the model is told, and nothing is kept.
  *
  * A previewable one is compiled first, so a syntax error goes back to the
  * model while it still has steps to fix it in, rather than to the reader as
@@ -207,7 +212,7 @@ export function buildArtifact(
     });
     if ('error' in compiled) {
       throw new Error(
-        `The artifact did not compile, so it was not saved. Fix these errors and call create_artifact again with the complete corrected content:\n\n${compiled.error}`
+        `The artifact did not compile, so it was not saved. Fix these errors and call the tool again:\n\n${compiled.error}`
       );
     }
   }
@@ -229,4 +234,57 @@ export function buildArtifact(
     createdAt: now,
     updatedAt: now
   };
+}
+
+/**
+ * The artifact an `update_artifact` call makes: `source` with one passage of
+ * it replaced, as a new artifact of the reply making the change. `source` is
+ * left as it was, so each reply's card goes on showing what that reply made,
+ * and a reply regenerated takes its own change away with it.
+ *
+ * The passage must appear exactly once, or which one was meant is a guess.
+ * Not found, the model is told the artifact as it stands, since that is what
+ * it got wrong.
+ */
+export function editArtifact(
+  source: Artifact,
+  edit: UpdateArtifactInput,
+  owner: { id: string; chatId: string; messageId: string }
+): Artifact {
+  if (
+    source.content == null ||
+    source.type === 'image' ||
+    source.type === 'file'
+  ) {
+    throw new Error(
+      'Only a text artifact can be edited, and this one is a file'
+    );
+  }
+
+  const content = source.content;
+  const at = content.indexOf(edit.oldStr);
+  if (at === -1) {
+    throw new Error(
+      `oldStr was not found in the artifact. Copy it exactly from the artifact as it is now:\n\n${content}`
+    );
+  }
+  if (content.indexOf(edit.oldStr, at + 1) !== -1) {
+    throw new Error(
+      'oldStr appears in the artifact more than once. Include enough of the text around it to match exactly once.'
+    );
+  }
+
+  return buildArtifact(
+    {
+      title: source.title,
+      type: source.type,
+      language: source.language ?? undefined,
+      fileName: source.fileName ?? undefined,
+      content:
+        content.slice(0, at) +
+        edit.newStr +
+        content.slice(at + edit.oldStr.length)
+    },
+    owner
+  );
 }

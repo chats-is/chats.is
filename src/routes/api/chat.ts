@@ -17,6 +17,7 @@ import { type z } from 'zod';
 
 import {
   createArtifactInputSchema,
+  updateArtifactInputSchema,
   type Artifact,
   type ChatErrorKind,
   type ChatMessage,
@@ -57,7 +58,11 @@ import {
   generateUUID
 } from '@/lib/utils';
 import { authedRequest } from '@/server/middleware';
-import { buildArtifact } from '@/server/services/artifact';
+import {
+  buildArtifact,
+  editArtifact,
+  getArtifact
+} from '@/server/services/artifact';
 import { carriesOnlyOwnFiles, isOwnBlobUrl } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
 import { buildMediaTools } from '@/server/services/chat-tools';
@@ -880,6 +885,36 @@ async function POST({
                 toolArtifactStates.delete(options.toolCallId);
               }
 
+              return { id: artifact.id };
+            }
+          }),
+          // A change to an artifact already in the chat — made this turn,
+          // or by an earlier reply — written as only the passage that
+          // changes. Not streamed onto the canvas as it is written: the
+          // passages are short, and only the whole result means anything.
+          update_artifact: tool({
+            description:
+              'Change part of an artifact already in this chat: replace oldStr, which must appear in it exactly once, with newStr. Makes a new artifact for this reply; the earlier one stays as it was.',
+            inputSchema: updateArtifactInputSchema,
+            execute: async input => {
+              const source =
+                completedArtifacts.get(input.id) ??
+                (await getArtifact(user.id, input.id));
+              if (!source || source.chatId !== id) {
+                throw new Error(`No artifact in this chat has id ${input.id}`);
+              }
+              const artifact = editArtifact(source, input, {
+                id: generateUUID(),
+                chatId: id,
+                messageId: assistantMessageId
+              });
+              completedArtifactOrder.push(artifact.id);
+              completedArtifacts.set(artifact.id, artifact);
+              emitArtifactDelta(artifact);
+              emitTransient({
+                type: 'data-artifact',
+                data: { artifact }
+              });
               return { id: artifact.id };
             }
           })
