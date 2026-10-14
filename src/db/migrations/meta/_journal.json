@@ -267,6 +267,13 @@
       "when": 1791980506898,
       "tag": "0037_artifact_share",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791988457687,
+      "tag": "0038_drop_artifact_files",
+      "breakpoints": true
     }
   ]
 }
