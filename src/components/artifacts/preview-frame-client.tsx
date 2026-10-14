@@ -1,17 +1,28 @@
 import React, { useEffect, useState } from 'react';
+import * as classVarianceAuthority from 'class-variance-authority';
+import * as clsx from 'clsx';
+import * as framerMotion from 'framer-motion';
+import * as lucideReact from 'lucide-react';
+import * as recharts from 'recharts';
 
 import { type PreviewPackage } from '@/types';
 
-// The curated packages, each loaded from our own origin the first time a
-// preview imports it (no CDN, so previews stay fully offline), and handed to
-// the sandbox's require(). One for every entry of PREVIEW_PACKAGES — the
-// `satisfies` refuses to build with one missing or one too many.
+// The curated packages, from our own origin (no CDN, so previews stay fully
+// offline), handed to the sandbox's require(). One for every entry of
+// PREVIEW_PACKAGES — the `satisfies` refuses to build with one missing or
+// one too many.
+//
+// Most are loaded the first time a preview imports them. The five the app
+// uses itself are bundled with the frame, as they were: loaded on demand,
+// they changed how the build shares code between the app's own pages, and
+// moved a date picker, the form library and more into the chunk every page
+// loads — some 300 kB more for everyone, measured, for a preview's sake.
 const PREVIEW_PACKAGE_LOADERS = {
-  'lucide-react': () => import('lucide-react'),
-  recharts: () => import('recharts'),
-  'framer-motion': () => import('framer-motion'),
-  clsx: () => import('clsx'),
-  'class-variance-authority': () => import('class-variance-authority'),
+  'lucide-react': async () => lucideReact,
+  recharts: async () => recharts,
+  'framer-motion': async () => framerMotion,
+  clsx: async () => clsx,
+  'class-variance-authority': async () => classVarianceAuthority,
   lodash: () => import('lodash'),
   d3: () => import('d3'),
   'chart.js/auto': () => import('chart.js/auto'),
