@@ -143,19 +143,6 @@ describe('buildArtifact', () => {
 
     expect(artifact.content).toBe('def broken(:');
   });
-
-  it('refuses a file the app did not store', () => {
-    expect(() =>
-      buildArtifact(
-        {
-          title: 'Picture',
-          type: 'image',
-          fileUrl: 'https://example.com/cat.png'
-        },
-        owner
-      )
-    ).toThrow('fileUrl must be a file stored by this app');
-  });
 });
 
 describe('editArtifact', () => {

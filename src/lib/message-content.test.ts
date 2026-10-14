@@ -53,7 +53,7 @@ describe('hasVisibleContent', () => {
           type: 'tool-create_artifact',
           toolCallId: 'a',
           state: 'output-available',
-          input: { title: 't', type: 'text' },
+          input: { title: 't', type: 'text', content: 'c' },
           output: { id: 'x' }
         },
         {

@@ -13,7 +13,6 @@ import {
   tool,
   UI_MESSAGE_STREAM_HEADERS
 } from 'ai';
-import { type z } from 'zod';
 
 import {
   createArtifactInputSchema,
@@ -22,6 +21,7 @@ import {
   type ChatErrorKind,
   type ChatMessage,
   type ChatUsage,
+  type CreateArtifactInput,
   type MessageMetadata,
   type Provider,
   type User
@@ -67,7 +67,7 @@ import {
   editArtifact,
   getArtifact
 } from '@/server/services/artifact';
-import { carriesOnlyOwnFiles, isOwnBlobUrl } from '@/server/services/blob';
+import { carriesOnlyOwnFiles } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
 import { buildMediaTools } from '@/server/services/chat-tools';
 import * as messages from '@/server/services/message';
@@ -597,43 +597,6 @@ async function POST({
             });
             return;
           }
-          if (artifact.type === 'image' && artifact.fileUrl) {
-            emitTransient({
-              type: 'data-imageDelta',
-              data: {
-                id: artifact.id,
-                title: artifact.title,
-                url: artifact.fileUrl,
-                status: 'done',
-                artifactType: artifact.type
-              }
-            });
-            emitTransient({
-              type: 'data-finish',
-              data: { id: artifact.id }
-            });
-            return;
-          }
-          if (artifact.type === 'file' && artifact.fileUrl) {
-            emitTransient({
-              type: 'data-fileDelta',
-              data: {
-                id: artifact.id,
-                title: artifact.title,
-                url: artifact.fileUrl,
-                fileName: artifact.fileName ?? null,
-                mimeType: artifact.mimeType ?? null,
-                size: artifact.size ?? null,
-                status: 'done',
-                artifactType: artifact.type
-              }
-            });
-            emitTransient({
-              type: 'data-finish',
-              data: { id: artifact.id }
-            });
-            return;
-          }
           emitTransient({
             type: 'data-textDelta',
             data: {
@@ -651,9 +614,6 @@ async function POST({
           });
         };
 
-        const createArtifactSchema = createArtifactInputSchema;
-        type CreateArtifactInput = z.infer<typeof createArtifactSchema>;
-
         type ToolArtifactStreamState = {
           artifactId: string;
           rawInput: string;
@@ -662,10 +622,6 @@ async function POST({
           lastKind: ArtifactKind;
           lastType?: CreateArtifactInput['type'];
           lastContent: string;
-          lastUrl: string | null;
-          lastFileName: string | null;
-          lastMimeType: string | null;
-          lastSize: number | null;
         };
 
         const toolArtifactStates = new Map<string, ToolArtifactStreamState>();
@@ -742,103 +698,44 @@ async function POST({
             }
           }
 
-          if (kind === 'code' || kind === 'sheet' || kind === 'text') {
-            const nextContent = input.content ?? '';
-            if (nextContent !== state.lastContent) {
-              const isAppend = nextContent.startsWith(state.lastContent);
-              const delta = isAppend
-                ? nextContent.slice(state.lastContent.length)
-                : nextContent;
+          const nextContent = input.content ?? '';
+          if (nextContent !== state.lastContent) {
+            const isAppend = nextContent.startsWith(state.lastContent);
+            const delta = isAppend
+              ? nextContent.slice(state.lastContent.length)
+              : nextContent;
 
-              emitTransient({
-                type:
-                  kind === 'code' || kind === 'sheet'
-                    ? 'data-codeDelta'
-                    : 'data-textDelta',
-                data: {
-                  id: state.artifactId,
-                  title,
-                  delta,
-                  mode: isAppend ? 'append' : 'replace',
-                  status: 'streaming',
-                  artifactType,
-                  ...(kind === 'code' || kind === 'sheet'
-                    ? {
-                        language:
-                          artifactType === 'json'
-                            ? 'json'
-                            : (input.language ?? undefined)
-                      }
-                    : {})
-                }
-              });
-              state.lastContent = nextContent;
-            }
-            return;
-          }
-
-          if (
-            kind === 'image' &&
-            input.fileUrl &&
-            isOwnBlobUrl(input.fileUrl) &&
-            input.fileUrl !== state.lastUrl
-          ) {
             emitTransient({
-              type: 'data-imageDelta',
+              type:
+                kind === 'code' || kind === 'sheet'
+                  ? 'data-codeDelta'
+                  : 'data-textDelta',
               data: {
                 id: state.artifactId,
                 title,
-                url: input.fileUrl,
+                delta,
+                mode: isAppend ? 'append' : 'replace',
                 status: 'streaming',
-                artifactType
+                artifactType,
+                ...(kind === 'code' || kind === 'sheet'
+                  ? {
+                      language:
+                        artifactType === 'json'
+                          ? 'json'
+                          : (input.language ?? undefined)
+                    }
+                  : {})
               }
             });
-            state.lastUrl = input.fileUrl;
-            return;
-          }
-
-          if (kind === 'file') {
-            const nextUrl =
-              input.fileUrl && isOwnBlobUrl(input.fileUrl)
-                ? input.fileUrl
-                : null;
-            const nextFileName = input.fileName ?? null;
-            const nextMimeType = input.mimeType ?? null;
-            const nextSize = input.size ?? null;
-
-            if (
-              nextUrl &&
-              (nextUrl !== state.lastUrl ||
-                nextFileName !== state.lastFileName ||
-                nextMimeType !== state.lastMimeType ||
-                nextSize !== state.lastSize)
-            ) {
-              emitTransient({
-                type: 'data-fileDelta',
-                data: {
-                  id: state.artifactId,
-                  title,
-                  url: nextUrl,
-                  fileName: nextFileName,
-                  mimeType: nextMimeType,
-                  size: nextSize,
-                  status: 'streaming',
-                  artifactType
-                }
-              });
-              state.lastUrl = nextUrl;
-              state.lastFileName = nextFileName;
-              state.lastMimeType = nextMimeType;
-              state.lastSize = nextSize;
-            }
+            state.lastContent = nextContent;
           }
         };
 
         const artifactTools = {
           create_artifact: tool({
             description:
-              'Create a new artifact (code, markdown, html, json, text, image, or file).',
-            inputSchema: createArtifactSchema,
+              'Create a new artifact: code, a document (markdown, html or text), or a data table (json).',
+            inputSchema: createArtifactInputSchema,
             onInputStart: ({ toolCallId }) => {
               toolArtifactStates.set(toolCallId, {
                 artifactId: generateUUID(),
@@ -847,11 +744,7 @@ async function POST({
                 lastTitle: 'Untitled',
                 lastKind: 'text',
                 lastType: undefined,
-                lastContent: '',
-                lastUrl: null,
-                lastFileName: null,
-                lastMimeType: null,
-                lastSize: null
+                lastContent: ''
               });
             },
             onInputDelta: async ({ toolCallId, inputTextDelta }) => {

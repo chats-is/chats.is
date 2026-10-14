@@ -22,7 +22,6 @@ import {
 import { normalizeCodeLanguage } from '@/lib/code-language';
 import { db } from '@/db';
 import { artifacts } from '@/db/schema';
-import { isOwnBlobUrl } from '@/server/services/blob';
 
 /**
  * One artifact with its full content, or null when the id names nothing the
@@ -205,14 +204,8 @@ export function buildArtifact(
   owner: { id: string; chatId: string; messageId: string }
 ): Artifact {
   assertArtifactPayload(input);
-  // The model is not told about file artifacts, and has no way
-  // to make a file; a `fileUrl` it sends anyway is an address of
-  // its own choosing, which must not become a file of ours.
-  if (input.fileUrl && !isOwnBlobUrl(input.fileUrl)) {
-    throw new Error('fileUrl must be a file stored by this app');
-  }
 
-  if (isPreviewableCodeArtifact(input) && input.content?.trim()) {
+  if (isPreviewableCodeArtifact(input) && input.content.trim()) {
     const source = { ...input, id: owner.id };
     const compiled = compilePreview({
       entryPath: getArtifactVirtualPath(source),
@@ -233,11 +226,11 @@ export function buildArtifact(
     title: input.title,
     type: input.type,
     language: input.language ?? null,
-    content: input.content ?? null,
-    fileUrl: input.fileUrl ?? null,
+    content: input.content,
+    fileUrl: null,
     fileName: input.fileName ?? null,
-    mimeType: input.mimeType ?? null,
-    size: input.size ?? null,
+    mimeType: null,
+    size: null,
     status: 'done',
     createdAt: now,
     updatedAt: now

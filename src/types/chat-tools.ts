@@ -8,15 +8,25 @@ import { artifactTypeSchema } from './artifact';
 // Shared by the server (streamText tool definitions) and the client (tool
 // part type narrowing via ChatTools).
 
+/**
+ * What the model may make with create_artifact: text it writes, the content
+ * always given. An image or a file is an artifact too, but not the model's
+ * to make — it has no way to make a file — so neither those types nor their
+ * fields are offered: a model that fills in what it is offered left the
+ * content out and sent `size: 0` instead.
+ */
 export const createArtifactInputSchema = z.object({
   title: z.string().min(1),
-  type: artifactTypeSchema,
+  type: artifactTypeSchema.extract([
+    'code',
+    'markdown',
+    'html',
+    'json',
+    'text'
+  ]),
   language: z.string().optional(),
-  content: z.string().optional(),
-  fileUrl: z.url().optional(),
   fileName: z.string().optional(),
-  mimeType: z.string().optional(),
-  size: z.number().int().nonnegative().optional()
+  content: z.string().min(1)
 });
 
 export type CreateArtifactInput = z.infer<typeof createArtifactInputSchema>;
