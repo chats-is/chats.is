@@ -352,7 +352,11 @@ function FrameArtifactPreview({
 
     // Short debounce just to coalesce the few dep changes that fire together.
     const timeoutId = window.setTimeout(() => {
-      void run();
+      // A build this preview no longer wants is aborted, and that is not a
+      // failure.
+      void run().catch(error => {
+        if (!cancelled) throw error;
+      });
     }, 80);
 
     return () => {
