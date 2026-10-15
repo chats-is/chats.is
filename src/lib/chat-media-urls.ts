@@ -33,20 +33,26 @@ export function isTrustedMediaUrl(url: string): boolean {
  * one that could not edit an upload: it saw the image and then asked the user
  * to attach it again.
  *
+ * The marker carries the file's name in the chat too, where it has one: an
+ * artifact reads a file by its name.
+ *
  * Persistence is unaffected — this only shapes what the model sees.
  */
 export function maskUnsupportedFileParts(
   messages: ChatMessage[],
-  options: { supportsVision?: boolean | null }
+  options: { supportsVision?: boolean | null; names?: Map<string, string> }
 ): ChatMessage[] {
   return messages.map(message => ({
     ...message,
     parts: (message.parts ?? []).flatMap((part): ChatMessage['parts'] => {
       if (part.type !== 'file') return [part];
       const mediaType = part.mediaType ?? '';
+      const name = options.names?.get(part.url);
       const marker = (label: string) => ({
         type: 'text' as const,
-        text: `[${label} file attached: ${part.url}]`
+        text: name
+          ? `[${label} file attached: ${name}, ${part.url}]`
+          : `[${label} file attached: ${part.url}]`
       });
 
       if (mediaType.startsWith('audio/')) return [marker('Audio')];

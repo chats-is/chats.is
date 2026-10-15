@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -7,6 +8,7 @@ import {
   useState
 } from 'react';
 import { useMatch } from '@tanstack/react-router';
+import { ArtifactFilesContext } from '@/contexts/artifact-files-context';
 import { LoaderCircle, Wrench, X } from 'lucide-react';
 
 import { type Artifact, type PreviewPackage } from '@/types';
@@ -195,6 +197,58 @@ function usePreviewFailure(
 }
 
 /**
+ * `window.fs.readFile` for the artifact in `frameRef`: the frame asks for a
+ * file by name, and gets its bytes back, or why not. The frame cannot fetch
+ * anything itself that is worth having — it runs at an opaque origin — and
+ * may only have the files this page says it can read: the ones attached in
+ * its chat.
+ */
+function useFileReads(frameRef: React.RefObject<HTMLIFrameElement | null>) {
+  const files = useContext(ArtifactFilesContext);
+
+  useEffect(() => {
+    const handleMessage = async (
+      event: MessageEvent<{ type?: string; id?: number; name?: string }>
+    ) => {
+      const frame = frameRef.current?.contentWindow;
+      if (!frame || event.source !== frame) return;
+      if (event.data?.type !== 'artifact-fs-read') return;
+      const { id, name } = event.data;
+      const reply = (
+        result: { data: ArrayBuffer } | { error: string },
+        transfer: Transferable[] = []
+      ) =>
+        frame.postMessage(
+          { type: 'artifact-fs-result', id, ...result },
+          '*',
+          transfer
+        );
+
+      const file = files.find(candidate => candidate.name === name);
+      if (!file) {
+        reply({
+          error: `No file named "${name}". The files that can be read are: ${
+            files.map(candidate => candidate.name).join(', ') || 'none'
+          }.`
+        });
+        return;
+      }
+      try {
+        const response = await fetch(file.url);
+        if (!response.ok) throw new Error(String(response.status));
+        const data = await response.arrayBuffer();
+        reply({ data }, [data]);
+      } catch {
+        reply({ error: `"${name}" could not be read.` });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [frameRef, files]);
+}
+
+/**
  * A preview drawn in the sandboxed frame: a React artifact, compiled on the
  * server first, or a Mermaid diagram, which the frame draws from its source.
  */
@@ -238,6 +292,7 @@ function FrameArtifactPreview({
   const payloadRef = useRef<FramePayload | null>(null);
   const fallbackRef = useRef<number | null>(null);
   const { failure, clearFailure } = usePreviewFailure(iframeRef);
+  useFileReads(iframeRef);
 
   // The single place that pushes the latest compiled result into the frame.
   // Called both when a new result compiles AND when the frame (re)announces it
@@ -468,6 +523,34 @@ const HTML_ERROR_REPORTER = `<script>window.addEventListener('error', function (
   try { parent.postMessage({ type: 'artifact-preview-error', message: message }, '*'); } catch (e) {}
 });</script>`;
 
+// `window.fs.readFile` in an HTML artifact, as the React frame has it (see
+// preview-frame-client): the file is asked of this page by name, and comes
+// back as bytes, or as text when an encoding is given.
+const HTML_FILE_SYSTEM = `<script>(function () {
+  var next = 0, pending = {};
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (event.source !== parent || !data || data.type !== 'artifact-fs-result') return;
+    var request = pending[data.id];
+    if (!request) return;
+    delete pending[data.id];
+    if (data.error) request.reject(new Error(data.error));
+    else {
+      var bytes = new Uint8Array(data.data);
+      request.resolve(request.encoding ? new TextDecoder(request.encoding).decode(bytes) : bytes);
+    }
+  });
+  window.fs = {
+    readFile: function (name, options) {
+      return new Promise(function (resolve, reject) {
+        var id = ++next;
+        pending[id] = { resolve: resolve, reject: reject, encoding: options && options.encoding };
+        parent.postMessage({ type: 'artifact-fs-read', id: id, name: String(name) }, '*');
+      });
+    }
+  };
+})();</script>`;
+
 function HtmlArtifactPreview({
   content,
   onFix
@@ -478,6 +561,7 @@ function HtmlArtifactPreview({
   const iframeTitle = useId();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { failure, clearFailure } = usePreviewFailure(iframeRef);
+  useFileReads(iframeRef);
   const htmlSource = useMemo(() => {
     // Inject a strict CSP so self-contained HTML/SVG previews can use inline
     // script/style, and a library's script, stylesheet or font from the one
@@ -498,7 +582,7 @@ function HtmlArtifactPreview({
     // none. A parser that meets a second <html>, <head> or <body> keeps their
     // contents and folds their attributes into the ones it has, so the
     // document renders as written, under a policy it had no part in placing.
-    return `<!DOCTYPE html><html><head>${meta}${HTML_ERROR_REPORTER}</head><body>${content}</body></html>`;
+    return `<!DOCTYPE html><html><head>${meta}${HTML_ERROR_REPORTER}${HTML_FILE_SYSTEM}</head><body>${content}</body></html>`;
   }, [content]);
 
   // New source is a new page: what the last one threw no longer applies.

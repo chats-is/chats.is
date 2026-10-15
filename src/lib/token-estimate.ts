@@ -20,3 +20,20 @@ export function estimateTokens(text: string): number {
   }
   return Math.ceil(ascii / 4) + other;
 }
+
+/**
+ * As much of `text` as `estimateTokens` puts at `maxTokens` or under, counted
+ * the same way; null when all of it fits.
+ */
+export function cutToTokens(text: string, maxTokens: number): string | null {
+  let ascii = 0;
+  let other = 0;
+  let end = 0;
+  for (const char of text) {
+    if (char.charCodeAt(0) < 128) ascii++;
+    else other++;
+    if (Math.ceil(ascii / 4) + other > maxTokens) return text.slice(0, end);
+    end += char.length;
+  }
+  return null;
+}

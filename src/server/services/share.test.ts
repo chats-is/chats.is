@@ -23,6 +23,9 @@ const {
 
 let client: { close?: () => Promise<void> } | undefined;
 
+const STORE =
+  'https://store.public.blob.vercel-storage.com/uploads/attachments/owner';
+
 beforeAll(async () => {
   const t = await makeTestDb();
   h.db = t.db;
@@ -38,13 +41,52 @@ beforeAll(async () => {
     { id: 'shared-chat', title: 'Shared', userId: 'owner', modelId: 'm' },
     { id: 'private-chat', title: 'Private', userId: 'other', modelId: 'm' }
   ]);
+  // The first chat as chats are stored: in the order written, each reply
+  // naming the message it answers. A file is attached in the first turn, the
+  // artifacts are made in the second, and a file comes after them.
+  const attached = (name: string) => ({
+    type: 'file' as const,
+    mediaType: 'text/csv',
+    url: `${STORE}/${name}`,
+    filename: name
+  });
+  const at = (minute: number) => new Date(Date.UTC(2026, 0, 1, 12, minute));
   await h.db.insert(schema.messages).values([
     {
-      id: 'm1',
+      id: 'u0',
+      chatId: 'shared-chat',
+      userId: 'owner',
+      role: 'user',
+      parts: [attached('sales.csv')],
+      createdAt: at(1)
+    },
+    {
+      id: 'u1',
+      chatId: 'shared-chat',
+      userId: 'owner',
+      role: 'user',
+      parts: [attached('notes.txt')],
+      createdAt: at(3)
+    }
+  ]);
+  await h.db.insert(schema.messages).values([
+    {
+      id: 'a0',
+      parentId: 'u0',
       chatId: 'shared-chat',
       userId: 'owner',
       role: 'assistant',
-      parts: []
+      parts: [],
+      createdAt: at(2)
+    },
+    {
+      id: 'm1',
+      parentId: 'u1',
+      chatId: 'shared-chat',
+      userId: 'owner',
+      role: 'assistant',
+      parts: [],
+      createdAt: at(4)
     },
     {
       id: 'm2',
@@ -85,6 +127,14 @@ beforeAll(async () => {
       content: 'export default () => "secret"'
     }
   ]);
+  await h.db.insert(schema.messages).values({
+    id: 'u2',
+    chatId: 'shared-chat',
+    userId: 'owner',
+    role: 'user',
+    parts: [attached('later.csv')],
+    createdAt: at(5)
+  });
   await h.db
     .insert(schema.shares)
     .values({ id: 'link', chatId: 'shared-chat', userId: 'owner' });
@@ -137,13 +187,25 @@ describe('an artifact shared on its own', () => {
     const { id } = await createArtifactShare('owner', 'shared-artifact');
 
     const page = await getSharedArtifactPage(id);
-    expect(page).toMatchObject({ id: 'shared-artifact', title: 'Counter' });
-    expect(page).not.toHaveProperty('chatId');
-    expect(page).not.toHaveProperty('messageId');
-    expect(page).not.toHaveProperty('userId');
+    expect(page?.artifact).toMatchObject({
+      id: 'shared-artifact',
+      title: 'Counter'
+    });
+    expect(page?.artifact).not.toHaveProperty('chatId');
+    expect(page?.artifact).not.toHaveProperty('messageId');
+    expect(page?.artifact).not.toHaveProperty('userId');
 
     // Its id is no key to the chat page.
     await expect(getSharedChat(id)).resolves.toBeFalsy();
+  });
+
+  it('can read the files attached up to its reply, in earlier turns too, and none after', async () => {
+    const { id } = await createArtifactShare('owner', 'shared-artifact');
+
+    expect((await getSharedArtifactPage(id))?.files).toEqual([
+      { name: 'sales.csv', url: `${STORE}/sales.csv` },
+      { name: 'notes.txt', url: `${STORE}/notes.txt` }
+    ]);
   });
 
   it("compiles that artifact's source alone, not its chat's others", async () => {

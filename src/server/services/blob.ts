@@ -1,13 +1,13 @@
 import '@tanstack/react-start/server-only';
 
 import { del } from '@vercel/blob';
-import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 
 import { isTrustedMediaUrl } from '@/lib/chat-media-urls';
 import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env.public';
 import { db } from '@/db';
-import { messages, prompts, users } from '@/db/schema';
+import { documents, messages, prompts, users } from '@/db/schema';
 
 /**
  * Whether `url` is a file in this install's own blob store.
@@ -155,7 +155,11 @@ export async function removeBlobs(userId: string, urls: string[]) {
       if (!onPrompt) orphaned.push(url);
     }
 
-    if (orphaned.length > 0) await del(orphaned);
+    if (orphaned.length > 0) {
+      // The text read from a document goes with its file.
+      await db.delete(documents).where(inArray(documents.url, orphaned));
+      await del(orphaned);
+    }
   } catch (err) {
     console.error('[blob] failed to remove files:', err);
   }

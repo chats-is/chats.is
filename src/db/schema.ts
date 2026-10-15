@@ -174,6 +174,36 @@ export const chatsRelations = relations(chats, ({ one, many }) => ({
 }));
 
 /**
+ * The text of a document a user attached: read from the file once, when the
+ * message carrying it is first answered, and given to the models that cannot
+ * read the file itself. Found by the file's address — what a message names,
+ * and what the text was read from — one row to a file; it goes when the file
+ * does.
+ */
+export const documents = createTable(
+  'document',
+  {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    url: text('url').notNull(),
+    userId: varchar('user_id', { length: 255 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mediaType: varchar('media_type', { length: 255 }).notNull(),
+    text: text('text').notNull(),
+    /** A text file's encoding, as TextDecoder names it, for an artifact to
+     *  read it in; none for a PDF, a Word document or a workbook. */
+    encoding: varchar('encoding', { length: 64 }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  document => [
+    uniqueIndex('document_url_idx').on(document.url),
+    index('document_user_id_idx').on(document.userId)
+  ]
+);
+
+/**
  * A share link: of a whole chat, or of one artifact on its own — never both.
  * An artifact's link leaves `chat_id` empty, so nothing that opens a shared
  * chat can be handed one and show the chat it came from; the artifact's own

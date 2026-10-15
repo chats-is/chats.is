@@ -58,4 +58,32 @@ describe('fitToContext', () => {
     // does not.
     expect(ids(fitToContext(chinese, 200).messages)).toEqual(['u2']);
   });
+
+  it('counts a file the model reads itself by what the caller says it costs', () => {
+    const withPdf: ChatMessage[] = [
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [
+          {
+            type: 'file',
+            mediaType: 'application/pdf',
+            url: 'https://store.public.blob.vercel-storage.com/r.pdf'
+          }
+        ]
+      },
+      message('a1', 'assistant', 10),
+      message('u2', 'user', 10)
+    ];
+
+    // By its address it would fit; by the text in it, it does not.
+    expect(ids(fitToContext(withPdf, 200).messages)).toEqual([
+      'u1',
+      'a1',
+      'u2'
+    ]);
+    expect(
+      ids(fitToContext(withPdf, 200, { fileTokens: () => 500 }).messages)
+    ).toEqual(['u2']);
+  });
 });

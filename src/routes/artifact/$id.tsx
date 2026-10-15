@@ -12,13 +12,13 @@ import { SharedArtifactView } from '@/components/shared-artifact-view';
  */
 export const Route = createFileRoute('/artifact/$id')({
   loader: async ({ params }) => {
-    const artifact = await getSharedArtifactPage({ data: { id: params.id } });
+    const page = await getSharedArtifactPage({ data: { id: params.id } });
 
-    if (!artifact) {
+    if (!page) {
       throw notFound();
     }
 
-    return { artifact };
+    return page;
   },
   head: ({ matches, loaderData }) => ({
     meta: [
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/artifact/$id')({
 });
 
 function SharedArtifactPage() {
-  const { artifact } = Route.useLoaderData();
+  const { artifact, files } = Route.useLoaderData();
 
-  return <SharedArtifactView artifact={artifact} />;
+  return <SharedArtifactView artifact={artifact} files={files} />;
 }

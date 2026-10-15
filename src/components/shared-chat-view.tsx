@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import { ArtifactFilesContext } from '@/contexts/artifact-files-context';
 
 import { type Artifact, type ChatMessage } from '@/types';
+import { artifactFiles } from '@/lib/document';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import {
   ResizableHandle,
@@ -45,6 +47,9 @@ export function SharedChatView({
     [artifacts]
   );
 
+  // What an artifact here can read: the files attached in the thread shown.
+  const files = useMemo(() => artifactFiles(messages), [messages]);
+
   const thread = (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       <header className="flex h-16 shrink-0 flex-col items-center justify-center border-b px-4">
@@ -71,48 +76,50 @@ export function SharedChatView({
   );
 
   return (
-    <div className="flex h-svh w-full overflow-hidden">
-      {panelOpen && isDesktop ? (
-        <ResizablePanelGroup
-          orientation="horizontal"
-          className="h-full w-full overflow-hidden"
-        >
-          <ResizablePanel
-            defaultSize="44%"
-            minSize="35%"
-            className="flex h-full min-w-0 flex-col overflow-hidden"
+    <ArtifactFilesContext.Provider value={files}>
+      <div className="flex h-svh w-full overflow-hidden">
+        {panelOpen && isDesktop ? (
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="h-full w-full overflow-hidden"
           >
+            <ResizablePanel
+              defaultSize="44%"
+              minSize="35%"
+              className="flex h-full min-w-0 flex-col overflow-hidden"
+            >
+              {thread}
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel
+              defaultSize="56%"
+              minSize="25%"
+              maxSize="65%"
+              className="h-full min-w-0 overflow-hidden"
+            >
+              <ArtifactsPanel
+                open={panelOpen}
+                onOpenChange={setPanelOpen}
+                artifacts={artifactList}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                desktopContainerClassName="h-full w-full min-w-0 max-w-none border-l-0"
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <>
             {thread}
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel
-            defaultSize="56%"
-            minSize="25%"
-            maxSize="65%"
-            className="h-full min-w-0 overflow-hidden"
-          >
             <ArtifactsPanel
               open={panelOpen}
               onOpenChange={setPanelOpen}
               artifacts={artifactList}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              desktopContainerClassName="h-full w-full min-w-0 max-w-none border-l-0"
             />
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        <>
-          {thread}
-          <ArtifactsPanel
-            open={panelOpen}
-            onOpenChange={setPanelOpen}
-            artifacts={artifactList}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </div>
+    </ArtifactFilesContext.Provider>
   );
 }

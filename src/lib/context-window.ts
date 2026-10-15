@@ -5,14 +5,20 @@ import { estimateTokens } from '@/lib/token-estimate';
  *  disk. Providers differ; this is the upper end of what they charge. */
 const IMAGE_TOKENS = 1500;
 
-function partTokens(part: ChatMessage['parts'][number]): number {
+type Part = ChatMessage['parts'][number];
+
+/** What a file the model reads itself costs, where the caller knows: a PDF,
+ *  by the text in it. */
+type FileTokens = (part: Extract<Part, { type: 'file' }>) => number | undefined;
+
+function partTokens(part: Part, fileTokens?: FileTokens): number {
   if (part.type === 'text' || part.type === 'reasoning') {
     return estimateTokens(part.text);
   }
   if (part.type === 'file') {
     return part.mediaType.startsWith('image/')
       ? IMAGE_TOKENS
-      : estimateTokens(part.url);
+      : (fileTokens?.(part) ?? estimateTokens(part.url));
   }
   // A tool call goes to the model as its input and its result, both JSON.
   if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
@@ -22,9 +28,9 @@ function partTokens(part: ChatMessage['parts'][number]): number {
   return 0;
 }
 
-const messageTokens = (message: ChatMessage) =>
+const messageTokens = (message: ChatMessage, fileTokens?: FileTokens) =>
   // A few tokens of framing per message, on every provider.
-  message.parts.reduce((sum, part) => sum + partTokens(part), 4);
+  message.parts.reduce((sum, part) => sum + partTokens(part, fileTokens), 4);
 
 /**
  * The most recent part of a conversation that fits in `budget` tokens.
@@ -45,13 +51,14 @@ const messageTokens = (message: ChatMessage) =>
  */
 export function fitToContext(
   messages: ChatMessage[],
-  budget: number
+  budget: number,
+  options?: { fileTokens?: FileTokens }
 ): { messages: ChatMessage[]; dropped: number } {
   let used = 0;
   let start = messages.length;
 
   for (let i = messages.length - 1; i >= 0; i--) {
-    used += messageTokens(messages[i]);
+    used += messageTokens(messages[i], options?.fileTokens);
     if (used > budget && i < messages.length - 1) break;
     start = i;
   }

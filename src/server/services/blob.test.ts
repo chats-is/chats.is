@@ -139,6 +139,29 @@ describe('files follow their rows', () => {
     ).toHaveLength(1);
   });
 
+  it('takes the text read from a document with the document', async () => {
+    await h.db.insert(schema.messages).values({
+      id: 'u3',
+      role: 'user',
+      chatId: 'c1',
+      userId: USER,
+      createdAt: new Date(Date.UTC(2026, 0, 1, 12, 3)),
+      parts: [{ type: 'file', mediaType: 'text/csv', url: mine('sales.csv') }]
+    });
+    await h.db.insert(schema.documents).values({
+      id: 'd1',
+      url: mine('sales.csv'),
+      userId: USER,
+      mediaType: 'text/csv',
+      text: 'a,b'
+    });
+
+    await deleteChat(USER, 'c1');
+
+    expect(deleted()).toContain(mine('sales.csv'));
+    expect(await h.db.select().from(schema.documents)).toEqual([]);
+  });
+
   it('does not fail the deletion when storage does', async () => {
     h.del.mockRejectedValueOnce(new Error('storage is down'));
 

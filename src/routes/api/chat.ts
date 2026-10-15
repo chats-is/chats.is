@@ -34,6 +34,7 @@ import {
   PROVIDER_FAILURE_MESSAGE
 } from '@/lib/constant';
 import { fitToContext } from '@/lib/context-window';
+import { attachmentNames, expandDocuments, readsPdf } from '@/lib/document';
 import { pickEffort } from '@/lib/media-options';
 import { markStopped } from '@/lib/message-content';
 import {
@@ -58,6 +59,7 @@ import {
   buildArtifactTools,
   buildMediaTools
 } from '@/server/services/chat-tools';
+import { readDocuments } from '@/server/services/document';
 import * as messages from '@/server/services/message';
 import { findModelByModelId, usableCandidates } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
@@ -442,30 +444,32 @@ async function POST({
 
     // Independent setup queries — run concurrently to keep time-to-first-token
     // down (media tool resolution should not delay plain text chats).
-    const [systemPromptContent, mediaTools, search] = await Promise.all([
-      getSystemPrompt(dbModel.systemPrompt),
-      // Switched off by the user: no media tool at all, and nothing in the
-      // prompt about them.
-      mediaGeneration === false
-        ? { tools: {}, systemPrompt: '' }
-        : buildMediaTools({
-            userId: user.id,
-            chatId: id,
-            assistantMessageId,
-            mediaOptions,
-            chatMessages
-          }),
-      // Unticked by the user: no search, however the install is set up.
-      webSearch === false
-        ? { toolsFor: () => ({}), systemPrompt: '' }
-        : setupWebSearch({
-            userId: user.id,
-            chatId: id,
-            assistantMessageId,
-            chatModel: dbModel,
-            candidates
-          })
-    ]);
+    const [systemPromptContent, mediaTools, search, documents] =
+      await Promise.all([
+        getSystemPrompt(dbModel.systemPrompt),
+        // Switched off by the user: no media tool at all, and nothing in the
+        // prompt about them.
+        mediaGeneration === false
+          ? { tools: {}, systemPrompt: '' }
+          : buildMediaTools({
+              userId: user.id,
+              chatId: id,
+              assistantMessageId,
+              mediaOptions,
+              chatMessages
+            }),
+        // Unticked by the user: no search, however the install is set up.
+        webSearch === false
+          ? { toolsFor: () => ({}), systemPrompt: '' }
+          : setupWebSearch({
+              userId: user.id,
+              chatId: id,
+              assistantMessageId,
+              chatModel: dbModel,
+              candidates
+            }),
+        readDocuments(user.id, chatMessages)
+      ]);
     // Only the app's own part is a template. What an admin wrote, and what
     // the model carries, follow it verbatim.
     const systemMessage = [
@@ -580,9 +584,29 @@ async function POST({
         // providers' worth of models behind this, and no list of their limits
         // that stays true.
         const budget = dbModel.apiParams?.maxInputTokens;
+
+        // A document goes to the model as its text, or — a PDF, to a model
+        // that can see, where every provider behind it reads one — as the
+        // file itself. Every provider, since which one answers is not known
+        // yet. A document's text is given at most half of what the model
+        // takes, when that is known; an artifact can read the rest.
+        const attachedNames = attachmentNames(chatMessages);
+        const withDocuments = expandDocuments(chatMessages, {
+          documents,
+          names: attachedNames,
+          nativePdf:
+            !!dbModel.supportsVision &&
+            candidates.every(candidate => readsPdf(candidate.type)),
+          maxTokens: budget ? Math.floor(budget / 2) : undefined
+        });
         const fitted = budget
-          ? fitToContext(chatMessages, budget - estimateTokens(instructions))
-          : { messages: chatMessages, dropped: 0 };
+          ? fitToContext(withDocuments, budget - estimateTokens(instructions), {
+              fileTokens: part => {
+                const document = documents.get(part.url);
+                return document && estimateTokens(document.text);
+              }
+            })
+          : { messages: withDocuments, dropped: 0 };
         if (fitted.dropped > 0) {
           console.warn(
             `[chat] chat=${id} outgrew ${modelId}: sent without its first ${fitted.dropped} messages`
@@ -591,7 +615,8 @@ async function POST({
 
         const modelMessages = await convertToModelMessages<ChatMessage>(
           maskUnsupportedFileParts(fitted.messages, {
-            supportsVision: dbModel.supportsVision
+            supportsVision: dbModel.supportsVision,
+            names: attachedNames
           }),
           {
             // A turn cut short mid-call is stored with the call and no result,

@@ -148,6 +148,68 @@ function installMemoryStorage() {
   }
 }
 
+/**
+ * `window.fs.readFile(name, options?)`: a file the user attached in the
+ * chat, by its name there — as bytes, or as text when `options.encoding` is
+ * given. The frame cannot fetch it (its origin is opaque, and it may read
+ * only what the page lets it), so the page reads it and sends it over. The
+ * HTML preview gets the same, as a script (see runtime-preview).
+ */
+function installFileSystem() {
+  let next = 0;
+  const pending = new Map<
+    number,
+    {
+      resolve: (value: Uint8Array | string) => void;
+      reject: (error: Error) => void;
+      encoding?: string;
+    }
+  >();
+
+  window.addEventListener(
+    'message',
+    (
+      event: MessageEvent<{
+        type?: string;
+        id?: number;
+        data?: ArrayBuffer;
+        error?: string;
+      }>
+    ) => {
+      if (event.source !== window.parent) return;
+      if (event.data?.type !== 'artifact-fs-result') return;
+      const request = pending.get(event.data.id ?? -1);
+      if (!request) return;
+      pending.delete(event.data.id!);
+      if (event.data.error) {
+        request.reject(new Error(event.data.error));
+        return;
+      }
+      const bytes = new Uint8Array(event.data.data ?? new ArrayBuffer(0));
+      request.resolve(
+        request.encoding
+          ? new TextDecoder(request.encoding).decode(bytes)
+          : bytes
+      );
+    }
+  );
+
+  Object.defineProperty(window, 'fs', {
+    configurable: true,
+    value: {
+      readFile: (name: string, options?: { encoding?: string }) =>
+        new Promise<Uint8Array | string>((resolve, reject) => {
+          const id = ++next;
+          pending.set(id, { resolve, reject, encoding: options?.encoding });
+          window.parent.postMessage(
+            { type: 'artifact-fs-read', id, name: String(name) },
+            '*'
+          );
+        })
+    }
+  });
+}
+
 type PreviewMessage =
   | {
       type: 'artifact-preview-render';
@@ -350,6 +412,7 @@ export function ArtifactPreviewFrameClient() {
 
   useEffect(() => {
     installMemoryStorage();
+    installFileSystem();
     // Which render is current: one that waited on a package or on Mermaid
     // gives way to any sent after it.
     let latestRender = 0;

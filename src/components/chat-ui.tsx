@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useRouter } from '@tanstack/react-router';
 import { useArtifact } from '@/contexts/artifact-context';
+import { ArtifactFilesContext } from '@/contexts/artifact-files-context';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { useChat } from '@ai-sdk/react';
@@ -20,6 +21,7 @@ import {
   releaseChatSession,
   retainChatSession
 } from '@/lib/chat-session';
+import { artifactFiles } from '@/lib/document';
 import { resolveAutoOption } from '@/lib/media-options';
 import { markStopped } from '@/lib/message-content';
 import { takePendingPrompt } from '@/lib/pending-prompt';
@@ -599,18 +601,68 @@ export function ChatUI({
     }
   }, [activeId, artifactList, isPanelOpen, setPanelOpen]);
 
+  // What an artifact here can read: the files attached in this chat.
+  const files = useMemo(() => artifactFiles(messages), [messages]);
+
   return (
-    <div className="flex size-full overflow-hidden">
-      {isPanelOpen && !isMobile ? (
-        <ResizablePanelGroup
-          orientation="horizontal"
-          className="h-full w-full flex-1 overflow-hidden"
-        >
-          <ResizablePanel
-            defaultSize="44%"
-            minSize="35%"
-            className="flex h-full min-w-0 flex-col overflow-hidden"
+    <ArtifactFilesContext.Provider value={files}>
+      <div className="flex size-full overflow-hidden">
+        {isPanelOpen && !isMobile ? (
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="h-full w-full flex-1 overflow-hidden"
           >
+            <ResizablePanel
+              defaultSize="44%"
+              minSize="35%"
+              className="flex h-full min-w-0 flex-col overflow-hidden"
+            >
+              <ChatPanel
+                title={title}
+                noChat={noChat}
+                modelId={displayModelId}
+                image={displayImage}
+                currentModelId={currentModelId}
+                currentImage={currentImage}
+                supportsReasoning={supportsReasoning}
+                artifacts={artifactList}
+                messages={messages}
+                setMessages={setMessages}
+                status={status}
+                stop={handleStop}
+                input={input}
+                setInput={setInput}
+                onInputChange={e => setInput(e.target.value)}
+                onSubmit={handleSubmit}
+                onModelChange={handleModelChange}
+                onOptionsChange={handleOptionsChange}
+                onSelectArtifact={handleArtifactSelect}
+                onReload={handleReload}
+                error={error}
+                refusedHere={session.refusedHere}
+              />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel
+              defaultSize="56%"
+              minSize="25%"
+              maxSize="65%"
+              className="h-full min-w-0 overflow-hidden"
+            >
+              <ArtifactsPanel
+                open={isPanelOpen}
+                onOpenChange={setPanelOpen}
+                artifacts={artifactList}
+                selectedId={activeId}
+                onSelect={handleArtifactSelect}
+                desktopContainerClassName="h-full w-full min-w-0 max-w-none border-l-0"
+                onFix={betweenTurns ? handleFix : undefined}
+                canShare={betweenTurns}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <div className="flex w-full flex-1 overflow-hidden">
             <ChatPanel
               title={title}
               noChat={noChat}
@@ -635,63 +687,18 @@ export function ChatUI({
               error={error}
               refusedHere={session.refusedHere}
             />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel
-            defaultSize="56%"
-            minSize="25%"
-            maxSize="65%"
-            className="h-full min-w-0 overflow-hidden"
-          >
             <ArtifactsPanel
               open={isPanelOpen}
               onOpenChange={setPanelOpen}
               artifacts={artifactList}
               selectedId={activeId}
               onSelect={handleArtifactSelect}
-              desktopContainerClassName="h-full w-full min-w-0 max-w-none border-l-0"
               onFix={betweenTurns ? handleFix : undefined}
               canShare={betweenTurns}
             />
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        <div className="flex w-full flex-1 overflow-hidden">
-          <ChatPanel
-            title={title}
-            noChat={noChat}
-            modelId={displayModelId}
-            image={displayImage}
-            currentModelId={currentModelId}
-            currentImage={currentImage}
-            supportsReasoning={supportsReasoning}
-            artifacts={artifactList}
-            messages={messages}
-            setMessages={setMessages}
-            status={status}
-            stop={handleStop}
-            input={input}
-            setInput={setInput}
-            onInputChange={e => setInput(e.target.value)}
-            onSubmit={handleSubmit}
-            onModelChange={handleModelChange}
-            onOptionsChange={handleOptionsChange}
-            onSelectArtifact={handleArtifactSelect}
-            onReload={handleReload}
-            error={error}
-            refusedHere={session.refusedHere}
-          />
-          <ArtifactsPanel
-            open={isPanelOpen}
-            onOpenChange={setPanelOpen}
-            artifacts={artifactList}
-            selectedId={activeId}
-            onSelect={handleArtifactSelect}
-            onFix={betweenTurns ? handleFix : undefined}
-            canShare={betweenTurns}
-          />
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </ArtifactFilesContext.Provider>
   );
 }

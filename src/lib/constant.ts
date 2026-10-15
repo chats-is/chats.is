@@ -623,6 +623,23 @@ export const MEDIA_OPTION_LABELS: Record<MediaOptionKey, string> = {
 export const UNAUTHORIZED = 'Unauthorized';
 
 /**
+ * The documents a message can carry, by extension, with the type each is
+ * stored under. Browsers name some of these unreliably — a `.md` often comes
+ * with no type at all, and a `.csv` on Windows as an Excel file — so the type
+ * is decided from the extension, before the upload.
+ */
+export const DOCUMENT_MEDIA_TYPES = {
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  csv: 'text/csv',
+  txt: 'text/plain',
+  md: 'text/markdown',
+  json: 'application/json'
+} as const;
+
+/**
  * What each kind of upload accepts, shared by the browser (which picks the
  * file) and the route that signs the token (which is what actually enforces
  * it — the browser's copy is a courtesy, not a control).
@@ -657,7 +674,9 @@ export const UPLOAD_CONFIG = {
       // Video attachments feed the chat edit_video tool.
       'video/mp4',
       'video/quicktime',
-      'video/webm'
+      'video/webm',
+      // Documents are read for the chat model, and by artifacts.
+      ...Object.values(DOCUMENT_MEDIA_TYPES)
     ],
     maxSize: 10 * 1024 * 1024,
     /** Video is the reason client uploads exist here; a clip needs the room. */

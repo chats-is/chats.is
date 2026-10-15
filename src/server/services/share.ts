@@ -1,13 +1,15 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, isNull, lte } from 'drizzle-orm';
 import { type z } from 'zod';
 
+import { type ChatMessage } from '@/types';
 import { pageWindow } from '@/types/pagination';
 import { type sharePageSchema } from '@/types/shared-link';
+import { artifactFiles } from '@/lib/document';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { artifacts, chats, shares } from '@/db/schema';
+import { artifacts, chats, messages, shares } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
 
 /**
@@ -217,8 +219,8 @@ export async function getSharedArtifact(shareId: string, artifactId: string) {
 
 /**
  * The artifact behind an artifact's share link, or undefined — for the page
- * that shows it alone. Nothing of its chat comes with it: not the chat, not
- * the messages, not who made it.
+ * that shows it alone. Nothing of its chat comes with it — not the chat, not
+ * the messages, not who made it — but the files it may read.
  */
 export async function getSharedArtifactPage(id: string) {
   const link = await db.query.shares.findFirst({
@@ -227,13 +229,41 @@ export async function getSharedArtifactPage(id: string) {
   });
   if (!link?.artifactId) return undefined;
 
-  return await db.query.artifacts.findFirst({
+  const found = await db.query.artifacts.findFirst({
     where: and(
       eq(artifacts.id, link.artifactId),
       eq(artifacts.userId, link.userId)
     ),
-    columns: { userId: false, chatId: false, messageId: false }
+    columns: { userId: false }
   });
+  if (!found) return undefined;
+  const { chatId, messageId, ...artifact } = found;
+
+  // The files it can read are those attached up to the reply that made it,
+  // named as the model was shown them then: a chat runs in the order it was
+  // written, and regenerating cuts away what came after.
+  const reply = await db.query.messages.findFirst({
+    where: eq(messages.id, messageId),
+    columns: { createdAt: true }
+  });
+  const before: ChatMessage[] = reply
+    ? await db
+        .select({
+          id: messages.id,
+          role: messages.role,
+          parts: messages.parts
+        })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.chatId, chatId),
+            lte(messages.createdAt, reply.createdAt)
+          )
+        )
+        .orderBy(asc(messages.createdAt))
+    : [];
+
+  return { artifact, files: artifactFiles(before) };
 }
 
 export async function deleteShare(userId: string, id: string) {

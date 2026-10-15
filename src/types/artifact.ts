@@ -29,6 +29,9 @@ export type Artifact = {
   updatedAt: Date;
 };
 
+/** A file an artifact can read, by the name it goes by in the chat. */
+export type ArtifactFile = { name: string; url: string };
+
 /** What the artifact server functions accept. */
 export const artifactIdSchema = z.object({ id: z.string().min(1) });
 export const artifactChatSchema = z.object({ chatId: z.string().min(1) });
