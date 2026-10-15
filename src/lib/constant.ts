@@ -480,6 +480,13 @@ export const PROVIDER_WEB_SEARCH_TOOL_NAMES: string[] = [
 ];
 
 /**
+ * The name the SDK gives a search Gemini reports running, with the queries it
+ * ran — reported only beside function tools, through Google's own API. Read
+ * by the usage count, and by the page to show the search.
+ */
+export const GEMINI_WEB_SEARCH_TOOL_NAME = 'server:GOOGLE_SEARCH_WEB';
+
+/**
  * 'auto' is a regular option value that admins put in a model's `uiOptions`
  * (e.g. `"aspectRatios": ["auto", "16:9"]`, default `"aspectRatio": "auto"`).
  * It flows through selection like any other value; only at the provider call

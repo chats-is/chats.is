@@ -142,8 +142,8 @@ describe('countWebSearches', () => {
     ).toBe(2);
   });
 
-  it('counts a Gemini-grounded step once, however many queries it ran', () => {
-    // Google bills the grounded prompt, not the queries behind it.
+  it('counts each query Gemini’s grounding lists', () => {
+    // Google bills Gemini by the query, not by the grounded step.
     expect(
       countWebSearches({
         content: [{ type: 'text' }],
@@ -151,7 +151,25 @@ describe('countWebSearches', () => {
           google: { groundingMetadata: { webSearchQueries: ['a', 'b', 'c'] } }
         }
       })
-    ).toBe(1);
+    ).toBe(3);
+  });
+
+  it('counts the queries of the searches Gemini reported, over a list that missed one', () => {
+    // Two searches in one step, four queries; the grounding listed three.
+    const search = (queries: string[]) => ({
+      type: 'tool-call',
+      toolName: 'server:GOOGLE_SEARCH_WEB',
+      providerExecuted: true,
+      input: { queries }
+    });
+    expect(
+      countWebSearches({
+        content: [search(['a', 'b']), search(['c', 'd']), { type: 'text' }],
+        providerMetadata: {
+          google: { groundingMetadata: { webSearchQueries: ['a', 'b', 'd'] } }
+        }
+      })
+    ).toBe(4);
   });
 
   it('is zero for a step that did not search', () => {

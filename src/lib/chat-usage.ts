@@ -1,5 +1,8 @@
 import { type ChatUsage } from '@/types';
-import { PROVIDER_WEB_SEARCH_TOOL_NAMES } from '@/lib/constant';
+import {
+  GEMINI_WEB_SEARCH_TOOL_NAME,
+  PROVIDER_WEB_SEARCH_TOOL_NAMES
+} from '@/lib/constant';
 
 /**
  * The subset of the AI SDK's `LanguageModelUsage` (the `usage` object passed to
@@ -120,6 +123,7 @@ export type SearchStepLike = {
     type: string;
     toolName?: string;
     providerExecuted?: boolean;
+    input?: unknown;
   }>;
   providerMetadata?: Record<string, unknown> | undefined;
 };
@@ -128,11 +132,16 @@ export type SearchStepLike = {
  * How many web searches a step made, as the provider bills them.
  *
  * OpenAI, Anthropic and xAI run their search as a tool call the step reports,
- * and charge each one. Gemini grounds the whole step and charges the step —
- * however many queries it ran — so a grounded step counts once.
+ * and charge each one. Gemini charges each query it sends Google, and one
+ * search may send several. Where it reports its searches — beside function
+ * tools, through Google's own API — their queries are counted; elsewhere
+ * (Vertex, or the search tool alone) the queries its grounding lists. That
+ * list can miss one when the model searches twice in a step, so the searches
+ * reported come first.
  */
 export function countWebSearches(step: SearchStepLike): number {
-  const calls = (step.content ?? []).filter(
+  const content = step.content ?? [];
+  const calls = content.filter(
     part =>
       part.type === 'tool-call' &&
       part.providerExecuted === true &&
@@ -140,11 +149,24 @@ export function countWebSearches(step: SearchStepLike): number {
       PROVIDER_WEB_SEARCH_TOOL_NAMES.includes(part.toolName)
   ).length;
 
+  const reported = content
+    .filter(
+      part =>
+        part.type === 'tool-call' &&
+        part.toolName === GEMINI_WEB_SEARCH_TOOL_NAME
+    )
+    // A search with no queries to show still went to Google once.
+    .reduce((sum, part) => sum + Math.max(1, queriesIn(part.input)), 0);
   const google = step.providerMetadata?.google as
     | { groundingMetadata?: { webSearchQueries?: string[] | null } | null }
     | undefined;
-  const grounded =
-    (google?.groundingMetadata?.webSearchQueries?.length ?? 0) > 0;
+  const listed = google?.groundingMetadata?.webSearchQueries?.length ?? 0;
 
-  return calls + (grounded ? 1 : 0);
+  return calls + (reported || listed);
+}
+
+/** How many queries a search Gemini reported ran. */
+function queriesIn(input: unknown): number {
+  const queries = (input as { queries?: unknown } | null)?.queries;
+  return Array.isArray(queries) ? queries.length : 0;
 }

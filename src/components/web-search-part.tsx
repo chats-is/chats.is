@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Globe, Loader2 } from 'lucide-react';
 
 import { type ChatMessage } from '@/types';
+import { GEMINI_WEB_SEARCH_TOOL_NAME } from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -15,13 +16,11 @@ export type WebSearchUIPart =
   | Extract<ChatPart, { type: 'tool-web_search' }>
   | Extract<ChatPart, { type: 'dynamic-tool' }>;
 
-/** The name the SDK gives Gemini's own web search. */
-const GEMINI_WEB_SEARCH = 'server:GOOGLE_SEARCH_WEB';
-
 export function isWebSearchPart(part: ChatPart): part is WebSearchUIPart {
   return (
     part.type === 'tool-web_search' ||
-    (part.type === 'dynamic-tool' && part.toolName === GEMINI_WEB_SEARCH)
+    (part.type === 'dynamic-tool' &&
+      part.toolName === GEMINI_WEB_SEARCH_TOOL_NAME)
   );
 }
 
