@@ -4,18 +4,18 @@ import {
   type Dispatch,
   type SetStateAction
 } from 'react';
-import {
-  AudioLines,
-  CircleAlert,
-  Clapperboard,
-  Loader2,
-  XCircle
-} from 'lucide-react';
+import { CircleAlert, Loader2, XCircle } from 'lucide-react';
 
 import { type Attachment } from '@/types';
 import { deleteFile } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
+import { FileTypeIcon } from '@/components/file-type-icon';
 
 /**
  * A file on its way to storage: shown at once in the place it will take, with
@@ -76,42 +76,36 @@ export const AttachmentsPreview = ({
     (attachments.length > 0 || uploads.length > 0) && (
       <div
         className={cn(
-          'mx-3 flex space-x-2 rounded-t-xl border border-b-0 bg-muted p-3 shadow-md',
+          'mx-3 flex space-x-2 overflow-x-auto rounded-t-xl border border-b-0 bg-muted p-3 shadow-md',
           className
         )}
       >
         {attachments.map((attachment, index) => (
           <div key={index} className="relative">
-            <div
-              className={cn(
-                'h-7 w-11 cursor-pointer overflow-hidden rounded-lg border p-px sm:h-16 sm:w-24',
-                { 'opacity-50': isPending }
-              )}
-            >
-              {attachment.contentType?.startsWith('audio/') ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <div
-                  title={attachment.name}
-                  className="flex size-full items-center justify-center rounded-md bg-background"
+                  className={cn(
+                    'size-11 cursor-pointer overflow-hidden rounded-lg border p-px sm:size-16',
+                    { 'opacity-50': isPending }
+                  )}
                 >
-                  <AudioLines className="size-5 text-muted-foreground" />
+                  {attachment.contentType?.startsWith('image/') ? (
+                    <img
+                      src={attachment.url}
+                      alt={attachment.name}
+                      className="size-full rounded-md object-cover"
+                    />
+                  ) : (
+                    <FileTile
+                      name={attachment.name}
+                      contentType={attachment.contentType}
+                    />
+                  )}
                 </div>
-              ) : attachment.contentType?.startsWith('video/') ? (
-                // A poster frame would need the file decoded; the icon says
-                // what was attached, which is what an <img> could not.
-                <div
-                  title={attachment.name}
-                  className="flex size-full items-center justify-center rounded-md bg-background"
-                >
-                  <Clapperboard className="size-5 text-muted-foreground" />
-                </div>
-              ) : (
-                <img
-                  src={attachment.url}
-                  alt={attachment.name}
-                  className="size-full rounded-md object-cover"
-                />
-              )}
-            </div>
+              </TooltipTrigger>
+              <TooltipContent>{attachment.name}</TooltipContent>
+            </Tooltip>
             <Button
               type="button"
               variant="link"
@@ -128,45 +122,43 @@ export const AttachmentsPreview = ({
         ))}
 
         {uploads.map(upload => (
-          <div
-            key={upload.id}
-            className="relative"
-            title={
-              upload.error ? `${upload.name}: ${upload.error}` : upload.name
-            }
-          >
-            <div className="relative h-7 w-11 overflow-hidden rounded-lg border p-px sm:h-16 sm:w-24">
-              {upload.previewUrl ? (
-                <img
-                  src={upload.previewUrl}
-                  alt={upload.name}
-                  className="size-full rounded-md object-cover"
-                />
-              ) : (
-                <div className="flex size-full items-center justify-center rounded-md bg-background">
-                  {upload.contentType.startsWith('video/') ? (
-                    <Clapperboard className="size-5 text-muted-foreground" />
+          <div key={upload.id} className="relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative size-11 overflow-hidden rounded-lg border p-px sm:size-16">
+                  {upload.previewUrl ? (
+                    <img
+                      src={upload.previewUrl}
+                      alt={upload.name}
+                      className="size-full rounded-md object-cover"
+                    />
                   ) : (
-                    <AudioLines className="size-5 text-muted-foreground" />
+                    <FileTile
+                      name={upload.name}
+                      contentType={upload.contentType}
+                    />
+                  )}
+                  {upload.error ? (
+                    <div className="absolute inset-px flex items-center justify-center rounded-md bg-destructive/70 text-white">
+                      <CircleAlert className="size-5" />
+                      <span className="sr-only">Upload failed</span>
+                    </div>
+                  ) : (
+                    <div className="absolute inset-px flex items-center justify-center rounded-md bg-background/60">
+                      <Loader2 className="size-4 animate-spin text-foreground" />
+                      <span className="sr-only">Uploading</span>
+                      <div
+                        className="absolute bottom-0 left-0 h-1 bg-primary transition-[width]"
+                        style={{ width: `${upload.progress}%` }}
+                      />
+                    </div>
                   )}
                 </div>
-              )}
-              {upload.error ? (
-                <div className="absolute inset-px flex items-center justify-center rounded-md bg-destructive/70 text-white">
-                  <CircleAlert className="size-5" />
-                  <span className="sr-only">Upload failed</span>
-                </div>
-              ) : (
-                <div className="absolute inset-px flex items-center justify-center rounded-md bg-background/60">
-                  <Loader2 className="size-4 animate-spin text-foreground" />
-                  <span className="sr-only">Uploading</span>
-                  <div
-                    className="absolute bottom-0 left-0 h-1 bg-primary transition-[width]"
-                    style={{ width: `${upload.progress}%` }}
-                  />
-                </div>
-              )}
-            </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                {upload.error ? `${upload.name}: ${upload.error}` : upload.name}
+              </TooltipContent>
+            </Tooltip>
             <Button
               type="button"
               variant="link"
@@ -184,3 +176,27 @@ export const AttachmentsPreview = ({
     )
   );
 };
+
+/** A file that is not a picture: its icon in the middle, its name along the
+ *  bottom where there is room for one. */
+function FileTile({
+  name,
+  contentType
+}: {
+  name?: string;
+  contentType?: string;
+}) {
+  return (
+    <div className="flex size-full flex-col rounded-md bg-background">
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <FileTypeIcon
+          contentType={contentType}
+          className="size-5 text-muted-foreground/60"
+        />
+      </div>
+      <span className="hidden truncate px-1 pb-1 text-center text-[10px] leading-tight text-muted-foreground sm:block">
+        {name}
+      </span>
+    </div>
+  );
+}

@@ -4,8 +4,14 @@ import { User } from 'lucide-react';
 
 import { type Artifact, type ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { DocumentPreview } from '@/components/artifacts/document-preview';
 import { AudioPlayer } from '@/components/audio-player';
+import { FileTypeIcon } from '@/components/file-type-icon';
 import { IconLoading } from '@/components/icons';
 import { MediaLightbox } from '@/components/media-lightbox';
 import {
@@ -321,18 +327,29 @@ export function Message({
                   );
                 }
 
-                // Display download link for other file types
+                // A document, or any other file: its name, opening the file.
+                // As wide as its name, up to a limit, and inline — so the
+                // files of one message sit side by side.
                 return (
-                  <a
-                    key={index}
-                    href={part.url}
-                    title={part.filename}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary underline hover:no-underline"
-                  >
-                    Download file
-                  </a>
+                  <Tooltip key={index}>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={part.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="my-1 mr-2 inline-flex max-w-60 items-center gap-2 rounded-lg border bg-background px-3 py-2 align-top text-sm hover:bg-muted"
+                      >
+                        <FileTypeIcon
+                          contentType={part.mediaType}
+                          className="size-4 shrink-0 text-muted-foreground/60"
+                        />
+                        <span className="min-w-0 truncate">
+                          {part.filename || 'File'}
+                        </span>
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>{part.filename || 'File'}</TooltipContent>
+                  </Tooltip>
                 );
               }
             })}
