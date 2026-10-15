@@ -4,7 +4,7 @@
  * It carries the facts only the running request knows — which model answered,
  * who serves it, when and where the user is — and the conventions that come
  * from this app's own renderer rather than from anyone's preference: Markdown
- * through `remark-gfm`, mathematics through KaTeX.
+ * as GitHub writes it, mathematics through KaTeX.
  *
  * Built here, not filled from a template: a fact that is not known is left
  * out rather than left blank — "served by ." is worse than saying nothing of

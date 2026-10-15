@@ -5,7 +5,7 @@ import { ChevronDown, Lightbulb, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { MemoizedReactMarkdown } from '@/components/markdown';
+import { MessageMarkdown } from '@/components/message-markdown';
 
 export interface MessageReasoningProps {
   isLoading: boolean;
@@ -158,7 +158,7 @@ export function MessageReasoning({
             variants={variants}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
           >
-            <MemoizedReactMarkdown>{text}</MemoizedReactMarkdown>
+            <MessageMarkdown content={text} streaming={isLoading} />
           </motion.div>
         )}
       </AnimatePresence>

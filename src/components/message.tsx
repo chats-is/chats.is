@@ -3,6 +3,7 @@ import { type UseChatHelpers } from '@ai-sdk/react';
 import { User } from 'lucide-react';
 
 import { type Artifact, type ChatMessage } from '@/types';
+import { textRuns } from '@/lib/message-content';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -88,6 +89,7 @@ export function Message({
       isWebSearchPart(part)
   );
   const sources = useMemo(() => collectSources(message.parts), [message.parts]);
+  const runs = useMemo(() => textRuns(message.parts), [message.parts]);
   // The searches are shown as one block, where the first of them was made —
   // as the reasoning parts are, and for the same reason: several at once are
   // one thing happening, not several.
@@ -274,18 +276,27 @@ export function Message({
               }
 
               if (part.type === 'text') {
-                return message.role === 'user' ? (
-                  <p key={index} className="whitespace-pre-wrap">
-                    {part.text.split('\n').map((line, i) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && <br />}
-                        {line}
-                      </React.Fragment>
-                    ))}
-                  </p>
-                ) : (
-                  <MessageMarkdown key={index} content={part.text} />
-                );
+                if (message.role === 'user') {
+                  return (
+                    <p key={index} className="whitespace-pre-wrap">
+                      {part.text.split('\n').map((line, i) => (
+                        <React.Fragment key={i}>
+                          {i > 0 && <br />}
+                          {line}
+                        </React.Fragment>
+                      ))}
+                    </p>
+                  );
+                }
+                // Drawn once, at the start of the piece it belongs to.
+                const run = runs.get(index);
+                return run ? (
+                  <MessageMarkdown
+                    key={index}
+                    content={run.text}
+                    streaming={run.streaming}
+                  />
+                ) : null;
               }
 
               if (part.type === 'file') {

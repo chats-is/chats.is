@@ -79,3 +79,34 @@ export function markStopped(parts: Part[]): Part[] {
     }
   ];
 }
+
+/**
+ * A reply's writing as it reads, keyed by the part each piece begins at.
+ * Text parts next to each other are one piece: Anthropic cuts a cited answer
+ * into a block per citation, so "今日" "国际金价约为…" "，" arrive as parts of
+ * their own, and drawn one by one each took a line. A source between them
+ * draws nothing, and does not part them; anything else — a tool call, a step,
+ * a thought — does. A text part that continues a piece has no entry.
+ */
+export function textRuns(
+  parts: Part[]
+): Map<number, { text: string; streaming: boolean }> {
+  const runs = new Map<number, { text: string; streaming: boolean }>();
+  let open: { text: string; streaming: boolean } | null = null;
+  parts.forEach((part, index) => {
+    if (part.type === 'text') {
+      if (open) {
+        open.text += part.text;
+        open.streaming = part.state === 'streaming';
+      } else {
+        open = { text: part.text, streaming: part.state === 'streaming' };
+        runs.set(index, open);
+      }
+      return;
+    }
+    if (part.type !== 'source-url' && part.type !== 'source-document') {
+      open = null;
+    }
+  });
+  return runs;
+}

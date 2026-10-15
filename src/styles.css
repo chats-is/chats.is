@@ -5,7 +5,9 @@
 /* KaTeX ships its own typography; the message renderer turns `$…$` and
    `\(…\)` into markup that needs it. */
 @import 'katex/dist/katex.min.css';
-@plugin '@tailwindcss/typography';
+/* Streamdown draws replies with utility classes of its own, which the build
+   finds only by looking in its files. */
+@source '../node_modules/streamdown/dist/*.js';
 
 @custom-variant dark (&:is(.dark *));
 

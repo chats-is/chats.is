@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { type ChatMessage } from '@/types';
 
-import { hasVisibleContent, markStopped } from './message-content';
+import { hasVisibleContent, markStopped, textRuns } from './message-content';
 
 type Part = ChatMessage['parts'][number];
 
@@ -124,5 +124,48 @@ describe('markStopped', () => {
   it('leaves a finished reply alone', () => {
     const parts: Part[] = [{ type: 'text', text: 'done' }, done];
     expect(markStopped(parts)).toEqual(parts);
+  });
+});
+
+describe('textRuns', () => {
+  const text = (value: string, state: 'done' | 'streaming' = 'done'): Part => ({
+    type: 'text',
+    text: value,
+    state
+  });
+  const source = (url: string): Part => ({
+    type: 'source-url',
+    sourceId: url,
+    url
+  });
+
+  it('joins the blocks a cited answer is cut into, across its sources', () => {
+    const runs = textRuns([
+      { type: 'step-start' },
+      text('今日'),
+      text('国际金价约为 **$4,138**'),
+      source('https://a.com'),
+      text('，'),
+      text('汇率约为 6.69', 'streaming')
+    ]);
+    expect([...runs]).toEqual([
+      [
+        1,
+        { text: '今日国际金价约为 **$4,138**，汇率约为 6.69', streaming: true }
+      ]
+    ]);
+  });
+
+  it('keeps writing on either side of anything else apart', () => {
+    const runs = textRuns([
+      text('Searching.'),
+      running('s1'),
+      { type: 'step-start' },
+      text('Found it.')
+    ]);
+    expect([...runs]).toEqual([
+      [0, { text: 'Searching.', streaming: false }],
+      [3, { text: 'Found it.', streaming: false }]
+    ]);
   });
 });
