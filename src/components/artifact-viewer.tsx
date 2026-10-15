@@ -111,7 +111,7 @@ export function ArtifactViewer({
     <div
       ref={contentRef}
       className={cn(
-        'h-full min-h-0 overflow-auto rounded-md bg-background',
+        'h-full min-h-0 overflow-auto bg-background',
         artifactSourceUsesCodeChrome(artifact) ? 'p-0' : 'border p-4'
       )}
     >

@@ -21,9 +21,8 @@ import { properties } from '@codemirror/legacy-modes/mode/properties';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { toml } from '@codemirror/legacy-modes/mode/toml';
 import { EditorState } from '@codemirror/state';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, lineNumbers } from '@codemirror/view';
-import { githubLight } from '@uiw/codemirror-theme-github';
+import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
 import { useTheme } from 'next-themes';
 
 import { normalizeCodeLanguage } from '@/lib/code-language';
@@ -108,7 +107,8 @@ export function CodeEditor({
       EditorView.editable.of(false),
       ...(showLineNumbers ? [lineNumbers()] : []),
       ...(wrapLongLines ? [EditorView.lineWrapping] : []),
-      ...(resolvedTheme === 'dark' ? [oneDark] : [githubLight]),
+      // GitHub's colours, light and dark, as a reply's code blocks have.
+      ...(resolvedTheme === 'dark' ? [githubDark] : [githubLight]),
       ...(languageExtension ? [languageExtension] : [])
     ];
   }, [language, resolvedTheme, showLineNumbers, wrapLongLines]);
