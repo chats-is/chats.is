@@ -1,22 +1,18 @@
 import { type ProviderType } from '@/types';
 
 /**
- * Whether a provider type has a web search of its own. Google's cannot run
- * beside function tools — Gemini drops them — so it counts only where it
- * would be the only tool, which is the delegate path.
+ * Whether a provider type has a web search of its own, which runs beside the
+ * chat's other tools. Google's does from Gemini 3 on; an older Gemini drops
+ * the function tools beside it, so its search switch is left off.
  */
-export function hasOwnWebSearch(
-  type: ProviderType,
-  options: { alone: boolean }
-): boolean {
+export function hasOwnWebSearch(type: ProviderType): boolean {
   switch (type) {
     case 'openai':
     case 'anthropic':
     case 'xai':
-      return true;
     case 'google':
     case 'vertex':
-      return options.alone;
+      return true;
     default:
       return false;
   }
@@ -62,8 +58,6 @@ export function searchesForItself(args: {
   return (
     (args.mode === 'auto' || selfServes) &&
     !!args.model.supportsWebSearch &&
-    args.model.providerTypes.some(type =>
-      hasOwnWebSearch(type, { alone: false })
-    )
+    args.model.providerTypes.some(hasOwnWebSearch)
   );
 }

@@ -256,14 +256,10 @@ describe('a Vertex provider', () => {
 
   it('gives Claude Anthropic’s search, and Gemini Google’s', () => {
     expect(
-      getProviderWebSearchTool(serviceAccount, 'claude-sonnet-4-5', {
-        alone: true
-      })?.web_search
+      getProviderWebSearchTool(serviceAccount, 'claude-sonnet-4-5')?.web_search
     ).toMatchObject({ id: 'anthropic.web_search_20250305' });
     expect(
-      getProviderWebSearchTool(serviceAccount, 'gemini-2.5-pro', {
-        alone: true
-      })
+      getProviderWebSearchTool(serviceAccount, 'gemini-2.5-pro')
     ).toHaveProperty('google_search');
   });
 });

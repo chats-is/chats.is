@@ -139,8 +139,7 @@ export async function setupWebSearch(args: {
                 async candidate => {
                   const searchTool = getProviderWebSearchTool(
                     candidate,
-                    searchable.dbModel.modelId,
-                    { alone: true }
+                    searchable.dbModel.modelId
                   );
                   if (!searchTool) throw new NoSearchError(candidate.name);
 
@@ -224,9 +223,7 @@ export async function setupWebSearch(args: {
 
   const toolsFor = (candidate: Candidate): ToolSet =>
     (ownSearch(candidate)
-      ? getProviderWebSearchTool(candidate, chatModel.modelId, {
-          alone: false
-        })
+      ? getProviderWebSearchTool(candidate, chatModel.modelId)
       : null) ??
     delegate ??
     {};

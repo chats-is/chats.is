@@ -749,6 +749,11 @@ async function POST({
             originalMessages: chatMessages,
             generateMessageId: () => assistantMessageId,
             sendReasoning: isReasoning,
+            // The pages a provider's own search drew on, kept with the reply
+            // as `source-url` parts. Gemini reports them only so; the others
+            // put them in their search tool's result as well, and the page
+            // shows each page once.
+            sendSources: true,
             // Without this the inner stream uses the SDK's default, which
             // reports every failure as "An error occurred.", and the reason
             // is lost before it can be shown or written to the message.

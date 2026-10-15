@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Globe, Loader2 } from 'lucide-react';
 
@@ -6,15 +6,23 @@ import { type ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-export type WebSearchUIPart = Extract<
-  ChatMessage['parts'][number],
-  { type: 'tool-web_search' }
->;
+type ChatPart = ChatMessage['parts'][number];
 
-export function isWebSearchPart(
-  part: ChatMessage['parts'][number]
-): part is WebSearchUIPart {
-  return part.type === 'tool-web_search';
+/** A search: the delegate's tool or a provider's own, under the tool's name —
+ *  or Gemini's, which the SDK reports as a tool it has no schema for, named
+ *  by its kind. */
+export type WebSearchUIPart =
+  | Extract<ChatPart, { type: 'tool-web_search' }>
+  | Extract<ChatPart, { type: 'dynamic-tool' }>;
+
+/** The name the SDK gives Gemini's own web search. */
+const GEMINI_WEB_SEARCH = 'server:GOOGLE_SEARCH_WEB';
+
+export function isWebSearchPart(part: ChatPart): part is WebSearchUIPart {
+  return (
+    part.type === 'tool-web_search' ||
+    (part.type === 'dynamic-tool' && part.toolName === GEMINI_WEB_SEARCH)
+  );
 }
 
 /** One page a reply drew on. */
@@ -28,21 +36,23 @@ export type WebSource = { title: string; url: string };
  * once, by its address.
  */
 export function collectSources(parts: ChatMessage['parts']): WebSource[] {
-  const seen = new Set<string>();
-  const sources: WebSource[] = [];
+  const byUrl = new Map<string, WebSource>();
+  const untitled = new Set<string>();
   const add = (url: unknown, title: unknown) => {
-    if (typeof url !== 'string' || !/^https?:\/\//.test(url) || seen.has(url)) {
+    if (typeof url !== 'string' || !/^https?:\/\//.test(url)) return;
+    const named = typeof title === 'string' && !!title;
+    const known = byUrl.get(url);
+    if (known) {
+      // Found by a search whose result names no page, then cited by title.
+      if (named && untitled.delete(url)) known.title = title;
       return;
     }
-    seen.add(url);
+    if (!named) untitled.add(url);
     // A source with no title is named by its address, less the protocol:
     // a provider that names none sends several pages from the same site,
     // which the host alone could not tell apart.
-    sources.push({
-      title:
-        typeof title === 'string' && title
-          ? title
-          : url.replace(/^https?:\/\//, '').replace(/\/$/, ''),
+    byUrl.set(url, {
+      title: named ? title : url.replace(/^https?:\/\//, '').replace(/\/$/, ''),
       url
     });
   };
@@ -64,16 +74,32 @@ export function collectSources(parts: ChatMessage['parts']): WebSource[] {
       walk(part.output, 0);
     }
   }
-  return sources;
+  return [...byUrl.values()];
 }
 
-/** What was searched for: the delegate tool's input, or, for a provider's
- *  own search, whatever its result says it looked up. */
-function queryOf(part: WebSearchUIPart): string | undefined {
-  if (part.input?.query) return part.input.query;
+/** What was searched for: the delegate tool's input, Gemini's — which runs
+ *  several queries in one search — or, for another provider's own search,
+ *  whatever its result says it looked up. */
+function queriesOf(part: WebSearchUIPart): string[] {
+  const input = part.input as
+    { query?: unknown; queries?: unknown } | undefined;
+  if (typeof input?.query === 'string' && input.query) return [input.query];
+  if (Array.isArray(input?.queries)) {
+    return input.queries.filter(
+      (query): query is string => typeof query === 'string' && !!query
+    );
+  }
   const output = part.output as { action?: { query?: unknown } } | undefined;
   const query = output?.action?.query;
-  return typeof query === 'string' && query ? query : undefined;
+  return typeof query === 'string' && query ? [query] : [];
+}
+
+/** The delegate says in its output that a search failed. */
+function reportsError(part: WebSearchUIPart): boolean {
+  return (
+    part.state === 'output-available' &&
+    (part.output as { status?: unknown } | undefined)?.status === 'error'
+  );
 }
 
 /**
@@ -88,7 +114,7 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
     part => part.state === 'input-streaming' || part.state === 'input-available'
   );
   const found = parts.some(
-    part => part.state === 'output-available' && part.output?.status !== 'error'
+    part => part.state === 'output-available' && !reportsError(part)
   );
   // Open while searching, so it can be watched, and closed once done — as
   // the reasoning is. The reader can open or close it either way.
@@ -96,7 +122,6 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
   useEffect(() => {
     setIsExpanded(searching);
   }, [searching]);
-  const queries = parts.map(queryOf);
 
   return (
     <div className="mb-2">
@@ -146,20 +171,23 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
                 // Failed, or stopped before it finished: the delegate says
                 // so in its output, a stopped call in its state.
                 const failed =
-                  part.state === 'output-error' ||
-                  (part.state === 'output-available' &&
-                    part.output?.status === 'error');
-                const query = queries[index];
+                  part.state === 'output-error' || reportsError(part);
                 const verb = running
                   ? 'Searching'
                   : failed
                     ? 'Could not search'
                     : 'Searched';
-                return (
-                  <li key={part.toolCallId ?? index} className="truncate">
-                    {query ? `${verb} “${query}”` : verb}
-                    {running && '…'}
-                  </li>
+                const queries = queriesOf(part);
+                return (queries.length ? queries : [undefined]).map(
+                  (query, queryIndex) => (
+                    <li
+                      key={`${part.toolCallId ?? index}-${queryIndex}`}
+                      className="truncate"
+                    >
+                      {query ? `${verb} “${query}”` : verb}
+                      {running && '…'}
+                    </li>
+                  )
                 );
               })}
             </ul>
@@ -175,66 +203,121 @@ const variants = {
   expanded: { height: 'auto', opacity: 1 }
 };
 
-/** How many sources are listed before the rest fold away. */
-const SOURCES_SHOWN = 6;
+/** How many sites' icons the closed list shows, one over the next. */
+const ICONS_STACKED = 4;
 
-/** The pages a reply drew on, listed once under it. */
+/** The pill the list opens from, and each page in it, alike. */
+const PILL =
+  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground';
+
+/**
+ * The pages a reply drew on, under it: closed, the icons of the first few
+ * sites and how many pages there are; opened, each page as a pill — its
+ * site's icon and its title — as many to a line as fit.
+ */
 export function MessageSources({ sources }: { sources: WebSource[] }) {
-  const [expanded, setExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   if (sources.length === 0) return null;
 
-  const shown = expanded ? sources : sources.slice(0, SOURCES_SHOWN);
-  const hidden = sources.length - shown.length;
+  const stacked = [...new Set(sources.map(siteOf))].slice(0, ICONS_STACKED);
 
   return (
-    <div className="mt-3 text-sm">
-      <div className="mb-1 text-xs font-medium text-muted-foreground">
-        Sources
-      </div>
-      <ol className="space-y-1">
-        {shown.map((source, index) => {
-          const host = hostOf(source.url);
-          return (
-            <li key={source.url} className="flex min-w-0 items-baseline gap-2">
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {index + 1}.
-              </span>
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={source.url}
-                className="min-w-0 truncate text-primary hover:underline"
-              >
-                {source.title}
-              </a>
-              {/* The host, unless the title already says it. */}
-              {host && !namesSite(source.title, host) && (
-                <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-                  {host}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-      {hidden > 0 && (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="mt-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          Show {hidden} more
-        </button>
-      )}
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={PILL}
+      >
+        <span className="flex -space-x-1.5">
+          {/* The first on top, each over the one after it. */}
+          {stacked.map((site, index) => (
+            <SiteIcon
+              key={site}
+              site={site}
+              style={{ zIndex: stacked.length - index }}
+              className="relative size-3.5 bg-muted"
+            />
+          ))}
+        </span>
+        {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+        <ChevronDown
+          className={cn('size-3.5 transition-transform', {
+            'rotate-180': isExpanded
+          })}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.ul
+            key="sources"
+            className="mt-2 flex flex-wrap gap-1.5 overflow-hidden"
+            initial="collapsed"
+            animate="expanded"
+            exit="collapsed"
+            variants={variants}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+          >
+            {sources.map(source => (
+              <li key={source.url} className="min-w-0">
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`${source.title}\n${source.url}`}
+                  className={cn(PILL, 'max-w-64')}
+                >
+                  <SiteIcon site={siteOf(source)} className="size-3.5" />
+                  <span className="truncate">{source.title}</span>
+                </a>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-/** Whether a title already says where a page is: it carries the host, or
- *  is itself one — a redirecting search names a page by its site alone. */
-function namesSite(title: string, host: string): boolean {
-  return title.includes(host) || /^[\w.-]+\.[a-z]{2,}$/i.test(title.trim());
+/** A site's icon, round, as Google's icon service has it — a globe where
+ *  it has none, or cannot be reached. */
+function SiteIcon({
+  site,
+  className,
+  style
+}: {
+  site: string;
+  className: string;
+  style?: CSSProperties;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <Globe
+        style={style}
+        className={cn('shrink-0 rounded-full text-muted-foreground', className)}
+      />
+    );
+  }
+  return (
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(site)}&sz=32`}
+      alt=""
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      style={style}
+      className={cn('shrink-0 rounded-full', className)}
+    />
+  );
+}
+
+/** The site a page is on: its host — or its title, where the address is a
+ *  search's redirect and the title names the site. */
+function siteOf(source: WebSource): string {
+  const title = source.title.trim();
+  return /^[\w.-]+\.[a-z]{2,}$/i.test(title)
+    ? title.replace(/^www\./, '')
+    : hostOf(source.url) || title;
 }
 
 function hostOf(url: string): string {

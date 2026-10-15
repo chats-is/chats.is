@@ -219,10 +219,9 @@ export function getLanguageModel(
  */
 export function getProviderWebSearchTool(
   provider: Candidate,
-  modelId: string,
-  options: { alone: boolean }
+  modelId: string
 ): Record<string, Tool> | null {
-  if (!hasOwnWebSearch(provider.type, options)) return null;
+  if (!hasOwnWebSearch(provider.type)) return null;
   // Claude on Vertex searches as Claude does, with the one version of the
   // tool Vertex takes.
   if (

@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type Candidate, type Model } from '@/types';
-import {
-  getProviderWebSearchTool,
-  runWithProviderFailover
-} from '@/lib/provider';
+import { runWithProviderFailover } from '@/lib/provider';
 import { preflightCheck } from '@/server/services/preflight';
 import { getWebSearchSettings } from '@/server/services/settings';
 import { getUserTier } from '@/server/services/tier';
@@ -131,17 +128,16 @@ describe('who searches', () => {
     expect(tools.web_search.execute).toBeTypeOf('function');
   });
 
-  it('auto: Gemini asks the search model even with search on — its own cannot run beside tools', async () => {
+  it('auto: Gemini with search on searches for itself, beside its other tools', async () => {
     settings('auto');
     const chat = model('gemini', { supportsWebSearch: true }, [
       provider('google')
     ]);
     const search = await setup(chat);
 
-    const tools = search.toolsFor(provider('google'));
-    expect(Object.keys(tools)).toEqual(['web_search']);
-    expect(tools.web_search.execute).toBeTypeOf('function');
-    expect(getProviderWebSearchTool).not.toHaveBeenCalled();
+    expect(search.toolsFor(provider('google'))).toEqual({
+      google_search: { own: 'google' }
+    });
   });
 
   it('model: the search model answers even for a model with a search of its own', async () => {

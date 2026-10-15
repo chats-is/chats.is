@@ -8,13 +8,19 @@ const model = (
 ) => ({ modelId: 'chat', supportsWebSearch, providerTypes });
 
 describe('hasOwnWebSearch', () => {
-  it('is OpenAI, Anthropic and xAI beside tools; Google only alone', () => {
-    expect(hasOwnWebSearch('openai', { alone: false })).toBe(true);
-    expect(hasOwnWebSearch('anthropic', { alone: false })).toBe(true);
-    expect(hasOwnWebSearch('xai', { alone: false })).toBe(true);
-    expect(hasOwnWebSearch('google', { alone: false })).toBe(false);
-    expect(hasOwnWebSearch('google', { alone: true })).toBe(true);
-    expect(hasOwnWebSearch('deepseek', { alone: true })).toBe(false);
+  it('is OpenAI, Anthropic, xAI and Google’s — not DeepSeek’s, Azure’s or Bedrock’s', () => {
+    for (const type of [
+      'openai',
+      'anthropic',
+      'xai',
+      'google',
+      'vertex'
+    ] as const) {
+      expect(hasOwnWebSearch(type)).toBe(true);
+    }
+    for (const type of ['deepseek', 'azure', 'bedrock'] as const) {
+      expect(hasOwnWebSearch(type)).toBe(false);
+    }
   });
 });
 
@@ -45,8 +51,10 @@ describe('canSearchWeb', () => {
     expect(canSearchWeb({ ...none, model: model(false, 'openai') })).toBe(
       false
     );
-    // A provider with no search beside tools.
-    expect(canSearchWeb({ ...none, model: model(true, 'google') })).toBe(false);
+    // A provider with no search of its own.
+    expect(canSearchWeb({ ...none, model: model(true, 'bedrock') })).toBe(
+      false
+    );
     expect(canSearchWeb({ ...none, model: model(true, 'deepseek') })).toBe(
       false
     );
