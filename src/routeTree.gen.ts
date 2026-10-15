@@ -37,6 +37,7 @@ import { Route as ConsoleSettingsRouteImport } from './routes/console/settings'
 import { Route as ConsoleSubscriptionsRouteImport } from './routes/console/subscriptions'
 import { Route as ConsoleTiersRouteImport } from './routes/console/tiers'
 import { Route as ConsoleUsageRouteImport } from './routes/console/usage'
+import { Route as DevMarkdownRouteImport } from './routes/dev.markdown'
 import { Route as PayPaddleRouteImport } from './routes/pay/paddle'
 import { Route as ShareIdRouteImport } from './routes/share/$id'
 import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
@@ -186,6 +187,11 @@ const ConsoleUsageRoute = ConsoleUsageRouteImport.update({
   path: '/usage',
   getParentRoute: () => ConsoleRoute,
 } as any)
+const DevMarkdownRoute = DevMarkdownRouteImport.update({
+  id: '/dev/markdown',
+  path: '/dev/markdown',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PayPaddleRoute = PayPaddleRouteImport.update({
   id: '/pay/paddle',
   path: '/pay/paddle',
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
+  '/dev/markdown': typeof DevMarkdownRoute
   '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/console/': typeof ConsoleIndexRoute
@@ -296,6 +303,7 @@ export interface FileRoutesByTo {
   '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
+  '/dev/markdown': typeof DevMarkdownRoute
   '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/': typeof ChatIndexRoute
@@ -336,6 +344,7 @@ export interface FileRoutesById {
   '/console/subscriptions': typeof ConsoleSubscriptionsRoute
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
+  '/dev/markdown': typeof DevMarkdownRoute
   '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/_chat/': typeof ChatIndexRoute
@@ -377,6 +386,7 @@ export interface FileRouteTypes {
     | '/console/subscriptions'
     | '/console/tiers'
     | '/console/usage'
+    | '/dev/markdown'
     | '/pay/paddle'
     | '/share/$id'
     | '/console/'
@@ -413,6 +423,7 @@ export interface FileRouteTypes {
     | '/console/subscriptions'
     | '/console/tiers'
     | '/console/usage'
+    | '/dev/markdown'
     | '/pay/paddle'
     | '/share/$id'
     | '/'
@@ -452,6 +463,7 @@ export interface FileRouteTypes {
     | '/console/subscriptions'
     | '/console/tiers'
     | '/console/usage'
+    | '/dev/markdown'
     | '/pay/paddle'
     | '/share/$id'
     | '/_chat/'
@@ -476,6 +488,7 @@ export interface RootRouteChildren {
   ApiCronRoute: typeof ApiCronRoute
   ApiSpeechRoute: typeof ApiSpeechRoute
   ArtifactIdRoute: typeof ArtifactIdRoute
+  DevMarkdownRoute: typeof DevMarkdownRoute
   PayPaddleRoute: typeof PayPaddleRoute
   ShareIdRoute: typeof ShareIdRoute
   ApiArtifactsPreviewRoute: typeof ApiArtifactsPreviewRoute
@@ -681,6 +694,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleUsageRouteImport
       parentRoute: typeof ConsoleRoute
     }
+    '/dev/markdown': {
+      id: '/dev/markdown'
+      path: '/dev/markdown'
+      fullPath: '/dev/markdown'
+      preLoaderRoute: typeof DevMarkdownRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pay/paddle': {
       id: '/pay/paddle'
       path: '/pay/paddle'
@@ -829,6 +849,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronRoute: ApiCronRoute,
   ApiSpeechRoute: ApiSpeechRoute,
   ArtifactIdRoute: ArtifactIdRoute,
+  DevMarkdownRoute: DevMarkdownRoute,
   PayPaddleRoute: PayPaddleRoute,
   ShareIdRoute: ShareIdRoute,
   ApiArtifactsPreviewRoute: ApiArtifactsPreviewRoute,
