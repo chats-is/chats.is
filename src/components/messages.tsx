@@ -137,9 +137,14 @@ export function Messages({
         } = item;
         const isLastMessage = visibleIndex === displayItems.length - 1;
         const messageKey = message.id || `${message.role}-${index}`;
+        // A question after an answer begins the next exchange, and is set
+        // apart from the one before it.
+        const beginsExchange =
+          message.role === 'user' &&
+          displayItems[visibleIndex - 1]?.message.role === 'assistant';
 
         return (
-          <div key={messageKey}>
+          <div key={messageKey} className={cn(beginsExchange && 'mt-4')}>
             <Message
               status={status}
               message={message}

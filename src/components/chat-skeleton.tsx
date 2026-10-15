@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatHeader } from '@/components/chat-header';
 
@@ -24,7 +25,12 @@ export function ChatSkeleton() {
             key={index}
             className={
               turn.role === 'user'
-                ? 'mb-6 flex flex-row-reverse items-start'
+                ? // The space <Messages> sets before a question that follows
+                  // an answer.
+                  cn(
+                    'mb-6 flex flex-row-reverse items-start',
+                    index > 0 && 'mt-4'
+                  )
                 : 'mb-6 flex items-start'
             }
           >
