@@ -6,6 +6,7 @@ import { createAzure } from '@ai-sdk/azure';
 import { createDeepSeek } from '@ai-sdk/deepseek';
 import { createGoogle } from '@ai-sdk/google';
 import { createVertex } from '@ai-sdk/google-vertex';
+import { createVertexAnthropic } from '@ai-sdk/google-vertex/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
 import {
@@ -78,6 +79,47 @@ function toBedrockModelId(modelId: string): string {
 }
 
 /**
+ * Whether a Vertex model is Claude. Vertex publishes Claude under Anthropic,
+ * through an API of Anthropic's, and every id it gives Claude starts so;
+ * everything else there is Google's.
+ */
+function isVertexClaude(providerModelId: string): boolean {
+  return providerModelId.startsWith('claude-');
+}
+
+/** A Vertex key: a service account with its location, or an API key. */
+function parseVertexKey(apiKey?: string): VertexServiceAccountKey | null {
+  if (!apiKey) return null;
+  try {
+    return JSON.parse(apiKey) as VertexServiceAccountKey;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Claude on Vertex, with the service account Gemini there uses. An API key
+ * will not do: it reaches Vertex's express mode, which serves Gemini alone.
+ */
+function createVertexClaudeSDK(config: ProviderConfig) {
+  const vertexKey = parseVertexKey(
+    config.apiKey ? decrypt(config.apiKey) : undefined
+  );
+  if (!vertexKey?.location || !vertexKey.credentials) {
+    throw new Error(
+      'Claude on Vertex AI needs a service account key with a location; an API key reaches Gemini only.'
+    );
+  }
+  return createVertexAnthropic({
+    project: vertexKey.credentials.project_id,
+    location: vertexKey.location,
+    googleAuthOptions: {
+      credentials: vertexKey.credentials
+    }
+  });
+}
+
+/**
  * Create provider SDK instance based on type and config
  */
 function createProviderSDK(config: ProviderConfig): any {
@@ -104,13 +146,7 @@ function createProviderSDK(config: ProviderConfig): any {
       });
 
     case 'vertex': {
-      let vertexKey: VertexServiceAccountKey | null = null;
-
-      if (apiKey) {
-        try {
-          vertexKey = JSON.parse(apiKey) as VertexServiceAccountKey;
-        } catch {}
-      }
+      const vertexKey = parseVertexKey(apiKey);
 
       if (vertexKey?.location && vertexKey.credentials) {
         return createVertex({
@@ -168,8 +204,12 @@ export function getLanguageModel(
   provider: Candidate,
   modelId: string
 ): LanguageModel {
+  const providerModelId = resolveModelId(provider, modelId);
+  if (provider.type === 'vertex' && isVertexClaude(providerModelId)) {
+    return createVertexClaudeSDK(provider)(providerModelId);
+  }
   const sdk = createProviderSDK(provider);
-  return sdk(resolveModelId(provider, modelId));
+  return sdk(providerModelId);
 }
 
 /**
@@ -179,9 +219,22 @@ export function getLanguageModel(
  */
 export function getProviderWebSearchTool(
   provider: Candidate,
+  modelId: string,
   options: { alone: boolean }
 ): Record<string, Tool> | null {
   if (!hasOwnWebSearch(provider.type, options)) return null;
+  // Claude on Vertex searches as Claude does, with the one version of the
+  // tool Vertex takes.
+  if (
+    provider.type === 'vertex' &&
+    isVertexClaude(resolveModelId(provider, modelId))
+  ) {
+    return {
+      web_search: createVertexClaudeSDK(provider).tools.webSearch_20250305({
+        maxUses: 5
+      })
+    };
+  }
   const sdk = createProviderSDK(provider);
   switch (provider.type) {
     case 'openai':

@@ -5,6 +5,8 @@ import { type Provider } from '@/types';
 
 import {
   AllProvidersFailedError,
+  getLanguageModel,
+  getProviderWebSearchTool,
   isRetryableProviderError,
   runWithProviderFailover,
   toProviderModelId
@@ -198,5 +200,70 @@ describe('runWithProviderFailover', () => {
 
     expect(provider.id).toBe('b');
     expect(tried).toEqual(['a', 'b']);
+  });
+});
+
+describe('a Vertex provider', () => {
+  // A service account as the console stores it; nothing here signs in.
+  const serviceAccount = fp({
+    type: 'vertex',
+    apiKey: JSON.stringify({
+      location: 'us-east5',
+      credentials: {
+        project_id: 'p',
+        client_email: 'a@p.iam.gserviceaccount.com',
+        private_key: 'k'
+      }
+    })
+  });
+  const apiKeyOnly = fp({ type: 'vertex', apiKey: 'express-key' });
+
+  const model = (provider: Provider, modelId: string) =>
+    getLanguageModel(provider, modelId) as {
+      provider: string;
+      modelId: string;
+    };
+
+  it('serves Claude through Anthropic’s API, under Vertex’s id for it', () => {
+    expect(model(serviceAccount, 'claude-sonnet-4-5')).toMatchObject({
+      provider: 'googleVertex.anthropic.messages',
+      modelId: 'claude-sonnet-4-5@20250929'
+    });
+  });
+
+  it('serves a Claude id it has no rename for the same way', () => {
+    expect(model(serviceAccount, 'claude-sonnet-4-6')).toMatchObject({
+      provider: 'googleVertex.anthropic.messages',
+      modelId: 'claude-sonnet-4-6'
+    });
+  });
+
+  it('serves Gemini through Google’s', () => {
+    expect(model(serviceAccount, 'gemini-2.5-pro')).toMatchObject({
+      provider: 'google.vertex.chat',
+      modelId: 'gemini-2.5-pro'
+    });
+  });
+
+  it('says what is missing when an API key is asked for Claude', () => {
+    expect(() => model(apiKeyOnly, 'claude-sonnet-4-5')).toThrow(
+      'Claude on Vertex AI needs a service account key'
+    );
+    expect(model(apiKeyOnly, 'gemini-2.5-pro').provider).toBe(
+      'google.vertex.chat'
+    );
+  });
+
+  it('gives Claude Anthropic’s search, and Gemini Google’s', () => {
+    expect(
+      getProviderWebSearchTool(serviceAccount, 'claude-sonnet-4-5', {
+        alone: true
+      })?.web_search
+    ).toMatchObject({ id: 'anthropic.web_search_20250305' });
+    expect(
+      getProviderWebSearchTool(serviceAccount, 'gemini-2.5-pro', {
+        alone: true
+      })
+    ).toHaveProperty('google_search');
   });
 });
