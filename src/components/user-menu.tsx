@@ -59,10 +59,10 @@ export function UserMenu() {
         <SidebarMenuItem>
           <SidebarMenuButton
             size="lg"
-            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            className="group-data-[collapsible=icon]:justify-center data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
             <Skeleton className="size-6 rounded-full" />
-            <div className="grid flex-1 gap-1 text-left text-sm leading-tight">
+            <div className="grid flex-1 gap-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3 w-32" />
             </div>
@@ -81,7 +81,10 @@ export function UserMenu() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              // Collapsed, the button is the avatar's width and a little
+              // more, with no padding: the avatar is centred in it, and the
+              // name and the arrow, out of sight, take no room beside it.
+              className="group-data-[collapsible=icon]:justify-center group-data-[state=expanded]:border group-data-[state=expanded]:bg-background group-data-[state=expanded]:shadow-sm hover:bg-accent data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="size-6 rounded-full">
                 <AvatarImage src={user.image || ''} alt={user.name || ''} />
@@ -93,7 +96,7 @@ export function UserMenu() {
               </Avatar>
               {/* The name and the plan on one line; the name gives way when
                   it is long, the plan never does. */}
-              <div className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm leading-tight">
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-semibold">{user.name}</span>
                 {planName && (
                   <span className="shrink-0 text-xs text-muted-foreground">
@@ -121,7 +124,7 @@ export function UserMenu() {
                   </span>
                 )}
               </div>
-              <ChevronsUpDown className="ml-auto size-4 shrink-0" />
+              <ChevronsUpDown className="ml-auto size-4 shrink-0 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
