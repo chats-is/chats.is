@@ -2,13 +2,15 @@ import { useCallback, useState } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
-import { AlertTriangle, ArrowUp, Square } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Paperclip, Square } from 'lucide-react';
 import Textarea from 'react-textarea-autosize';
 
 import { type Attachment, type ChatMessage } from '@/types';
 import { modelMatchesId } from '@/lib/utils';
 import { canSearchWeb } from '@/lib/web-search';
+import { useAttachmentUpload } from '@/hooks/use-attachment-upload';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
+import { useFileDrop } from '@/hooks/use-file-drop';
 import { Button } from '@/components/ui/button';
 import { AddFilesMenu } from '@/components/add-files-menu';
 import {
@@ -97,6 +99,20 @@ export function ChatPromptForm({
   const canAttachVideo =
     toolsOn && !!videoModels?.some(model => model.supportsVideoEdit);
 
+  // Files come into the message three ways — the `+` menu, a drop anywhere on
+  // the page, a paste into the input — all on the same terms.
+  const busy = status === 'submitted' || status === 'streaming';
+  const { addFiles, refuseWhenFull } = useAttachmentUpload({
+    canAttachImages,
+    canAttachAudio,
+    canAttachVideo,
+    uploads,
+    setUploads,
+    attachments,
+    setAttachments
+  });
+  const dropping = useFileDrop(files => void addFiles(files), !busy);
+
   // Whether this model can search at all — the server's own rule, so the
   // switch is offered exactly when ticking it would do something.
   const selectedModel = chatModels?.find(model =>
@@ -154,6 +170,18 @@ export function ChatPromptForm({
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="w-full">
+      {/* Over the whole page, since a drop is taken anywhere on it; it lets
+          the drag through to the window, which is what takes the files. */}
+      {dropping && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+            <Paperclip className="size-8" />
+            <span className="text-sm">
+              Drop files to add them to your message
+            </span>
+          </div>
+        </div>
+      )}
       {/* Whatever is attached is shown, whatever the model now selected
           takes: an attachment still goes with the message, and one out of
           sight could be neither seen nor removed. */}
@@ -192,6 +220,17 @@ export function ChatPromptForm({
             }
             value={input}
             onChange={onInputChange}
+            // A file on the clipboard — a screenshot, a file copied in the
+            // file manager — is attached. Rich text copied from a document or
+            // a page often carries a picture of itself along with it; that is
+            // pasted as the text it is.
+            onPaste={e => {
+              const files = Array.from(e.clipboardData.files);
+              if (!files.length || e.clipboardData.types.includes('text/html'))
+                return;
+              e.preventDefault();
+              void addFiles(files);
+            }}
             onKeyDown={e => {
               if (e.key === 'Enter' && e.shiftKey) {
                 e.preventDefault();
@@ -219,15 +258,13 @@ export function ChatPromptForm({
           {/* Upload, the chat model, and how it should make media. */}
           <div className="flex items-center space-x-2">
             <AddFilesMenu
-              disabled={status === 'submitted' || status === 'streaming'}
+              disabled={busy}
               canAttachImages={canAttachImages}
               canAttachAudio={canAttachAudio}
               canAttachVideo={canAttachVideo}
               canSearchWeb={canSearch}
-              uploads={uploads}
-              setUploads={setUploads}
-              attachments={attachments}
-              setAttachments={setAttachments}
+              addFiles={addFiles}
+              refuseWhenFull={refuseWhenFull}
             />
             <ModelMenu
               models={chatModels}
