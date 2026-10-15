@@ -46,7 +46,8 @@ const CodeBlock = memo(
         }
       >
         {showHeader && (
-          <div className="flex w-full items-center justify-between bg-[#FAFAFA] pr-px pl-3 dark:bg-[#282C34]">
+          // A shade off the code's own GitHub background, light or dark.
+          <div className="flex w-full items-center justify-between bg-[#FAFAFA] pr-px pl-3 dark:bg-[#161b22]">
             <span className="text-xs text-muted-foreground lowercase">
               {language}
             </span>
