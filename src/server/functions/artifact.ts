@@ -1,7 +1,11 @@
 import { createServerFn } from '@tanstack/react-start';
 import { queryOptions } from '@tanstack/react-query';
 
-import { artifactChatSchema, artifactIdSchema } from '@/types/artifact';
+import {
+  artifactChatSchema,
+  artifactDuplicateSchema,
+  artifactIdSchema
+} from '@/types/artifact';
 import { authedMiddleware } from '@/server/middleware';
 import * as artifacts from '@/server/services/artifact';
 
@@ -17,6 +21,13 @@ export const listArtifacts = createServerFn({ method: 'GET' })
   .validator(artifactChatSchema)
   .handler(({ data, context }) =>
     artifacts.listArtifacts(context.user.id, data.chatId)
+  );
+
+export const duplicateArtifact = createServerFn({ method: 'POST' })
+  .middleware([authedMiddleware])
+  .validator(artifactDuplicateSchema)
+  .handler(({ data, context }) =>
+    artifacts.duplicateArtifact(context.user.id, data)
   );
 
 /**

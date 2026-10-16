@@ -256,6 +256,110 @@ describe('the artifact tools of one reply', () => {
     ]);
   });
 
+  // Where an edit call has got to, as the SDK tells the tool.
+  const written = async (
+    update: ReturnType<typeof reply>['tools']['update_artifact'],
+    toolCallId: string,
+    ...deltas: string[]
+  ) => {
+    const options = call(toolCallId);
+    await update.onInputStart?.(options);
+    for (const inputTextDelta of deltas) {
+      await update.onInputDelta?.({ ...options, inputTextDelta });
+    }
+    // The canvas is told once the calls before have done.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return options;
+  };
+  const editing = (parts: InferUIMessageChunk<ChatMessage>[]) =>
+    parts.filter(
+      part => part.type === 'data-editing' || part.type === 'data-finish'
+    );
+
+  it('tells the canvas which artifact a change is being written to', async () => {
+    inDatabase(earlier('old', 'one two'));
+    const r = reply();
+    const update = r.tools.update_artifact;
+
+    // Cut short, the id is not yet the artifact's.
+    await written(update, 'edit1', '{"id":"ol');
+    expect(r.parts).toEqual([]);
+    const options = await written(update, 'edit2', '{"id":"old","oldStr"');
+    expect(r.parts).toEqual([{ type: 'data-editing', data: { id: 'old' } }]);
+
+    const { id } = (await update.execute(
+      { id: 'old', oldStr: 'one', newStr: 'ONE' },
+      options
+    )) as { id: string };
+    r.discardUnfinished();
+    expect(r.kept()).toMatchObject([{ id, content: 'ONE two' }]);
+    // The new version is written, and still being changed until the reply is
+    // over — not just the step.
+    expect(editing(r.parts)).toEqual([
+      { type: 'data-editing', data: { id: 'old' } },
+      { type: 'data-finish', data: { id } },
+      { type: 'data-editing', data: { id } }
+    ]);
+  });
+
+  it('shows later changes on the version the first made', async () => {
+    inDatabase(earlier('old', 'one two'));
+    const r = reply();
+    const update = r.tools.update_artifact;
+
+    const first = await written(update, 'edit1', '{"id":"old","oldStr"');
+    const { id: copy } = (await update.execute(
+      { id: 'old', oldStr: 'one', newStr: 'ONE' },
+      first
+    )) as { id: string };
+    // The second names the earlier reply's artifact too.
+    const second = await written(update, 'edit2', '{"id":"old","oldStr"');
+    await update.execute({ id: 'old', oldStr: 'two', newStr: 'TWO' }, second);
+    r.discardUnfinished();
+
+    expect(editing(r.parts)).toEqual([
+      { type: 'data-editing', data: { id: 'old' } },
+      { type: 'data-finish', data: { id: copy } },
+      { type: 'data-editing', data: { id: copy } },
+      { type: 'data-editing', data: { id: copy } },
+      { type: 'data-finish', data: { id: copy } },
+      { type: 'data-editing', data: { id: copy } }
+    ]);
+    expect(r.kept()).toMatchObject([{ id: copy, content: 'ONE TWO' }]);
+  });
+
+  it('shows nothing done when a change cannot be made: the next call may', async () => {
+    inDatabase(earlier('old', 'one two'));
+    const r = reply();
+    const update = r.tools.update_artifact;
+
+    const options = await written(
+      update,
+      'edit1',
+      '{"id":"old","oldStr":"nowhere"'
+    );
+    await expect(
+      update.execute({ id: 'old', oldStr: 'nowhere', newStr: 'x' }, options)
+    ).rejects.toThrow();
+    r.discardUnfinished();
+    expect(editing(r.parts)).toEqual([
+      { type: 'data-editing', data: { id: 'old' } }
+    ]);
+  });
+
+  it('changes the version the call names, though a newer one exists', async () => {
+    // An earlier reply changed `first` into `newer`.
+    inDatabase(earlier('first', 'one two'), {
+      ...earlier('newer', 'one two three'),
+      messageId: 'm9'
+    });
+    const r = reply();
+
+    const { id } = await r.update('first', 'two', 'TWO');
+
+    expect(r.kept()).toMatchObject([{ id, content: 'one TWO' }]);
+  });
+
   it('makes one copy of an earlier reply’s artifact, changed by every call that follows the id it returned', async () => {
     const original = earlier('old', 'one two three');
     inDatabase(original);

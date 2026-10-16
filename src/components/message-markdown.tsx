@@ -3,8 +3,10 @@ import { cjk } from '@streamdown/cjk';
 import { math } from '@streamdown/math';
 import { type MermaidConfig } from 'mermaid';
 import { useTheme } from 'next-themes';
+import remarkBreaks from 'remark-breaks';
 import {
   defaultComponents,
+  defaultRemarkPlugins,
   Streamdown,
   type CodeHighlighterPlugin,
   type Components,
@@ -107,6 +109,11 @@ const LINK_SAFETY = { enabled: false };
 // A diagram is drawn to fit; its zoom buttons sat over its first node. Full
 // screen is still there to look closer.
 const CONTROLS = { mermaid: { panZoom: false } };
+
+// A line ended is a line ended, as the model meant it: an address, its hours
+// and a phone number, each on a line of its own, read as one line otherwise.
+// Streamdown's own plugins first, which a list given here replaces.
+const REMARK_PLUGINS = [...Object.values(defaultRemarkPlugins), remarkBreaks];
 
 /**
  * Lists and quotations, drawn as prose is: a list's markers hang outside its
@@ -300,6 +307,7 @@ export function MessageMarkdown({
       plugins={PLUGINS}
       components={COMPONENTS}
       isAnimating={streaming}
+      remarkPlugins={REMARK_PLUGINS}
       linkSafety={LINK_SAFETY}
       lineNumbers={false}
       controls={CONTROLS}

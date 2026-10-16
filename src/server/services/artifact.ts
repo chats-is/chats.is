@@ -1,14 +1,18 @@
 import '@tanstack/react-start/server-only';
 
+import { generateId } from 'ai';
 import { and, eq } from 'drizzle-orm';
 import ts from 'typescript';
+import { type z } from 'zod';
 
 import {
   type Artifact,
+  type ChatMessage,
   type CreateArtifactInput,
   type PreviewPackage,
   type UpdateArtifactInput
 } from '@/types';
+import { type artifactDuplicateSchema } from '@/types/artifact';
 import {
   assertArtifactPayload,
   buildPreviewFiles,
@@ -20,8 +24,17 @@ import {
   type PreviewFile
 } from '@/lib/artifact';
 import { normalizeCodeLanguage } from '@/lib/code-language';
+import { attachmentNames } from '@/lib/document';
+import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { artifacts } from '@/db/schema';
+import { artifacts, chats, messages, shares } from '@/db/schema';
+import { PublicError } from '@/server/public-error';
+import {
+  copyAsAttachment,
+  isOwnBlobUrl,
+  isUsersOwnFile
+} from '@/server/services/blob';
+import { messagesUpTo } from '@/server/services/message';
 
 /**
  * One artifact with its full content, or null when the id names nothing the
@@ -50,6 +63,160 @@ export async function listArtifacts(userId: string, chatId: string) {
     columns: {
       userId: false
     }
+  });
+}
+
+/**
+ * A new chat of the user's that begins with a duplicate of an artifact: one
+ * of their own, or one shared on its own, by its link. The original and its
+ * chat are left as they were; the chat is named after it, with "(Copy)"
+ * after the name.
+ *
+ * The chat opens as an ordinary exchange: the user asking for the duplicate,
+ * with the files the artifact can read, and a reply that makes it with
+ * create_artifact. The model sees an artifact it made, and changes it with
+ * update_artifact, rather than being handed text to write out again. The
+ * files keep the names the artifact reads them by. Someone else's are copied
+ * into the user's own: deleting the chat they came from deletes them.
+ *
+ * Answers the new chat's id and the duplicate's.
+ */
+export async function duplicateArtifact(
+  userId: string,
+  input: z.infer<typeof artifactDuplicateSchema>
+): Promise<{ chatId: string; artifactId: string }> {
+  const source = await duplicateSource(userId, input.from);
+  if (!source) {
+    throw new PublicError('This is no longer available.');
+  }
+
+  const history = await messagesUpTo(source.chatId, source.messageId);
+  const mediaTypes = new Map<string, string>();
+  for (const message of history) {
+    if (message.role !== 'user') continue;
+    for (const part of message.parts) {
+      if (part.type === 'file' && !mediaTypes.has(part.url)) {
+        mediaTypes.set(part.url, part.mediaType);
+      }
+    }
+  }
+  const files = await Promise.all(
+    [...attachmentNames(history)].map(async ([url, name]) => ({
+      type: 'file' as const,
+      mediaType: mediaTypes.get(url) ?? 'application/octet-stream',
+      filename: name,
+      url:
+        isOwnBlobUrl(url) && !isUsersOwnFile(url, userId)
+          ? await copyAsAttachment(url, userId)
+          : url
+    }))
+  );
+
+  const chatId = generateUUID();
+  const questionId = generateUUID();
+  const replyId = generateUUID();
+  const artifactId = generateUUID();
+  // Stamped here rather than by the database, which gives every row of one
+  // transaction the same time: the reply has to come after the question.
+  const asked = new Date();
+  const answered = new Date(asked.getTime() + 1);
+  const created: CreateArtifactInput = {
+    title: source.title,
+    type: source.type,
+    content: source.content ?? '',
+    ...(source.language && { language: source.language }),
+    ...(source.fileName && { fileName: source.fileName })
+  };
+  const question: ChatMessage['parts'] = [
+    ...files,
+    { type: 'text', text: `Duplicate “${source.title}”` }
+  ];
+  const reply: ChatMessage['parts'] = [
+    {
+      type: 'tool-create_artifact',
+      // The shape most providers give a call's id; any will do, so long as
+      // it is the chat's only one.
+      toolCallId: `call_${generateId()}`,
+      state: 'output-available',
+      input: created,
+      output: { id: artifactId }
+    }
+  ];
+
+  await db.transaction(async tx => {
+    await tx.insert(chats).values({
+      id: chatId,
+      title: `${source.title} (Copy)`,
+      // None: the chat opens on the model the user has chosen, settled by the
+      // page as for a chat whose model has since been switched off.
+      modelId: '',
+      userId,
+      createdAt: asked,
+      updatedAt: answered
+    });
+    await tx.insert(messages).values([
+      {
+        id: questionId,
+        role: 'user',
+        parts: question,
+        chatId,
+        userId,
+        createdAt: asked,
+        updatedAt: asked
+      },
+      {
+        id: replyId,
+        parentId: questionId,
+        role: 'assistant',
+        parts: reply,
+        chatId,
+        userId,
+        createdAt: answered,
+        updatedAt: answered
+      }
+    ]);
+    await tx.insert(artifacts).values({
+      id: artifactId,
+      chatId,
+      messageId: replyId,
+      userId,
+      title: source.title,
+      type: source.type,
+      language: source.language,
+      content: source.content,
+      fileName: source.fileName,
+      createdAt: answered,
+      updatedAt: answered
+    });
+  });
+
+  return { chatId, artifactId };
+}
+
+/** The artifact duplicated: the user's own, or the one a link shares on its
+ *  own, made by whoever shared it. */
+async function duplicateSource(
+  userId: string,
+  from: z.infer<typeof artifactDuplicateSchema>['from']
+) {
+  if ('artifactId' in from) {
+    return await db.query.artifacts.findFirst({
+      where: and(
+        eq(artifacts.id, from.artifactId),
+        eq(artifacts.userId, userId)
+      )
+    });
+  }
+  const link = await db.query.shares.findFirst({
+    where: eq(shares.id, from.shareId),
+    columns: { artifactId: true, userId: true }
+  });
+  if (!link?.artifactId) return undefined;
+  return await db.query.artifacts.findFirst({
+    where: and(
+      eq(artifacts.id, link.artifactId),
+      eq(artifacts.userId, link.userId)
+    )
   });
 }
 
@@ -240,8 +407,9 @@ export function buildArtifact(
  * and a reply regenerated takes its own change away with it.
  *
  * The passage must appear exactly once, or which one was meant is a guess.
- * Not found, the model is told the artifact as it stands, since that is what
- * it got wrong.
+ * Not found, the model is told the version it named as it stands, since that
+ * is what it got wrong — and which version that is, since it may have meant
+ * another.
  */
 export function editArtifact(
   source: Artifact,
@@ -252,7 +420,7 @@ export function editArtifact(
   const at = content.indexOf(edit.oldStr);
   if (at === -1) {
     throw new Error(
-      `oldStr was not found in the artifact. Copy it exactly from the artifact as it is now:\n\n${content}`
+      `oldStr was not found in the version you named, ${edit.id}, with any changes this reply has already made to it. Copy it exactly from that version, which is:\n\n${content}`
     );
   }
   if (content.indexOf(edit.oldStr, at + 1) !== -1) {

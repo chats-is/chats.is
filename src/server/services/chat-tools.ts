@@ -837,6 +837,10 @@ export async function buildMediaTools(args: {
   return { tools, systemPrompt: buildMediaToolsSystemPrompt(registered) };
 }
 
+/** The artifact an update_artifact call names, once the id's closing quote
+ *  is written: a partial parse would hand back an id cut short. */
+const EDIT_TARGET = /"id"\s*:\s*"([^"\\]+)"/;
+
 /**
  * The artifact tools for one reply, and what the reply keeps of them.
  *
@@ -924,12 +928,38 @@ export function buildArtifactTools(args: {
 
   const toolArtifactStates = new Map<string, ToolArtifactStreamState>();
 
+  // An update_artifact call being written, by its id, once the artifact it
+  // names is written. A change arrives whole, when the call is; until then
+  // the canvas is told which artifact is being changed, to show as it
+  // stands, as source.
+  //
+  // A model may make its change in several calls, one after another — some
+  // a step each, some failing. The canvas is shown the version each changes,
+  // and stays on source for all of them: this reply's version is shown as
+  // still being changed until the reply is over, when the canvas shows it
+  // as a preview. Nothing is shown done before then — a call that failed is
+  // often only the first try. The artifact a call names is told only once
+  // the calls before it are done, so that a later one is shown the version
+  // they made.
+  const editStates = new Map<string, { rawInput: string; named?: string }>();
+
+  // The version a change naming `id` is made to: this reply's, when the
+  // reply made it or a copy of it, or else the one named.
+  const editSource = async (id: string) => {
+    const ownId = completedArtifacts.has(id) ? id : replyCopies.get(id);
+    const source =
+      (ownId && completedArtifacts.get(ownId)) ||
+      (await getArtifact(userId, id));
+    return { ownId, source };
+  };
+
   // A call that showed its artifact on the canvas as it streamed, and
   // then failed — its input did not parse, or `execute` threw — leaves
   // nothing kept. Successful calls remove their own state, so what is
   // left when a step ends is exactly those, and the canvas is told to
   // drop them before the model's next step makes the artifact again.
   const discardUnfinished = () => {
+    editStates.clear();
     for (const state of toolArtifactStates.values()) {
       if (state.started) {
         emit({
@@ -1087,24 +1117,36 @@ export function buildArtifactTools(args: {
     // changes. Not streamed onto the canvas as it is written: the
     // passages are short, and only the whole result means anything.
     //
-    // An earlier reply's artifact is left as it was, and this reply
-    // gets its own copy; every later change in this reply goes to that
-    // copy, whichever of the two ids it names, so one change made in
-    // several calls is one artifact, not one per call. The SDK runs the
-    // calls of one step at once, so they are taken in turn: each sees
-    // the copy the one before it made.
+    // A change is made to the version the call names. An earlier reply's
+    // version is left as it was, and this reply gets its own copy; every
+    // later change in this reply goes to that copy, whichever of the two ids
+    // it names, so one change made in several calls is one version, not one
+    // per call — calls made at once cannot know the id the others answer.
+    // The SDK runs the calls of one step at once, so they are taken in turn:
+    // each sees the copy the one before it made.
     update_artifact: tool({
       description:
-        "Change part of an artifact already in this chat: replace oldStr, which must appear in it exactly once, with newStr. The change is kept as this reply's version of the artifact; an earlier reply's stays as it was.",
+        "Change part of one version of an artifact in this chat: replace oldStr, which must appear in it exactly once, with newStr. The id names the version the change starts from. Each change makes a new version, whose id the call returns; the version named stays as it was. Changes in one reply that name the same version build on one another, into that reply's one new version.",
       inputSchema: updateArtifactInputSchema,
-      execute: input => {
+      onInputStart: ({ toolCallId }) => {
+        editStates.set(toolCallId, { rawInput: '' });
+      },
+      onInputDelta: ({ toolCallId, inputTextDelta }) => {
+        const state = editStates.get(toolCallId);
+        if (!state || state.named) return;
+        state.rawInput += inputTextDelta;
+        const named = EDIT_TARGET.exec(state.rawInput)?.[1];
+        if (!named) return;
+        state.named = named;
+        void pendingEdit.then(async () => {
+          if (!editStates.has(toolCallId)) return;
+          const { source } = await editSource(named);
+          emit({ type: 'data-editing', data: { id: source?.id ?? named } });
+        });
+      },
+      execute: (input, options?: { toolCallId?: string }) => {
         const edit = pendingEdit.then(async () => {
-          const ownId = completedArtifacts.has(input.id)
-            ? input.id
-            : replyCopies.get(input.id);
-          const source =
-            (ownId && completedArtifacts.get(ownId)) ||
-            (await getArtifact(userId, input.id));
+          const { ownId, source } = await editSource(input.id);
           if (!source || source.chatId !== chatId) {
             throw new Error(`No artifact in this chat has id ${input.id}`);
           }
@@ -1126,9 +1168,15 @@ export function buildArtifactTools(args: {
             type: 'data-artifact',
             data: artifact
           });
+          emit({ type: 'data-editing', data: { id: artifact.id } });
           return { id: artifact.id };
         });
         pendingEdit = edit.catch(() => {});
+        void edit
+          .finally(() => {
+            if (options?.toolCallId) editStates.delete(options.toolCallId);
+          })
+          .catch(() => {});
         return edit;
       }
     })

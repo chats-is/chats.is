@@ -31,12 +31,13 @@ import {
 } from '@/lib/chat-usage';
 import {
   ARTIFACT_SYSTEM_PROMPT,
-  PROVIDER_FAILURE_MESSAGE
+  PROVIDER_FAILURE_MESSAGE,
+  STOPPED_CALL_ERROR
 } from '@/lib/constant';
 import { fitToContext } from '@/lib/context-window';
 import { attachmentNames, expandDocuments, readsPdf } from '@/lib/document';
 import { pickEffort } from '@/lib/media-options';
-import { markStopped } from '@/lib/message-content';
+import { forgetProviderItems, markStopped } from '@/lib/message-content';
 import {
   AllProvidersFailedError,
   getLanguageModel,
@@ -613,8 +614,23 @@ async function POST({
           );
         }
 
+        // A reply stored before unfinished ones were stored without their
+        // provider's items (see `forgetProviderItems`) still names them, and
+        // would fail every turn after it: told by its marker, or by a call
+        // it was stopped in, it is sent without them too.
+        const history = fitted.messages.map(message =>
+          message.role === 'assistant' &&
+          message.parts.some(
+            part =>
+              (part.type === 'data-error' && part.data.kind === 'incomplete') ||
+              ('errorText' in part && part.errorText === STOPPED_CALL_ERROR)
+          )
+            ? { ...message, parts: forgetProviderItems(message.parts) }
+            : message
+        );
+
         const modelMessages = await convertToModelMessages<ChatMessage>(
-          maskUnsupportedFileParts(fitted.messages, {
+          maskUnsupportedFileParts(history, {
             supportsVision: dbModel.supportsVision,
             names: attachedNames
           }),
@@ -954,6 +970,11 @@ async function POST({
             }
           }
         ];
+      }
+
+      // A reply that did not finish names items the provider never kept.
+      if (isAborted || streamFailed) {
+        responseMessage.parts = forgetProviderItems(responseMessage.parts);
       }
 
       await messages.createTurn(user.id, {

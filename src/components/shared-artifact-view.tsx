@@ -12,9 +12,12 @@ import { ArtifactViewer } from '@/components/artifact-viewer';
  * attached on the way to it, which it may read.
  */
 export function SharedArtifactView({
+  shareId,
   artifact,
   files
 }: {
+  /** The link it is opened by, which it is duplicated through. */
+  shareId: string;
   artifact: Omit<Artifact, 'chatId' | 'messageId'>;
   files: ArtifactFile[];
 }) {
@@ -32,6 +35,7 @@ export function SharedArtifactView({
             hideContent={true}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            duplicateFrom={{ shareId }}
           />
         </div>
         <div className="min-h-0 flex-1 overflow-auto">

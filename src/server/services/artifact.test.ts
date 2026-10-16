@@ -1,11 +1,27 @@
-import { describe, expect, it, vi } from 'vitest';
+import { makeTestDb } from '@/test-utils/pg';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/db', () => ({ db: {} }));
+import * as schema from '@/db/schema';
+
+const h = vi.hoisted(() => ({ db: undefined as any }));
+vi.mock('@/db', () => ({
+  get db() {
+    return h.db;
+  }
+}));
 vi.mock('@/lib/env', () => ({
   env: { BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_store123_secret' }
 }));
+// A copy lands at the path asked for, as the store's own would.
+const copy = vi.hoisted(() =>
+  vi.fn(async (_url: string, pathname: string) => ({
+    url: `https://store123.public.blob.vercel-storage.com/${pathname}`
+  }))
+);
+vi.mock('@vercel/blob', () => ({ copy, del: vi.fn() }));
 
-const { buildArtifact, compilePreview, editArtifact } =
+const { buildArtifact, compilePreview, duplicateArtifact, editArtifact } =
   await import('./artifact');
 
 const owner = { id: 'a1', chatId: 'c1', messageId: 'm1' };
@@ -200,5 +216,177 @@ describe('editArtifact', () => {
     expect(() =>
       editArtifact(source, { id: 'a1', oldStr: '</div>', newStr: '' }, reply)
     ).toThrow('did not compile');
+  });
+});
+
+describe('duplicateArtifact', () => {
+  let client: { close?: () => Promise<void> } | undefined;
+  const STORE = 'https://store123.public.blob.vercel-storage.com/uploads';
+  const file = (owner: string, name: string) => ({
+    type: 'file' as const,
+    mediaType: 'text/csv',
+    url: `${STORE}/attachments/${owner}/${name}`,
+    filename: 'data.csv'
+  });
+  const at = (minute: number) => new Date(Date.UTC(2026, 0, 1, 12, minute));
+
+  beforeAll(async () => {
+    const t = await makeTestDb();
+    h.db = t.db;
+    client = t.client;
+
+    // The owner's chat: two files attached under one name, then the reply
+    // that made the artifact; a file attached after it is not the
+    // artifact's to read.
+    await h.db.insert(schema.users).values([
+      { id: 'owner', name: 'Owner', email: 'owner@example.com' },
+      { id: 'other', name: 'Other', email: 'other@example.com' }
+    ]);
+    await h.db
+      .insert(schema.chats)
+      .values({ id: 'c1', title: 'Chat', userId: 'owner', modelId: 'm' });
+    await h.db.insert(schema.messages).values([
+      {
+        id: 'u1',
+        chatId: 'c1',
+        userId: 'owner',
+        role: 'user',
+        parts: [file('owner', 'a.csv'), file('owner', 'b.csv')],
+        createdAt: at(1)
+      },
+      {
+        id: 'r1',
+        parentId: 'u1',
+        chatId: 'c1',
+        userId: 'owner',
+        role: 'assistant',
+        parts: [],
+        createdAt: at(2)
+      },
+      {
+        id: 'u2',
+        chatId: 'c1',
+        userId: 'owner',
+        role: 'user',
+        parts: [file('owner', 'later.csv')],
+        createdAt: at(3)
+      }
+    ]);
+    await h.db.insert(schema.artifacts).values({
+      id: 'art',
+      chatId: 'c1',
+      messageId: 'r1',
+      userId: 'owner',
+      title: 'Counter',
+      type: 'code',
+      language: 'tsx',
+      fileName: 'index.tsx',
+      content: 'export default () => null'
+    });
+    await h.db.insert(schema.shares).values([
+      { id: 'art-link', artifactId: 'art', userId: 'owner' },
+      { id: 'chat-link', chatId: 'c1', userId: 'owner' }
+    ]);
+  });
+
+  afterAll(async () => {
+    await client?.close?.();
+  });
+
+  const opened = async (chatId: string) => ({
+    chat: await h.db.query.chats.findFirst({
+      where: eq(schema.chats.id, chatId)
+    }),
+    messages: await h.db.query.messages.findMany({
+      where: eq(schema.messages.chatId, chatId),
+      orderBy: (m: typeof schema.messages, { asc }: any) => [asc(m.createdAt)]
+    }),
+    artifacts: await h.db.query.artifacts.findMany({
+      where: eq(schema.artifacts.chatId, chatId)
+    })
+  });
+
+  it("opens a chat of the user's own with a duplicate of their artifact", async () => {
+    copy.mockClear();
+    const { chatId, artifactId } = await duplicateArtifact('owner', {
+      from: { artifactId: 'art' }
+    });
+    const { chat, messages, artifacts } = await opened(chatId);
+
+    // No model of its own: the page opens it on the one the user has chosen.
+    expect(chat).toMatchObject({
+      title: 'Counter (Copy)',
+      userId: 'owner',
+      modelId: ''
+    });
+    expect(messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
+    const [question, reply] = messages;
+    // Their own files are theirs already, and keep the names the artifact
+    // reads them by.
+    expect(copy).not.toHaveBeenCalled();
+    expect(question.parts).toEqual([
+      { ...file('owner', 'a.csv'), filename: 'data.csv' },
+      { ...file('owner', 'b.csv'), filename: 'data (2).csv' },
+      { type: 'text', text: 'Duplicate “Counter”' }
+    ]);
+    expect(reply.parentId).toBe(question.id);
+    expect(reply.parts).toEqual([
+      expect.objectContaining({
+        type: 'tool-create_artifact',
+        state: 'output-available',
+        input: {
+          title: 'Counter',
+          type: 'code',
+          language: 'tsx',
+          fileName: 'index.tsx',
+          content: 'export default () => null'
+        },
+        output: { id: artifactId }
+      })
+    ]);
+    expect(artifacts).toEqual([
+      expect.objectContaining({
+        id: artifactId,
+        title: 'Counter',
+        messageId: reply.id,
+        userId: 'owner',
+        content: 'export default () => null'
+      })
+    ]);
+    // The original stays where it was.
+    expect(
+      await h.db.query.artifacts.findFirst({
+        where: eq(schema.artifacts.id, 'art')
+      })
+    ).toMatchObject({ chatId: 'c1', messageId: 'r1' });
+  });
+
+  it("copies someone else's files into the user's own, by its link", async () => {
+    copy.mockClear();
+    const { chatId } = await duplicateArtifact('other', {
+      from: { shareId: 'art-link' }
+    });
+    const { messages } = await opened(chatId);
+
+    expect(copy).toHaveBeenCalledTimes(2);
+    const files = messages[0].parts.filter((p: any) => p.type === 'file');
+    expect(files.map((p: any) => p.filename)).toEqual([
+      'data.csv',
+      'data (2).csv'
+    ]);
+    for (const part of files) {
+      expect(part.url).toMatch(`${STORE}/attachments/other/`);
+    }
+  });
+
+  it('refuses what is not the user’s, or not shared on its own', async () => {
+    await expect(
+      duplicateArtifact('other', { from: { artifactId: 'art' } })
+    ).rejects.toThrow('no longer available');
+    await expect(
+      duplicateArtifact('other', {
+        from: { shareId: 'chat-link' }
+      })
+    ).rejects.toThrow('no longer available');
   });
 });

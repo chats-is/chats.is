@@ -27,6 +27,8 @@ interface ArtifactsPanelProps {
   onEdit?: (artifact: Artifact, selection: string, request: string) => void;
   /** Offers to share an artifact on its own; not on a share page. */
   canShare?: boolean;
+  /** Offers to duplicate one into a new chat; not on a share page. */
+  canDuplicate?: boolean;
 }
 
 export function ArtifactsPanel({
@@ -38,7 +40,8 @@ export function ArtifactsPanel({
   desktopContainerClassName,
   onFix,
   onEdit,
-  canShare
+  canShare,
+  canDuplicate
 }: ArtifactsPanelProps) {
   // The source/preview choice is a persistent preference: switching artifacts
   // keeps the current view (a JSON/code artifact viewed as source stays source
@@ -106,6 +109,9 @@ export function ArtifactsPanel({
             viewMode={effectiveViewMode}
             onViewModeChange={setViewMode}
             canShare={canShare}
+            duplicateFrom={
+              canDuplicate ? { artifactId: selected.id } : undefined
+            }
           />
         </div>
         <div className="min-h-0 flex-1 overflow-auto">

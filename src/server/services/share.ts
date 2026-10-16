@@ -1,16 +1,16 @@
 import '@tanstack/react-start/server-only';
 
-import { and, asc, count, eq, isNull, lte } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
 import { type z } from 'zod';
 
-import { type ChatMessage } from '@/types';
 import { pageWindow } from '@/types/pagination';
 import { type sharePageSchema } from '@/types/shared-link';
 import { artifactFiles } from '@/lib/document';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { artifacts, chats, messages, shares } from '@/db/schema';
+import { artifacts, chats, shares } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
+import { messagesUpTo } from '@/server/services/message';
 
 /**
  * Share a chat, or hand back the share it already has.
@@ -248,31 +248,10 @@ export async function getSharedArtifactPage(id: string) {
   if (!found) return undefined;
   const { chatId, messageId, ...artifact } = found;
 
-  // The files it can read are those attached up to the reply that made it,
-  // named as the model was shown them then: a chat runs in the order it was
-  // written, and regenerating cuts away what came after.
-  const reply = await db.query.messages.findFirst({
-    where: eq(messages.id, messageId),
-    columns: { createdAt: true }
-  });
-  const before: ChatMessage[] = reply
-    ? await db
-        .select({
-          id: messages.id,
-          role: messages.role,
-          parts: messages.parts
-        })
-        .from(messages)
-        .where(
-          and(
-            eq(messages.chatId, chatId),
-            lte(messages.createdAt, reply.createdAt)
-          )
-        )
-        .orderBy(asc(messages.createdAt))
-    : [];
-
-  return { artifact, files: artifactFiles(before) };
+  return {
+    artifact,
+    files: artifactFiles(await messagesUpTo(chatId, messageId))
+  };
 }
 
 export async function deleteShare(userId: string, id: string) {

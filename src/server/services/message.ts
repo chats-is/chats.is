@@ -1,9 +1,9 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
-import { type Artifact } from '@/types';
+import { type Artifact, type ChatMessage } from '@/types';
 import {
   type messageCreateSchema,
   type messageDeleteSchema,
@@ -37,6 +37,34 @@ export async function listMessages(userId: string, chatId: string) {
       chatId: false
     }
   });
+}
+
+/**
+ * A chat as it stood when one of its messages was written: every message up
+ * to it, in the order they were written. What an artifact made in that
+ * message could see — the files it may read are those attached by then,
+ * named as the model was shown them; regenerating cuts away what came after.
+ */
+export async function messagesUpTo(
+  chatId: string,
+  messageId: string
+): Promise<ChatMessage[]> {
+  const message = await db.query.messages.findFirst({
+    where: eq(messages.id, messageId),
+    columns: { createdAt: true }
+  });
+  if (!message) return [];
+
+  return await db
+    .select({ id: messages.id, role: messages.role, parts: messages.parts })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.chatId, chatId),
+        lte(messages.createdAt, message.createdAt)
+      )
+    )
+    .orderBy(asc(messages.createdAt));
 }
 
 /**

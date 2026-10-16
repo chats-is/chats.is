@@ -273,6 +273,9 @@ importers:
       redis:
         specifier: ^6.2.1
         version: 6.2.1
+      remark-breaks:
+        specifier: ^4.0.0
+        version: 4.0.0
       resend:
         specifier: ^6.25.0
         version: 6.25.0

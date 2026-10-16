@@ -71,6 +71,14 @@ export type CustomUIDataTypes = {
   finish: {
     id: string;
   };
+  /**
+   * An artifact in the chat that the reply is changing. A change arrives
+   * whole, once its call is written; meanwhile, and until the reply is over,
+   * the canvas shows the artifact as source.
+   */
+  editing: {
+    id: string;
+  };
   /** An artifact that streamed onto the canvas but was never kept. */
   discard: {
     id: string;

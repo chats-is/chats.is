@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { type ChatMessage } from '@/types';
 
-import { hasVisibleContent, markStopped, textRuns } from './message-content';
+import {
+  forgetProviderItems,
+  hasVisibleContent,
+  markStopped,
+  textRuns
+} from './message-content';
 
 type Part = ChatMessage['parts'][number];
 
@@ -92,6 +97,60 @@ describe('hasVisibleContent', () => {
         } as Part
       ])
     ).toBe(false);
+  });
+});
+
+describe('forgetProviderItems', () => {
+  it('leaves out what names the provider’s own copy, and keeps the rest', () => {
+    const parts = [
+      {
+        type: 'reasoning',
+        text: '',
+        state: 'done',
+        providerMetadata: {
+          openai: { itemId: 'rs_1', reasoningEncryptedContent: 'enc' }
+        }
+      },
+      {
+        type: 'text',
+        text: 'Hi',
+        state: 'done',
+        providerMetadata: { openai: { itemId: 'msg_1', phase: 'final' } }
+      },
+      {
+        type: 'tool-create_artifact',
+        toolCallId: 'call_1',
+        state: 'output-error',
+        input: {},
+        errorText: 'Stopped before it finished.',
+        callProviderMetadata: { openai: { itemId: 'fc_1' } }
+      },
+      { type: 'step-start' }
+    ] as unknown as ChatMessage['parts'];
+
+    expect(forgetProviderItems(parts)).toEqual([
+      {
+        type: 'reasoning',
+        text: '',
+        state: 'done',
+        providerMetadata: { openai: {} }
+      },
+      {
+        type: 'text',
+        text: 'Hi',
+        state: 'done',
+        providerMetadata: { openai: { phase: 'final' } }
+      },
+      {
+        type: 'tool-create_artifact',
+        toolCallId: 'call_1',
+        state: 'output-error',
+        input: {},
+        errorText: 'Stopped before it finished.',
+        callProviderMetadata: { openai: {} }
+      },
+      { type: 'step-start' }
+    ]);
   });
 });
 

@@ -49,13 +49,16 @@ interface ChatUIProps {
   };
   initialMessages?: ChatMessage[];
   initialArtifacts?: Artifact[];
+  /** An artifact to open beside the chat on arriving. */
+  openArtifactId?: string;
 }
 
 export function ChatUI({
   id,
   initialChat,
   initialMessages = [],
-  initialArtifacts = []
+  initialArtifacts = [],
+  openArtifactId
 }: ChatUIProps) {
   const { refreshChats } = useChats();
   const router = useRouter();
@@ -76,7 +79,8 @@ export function ChatUI({
     openArtifact,
     setPanelOpen,
     handleStreamPart,
-    setArtifactsFromServer
+    setArtifactsFromServer,
+    settleArtifacts
   } = useArtifact();
 
   // The conversation itself — messages, status, the stream in flight — lives
@@ -578,6 +582,12 @@ export function ChatUI({
   // what it is making is not stored yet, so it cannot be shared.
   const betweenTurns = status === 'ready' || status === 'error';
 
+  // A reply over — finished, failed or stopped — has nothing left being
+  // written: the canvas shows what it changed as a preview.
+  useEffect(() => {
+    if (betweenTurns) settleArtifacts(id);
+  }, [betweenTurns, id, settleArtifacts]);
+
   const handleArtifactSelect = useCallback(
     (artifactId: string) => {
       openArtifact(artifactId);
@@ -598,7 +608,9 @@ export function ChatUI({
           language: artifact.language ?? null,
           content: artifact.content,
           fileName: artifact.fileName ?? null,
-          status: artifact.status,
+          // Being changed reads as being written: shown as source, and
+          // closed to edits of its own, until the reply is over.
+          status: artifact.editing ? 'streaming' : artifact.status,
           createdAt: artifact.createdAt ?? new Date(),
           updatedAt: artifact.updatedAt ?? new Date()
         };
@@ -617,6 +629,16 @@ export function ChatUI({
       setPanelOpen(false);
     }
   }, [activeId, artifactList, isPanelOpen, setPanelOpen]);
+
+  // The artifact asked to be open on arriving, opened once it is among this
+  // chat's: until then the panel would be closed again for having none.
+  const openedOnArrival = useRef(false);
+  useEffect(() => {
+    if (openedOnArrival.current || !openArtifactId) return;
+    if (!artifactList.some(artifact => artifact.id === openArtifactId)) return;
+    openedOnArrival.current = true;
+    openArtifact(openArtifactId);
+  }, [artifactList, openArtifactId, openArtifact]);
 
   // What an artifact here can read: the files attached in this chat.
   const files = useMemo(() => artifactFiles(messages), [messages]);
@@ -676,6 +698,7 @@ export function ChatUI({
                 onFix={betweenTurns ? handleFix : undefined}
                 onEdit={betweenTurns ? handleEdit : undefined}
                 canShare={betweenTurns}
+                canDuplicate={betweenTurns}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -714,6 +737,7 @@ export function ChatUI({
               onFix={betweenTurns ? handleFix : undefined}
               onEdit={betweenTurns ? handleEdit : undefined}
               canShare={betweenTurns}
+              canDuplicate={betweenTurns}
             />
           </div>
         )}

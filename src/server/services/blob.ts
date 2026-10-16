@@ -1,9 +1,10 @@
 import '@tanstack/react-start/server-only';
 
-import { del } from '@vercel/blob';
+import { copy, del } from '@vercel/blob';
 import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 
 import { isTrustedMediaUrl } from '@/lib/chat-media-urls';
+import { UPLOAD_CONFIG } from '@/lib/constant';
 import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env.public';
 import { db } from '@/db';
@@ -56,6 +57,31 @@ export function isUsersOwnFile(url: string, userId: string): boolean {
     .slice(prefix.length)
     .split('/');
   return Boolean(folder && file) && owner === userId && rest.length === 0;
+}
+
+/**
+ * A copy of a file in this install's store, filed as one of this user's
+ * attachments under the name it had. Someone else's file is copied rather
+ * than pointed at: deleting their chat deletes their files.
+ */
+export async function copyAsAttachment(
+  url: string,
+  userId: string
+): Promise<string> {
+  const name = new URL(url).pathname.split('/').pop() ?? 'file';
+  const pathname = [
+    publicEnv.VITE_UPLOAD_PATH,
+    UPLOAD_CONFIG.attachment.folder,
+    userId,
+    decodeURIComponent(name)
+  ]
+    .filter(Boolean)
+    .join('/');
+  const copied = await copy(url, pathname, {
+    access: 'public',
+    addRandomSuffix: true
+  });
+  return copied.url;
 }
 
 /** Whether every file a message carries is one this install stored. */

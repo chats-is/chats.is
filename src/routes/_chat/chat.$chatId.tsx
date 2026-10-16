@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { peekChatSession } from '@/lib/chat-session';
 import { formatTitle, pageTitle, useAppName } from '@/lib/head';
@@ -45,11 +46,16 @@ export const Route = createFileRoute('/_chat/chat/$chatId')({
   head: ({ matches, loaderData }) => ({
     meta: [{ title: pageTitle(matches, loaderData?.title ?? undefined) }]
   }),
+  // An artifact to open beside the chat on arriving: the duplicate just made.
+  validateSearch: z.object({
+    artifact: z.string().optional().catch(undefined)
+  }),
   component: ChatPage
 });
 
 function ChatPage() {
   const { chatId } = Route.useParams();
+  const { artifact } = Route.useSearch();
   const {
     data: chat,
     isPending,
@@ -107,6 +113,7 @@ function ChatPage() {
       }}
       initialMessages={chat ? convertToChatMessages(chat.messages) : []}
       initialArtifacts={chat?.artifacts ?? []}
+      openArtifactId={artifact}
     />
   );
 }

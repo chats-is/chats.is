@@ -1,5 +1,5 @@
 import { type ChatMessage } from '@/types';
-import { MEDIA_TOOL_NAMES } from '@/lib/constant';
+import { MEDIA_TOOL_NAMES, STOPPED_CALL_ERROR } from '@/lib/constant';
 
 type Part = ChatMessage['parts'][number];
 
@@ -64,7 +64,7 @@ export function markStopped(parts: Part[]): Part[] {
       return {
         ...part,
         state: 'output-error',
-        errorText: 'Stopped before it finished.'
+        errorText: STOPPED_CALL_ERROR
       } as Part;
     }
     return part;
@@ -78,6 +78,57 @@ export function markStopped(parts: Part[]): Part[] {
       data: { kind: 'incomplete', message: 'This response was stopped.' }
     }
   ];
+}
+
+/** What a provider keeps of a reply on its side, named in its parts. */
+const PROVIDER_ITEM_KEYS = ['itemId', 'reasoningEncryptedContent'];
+
+const withoutItems = (metadata: unknown) => {
+  if (!metadata || typeof metadata !== 'object') return metadata;
+  return Object.fromEntries(
+    Object.entries(metadata as Record<string, unknown>).map(
+      ([provider, value]) => [
+        provider,
+        value && typeof value === 'object'
+          ? Object.fromEntries(
+              Object.entries(value).filter(
+                ([key]) => !PROVIDER_ITEM_KEYS.includes(key)
+              )
+            )
+          : value
+      ]
+    )
+  );
+};
+
+/**
+ * A reply that did not finish — stopped, or cut off — without what it names
+ * of the provider's own copy of it.
+ *
+ * OpenAI keeps each item of a reply it gave, and the next turn sends an item
+ * by its id rather than whole: a thought, a message, a tool call. A reply
+ * that never finished was never kept, so every turn after it was refused,
+ * the item "not found". Without the ids its text and calls are sent whole,
+ * and its unfinished thinking, which was never more than started, is left
+ * out; the thinking still shows in the thread.
+ */
+export function forgetProviderItems(parts: Part[]): Part[] {
+  return parts.map(part => {
+    const named = part as Part & {
+      providerMetadata?: unknown;
+      callProviderMetadata?: unknown;
+    };
+    if (!named.providerMetadata && !named.callProviderMetadata) return part;
+    return {
+      ...part,
+      ...(named.providerMetadata
+        ? { providerMetadata: withoutItems(named.providerMetadata) }
+        : {}),
+      ...(named.callProviderMetadata
+        ? { callProviderMetadata: withoutItems(named.callProviderMetadata) }
+        : {})
+    } as Part;
+  });
 }
 
 /**

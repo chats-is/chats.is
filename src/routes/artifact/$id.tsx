@@ -31,7 +31,8 @@ export const Route = createFileRoute('/artifact/$id')({
 });
 
 function SharedArtifactPage() {
+  const { id } = Route.useParams();
   const { artifact, files } = Route.useLoaderData();
 
-  return <SharedArtifactView artifact={artifact} files={files} />;
+  return <SharedArtifactView shareId={id} artifact={artifact} files={files} />;
 }

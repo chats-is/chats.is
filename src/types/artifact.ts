@@ -35,3 +35,12 @@ export type ArtifactFile = { name: string; url: string };
 /** What the artifact server functions accept. */
 export const artifactIdSchema = z.object({ id: z.string().min(1) });
 export const artifactChatSchema = z.object({ chatId: z.string().min(1) });
+
+/** An artifact to start a new chat from: one of the user's own, or one
+ *  shared on its own, by its link. */
+export const artifactDuplicateSchema = z.object({
+  from: z.union([
+    z.object({ artifactId: z.string().min(1) }),
+    z.object({ shareId: z.string().min(1) })
+  ])
+});

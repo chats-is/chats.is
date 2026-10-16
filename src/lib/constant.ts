@@ -273,7 +273,7 @@ export const ARTIFACT_SYSTEM_PROMPT = [
   '',
   'Always put the COMPLETE content in `content`. Never truncate or use placeholders like "// rest unchanged".',
   '',
-  'To change an artifact that is already in this chat — a fix, a tweak, an addition — call update_artifact with its id (the id its tool call returned) and replace only the part that changes: `oldStr` must be copied exactly from the artifact and appear in it exactly once, and `newStr` replaces it. Call it once per separate change. Use create_artifact again only for something new, or when most of an artifact is being rewritten.',
+  'To change an artifact that is already in this chat — a fix, a tweak, an addition — call update_artifact and replace only the part that changes: `oldStr` must be copied exactly from the version being changed and appear in it exactly once, and `newStr` replaces it. Every change makes a new version of the artifact, with a new id, which the call returns; the id you name is the version the change starts from. Call it once per separate change. Use create_artifact again only for something new, or when most of an artifact is being rewritten.',
   '',
   'An artifact changes only when you call update_artifact or create_artifact. Never say you have fixed, changed or updated one without making that call in the same reply.',
   '',
@@ -725,3 +725,7 @@ export const CELL_WIDTHS = [
   'max-w-28',
   'max-w-16'
 ];
+
+/** What a tool call still running when its reply was stopped is closed
+ *  with — and how a stopped reply is told by its calls. */
+export const STOPPED_CALL_ERROR = 'Stopped before it finished.';

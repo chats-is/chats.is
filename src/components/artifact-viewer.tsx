@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { CodeXml, Copy, Download, Eye, LoaderCircle, X } from 'lucide-react';
+import { CodeXml, Eye, LoaderCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type Artifact } from '@/types';
 import { cn } from '@/lib/utils';
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -19,6 +18,10 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 import {
+  ArtifactActionsMenu,
+  type DuplicateSource
+} from '@/components/artifacts/artifact-actions-menu';
+import {
   artifactRegistry,
   artifactSourceUsesCodeChrome,
   getArtifactKind,
@@ -29,7 +32,6 @@ import {
   supportsArtifactRuntimePreview
 } from '@/components/artifacts/runtime-preview';
 import { SelectionEdit } from '@/components/artifacts/selection-edit';
-import { ShareArtifactButton } from '@/components/artifacts/share-artifact-button';
 
 interface ArtifactViewerProps {
   artifact?: Artifact;
@@ -46,6 +48,8 @@ interface ArtifactViewerProps {
   onEdit?: (artifact: Artifact, selection: string, request: string) => void;
   /** Offers to share the artifact on its own: in the chat, between turns. */
   canShare?: boolean;
+  /** Offers to duplicate it into a new chat, found this way. */
+  duplicateFrom?: DuplicateSource;
 }
 
 export function ArtifactViewer({
@@ -59,9 +63,9 @@ export function ArtifactViewer({
   onViewModeChange,
   onFix,
   onEdit,
-  canShare
+  canShare,
+  duplicateFrom
 }: ArtifactViewerProps) {
-  const { copyToClipboard } = useCopyToClipboard();
   const [uncontrolledViewMode, setUncontrolledViewMode] = useState<
     'source' | 'preview'
   >('source');
@@ -94,7 +98,6 @@ export function ArtifactViewer({
     );
   }
 
-  const canCopyContent = !!(artifact.content ?? '').trim();
   const kind = getArtifactKind(artifact);
   const registry = artifactRegistry[kind];
   const isStreaming = artifact.status === 'streaming';
@@ -271,48 +274,14 @@ export function ArtifactViewer({
             )}
           </div>
           <div className="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-2">
-            {canShare && (
-              <ShareArtifactButton
-                artifactId={artifact.id}
-                disabled={isHeaderActionDisabled}
-                className={headerActionButtonClassName}
-              />
-            )}
-            {canCopyContent && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={headerActionButtonClassName}
-                    disabled={isHeaderActionDisabled}
-                    onClick={async () => {
-                      await copyToClipboard(artifact.content ?? '');
-                      toast.success('Copied');
-                    }}
-                  >
-                    <Copy className="size-4" />
-                    <span className="sr-only">Copy artifact</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Copy</TooltipContent>
-              </Tooltip>
-            )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={headerActionButtonClassName}
-                  disabled={isHeaderActionDisabled || !canDownload}
-                  onClick={handleDownload}
-                >
-                  <Download className="size-4" />
-                  <span className="sr-only">Download artifact</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download</TooltipContent>
-            </Tooltip>
+            <ArtifactActionsMenu
+              artifact={artifact}
+              disabled={isHeaderActionDisabled}
+              onDownload={canDownload ? handleDownload : undefined}
+              canShare={canShare}
+              duplicateFrom={duplicateFrom}
+              className={headerActionButtonClassName}
+            />
             {onClose && (
               <Tooltip>
                 <TooltipTrigger asChild>

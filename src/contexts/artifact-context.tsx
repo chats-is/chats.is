@@ -24,7 +24,11 @@ export type ArtifactState = {
   fileName?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
+  /** Whether its content is still arriving. */
   status: 'streaming' | 'idle';
+  /** Being changed by the reply under way — shown as source until it is
+   *  over, though each change arrives whole. */
+  editing?: boolean;
 };
 
 type DataStreamPart = {
@@ -46,6 +50,8 @@ type ArtifactContextValue = {
     }
   ) => void;
   handleStreamPart: (part: DataStreamPart, chatId: string) => void;
+  /** Ends what a reply left as being written, once the reply is over. */
+  settleArtifacts: (chatId: string) => void;
 };
 
 const ArtifactContext = createContext<ArtifactContextValue | null>(null);
@@ -89,6 +95,7 @@ const mergeArtifactState = (
   createdAt: next.createdAt ?? previous?.createdAt ?? new Date(),
   updatedAt: next.updatedAt ?? previous?.updatedAt ?? new Date(),
   status: next.status ?? previous?.status ?? 'idle',
+  editing: next.editing ?? previous?.editing,
   messageId: next.messageId ?? previous?.messageId ?? null
 });
 
@@ -128,10 +135,11 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
             const nextArtifact = toStateFromArtifact(artifact);
 
             acc[artifact.id] =
-              prevArtifact?.status === 'streaming'
+              prevArtifact?.status === 'streaming' || prevArtifact?.editing
                 ? mergeArtifactState(nextArtifact, {
                     id: artifact.id,
-                    status: 'streaming'
+                    status: prevArtifact.status,
+                    editing: prevArtifact.editing
                   })
                 : nextArtifact;
             return acc;
@@ -146,7 +154,7 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
           if (
             preserveStreamingForChatId &&
             artifact.chatId === preserveStreamingForChatId &&
-            artifact.status === 'streaming' &&
+            (artifact.status === 'streaming' || artifact.editing) &&
             !next[artifactId]
           ) {
             next[artifactId] = artifact;
@@ -173,7 +181,8 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
             status:
               prev[artifact.id]?.status === 'streaming'
                 ? 'streaming'
-                : artifact.status
+                : artifact.status,
+            editing: prev[artifact.id]?.editing
           })
         }));
         return;
@@ -286,6 +295,19 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // An artifact the reply is changing: shown, as source, until the reply
+      // is over (`settleArtifacts`); each change arrives as an artifact of
+      // its own.
+      if (type === 'data-editing' && data) {
+        const { id } = data as { id: string };
+        setArtifacts(prev =>
+          prev[id] ? { ...prev, [id]: { ...prev[id], editing: true } } : prev
+        );
+        setActiveId(id);
+        setIsPanelOpen(true);
+        return;
+      }
+
       // The call that streamed it failed, and the model is told why; the
       // artifact it makes next replaces this one, so this one goes.
       if (type === 'data-discard') {
@@ -355,6 +377,28 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
     [upsertArtifact]
   );
 
+  // A reply over — finished, failed or stopped — is changing nothing, and
+  // what it changed is shown as a preview. An artifact whose content was
+  // still arriving was never made: its call did not finish, so nothing was
+  // kept, and it goes — it was drawn as it streamed, and would stay, half
+  // written and with no artifact behind it, until the page was reloaded.
+  const settleArtifacts = useCallback((chatId: string) => {
+    setArtifacts(prev => {
+      const open = Object.values(prev).filter(
+        artifact =>
+          artifact.chatId === chatId &&
+          (artifact.status === 'streaming' || artifact.editing)
+      );
+      if (open.length === 0) return prev;
+      const next = { ...prev };
+      for (const artifact of open) {
+        if (artifact.status === 'streaming') delete next[artifact.id];
+        else next[artifact.id] = { ...artifact, editing: false };
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       artifacts,
@@ -364,7 +408,8 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
       setPanelOpen,
       upsertArtifact,
       setArtifactsFromServer,
-      handleStreamPart
+      handleStreamPart,
+      settleArtifacts
     }),
     [
       artifacts,
@@ -374,7 +419,8 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
       setPanelOpen,
       upsertArtifact,
       setArtifactsFromServer,
-      handleStreamPart
+      handleStreamPart,
+      settleArtifacts
     ]
   );
 
