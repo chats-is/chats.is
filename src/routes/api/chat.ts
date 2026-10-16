@@ -37,7 +37,11 @@ import {
 import { fitToContext } from '@/lib/context-window';
 import { attachmentNames, expandDocuments, readsPdf } from '@/lib/document';
 import { pickEffort } from '@/lib/media-options';
-import { forgetProviderItems, markStopped } from '@/lib/message-content';
+import {
+  forgetProviderItems,
+  markStopped,
+  withoutRefusedCalls
+} from '@/lib/message-content';
 import {
   AllProvidersFailedError,
   getLanguageModel,
@@ -614,19 +618,28 @@ async function POST({
           );
         }
 
-        // A reply stored before unfinished ones were stored without their
-        // provider's items (see `forgetProviderItems`) still names them, and
-        // would fail every turn after it: told by its marker, or by a call
-        // it was stopped in, it is sent without them too.
-        const history = fitted.messages.map(message =>
-          message.role === 'assistant' &&
-          message.parts.some(
-            part =>
-              (part.type === 'data-error' && part.data.kind === 'incomplete') ||
-              ('errorText' in part && part.errorText === STOPPED_CALL_ERROR)
-          )
-            ? { ...message, parts: forgetProviderItems(message.parts) }
-            : message
+        // A reply is sent without the calls that never ran (see
+        // `withoutRefusedCalls`). A reply stored before unfinished ones were
+        // stored without their provider's items (see `forgetProviderItems`)
+        // still names them, and would fail every turn after it: told by its
+        // marker, or by a call it was stopped in, it is sent without them
+        // too.
+        const offered = { ...artifactTools.tools, ...mediaTools.tools };
+        const history = await Promise.all(
+          fitted.messages.map(async message => {
+            if (message.role !== 'assistant') return message;
+            const parts = await withoutRefusedCalls(message.parts, offered);
+            const unfinished = message.parts.some(
+              part =>
+                (part.type === 'data-error' &&
+                  part.data.kind === 'incomplete') ||
+                ('errorText' in part && part.errorText === STOPPED_CALL_ERROR)
+            );
+            return {
+              ...message,
+              parts: unfinished ? forgetProviderItems(parts) : parts
+            };
+          })
         );
 
         const modelMessages = await convertToModelMessages<ChatMessage>(

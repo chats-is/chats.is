@@ -1,3 +1,5 @@
+import { asSchema, getToolName, isToolUIPart, type Tool } from 'ai';
+
 import { type ChatMessage } from '@/types';
 import { MEDIA_TOOL_NAMES, STOPPED_CALL_ERROR } from '@/lib/constant';
 
@@ -129,6 +131,31 @@ export function forgetProviderItems(parts: Part[]): Part[] {
         : {})
     } as Part;
   });
+}
+
+/**
+ * A reply without the calls that never ran: those whose input does not fit
+ * their tool, refused before the tool was called. The model was told so at
+ * the time, and tried again; sent on every turn after, a call that came to
+ * nothing only costs — a model that once sent the same malformed call a
+ * hundred times made each later turn of its chat cost three times as much.
+ *
+ * Judged by the tools on offer now; a call to one that is not is kept.
+ */
+export async function withoutRefusedCalls(
+  parts: Part[],
+  tools: Record<string, Pick<Tool, 'inputSchema'>>
+): Promise<Part[]> {
+  const refused = await Promise.all(
+    parts.map(async part => {
+      if (!isToolUIPart(part) || part.state !== 'output-error') return false;
+      const tool = tools[getToolName(part)];
+      if (!tool || part.providerExecuted) return false;
+      const result = await asSchema(tool.inputSchema).validate?.(part.input);
+      return result?.success === false;
+    })
+  );
+  return parts.filter((_, index) => !refused[index]);
 }
 
 /**

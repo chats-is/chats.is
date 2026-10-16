@@ -1,4 +1,6 @@
+import { tool } from 'ai';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { type ChatMessage } from '@/types';
 
@@ -6,7 +8,8 @@ import {
   forgetProviderItems,
   hasVisibleContent,
   markStopped,
-  textRuns
+  textRuns,
+  withoutRefusedCalls
 } from './message-content';
 
 type Part = ChatMessage['parts'][number];
@@ -150,6 +153,59 @@ describe('forgetProviderItems', () => {
         callProviderMetadata: { openai: {} }
       },
       { type: 'step-start' }
+    ]);
+  });
+});
+
+describe('withoutRefusedCalls', () => {
+  const tools = {
+    create_artifact: tool({
+      inputSchema: z.object({ title: z.string(), content: z.string() })
+    })
+  };
+  const call = (
+    id: string,
+    input: unknown,
+    state: 'output-error' | 'output-available' = 'output-error'
+  ): Part =>
+    ({
+      type: 'tool-create_artifact',
+      toolCallId: id,
+      state,
+      input,
+      ...(state === 'output-error'
+        ? { errorText: 'failed' }
+        : { output: { id: 'a1' } })
+    }) as Part;
+
+  it('leaves out a call whose input its tool refused', async () => {
+    const refused = call('c1', { title: 'Game' });
+    const again = call('c2', { title: 'Game' });
+    const made = call(
+      'c3',
+      { title: 'Game', content: 'x' },
+      'output-available'
+    );
+    const text: Part = { type: 'text', text: 'Here it is.' };
+
+    expect(
+      await withoutRefusedCalls([refused, again, made, text], tools)
+    ).toEqual([made, text]);
+  });
+
+  it('keeps a call that ran and failed, and one to a tool not on offer', async () => {
+    const ranAndFailed = call('c1', { title: 'Game', content: 'x' });
+    const unknown = {
+      type: 'tool-generate_image',
+      toolCallId: 'c2',
+      state: 'output-error',
+      input: {},
+      errorText: 'failed'
+    } as Part;
+
+    expect(await withoutRefusedCalls([ranAndFailed, unknown], tools)).toEqual([
+      ranAndFailed,
+      unknown
     ]);
   });
 });
