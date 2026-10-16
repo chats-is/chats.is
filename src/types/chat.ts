@@ -9,6 +9,8 @@ export type Chat = {
   title: string;
   modelId: string;
   streamId?: string | null;
+  /** Its share link, where the list it came in says. */
+  shareId?: string | null;
   messages: ChatMessage[];
   artifacts?: Artifact[];
   createdAt: Date;

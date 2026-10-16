@@ -25,6 +25,13 @@ export const createArtifactShare = createServerFn({ method: 'POST' })
     shares.createArtifactShare(context.user.id, data.artifactId)
   );
 
+export const getArtifactShare = createServerFn({ method: 'GET' })
+  .middleware([authedMiddleware])
+  .validator(shareArtifactSchema)
+  .handler(({ data, context }) =>
+    shares.getArtifactShare(context.user.id, data.artifactId)
+  );
+
 export const listShares = createServerFn({ method: 'GET' })
   .middleware([authedMiddleware])
   .validator(sharePageSchema)
@@ -54,8 +61,15 @@ export const shareQueries = {
   /** Key prefixes, shared by the readers and by anything that
    *  invalidates them, so the two can never drift apart. */
   key: {
-    list: () => ['share', 'list'] as const
+    list: () => ['share', 'list'] as const,
+    artifact: () => ['share', 'artifact'] as const
   },
+  /** The link an artifact is shared by on its own, if it is. */
+  artifact: (input: { artifactId: string }) =>
+    queryOptions({
+      queryKey: [...shareQueries.key.artifact(), input] as const,
+      queryFn: () => getArtifactShare({ data: input })
+    }),
   /** One page of the user's share links. */
   list: (input: { page?: number; pageSize?: number } = {}) =>
     queryOptions({

@@ -46,3 +46,26 @@ export function SharedArtifactView({
     </ArtifactFilesContext.Provider>
   );
 }
+
+/**
+ * An artifact shared on its own, embedded in someone else's page: the
+ * artifact alone, filling the frame it is given — its preview where it has
+ * one, else its source — with nothing around it to press.
+ */
+export function EmbeddedArtifactView({
+  artifact,
+  files
+}: {
+  artifact: Omit<Artifact, 'chatId' | 'messageId'>;
+  files: ArtifactFile[];
+}) {
+  const shown: Artifact = { ...artifact, chatId: '', messageId: '' };
+
+  return (
+    <ArtifactFilesContext.Provider value={files}>
+      <div className="h-svh w-full overflow-auto bg-background">
+        <ArtifactViewer artifact={shown} hideHeader={true} viewMode="preview" />
+      </div>
+    </ArtifactFilesContext.Provider>
+  );
+}

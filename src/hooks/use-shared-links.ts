@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { mutating } from '@/lib/mutation';
+import { chatQueries } from '@/server/functions/chat';
+import { libraryQueries } from '@/server/functions/library';
 import {
   deleteAllShares,
   deleteShare,
@@ -10,6 +12,15 @@ import {
 /** `page` is 1-based, as it is everywhere else the app pages. */
 export function useSharedLinks(page: number = 1, pageSize?: number) {
   const queryClient = useQueryClient();
+  // A link taken back is no longer shown as shared anywhere: the sidebar's
+  // chats, the library's artifacts, an artifact's own button.
+  const unshared = () => {
+    void queryClient.invalidateQueries({ queryKey: shareQueries.all() });
+    void queryClient.invalidateQueries({
+      queryKey: chatQueries.key.infinite()
+    });
+    void queryClient.invalidateQueries({ queryKey: libraryQueries.key.list() });
+  };
 
   const { data, error, isLoading, isPlaceholderData, refetch } = useQuery(
     shareQueries.list({ page, pageSize })
@@ -17,16 +28,12 @@ export function useSharedLinks(page: number = 1, pageSize?: number) {
 
   const deleteMutation = useMutation({
     mutationFn: mutating(deleteShare),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: shareQueries.key.list() });
-    }
+    onSuccess: unshared
   });
 
   const deleteAllMutation = useMutation({
     mutationFn: () => deleteAllShares(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: shareQueries.key.list() });
-    }
+    onSuccess: unshared
   });
 
   const deleteSharedLink = async (id: string) => {

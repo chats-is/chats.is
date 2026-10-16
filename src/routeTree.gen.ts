@@ -38,6 +38,7 @@ import { Route as ConsoleSubscriptionsRouteImport } from './routes/console/subsc
 import { Route as ConsoleTiersRouteImport } from './routes/console/tiers'
 import { Route as ConsoleUsageRouteImport } from './routes/console/usage'
 import { Route as DevMarkdownRouteImport } from './routes/dev.markdown'
+import { Route as EmbedIdRouteImport } from './routes/embed.$id'
 import { Route as PayPaddleRouteImport } from './routes/pay/paddle'
 import { Route as ShareIdRouteImport } from './routes/share/$id'
 import { Route as ChatChatChatIdRouteImport } from './routes/_chat/chat.$chatId'
@@ -192,6 +193,11 @@ const DevMarkdownRoute = DevMarkdownRouteImport.update({
   path: '/dev/markdown',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmbedIdRoute = EmbedIdRouteImport.update({
+  id: '/embed/$id',
+  path: '/embed/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PayPaddleRoute = PayPaddleRouteImport.update({
   id: '/pay/paddle',
   path: '/pay/paddle',
@@ -267,6 +273,7 @@ export interface FileRoutesByFullPath {
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/dev/markdown': typeof DevMarkdownRoute
+  '/embed/$id': typeof EmbedIdRoute
   '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/console/': typeof ConsoleIndexRoute
@@ -304,6 +311,7 @@ export interface FileRoutesByTo {
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/dev/markdown': typeof DevMarkdownRoute
+  '/embed/$id': typeof EmbedIdRoute
   '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/': typeof ChatIndexRoute
@@ -345,6 +353,7 @@ export interface FileRoutesById {
   '/console/tiers': typeof ConsoleTiersRoute
   '/console/usage': typeof ConsoleUsageRoute
   '/dev/markdown': typeof DevMarkdownRoute
+  '/embed/$id': typeof EmbedIdRoute
   '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
   '/_chat/': typeof ChatIndexRoute
@@ -387,6 +396,7 @@ export interface FileRouteTypes {
     | '/console/tiers'
     | '/console/usage'
     | '/dev/markdown'
+    | '/embed/$id'
     | '/pay/paddle'
     | '/share/$id'
     | '/console/'
@@ -424,6 +434,7 @@ export interface FileRouteTypes {
     | '/console/tiers'
     | '/console/usage'
     | '/dev/markdown'
+    | '/embed/$id'
     | '/pay/paddle'
     | '/share/$id'
     | '/'
@@ -464,6 +475,7 @@ export interface FileRouteTypes {
     | '/console/tiers'
     | '/console/usage'
     | '/dev/markdown'
+    | '/embed/$id'
     | '/pay/paddle'
     | '/share/$id'
     | '/_chat/'
@@ -489,6 +501,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ArtifactIdRoute: typeof ArtifactIdRoute
   DevMarkdownRoute: typeof DevMarkdownRoute
+  EmbedIdRoute: typeof EmbedIdRoute
   PayPaddleRoute: typeof PayPaddleRoute
   ShareIdRoute: typeof ShareIdRoute
   ApiArtifactsPreviewRoute: typeof ApiArtifactsPreviewRoute
@@ -701,6 +714,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevMarkdownRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/embed/$id': {
+      id: '/embed/$id'
+      path: '/embed/$id'
+      fullPath: '/embed/$id'
+      preLoaderRoute: typeof EmbedIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pay/paddle': {
       id: '/pay/paddle'
       path: '/pay/paddle'
@@ -850,6 +870,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ArtifactIdRoute: ArtifactIdRoute,
   DevMarkdownRoute: DevMarkdownRoute,
+  EmbedIdRoute: EmbedIdRoute,
   PayPaddleRoute: PayPaddleRoute,
   ShareIdRoute: ShareIdRoute,
   ApiArtifactsPreviewRoute: ApiArtifactsPreviewRoute,

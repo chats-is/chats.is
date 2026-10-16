@@ -86,6 +86,15 @@ export async function createArtifactShare(userId: string, artifactId: string) {
   return result[0];
 }
 
+/** The link one of the user's artifacts is shared by on its own, or null. */
+export async function getArtifactShare(userId: string, artifactId: string) {
+  const share = await db.query.shares.findFirst({
+    where: and(eq(shares.artifactId, artifactId), eq(shares.userId, userId)),
+    columns: { id: true }
+  });
+  return share ?? null;
+}
+
 /** One page of the user's own share links, and how many they have in all. */
 export async function listShares(
   userId: string,

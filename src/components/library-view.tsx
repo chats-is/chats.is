@@ -10,15 +10,18 @@ import {
   Pause,
   Play,
   Search,
+  Share2,
   Table,
   X
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { type Artifact } from '@/types';
 import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 import { getArtifactLanguageLabel } from '@/lib/code-language';
 import { downloadArtifact, downloadFileFromUrl } from '@/lib/download';
 import { formatMediaTime } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { artifactQueries } from '@/server/functions/artifact';
 import { libraryQueries, type LibraryItem } from '@/server/functions/library';
@@ -37,16 +40,20 @@ import {
 } from '@/components/gallery-skeleton';
 
 /** Hover corner actions — uniform across all card kinds: download and
- *  open-chat side by side at the top-right. `dark` for image/video overlays. */
+ *  open-chat side by side at the top-right, and for an artifact shared on
+ *  its own, its link to copy. `dark` for image/video overlays. */
 function CardActions({
   chatId,
+  shareId,
   onDownload,
   dark
 }: {
   chatId: string | null;
+  shareId?: string | null;
   onDownload?: () => void;
   dark?: boolean;
 }) {
+  const { copyToClipboard } = useCopyToClipboard();
   // Solid backgrounds — no translucency over the card content.
   const buttonClass = dark
     ? 'rounded-full bg-black p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-700'
@@ -54,6 +61,22 @@ function CardActions({
 
   return (
     <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+      {shareId && (
+        <button
+          type="button"
+          title="Copy share link"
+          onClick={async event => {
+            event.stopPropagation();
+            const link = new URL(window.location.origin);
+            link.pathname = `/artifact/${shareId}`;
+            await copyToClipboard(link.toString());
+            toast.success('Share link copied to clipboard', { duration: 2000 });
+          }}
+          className={buttonClass}
+        >
+          <Share2 className="size-3.5" />
+        </button>
+      )}
       {onDownload && (
         <button
           type="button"
@@ -334,6 +357,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
         </div>
         <CardActions
           chatId={item.chatId}
+          shareId={item.shareId}
           onDownload={() => void handleArtifactDownload(item.artifact.id)}
         />
       </div>

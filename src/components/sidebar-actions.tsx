@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle,
   Loader2,
@@ -14,7 +14,8 @@ import { type Chat } from '@/types';
 import { mutating } from '@/lib/mutation';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { createShare } from '@/server/functions/share';
+import { chatQueries } from '@/server/functions/chat';
+import { createShare, shareQueries } from '@/server/functions/share';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,7 @@ export function SidebarActions({
   className,
   onOpenChange
 }: SidebarActionsProps) {
+  const queryClient = useQueryClient();
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const [titleDialogOpen, setTitleDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
@@ -48,10 +50,19 @@ export function SidebarActions({
     if (isCopied || shareMutation.isPending) return;
 
     try {
-      const result = await shareMutation.mutateAsync({ chatId });
+      // Shared already, its link is known; otherwise it is shared now, and
+      // the list learns so.
+      let shareId = chat.shareId;
+      if (!shareId) {
+        shareId = (await shareMutation.mutateAsync({ chatId })).id;
+        void queryClient.invalidateQueries({
+          queryKey: chatQueries.key.infinite()
+        });
+        void queryClient.invalidateQueries({ queryKey: shareQueries.all() });
+      }
 
       const sharedLink = new URL(window.location.origin);
-      sharedLink.pathname = `/share/${result?.id}`;
+      sharedLink.pathname = `/share/${shareId}`;
       await copyToClipboard(sharedLink.toString());
       toast.success('Share link copied to clipboard', { duration: 2000 });
     } catch (error: any) {
@@ -87,6 +98,10 @@ export function SidebarActions({
             ) : shareMutation.isPending ? (
               <>
                 <Loader2 className="animate-spin" /> Sharing...
+              </>
+            ) : chat.shareId ? (
+              <>
+                <Share2 /> Copy link
               </>
             ) : (
               <>

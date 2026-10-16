@@ -30,8 +30,8 @@ const requestScope = createMiddleware({ type: 'request' }).server(({ next }) =>
  * Set on every response, whatever its status.
  *
  * This app runs code a model wrote, in frames of its own making. No other site
- * has a reason to put any page of it in a frame, and one that could would get
- * to choose how the preview frame is sandboxed.
+ * has a reason to put a page of it in a frame but the two below, and one that
+ * could frame the rest would act on a signed-in reader's behalf through them.
  *
  * Done here rather than as a route rule in the server config, which is where
  * it was first put: those rules are applied only to a response that is 2xx.
@@ -45,13 +45,32 @@ const SECURITY_HEADERS = {
   'referrer-policy': 'strict-origin-when-cross-origin'
 };
 
+/**
+ * The pages any site may frame: an artifact shared on its own, as another
+ * site embeds it, and the frame its preview runs in. That frame is framed by
+ * every page above it, the other site's too, and a browser asks each of them;
+ * so it is framable wherever the embed is. Framed by a site without a
+ * sandbox, it runs nothing: it runs code only at the opaque origin the app's
+ * own sandbox gives it (`preview-frame-client`). The embed page holds nothing
+ * of the reader's and offers nothing to press.
+ */
+const EMBEDDABLE = /^\/(embed\/[^/]+|artifact-preview-frame)$/;
+const EMBEDDABLE_HEADERS = {
+  'content-security-policy': 'frame-ancestors *',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin'
+};
+
 const privatePages = createMiddleware({ type: 'request' }).server(
-  async ({ next }) => {
+  async ({ request, next }) => {
     const result = await next();
     const { headers } = result.response;
+    const security = EMBEDDABLE.test(new URL(request.url).pathname)
+      ? EMBEDDABLE_HEADERS
+      : SECURITY_HEADERS;
 
     try {
-      for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      for (const [name, value] of Object.entries(security)) {
         if (!headers.has(name)) headers.set(name, value);
       }
     } catch {

@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { and, count, eq, gt, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, isNotNull, ne, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -10,7 +10,7 @@ import {
   type chatUpdateSchema
 } from '@/types/chat';
 import { db } from '@/db';
-import { artifacts, chats, messages } from '@/db/schema';
+import { artifacts, chats, messages, shares } from '@/db/schema';
 import { blobUrlsOfMessages, removeBlobs } from '@/server/services/blob';
 
 /**
@@ -68,15 +68,23 @@ export async function listChats(
   const limit = input.limit ?? 50;
   const offset = input.cursor ?? input.offset ?? 0;
 
-  return await db.query.chats.findMany({
-    orderBy: (chats, { desc }) => [desc(chats.createdAt)],
-    limit: limit,
-    offset: offset,
-    where: eq(chats.userId, userId),
-    columns: {
-      userId: false
-    }
-  });
+  // With its share link, if it has one, for the sidebar to offer to copy.
+  return await db
+    .select({
+      id: chats.id,
+      title: chats.title,
+      modelId: chats.modelId,
+      streamId: chats.streamId,
+      createdAt: chats.createdAt,
+      updatedAt: chats.updatedAt,
+      shareId: shares.id
+    })
+    .from(chats)
+    .leftJoin(shares, eq(shares.chatId, chats.id))
+    .where(eq(chats.userId, userId))
+    .orderBy(desc(chats.createdAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 /**

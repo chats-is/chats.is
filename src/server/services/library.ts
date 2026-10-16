@@ -7,7 +7,7 @@ import { type libraryPageSchema } from '@/types/library';
 import { MEDIA_PARTS_JSONPATH } from '@/lib/constant';
 import { extractLibraryMedia, type LibraryMediaItem } from '@/lib/library';
 import { db } from '@/db';
-import { artifacts, messages } from '@/db/schema';
+import { artifacts, messages, shares } from '@/db/schema';
 
 /** Cards only render a snippet; the full body is fetched on download. */
 const ARTIFACT_PREVIEW_CHARS = 2000;
@@ -22,6 +22,8 @@ export type LibraryItem =
       /** Artifact row with `content` truncated to the preview length. */
       artifact: ArtifactRow;
       chatId: string | null;
+      /** Its share link, if it is shared on its own. */
+      shareId: string | null;
       createdAt: Date;
     };
 
@@ -113,9 +115,11 @@ export async function listLibrary(
         >`left(${artifacts.content}, ${ARTIFACT_PREVIEW_CHARS})`,
         fileName: artifacts.fileName,
         createdAt: artifacts.createdAt,
-        updatedAt: artifacts.updatedAt
+        updatedAt: artifacts.updatedAt,
+        shareId: shares.id
       })
       .from(artifacts)
+      .leftJoin(shares, eq(shares.artifactId, artifacts.id))
       .where(
         and(
           eq(artifacts.userId, userId),
@@ -137,11 +141,12 @@ export async function listLibrary(
   const media: LibraryItem[] = messageRows
     .flatMap(row => extractLibraryMedia(row))
     .map(item => ({ type: 'media' as const, ...item }));
-  const arts: LibraryItem[] = artifactRows.map(row => ({
+  const arts: LibraryItem[] = artifactRows.map(({ shareId, ...row }) => ({
     type: 'artifact' as const,
     id: row.id,
     artifact: row,
     chatId: row.chatId,
+    shareId,
     createdAt: row.createdAt
   }));
 
