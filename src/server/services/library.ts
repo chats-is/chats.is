@@ -1,6 +1,18 @@
 import '@tanstack/react-start/server-only';
 
-import { and, desc, eq, ilike, isNotNull, lt, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  ilike,
+  isNotNull,
+  lt,
+  notExists,
+  or,
+  sql
+} from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { type z } from 'zod';
 
 import { type libraryPageSchema } from '@/types/library';
@@ -11,6 +23,10 @@ import { artifacts, messages, shares } from '@/db/schema';
 
 /** Cards only render a snippet; the full body is fetched on download. */
 const ARTIFACT_PREVIEW_CHARS = 2000;
+
+/** Another version of the same artifact: a later one, in its chat, under
+ *  its title — which a change keeps. */
+const newer = alias(artifacts, 'newer');
 
 type ArtifactRow = Omit<typeof artifacts.$inferSelect, 'userId'>;
 
@@ -124,6 +140,20 @@ export async function listLibrary(
         and(
           eq(artifacts.userId, userId),
           isNotNull(artifacts.messageId),
+          // An artifact once, as it is now: each change is kept as a version
+          // of its own, and only the newest has a card.
+          notExists(
+            db
+              .select({ id: newer.id })
+              .from(newer)
+              .where(
+                and(
+                  eq(newer.chatId, artifacts.chatId),
+                  eq(newer.title, artifacts.title),
+                  gt(newer.createdAt, artifacts.createdAt)
+                )
+              )
+          ),
           before ? lt(artifacts.createdAt, before) : undefined,
           term
             ? or(

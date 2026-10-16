@@ -84,22 +84,28 @@ async function seedMedia(id: string, said: string, filename: string) {
   });
 }
 
-async function seedArtifact(id: string, title: string, content: string) {
+async function seedArtifact(
+  id: string,
+  title: string,
+  content: string,
+  { chatId = CHAT, at }: { chatId?: string; at?: Date } = {}
+) {
   await h.db.insert(schema.messages).values({
     id: `${id}-msg`,
     role: 'assistant',
     userId: USER,
-    chatId: CHAT,
+    chatId,
     parts: [{ type: 'text', text: 'here you go' }]
   });
   await h.db.insert(schema.artifacts).values({
     id,
-    chatId: CHAT,
+    chatId,
     messageId: `${id}-msg`,
     userId: USER,
     title,
     type: 'code',
-    content
+    content,
+    ...(at && { createdAt: at, updatedAt: at })
   });
 }
 
@@ -157,5 +163,33 @@ describe('listLibrary search', () => {
     const found = await search('sunflower');
     expect(found).toHaveLength(2);
     expect(found.map(item => item.type).sort()).toEqual(['artifact', 'media']);
+  });
+});
+
+describe('listLibrary artifacts', () => {
+  const at = (minute: number) => new Date(Date.UTC(2026, 0, 1, 12, minute));
+
+  it('shows an artifact once, as its newest version', async () => {
+    await h.db.insert(schema.chats).values({
+      id: 'chat-2',
+      title: 'Other',
+      modelId: 'gpt-4',
+      userId: USER
+    });
+    await seedArtifact('v1', 'Game', 'first', { at: at(1) });
+    await seedArtifact('v2', 'Game', 'second', { at: at(2) });
+    await seedArtifact('v3', 'Game', 'third', { at: at(3) });
+    // Another artifact in the chat, and one of the same name in another.
+    await seedArtifact('chart', 'Chart', 'bars', { at: at(2) });
+    await seedArtifact('elsewhere', 'Game', 'other', {
+      chatId: 'chat-2',
+      at: at(1)
+    });
+
+    const items = await search();
+    expect(items.map(item => item.id)).toEqual(['v3', 'chart', 'elsewhere']);
+    // Searched as the card shows it: an older version's words find nothing.
+    expect((await search('third')).map(item => item.id)).toEqual(['v3']);
+    expect(await search('second')).toHaveLength(0);
   });
 });
