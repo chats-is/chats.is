@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, formatDistanceToNowStrict } from 'date-fns';
 
 /**
  * Every date and time the app shows, in one form.
@@ -12,7 +12,9 @@ import { format } from 'date-fns';
  *   `Sep 29, 2026 14:05:32`;
  * - a day a bill falls on — a renewal, the end of a period — to the day:
  *   `Sep 29, 2026`;
- * - a day on a chart's axis, where the year goes without saying: `Sep 29`.
+ * - a day on a chart's axis, where the year goes without saying: `Sep 29`;
+ * - how long ago something was changed, where its age is what tells it from
+ *   others like it — the versions of an artifact: `5 hours ago`.
  *
  * An instant is shown through `<LocalTime>`, not these directly: the server
  * renders in its own time zone, and only the browser knows the reader's.
@@ -34,3 +36,7 @@ export const formatDate = (value: DateLike) =>
  *  `Sep 29`. */
 export const formatShortDate = (value: DateLike) =>
   format(new Date(value), 'MMM d');
+
+/** How long ago, from now: `5 hours ago`. */
+export const formatAgo = (value: DateLike) =>
+  formatDistanceToNowStrict(new Date(value), { addSuffix: true });

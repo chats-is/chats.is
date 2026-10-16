@@ -3,6 +3,7 @@ import { CodeXml, Eye, LoaderCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type Artifact } from '@/types';
+import { formatAgo } from '@/lib/format-date';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -252,10 +253,17 @@ export function ArtifactViewer({
                 <SelectContent align="start">
                   {artifacts.map(item => (
                     <SelectItem key={item.id} value={item.id}>
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate">{item.title}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {getArtifactLanguageLabel(item) || item.type}
+                      {/* Each change is a version of its own, under the
+                          same title: when it was made tells them apart. */}
+                      <div className="flex min-w-0 flex-col">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate">{item.title}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {getArtifactLanguageLabel(item) || item.type}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          Updated {formatAgo(item.updatedAt)}
                         </span>
                       </div>
                     </SelectItem>
