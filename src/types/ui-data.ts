@@ -77,11 +77,14 @@ export type CustomUIDataTypes = {
   };
   /**
    * The artifact a reader's message is about, sent with it unseen — with a
-   * code's error, today. The message shows the reader's text alone; they
-   * need not know an "artifact" from a preview, and the model is told the
-   * rest (the chat route's `convertDataPart`).
+   * code's error, or with a request about a passage they selected in it.
+   * The message shows the reader's text, and the passage; they need not
+   * know an "artifact" from a preview, and the model is told the rest (the
+   * chat route's `convertDataPart`).
    */
   artifactRef: {
     id: string;
+    /** The passage selected, as it stands in the artifact. */
+    selection?: string;
   };
 };

@@ -22,6 +22,9 @@ interface ArtifactsPanelProps {
   desktopContainerClassName?: string;
   /** Asks the chat to fix a preview's error; absent on a share page. */
   onFix?: (artifact: Artifact, error: string) => void;
+  /** Asks the chat about a passage selected in an artifact; absent on a
+   *  share page. */
+  onEdit?: (artifact: Artifact, selection: string, request: string) => void;
   /** Offers to share an artifact on its own; not on a share page. */
   canShare?: boolean;
 }
@@ -34,6 +37,7 @@ export function ArtifactsPanel({
   onSelect,
   desktopContainerClassName,
   onFix,
+  onEdit,
   canShare
 }: ArtifactsPanelProps) {
   // The source/preview choice is a persistent preference: switching artifacts
@@ -112,6 +116,7 @@ export function ArtifactsPanel({
             viewMode={effectiveViewMode}
             onViewModeChange={setViewMode}
             onFix={onFix}
+            onEdit={onEdit}
           />
         </div>
       </div>

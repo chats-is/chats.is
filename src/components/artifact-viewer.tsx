@@ -28,6 +28,7 @@ import {
   ArtifactRuntimePreview,
   supportsArtifactRuntimePreview
 } from '@/components/artifacts/runtime-preview';
+import { SelectionEdit } from '@/components/artifacts/selection-edit';
 import { ShareArtifactButton } from '@/components/artifacts/share-artifact-button';
 
 interface ArtifactViewerProps {
@@ -41,6 +42,8 @@ interface ArtifactViewerProps {
   onViewModeChange?: (mode: 'source' | 'preview') => void;
   /** Asks the chat to fix an error in the artifact's preview. */
   onFix?: (artifact: Artifact, error: string) => void;
+  /** Asks the chat about a passage selected in the artifact's source. */
+  onEdit?: (artifact: Artifact, selection: string, request: string) => void;
   /** Offers to share the artifact on its own: in the chat, between turns. */
   canShare?: boolean;
 }
@@ -55,6 +58,7 @@ export function ArtifactViewer({
   viewMode: controlledViewMode,
   onViewModeChange,
   onFix,
+  onEdit,
   canShare
 }: ArtifactViewerProps) {
   const { copyToClipboard } = useCopyToClipboard();
@@ -111,11 +115,20 @@ export function ArtifactViewer({
     <div
       ref={contentRef}
       className={cn(
-        'h-full min-h-0 overflow-auto bg-background',
+        'relative h-full min-h-0 overflow-auto bg-background',
         artifactSourceUsesCodeChrome(artifact) ? 'p-0' : 'border p-4'
       )}
     >
       {registry.renderSource(artifact)}
+      {onEdit && !isStreaming && (
+        <SelectionEdit
+          key={artifact.id}
+          containerRef={contentRef}
+          onSubmit={(selection, request) =>
+            onEdit(artifact, selection, request)
+          }
+        />
+      )}
     </div>
   );
 

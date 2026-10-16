@@ -281,6 +281,18 @@ describe('dataPartForModel', () => {
     expect(part?.text).toContain('update_artifact');
   });
 
+  it('hands the model the passage selected, to change or ask about', () => {
+    const part = dataPartForModel({
+      type: 'data-artifactRef',
+      data: { id: 'artifact-1', selection: '<button>Submit</button>' }
+    });
+
+    expect(part?.text).toContain('artifact-1');
+    expect(part?.text).toContain('<button>Submit</button>');
+    expect(part?.text).toContain('update_artifact');
+    expect(part?.text).not.toContain('error');
+  });
+
   it("leaves out every data part that is the page's", () => {
     expect(
       dataPartForModel({

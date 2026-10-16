@@ -275,6 +275,19 @@ export function Message({
                 );
               }
 
+              // The passage a request is about, above it, as the reader
+              // chose it in the artifact.
+              if (part.type === 'data-artifactRef') {
+                return part.data.selection ? (
+                  <p
+                    key={index}
+                    className="my-1 line-clamp-3 border-l-2 border-muted-foreground/30 pl-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
+                  >
+                    {part.data.selection}
+                  </p>
+                ) : null;
+              }
+
               if (part.type === 'text') {
                 if (message.role === 'user') {
                   return (

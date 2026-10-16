@@ -16,6 +16,20 @@ describe('userMessageSchema', () => {
     ).toBe(true);
   });
 
+  it('takes a request with the passage it is about', () => {
+    expect(
+      userMessageSchema.safeParse(
+        message([
+          {
+            type: 'data-artifactRef',
+            data: { id: 'a1', selection: '<button>Submit</button>' }
+          },
+          { type: 'text', text: 'make it red' }
+        ])
+      ).success
+    ).toBe(true);
+  });
+
   it('refuses any other data part', () => {
     expect(
       userMessageSchema.safeParse(

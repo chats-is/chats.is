@@ -73,7 +73,10 @@ export const messageSchema = z.object({
 /** The artifact a message is about, sent with it unseen. */
 const artifactRefPartSchema = z.object({
   type: z.literal('data-artifactRef'),
-  data: z.object({ id: z.string().min(1).max(255) })
+  data: z.object({
+    id: z.string().min(1).max(255),
+    selection: z.string().min(1).optional()
+  })
 });
 
 export const userMessageSchema = messageSchema.extend({

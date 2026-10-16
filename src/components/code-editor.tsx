@@ -21,7 +21,7 @@ import { properties } from '@codemirror/legacy-modes/mode/properties';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { toml } from '@codemirror/legacy-modes/mode/toml';
 import { EditorState } from '@codemirror/state';
-import { EditorView, lineNumbers } from '@codemirror/view';
+import { drawSelection, EditorView, lineNumbers } from '@codemirror/view';
 import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
 import { useTheme } from 'next-themes';
 
@@ -77,6 +77,8 @@ const getLanguageExtension = (language: string) => {
   return null;
 };
 
+const FOCUS_OUTLINE = EditorView.theme({ '&.cm-focused': { outline: 'none' } });
+
 interface CodeEditorProps {
   language: string;
   value: string;
@@ -103,8 +105,17 @@ export function CodeEditor({
     const languageExtension = getLanguageExtension(language);
 
     return [
+      // Read-only, yet still focusable: the editor keeps a selection of its
+      // own, which a passage chosen to ask about needs — one running past
+      // the lines on screen outlasts their being drawn again, and it stays
+      // shown while the question is typed. No keyboard comes up for it on a
+      // phone.
       EditorState.readOnly.of(true),
-      EditorView.editable.of(false),
+      EditorView.contentAttributes.of({ inputmode: 'none' }),
+      drawSelection(),
+      // Focused, it would be ringed by the editor's own dotted outline,
+      // which its styles, not layered, keep over the page's.
+      FOCUS_OUTLINE,
       ...(showLineNumbers ? [lineNumbers()] : []),
       ...(wrapLongLines ? [EditorView.lineWrapping] : []),
       // GitHub's colours, light and dark, as a reply's code blocks have.

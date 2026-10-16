@@ -557,6 +557,23 @@ export function ChatUI({
     },
     [hasUsableModel, sendMessage, updateDisplayModelOptimistically]
   );
+
+  // A request about a passage selected in an artifact, sent as the
+  // reader's own message: the passage above what they typed, and which
+  // artifact it is in, unseen.
+  const handleEdit = useCallback(
+    (artifact: Artifact, selection: string, request: string) => {
+      if (!hasUsableModel()) return;
+      updateDisplayModelOptimistically();
+      sendMessage({
+        parts: [
+          { type: 'data-artifactRef', data: { id: artifact.id, selection } },
+          { type: 'text', text: request }
+        ]
+      });
+    },
+    [hasUsableModel, sendMessage, updateDisplayModelOptimistically]
+  );
   // Only between turns: while one is under way the input is closed too, and
   // what it is making is not stored yet, so it cannot be shared.
   const betweenTurns = status === 'ready' || status === 'error';
@@ -657,6 +674,7 @@ export function ChatUI({
                 onSelect={handleArtifactSelect}
                 desktopContainerClassName="h-full w-full min-w-0 max-w-none border-l-0"
                 onFix={betweenTurns ? handleFix : undefined}
+                onEdit={betweenTurns ? handleEdit : undefined}
                 canShare={betweenTurns}
               />
             </ResizablePanel>
@@ -694,6 +712,7 @@ export function ChatUI({
               selectedId={activeId}
               onSelect={handleArtifactSelect}
               onFix={betweenTurns ? handleFix : undefined}
+              onEdit={betweenTurns ? handleEdit : undefined}
               canShare={betweenTurns}
             />
           </div>

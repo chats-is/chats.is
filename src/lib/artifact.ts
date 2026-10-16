@@ -326,9 +326,10 @@ export const buildPreviewFiles = (artifact: PreviewArtifact): PreviewFile[] => {
 
 /**
  * What the model is given for a data part of a message. The artifact a
- * reader's message is about — its code's error, sent from Try fixing —
- * becomes the instruction the reader never saw; every other data part is
- * the page's, not the model's, and is left out.
+ * reader's message is about becomes the instruction the reader never saw:
+ * to fix its code's error, sent from Try fixing, or to act on a passage they
+ * selected in it. Every other data part is the page's, not the model's, and
+ * is left out.
  *
  * The error is the code's, not the preview's, which only shows it. And
  * the reader knows no artifact, id or tool, so the reply must not name
@@ -336,13 +337,17 @@ export const buildPreviewFiles = (artifact: PreviewArtifact): PreviewFile[] => {
  */
 export const dataPartForModel = (
   part: DataUIPart<CustomUIDataTypes>
-): TextPart | undefined =>
-  part.type === 'data-artifactRef'
-    ? {
-        type: 'text',
-        text: `The text above is an error that the code of the artifact with id ${part.data.id} raised. Call update_artifact on that artifact now to fix the code: only the call changes it, and saying it is fixed does not. Then tell the user what was wrong and what you changed, in the language the user writes in — the error text is the program's, not theirs — calling it by its title or by what it is (the page, the chart, the component), and not mentioning artifacts, ids or tool names to them.`
-      }
-    : undefined;
+): TextPart | undefined => {
+  if (part.type !== 'data-artifactRef') return undefined;
+  const { id, selection } = part.data;
+  return {
+    type: 'text',
+    text:
+      selection === undefined
+        ? `The text above is an error that the code of the artifact with id ${id} raised. Call update_artifact on that artifact now to fix the code: only the call changes it, and saying it is fixed does not. Then tell the user what was wrong and what you changed, in the language the user writes in — the error text is the program's, not theirs — calling it by its title or by what it is (the page, the chart, the component), and not mentioning artifacts, ids or tool names to them.`
+        : `The user selected this passage in the artifact with id ${id}, and the message that follows is about it:\n\n<selection>\n${selection}\n</selection>\n\nIf they ask for a change, call update_artifact on that artifact to make it, changing this passage and only what else the request needs: take oldStr from the passage, with the lines around it when the passage appears in the artifact more than once. Only the call changes it, and saying it is changed does not. If they ask a question, answer it and change nothing. Answer in the language the user writes in, calling the artifact by its title or by what it is (the page, the chart, the component), and not mentioning artifacts, ids or tool names to them.`
+  };
+};
 
 /**
  * What a preview says was thrown: its type and message, as JavaScript
