@@ -8,7 +8,13 @@ import { tanstackStartCookies } from 'better-auth/tanstack-start';
 import { sendVerificationCode } from '@/lib/email';
 import { env } from '@/lib/env';
 import { db } from '@/db';
-import { accounts, sessions, users, verifications } from '@/db/schema';
+import {
+  accounts,
+  rateLimits,
+  sessions,
+  users,
+  verifications
+} from '@/db/schema';
 import { makeFirstUserAdmin } from '@/server/services/user';
 
 /**
@@ -30,7 +36,20 @@ export const auth = betterAuth({
       user: users,
       session: sessions,
       account: accounts,
-      verification: verifications
+      verification: verifications,
+      rateLimit: rateLimits
+    }
+  }),
+  // Kept in the database rather than in each server's memory, so the limits
+  // hold across every instance a deploy runs. The rules are Better Auth's own.
+  rateLimit: { storage: 'database' },
+  ...(env.AUTH_IP_ADDRESS_HEADERS && {
+    advanced: {
+      ipAddress: {
+        ipAddressHeaders: env.AUTH_IP_ADDRESS_HEADERS.split(',')
+          .map(header => header.trim())
+          .filter(Boolean)
+      }
     }
   }),
   user: {

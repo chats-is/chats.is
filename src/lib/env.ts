@@ -36,6 +36,13 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url({ protocol: /^https?$/ }).optional(),
     AUTH_SECRET: z.string(),
     APP_SECRET: z.string().min(1),
+    // The request headers a client's IP is read from, comma-separated, first
+    // that holds one wins; it keys the sign-in rate limits. Unset is
+    // x-forwarded-for, which Vercel overwrites with whatever connects to it —
+    // behind Cloudflare that is Cloudflare, so set `cf-connecting-ip` there.
+    // Only name a header the proxy in front sets: one it passes through can be
+    // sent by anyone, with any address in it.
+    AUTH_IP_ADDRESS_HEADERS: z.string().optional(),
 
     // GitHub Auth
     AUTH_GITHUB_ENABLED: z.coerce.boolean().default(false),
@@ -99,6 +106,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     AUTH_SECRET: process.env.AUTH_SECRET,
     APP_SECRET: process.env.APP_SECRET,
+    AUTH_IP_ADDRESS_HEADERS: process.env.AUTH_IP_ADDRESS_HEADERS,
 
     // GitHub Auth
     AUTH_GITHUB_ENABLED: process.env.AUTH_GITHUB_ENABLED === 'true',

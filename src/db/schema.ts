@@ -1,6 +1,7 @@
 import { type JSONValue } from 'ai';
 import { relations, sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   index,
@@ -386,6 +387,22 @@ export const verifications = createTable(
       .defaultNow()
   },
   v => [index('verification_identifier_idx').on(v.identifier)]
+);
+
+/**
+ * Better Auth's rate limit counts, shared by every server instance: one row
+ * per client IP and auth path, read and written by Better Auth alone, which
+ * also clears the rows whose window has passed.
+ */
+export const rateLimits = createTable(
+  'rate_limit',
+  {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    key: varchar('key', { length: 255 }).notNull(),
+    count: integer('count').notNull(),
+    lastRequest: bigint('last_request', { mode: 'number' }).notNull()
+  },
+  rateLimit => [uniqueIndex('rate_limit_key_idx').on(rateLimit.key)]
 );
 
 export const providers = createTable(
