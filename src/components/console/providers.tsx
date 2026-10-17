@@ -115,8 +115,8 @@ const PROVIDER_TYPE_OPTIONS = PROVIDER_TYPES.map(t => ({
 }));
 
 const VERTEX_AUTH_OPTIONS = [
-  { value: 'service_account', label: 'JSON' },
-  { value: 'api_key', label: 'API Key (Gemini only)' }
+  { value: 'service_account', label: 'Service Account JSON' },
+  { value: 'api_key', label: 'Express Mode (API Key)' }
 ];
 
 /** Parses to a JSON object (not an array, not a scalar). */
@@ -250,46 +250,59 @@ const providerColumns = (actions: {
         headClassName: 'w-36',
         cellClassName: 'whitespace-nowrap'
       },
-      cell: ({ row }) => (
-        <>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => actions.sync(row.original.id)}
-              >
-                <RefreshCw className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Sync API Models</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => actions.edit(row.original)}
-              >
-                <Pencil className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Edit Provider</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => actions.remove(row.original.id)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Delete Provider</TooltipContent>
-          </Tooltip>
-        </>
-      )
+      cell: ({ row }) => {
+        // A Vertex API key reaches generateContent only, so it cannot list models.
+        const unlisted =
+          row.original.type === 'vertex' && !vertexKeyOf(row.original);
+        return (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* The span keeps the tooltip over a disabled button. */}
+                <span className="inline-flex">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={unlisted}
+                    onClick={() => actions.sync(row.original.id)}
+                  >
+                    <RefreshCw className="size-4" />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {unlisted
+                  ? "Express Mode (API Key) can't sync models"
+                  : 'Sync API Models'}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.edit(row.original)}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit Provider</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => actions.remove(row.original.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete Provider</TooltipContent>
+            </Tooltip>
+          </>
+        );
+      }
     })
   ]);
 
