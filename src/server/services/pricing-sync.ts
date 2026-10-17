@@ -7,7 +7,6 @@ import {
   type PricingSyncResult,
   type ProviderType
 } from '@/types';
-import { BEDROCK_MODELS, VERTEX_AI_MODELS } from '@/lib/constant';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, models } from '@/db/schema';
@@ -68,21 +67,18 @@ async function fetchRemote(source: PricingSource): Promise<RemoteData> {
 }
 
 /**
- * Resolve our internal (provider.type, model.modelId) → the remote pricing
- * data's (providerId, modelId) pair.
+ * Resolve one of a model's names, under its first provider's type → the
+ * remote pricing data's (providerId, modelId) pair.
  *
- * Most providers map 1:1 (same name) and the modelId is used as-is. Two
- * exceptions:
- *   - `bedrock`  : remote provider is `amazon-bedrock`; the modelId must be
- *                  translated via BEDROCK_MODELS (e.g. claude-opus-4-5 →
- *                  anthropic.claude-opus-4-5-20251101-v1:0).
- *   - `vertex`   : Anthropic-on-Vertex models go under `google-vertex-anthropic`
- *                  with the @date-suffixed modelId from VERTEX_AI_MODELS;
- *                  Gemini-on-Vertex stays under `google-vertex` with the
- *                  modelId as-is.
- *
- * Returns null if a translation is required but not configured (e.g. a
- * Bedrock model whose modelId isn't in BEDROCK_MODELS).
+ * Most providers are listed under their own name, with the model by that
+ * name as it is. Two exceptions:
+ *   - `bedrock`  : listed as `amazon-bedrock`, by Bedrock's own id
+ *                  (anthropic.claude-opus-4-5-20251101-v1:0).
+ *   - `vertex`   : the modelId is `publisher/model`. Anthropic's go under
+ *                  `google-vertex-anthropic` by the model alone; Google's
+ *                  under `google-vertex` by the model alone; every other
+ *                  publisher's under `google-vertex` by the whole id, as the
+ *                  remote data names them (xai/grok-4.6).
  *
  * Both models.dev and llm-metadata use the same provider keys, so a single
  * mapping covers both sources.
@@ -90,17 +86,19 @@ async function fetchRemote(source: PricingSource): Promise<RemoteData> {
 function resolveRemoteRef(
   type: ProviderType,
   modelId: string
-): { providerId: string; modelId: string } | null {
+): { providerId: string; modelId: string } {
   switch (type) {
-    case 'bedrock': {
-      const remoteId = BEDROCK_MODELS[modelId];
-      if (!remoteId) return null;
-      return { providerId: 'amazon-bedrock', modelId: remoteId };
-    }
+    case 'bedrock':
+      return { providerId: 'amazon-bedrock', modelId };
     case 'vertex': {
-      const claudeId = VERTEX_AI_MODELS[modelId];
-      if (claudeId) {
-        return { providerId: 'google-vertex-anthropic', modelId: claudeId };
+      const slash = modelId.indexOf('/');
+      const publisher = slash > 0 ? modelId.slice(0, slash) : '';
+      const name = modelId.slice(slash + 1);
+      if (publisher === 'anthropic') {
+        return { providerId: 'google-vertex-anthropic', modelId: name };
+      }
+      if (publisher === 'google') {
+        return { providerId: 'google-vertex', modelId: name };
       }
       return { providerId: 'google-vertex', modelId };
     }
@@ -114,17 +112,42 @@ function resolveRemoteRef(
   }
 }
 
+/**
+ * A model's price in the source, under the first of its names the source
+ * lists. A price belongs to the model, not to whichever provider serves it,
+ * so it is looked up by the model's own id and then by its aliases, which
+ * name the same model — never by the id a provider is sent.
+ */
 function findRemoteCost(
   data: RemoteData,
   type: ProviderType,
-  modelId: string
+  names: string[]
 ): { cost: RemoteCost; providerId: string; modelId: string } | null {
-  const ref = resolveRemoteRef(type, modelId);
-  if (!ref) return null;
-  const cost = data[ref.providerId]?.models?.[ref.modelId]?.cost;
-  if (!cost) return null;
-  return { cost, providerId: ref.providerId, modelId: ref.modelId };
+  for (const name of names) {
+    const ref = resolveRemoteRef(type, name);
+    const listed = data[ref.providerId]?.models ?? {};
+    // A model the source lists only under a version (claude-sonnet-4-6@default
+    // for claude-sonnet-4-6) is found by it, when that version is the only one.
+    const versions = Object.keys(listed).filter(key =>
+      key.startsWith(`${ref.modelId}@`)
+    );
+    const key =
+      ref.modelId in listed
+        ? ref.modelId
+        : versions.length === 1
+          ? versions[0]
+          : undefined;
+    const cost = key ? listed[key]?.cost : undefined;
+    if (key && cost) return { cost, providerId: ref.providerId, modelId: key };
+  }
+  return null;
 }
+
+/** Every name a model goes by: its id, then its aliases. */
+const namesOf = (model: { modelId: string; aliases: string[] | null }) => [
+  model.modelId,
+  ...(model.aliases ?? [])
+];
 
 /**
  * Preview what would change for a given list of model.id values if synced.
@@ -138,7 +161,8 @@ export async function previewPricingSync(args: {
     modelDbId: string;
     modelId: string;
     modelName: string;
-    /** The pairing this row was looked up under. Null for a model with none. */
+    /** The model's first provider, by priority, whose listing the price is
+     *  looked up in. Null for a model with none. */
     providerType: string | null;
     providerName: string | null;
     matched: boolean;
@@ -159,8 +183,8 @@ export async function previewPricingSync(args: {
       : undefined,
     with: {
       pricings: { limit: 1 },
-      // Priority order, because the price source follows whichever provider
-      // would actually serve the model first.
+      // Priority order: the price is looked up in the first provider's
+      // listing, whether or not it is on.
       providers: {
         with: { provider: true },
         orderBy: (binding, { asc }) => [asc(binding.priority), asc(binding.id)]
@@ -168,11 +192,9 @@ export async function previewPricingSync(args: {
     }
   });
 
-  // One row per pairing: a model served by two providers is listed under both
-  // in the catalogue, and the two entries can carry different rates. Offering
-  // only the first pairing's would hide the other, and price the model from a
-  // provider it may not even be using.
-  return allModels.flatMap(m => {
+  // One row per model, since a model has one price whichever provider serves
+  // it.
+  return allModels.map(m => {
     const current = m.pricings[0]
       ? {
           input: numOrUndef(m.pricings[0].input),
@@ -182,27 +204,19 @@ export async function previewPricingSync(args: {
         }
       : null;
 
-    const row = (type: ProviderType | null, providerName: string | null) => {
-      const remote = type ? findRemoteCost(data, type, m.modelId) : null;
-      return {
-        modelDbId: m.id,
-        modelId: m.modelId,
-        modelName: m.name,
-        providerType: type,
-        providerName,
-        matched: !!remote,
-        remote: remote?.cost ?? null,
-        current
-      };
+    // A model with no provider still shows, as a row nothing can price.
+    const first = m.providers[0]?.provider;
+    const remote = first ? findRemoteCost(data, first.type, namesOf(m)) : null;
+    return {
+      modelDbId: m.id,
+      modelId: m.modelId,
+      modelName: m.name,
+      providerType: first?.type ?? null,
+      providerName: first?.name ?? null,
+      matched: !!remote,
+      remote: remote?.cost ?? null,
+      current
     };
-
-    const pairings = m.providers.filter(binding => binding.provider);
-    // A model with no pairing still shows, as a row nothing can price.
-    if (pairings.length === 0) return [row(null, null)];
-
-    return pairings.map(binding =>
-      row(binding.provider.type, binding.provider.name)
-    );
   });
 }
 
@@ -218,8 +232,6 @@ export async function runPricingSync(args: {
   source: PricingSource;
   modelDbIds?: string[]; // models.id (PK)
   onlyMissing?: boolean; // skip models that already have pricing
-  /** Which pairing to price each model from, as the preview offered it. */
-  from?: Array<{ modelDbId: string; providerType: string }>;
 }): Promise<PricingSyncResult> {
   const data = await fetchRemote(args.source);
   const result: PricingSyncResult = {
@@ -237,26 +249,18 @@ export async function runPricingSync(args: {
       : undefined,
     with: {
       pricings: { limit: 1 },
-      // Priority order, because the price source follows whichever provider
-      // would actually serve the model first.
+      // Priority order: the price is looked up in the first provider's
+      // listing, whether or not it is on — as the preview showed it.
       providers: {
         with: { provider: true },
-        orderBy: (binding, { asc }) => [asc(binding.priority)]
+        orderBy: (binding, { asc }) => [asc(binding.priority), asc(binding.id)]
       }
     }
   });
 
-  // What the admin picked in the preview, if anything. A model left out of it
-  // falls back to its highest-priority pairing, which is what an unattended
-  // "sync everything" run has to do anyway.
-  const chosen = new Map(
-    (args.from ?? []).map(pick => [pick.modelDbId, pick.providerType])
-  );
-
   for (const m of targets) {
-    const type = (chosen.get(m.id) ?? m.providers[0]?.provider?.type) as
-      ProviderType | undefined;
-    const remote = type ? findRemoteCost(data, type, m.modelId) : null;
+    const type = m.providers[0]?.provider?.type as ProviderType | undefined;
+    const remote = type ? findRemoteCost(data, type, namesOf(m)) : null;
     if (!remote) {
       result.notFound.push(m.modelId);
       continue;

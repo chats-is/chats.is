@@ -98,15 +98,10 @@ type LocalCost = {
 };
 
 /**
- * One line of the preview: a model as one of its providers lists it.
- *
- * A model paired with two providers appears twice, because the catalogue can
- * carry a different rate under each — so `key` identifies the line and
- * `modelDbId` the model it would write to. Only one line per model can be
- * taken, since a model has one pricing row.
+ * One line of the preview: a model, as its first provider's listing in the
+ * catalogue prices it. A model has one price whichever provider serves it.
  */
 type PreviewRow = {
-  key: string;
   modelDbId: string;
   modelId: string;
   modelName: string;
@@ -455,8 +450,7 @@ export default function PricingPage() {
   const [previewSources, setPreviewSources] = useState<PricingSource[]>([]);
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [previewSearch, setPreviewSearch] = useState('');
-  // A pick is per preview line, not per model: `key` → the catalogue taken.
-  /** Which line of the preview to take, by its key. */
+  /** Which catalogue each model's price is taken from, by its id. */
   const [picks, setPicks] = useState<Map<string, PricingSource>>(new Map());
 
   const [defaults, setDefaults] = useState(EMPTY_PRICING);
@@ -559,14 +553,11 @@ export default function PricingPage() {
             .then(rows => ({ source: src, rows }));
         })
       );
-      // Merge by model *and* provider: the two catalogues return the same
-      // lines, and a model with two providers has two of them.
+      // Merge by model: the two catalogues return the same lines.
       const merged = new Map<string, PreviewRow>();
       for (const { source, rows } of results) {
         for (const r of rows) {
-          const key = `${r.modelDbId}:${r.providerType ?? ''}`;
-          const entry = merged.get(key) ?? {
-            key,
+          const entry = merged.get(r.modelDbId) ?? {
             modelDbId: r.modelDbId,
             modelId: r.modelId,
             modelName: r.modelName,
@@ -581,7 +572,7 @@ export default function PricingPage() {
           entry.sources[source] = { matched: r.matched, remote: r.remote };
           // Keep latest current (they should be the same).
           entry.current = r.current;
-          merged.set(key, entry);
+          merged.set(r.modelDbId, entry);
         }
       }
       setPreviewRows(Array.from(merged.values()));
@@ -659,20 +650,12 @@ export default function PricingPage() {
 
   const apply = async () => {
     if (pickCount === 0) return;
-    const groups: Record<
-      PricingSource,
-      Array<{ modelDbId: string; providerType: string }>
-    > = {
+    const groups: Record<PricingSource, string[]> = {
       'models.dev': [],
       'llm-metadata': []
     };
-    for (const [key, src] of picks.entries()) {
-      const row = previewRows.find(r => r.key === key);
-      if (!row?.providerType) continue;
-      groups[src].push({
-        modelDbId: row.modelDbId,
-        providerType: row.providerType
-      });
+    for (const [modelDbId, src] of picks.entries()) {
+      groups[src].push(modelDbId);
     }
     try {
       let created = 0;
@@ -680,13 +663,9 @@ export default function PricingPage() {
       let unchanged = 0;
       const skipped: string[] = [];
       for (const source of previewSources) {
-        const from = groups[source];
-        if (from.length === 0) continue;
-        const result = await syncMutation.mutateAsync({
-          source,
-          modelDbIds: from.map(pick => pick.modelDbId),
-          from
-        });
+        const modelDbIds = groups[source];
+        if (modelDbIds.length === 0) continue;
+        const result = await syncMutation.mutateAsync({ source, modelDbIds });
         created += result.created;
         updated += result.updated;
         unchanged += result.unchanged;
@@ -1048,20 +1027,12 @@ function PreviewDialog({
 
   const isSingle = sources.length === 1;
 
-  /**
-   * Take one line, or none.
-   *
-   * A model has a single pricing row, so taking a line drops any other line of
-   * the same model — picking Azure's rate after OpenAI's replaces it rather
-   * than queueing both writes against the same row.
-   */
+  /** Take a model's price from one catalogue, or from none. */
   const togglePick = (row: PreviewRow, source: PricingSource | null) => {
     setPicks(prev => {
       const next = new Map(prev);
-      for (const other of rows) {
-        if (other.modelDbId === row.modelDbId) next.delete(other.key);
-      }
-      if (source !== null) next.set(row.key, source);
+      if (source === null) next.delete(row.modelDbId);
+      else next.set(row.modelDbId, source);
       return next;
     });
   };
@@ -1076,37 +1047,18 @@ function PreviewDialog({
       if (r.sources[src].matched) matchedVisibleBySource[src].push(r);
     }
   }
-  /** Ticked when every model with a match here has one of its lines taken —
-   *  per model, not per line, since only one line of a model can be. */
+  /** Ticked when every model with a match here is taken from it. */
   const allMatchedFor = (src: PricingSource) => {
     const list = matchedVisibleBySource[src];
-    if (list.length === 0) return false;
-    const models = new Set(list.map(r => r.modelDbId));
-    const taken = new Set(
-      list.filter(r => picks.get(r.key) === src).map(r => r.modelDbId)
-    );
-    return models.size === taken.size;
+    return list.length > 0 && list.every(r => picks.get(r.modelDbId) === src);
   };
   const togglePickAllFor = (src: PricingSource, on: boolean) => {
     const matched = matchedVisibleBySource[src];
     setPicks(prev => {
       const next = new Map(prev);
-      // A model can only take one line, so where it has several here the
-      // first one wins and the rest are left alone.
-      const spokenFor = new Set(
-        [...next.keys()]
-          .map(key => rows.find(row => row.key === key)?.modelDbId)
-          .filter(Boolean)
-      );
       for (const row of matched) {
-        if (on) {
-          if (spokenFor.has(row.modelDbId)) continue;
-          next.set(row.key, src);
-          spokenFor.add(row.modelDbId);
-        } else if (next.get(row.key) === src) {
-          next.delete(row.key);
-          spokenFor.delete(row.modelDbId);
-        }
+        if (on) next.set(row.modelDbId, src);
+        else if (next.get(row.modelDbId) === src) next.delete(row.modelDbId);
       }
       return next;
     });
@@ -1220,16 +1172,16 @@ function PreviewDialog({
               <PreviewColgroup sources={sources} />
               <tbody>
                 {visibleRows.map(r => {
-                  const pick = picks.get(r.key);
+                  const pick = picks.get(r.modelDbId);
                   return (
                     <tr
-                      key={r.key}
+                      key={r.modelDbId}
                       className="border-b last:border-0 hover:bg-muted/30"
                     >
                       <td className="p-2 align-middle">
                         <div className="font-mono text-sm">{r.modelId}</div>
-                        {/* Which provider's listing this line came from — the
-                            only thing telling two lines of one model apart. */}
+                        {/* The provider whose listing the price is from: the
+                            model's first. */}
                         <div className="text-xs text-muted-foreground">
                           {r.providerName ?? 'No provider'}
                         </div>

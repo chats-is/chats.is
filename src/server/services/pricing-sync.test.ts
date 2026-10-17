@@ -32,6 +32,21 @@ const remote = (models: Record<string, { cost: Record<string, number> }>) =>
     vi.fn(async () => Response.json({ openai: { id: 'openai', models } }))
   );
 
+/** The same, with several providers' listings. */
+const catalogue = (
+  data: Record<string, Record<string, { cost: Record<string, number> }>>
+) =>
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json(
+        Object.fromEntries(
+          Object.entries(data).map(([id, models]) => [id, { id, models }])
+        )
+      )
+    )
+  );
+
 const priceOf = async (modelId: string) =>
   (
     await h.db
@@ -117,6 +132,111 @@ describe('price sync', () => {
     expect(price.image).toBeNull();
     expect(Number(price.input)).toBe(5);
     expect(pricingMissingFields('image', price)).toEqual([]);
+  });
+
+  it('finds a model the source lists only under its one version', async () => {
+    remote({ 'gpt-x@default': { cost: { input: 3, output: 6 } } });
+
+    const result = await sync.runPricingSync({
+      source: 'models.dev',
+      modelDbIds: ['m-chat']
+    });
+    const price = await priceOf('gpt-x');
+
+    expect(result.updated).toBe(1);
+    expect(Number(price.input)).toBe(3);
+    expect(Number(price.output)).toBe(6);
+  });
+
+  it('does not guess between several versions of a model', async () => {
+    remote({
+      'gpt-x@2026-01': { cost: { input: 3, output: 6 } },
+      'gpt-x@2026-06': { cost: { input: 5, output: 9 } }
+    });
+
+    const result = await sync.runPricingSync({
+      source: 'models.dev',
+      modelDbIds: ['m-chat']
+    });
+
+    expect(result.notFound).toEqual(['gpt-x']);
+    expect(Number((await priceOf('gpt-x')).input)).toBe(1);
+  });
+
+  describe('a model served by two providers', () => {
+    // OpenAI first by priority, and off; xAI second, sent an id of its own.
+    beforeEach(async () => {
+      await h.db.insert(schema.providers).values({
+        id: 'p2',
+        name: 'xAI',
+        type: 'xai',
+        apiKey: 'x',
+        isEnabled: true
+      });
+      await h.db
+        .update(schema.modelProviders)
+        .set({ isEnabled: false })
+        .where(eq(schema.modelProviders.id, 'b1'));
+      await h.db.insert(schema.modelProviders).values({
+        id: 'b3',
+        modelId: 'gpt-x',
+        providerId: 'p2',
+        providerModelId: 'grok-x',
+        priority: 1
+      });
+    });
+
+    it('is priced once, from its first provider, on or off', async () => {
+      catalogue({
+        openai: { 'gpt-x': { cost: { input: 3, output: 6 } } },
+        xai: { 'grok-x': { cost: { input: 7, output: 8 } } }
+      });
+
+      const rows = await sync.previewPricingSync({
+        source: 'models.dev',
+        modelDbIds: ['m-chat']
+      });
+      const result = await sync.runPricingSync({
+        source: 'models.dev',
+        modelDbIds: ['m-chat']
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        providerName: 'OpenAI',
+        matched: true,
+        remote: { input: 3, output: 6 }
+      });
+      expect(result.updated).toBe(1);
+      expect(Number((await priceOf('gpt-x')).input)).toBe(3);
+    });
+
+    it('is not looked up by the id another provider is sent', async () => {
+      catalogue({ xai: { 'grok-x': { cost: { input: 7, output: 8 } } } });
+
+      const result = await sync.runPricingSync({
+        source: 'models.dev',
+        modelDbIds: ['m-chat']
+      });
+
+      expect(result.notFound).toEqual(['gpt-x']);
+    });
+  });
+
+  it('finds a model by an alias when the source lists it by that', async () => {
+    await h.db
+      .update(schema.models)
+      .set({ aliases: ['gpt-x-latest', 'gpt-x-alias'] })
+      .where(eq(schema.models.id, 'm-chat'));
+    remote({ 'gpt-x-alias': { cost: { input: 3, output: 6 } } });
+
+    const result = await sync.runPricingSync({
+      source: 'models.dev',
+      modelDbIds: ['m-chat']
+    });
+
+    expect(result.updated).toBe(1);
+    expect(Number((await priceOf('gpt-x')).input)).toBe(3);
   });
 
   it('leaves a working model alone rather than price it two ways', async () => {

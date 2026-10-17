@@ -126,16 +126,7 @@ export const syncTargetSchema = z.object({
 });
 
 export const syncRunSchema = syncTargetSchema.extend({
-  onlyMissing: z.boolean().default(false),
-  /**
-   * Which provider each model should be priced from. A model paired with two
-   * providers can be listed under both in the catalogue, at different rates —
-   * so the preview offers every match and the run is told which was taken.
-   * Left out, each model falls back to its highest-priority pairing.
-   */
-  from: z
-    .array(z.object({ modelDbId: z.string(), providerType: z.string() }))
-    .optional()
+  onlyMissing: z.boolean().default(false)
 });
 
 export const remoteSearchSchema = z.object({
