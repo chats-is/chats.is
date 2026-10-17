@@ -8,8 +8,7 @@ import {
   getLanguageModel,
   getProviderWebSearchTool,
   isRetryableProviderError,
-  runWithProviderFailover,
-  toProviderModelId
+  runWithProviderFailover
 } from './provider';
 
 // provider.ts -> ./crypto -> @/lib/env validates APP_SECRET at module load.
@@ -109,25 +108,6 @@ describe('isRetryableProviderError', () => {
   });
 });
 
-describe('toProviderModelId', () => {
-  it('returns the modelId unchanged for providers without renaming', () => {
-    expect(toProviderModelId('openai', 'gpt-4o')).toBe('gpt-4o');
-    expect(toProviderModelId('anthropic', 'claude-sonnet')).toBe(
-      'claude-sonnet'
-    );
-    expect(toProviderModelId('azure', 'gpt-4o')).toBe('gpt-4o');
-  });
-
-  it('passes unknown ids through for vertex/bedrock', () => {
-    expect(toProviderModelId('vertex', 'some-unmapped-id')).toBe(
-      'some-unmapped-id'
-    );
-    expect(toProviderModelId('bedrock', 'some-unmapped-id')).toBe(
-      'some-unmapped-id'
-    );
-  });
-});
-
 describe('runWithProviderFailover', () => {
   it('returns the first success and does not try the rest', async () => {
     const tried: string[] = [];
@@ -224,42 +204,56 @@ describe('a Vertex provider', () => {
       modelId: string;
     };
 
-  it('serves Claude through Anthropic’s API, under Vertex’s id for it', () => {
-    expect(model(serviceAccount, 'claude-sonnet-4-5')).toMatchObject({
-      provider: 'googleVertex.anthropic.messages',
-      modelId: 'claude-sonnet-4-5@20250929'
-    });
-  });
-
-  it('serves a Claude id it has no rename for the same way', () => {
-    expect(model(serviceAccount, 'claude-sonnet-4-6')).toMatchObject({
+  it('serves Claude through Anthropic’s API, by the name after anthropic/', () => {
+    expect(model(serviceAccount, 'anthropic/claude-sonnet-4-6')).toMatchObject({
       provider: 'googleVertex.anthropic.messages',
       modelId: 'claude-sonnet-4-6'
     });
   });
 
-  it('serves Gemini through Google’s', () => {
-    expect(model(serviceAccount, 'gemini-2.5-pro')).toMatchObject({
+  it('serves Gemini through Google’s, by the name after google/', () => {
+    expect(model(serviceAccount, 'google/gemini-2.5-pro')).toMatchObject({
       provider: 'google.vertex.chat',
       modelId: 'gemini-2.5-pro'
     });
   });
 
-  it('says what is missing when an API key is asked for Claude', () => {
-    expect(() => model(apiKeyOnly, 'claude-sonnet-4-5')).toThrow(
-      'Claude on Vertex AI needs a service account key'
+  it('serves xAI and every other publisher by the whole id', () => {
+    expect(model(serviceAccount, 'xai/grok-4.6')).toMatchObject({
+      provider: 'googleVertex.xai.chat',
+      modelId: 'xai/grok-4.6'
+    });
+    expect(
+      model(serviceAccount, 'deepseek-ai/deepseek-v3.2-maas')
+    ).toMatchObject({
+      provider: 'vertex.maas.chat',
+      modelId: 'deepseek-ai/deepseek-v3.2-maas'
+    });
+  });
+
+  it('says what is missing from an id without its publisher', () => {
+    expect(() => model(serviceAccount, 'gemini-2.5-pro')).toThrow(
+      'A Vertex AI model id names its publisher'
     );
-    expect(model(apiKeyOnly, 'gemini-2.5-pro').provider).toBe(
+  });
+
+  it('says what is missing when an API key is asked for another publisher', () => {
+    expect(() => model(apiKeyOnly, 'anthropic/claude-sonnet-4-6')).toThrow(
+      'needs a service account key'
+    );
+    expect(model(apiKeyOnly, 'google/gemini-2.5-pro').provider).toBe(
       'google.vertex.chat'
     );
   });
 
-  it('gives Claude Anthropic’s search, and Gemini Google’s', () => {
+  it('gives Claude Anthropic’s search, Gemini Google’s, and others none', () => {
     expect(
-      getProviderWebSearchTool(serviceAccount, 'claude-sonnet-4-5')?.web_search
+      getProviderWebSearchTool(serviceAccount, 'anthropic/claude-sonnet-4-6')
+        ?.web_search
     ).toMatchObject({ id: 'anthropic.web_search_20250305' });
     expect(
-      getProviderWebSearchTool(serviceAccount, 'gemini-2.5-pro')
+      getProviderWebSearchTool(serviceAccount, 'google/gemini-2.5-pro')
     ).toHaveProperty('google_search');
+    expect(getProviderWebSearchTool(serviceAccount, 'xai/grok-4.6')).toBeNull();
   });
 });

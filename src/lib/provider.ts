@@ -7,13 +7,14 @@ import { createDeepSeek } from '@ai-sdk/deepseek';
 import { createGoogle } from '@ai-sdk/google';
 import { createVertex } from '@ai-sdk/google-vertex';
 import { createVertexAnthropic } from '@ai-sdk/google-vertex/anthropic';
+import { createVertexMaas } from '@ai-sdk/google-vertex/maas';
+import { createGoogleVertexXai } from '@ai-sdk/google-vertex/xai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
 import {
   BedrockClient,
   ListFoundationModelsCommand
 } from '@aws-sdk/client-bedrock';
-import { GoogleGenAI } from '@google/genai';
 import {
   APICallError,
   RetryError,
@@ -23,17 +24,16 @@ import {
   type Tool,
   type TranscriptionModel
 } from 'ai';
+import { GoogleAuth } from 'google-auth-library';
 
 import {
   type Candidate,
   type Provider,
   type ProviderConfig,
-  type ProviderType,
   type VertexServiceAccountKey
 } from '@/types';
 import { PROVIDER_FAILURE_MESSAGE } from '@/lib/constant';
 
-import { BEDROCK_MODELS, VERTEX_AI_MODELS } from './constant';
 import { decrypt } from './crypto';
 import { hasOwnWebSearch } from './web-search';
 
@@ -65,26 +65,21 @@ function getProviderBaseUrl(provider: ProviderConfig) {
 }
 
 /**
- * Convert model ID to Vertex AI format if needed
+ * A Vertex model id is `publisher/model`, as Vertex names its models
+ * (google/gemini-2.5-pro, anthropic/claude-sonnet-4-6): the publisher decides
+ * which API the model is called through.
  */
-function toVertexModelId(modelId: string): string {
-  return VERTEX_AI_MODELS[modelId] || modelId;
-}
-
-/**
- * Convert model ID to AWS Bedrock format if needed
- */
-function toBedrockModelId(modelId: string): string {
-  return BEDROCK_MODELS[modelId] || modelId;
-}
-
-/**
- * Whether a Vertex model is Claude. Vertex publishes Claude under Anthropic,
- * through an API of Anthropic's, and every id it gives Claude starts so;
- * everything else there is Google's.
- */
-function isVertexClaude(providerModelId: string): boolean {
-  return providerModelId.startsWith('claude-');
+function splitVertexModelId(modelId: string) {
+  const slash = modelId.indexOf('/');
+  if (slash <= 0) {
+    throw new Error(
+      `A Vertex AI model id names its publisher, as in google/gemini-2.5-pro; ${modelId} does not.`
+    );
+  }
+  return {
+    publisher: modelId.slice(0, slash),
+    name: modelId.slice(slash + 1)
+  };
 }
 
 /** A Vertex key: a service account with its location, or an API key. */
@@ -98,25 +93,64 @@ function parseVertexKey(apiKey?: string): VertexServiceAccountKey | null {
 }
 
 /**
- * Claude on Vertex, with the service account Gemini there uses. An API key
- * will not do: it reaches Vertex's express mode, which serves Gemini alone.
+ * The service account a model of another publisher than Google is called
+ * with on Vertex. An API key will not do: it reaches Vertex's express mode,
+ * which serves Google's own models alone.
  */
-function createVertexClaudeSDK(config: ProviderConfig) {
+function vertexServiceAccount(config: ProviderConfig, modelId: string) {
   const vertexKey = parseVertexKey(
     config.apiKey ? decrypt(config.apiKey) : undefined
   );
   if (!vertexKey?.location || !vertexKey.credentials) {
     throw new Error(
-      'Claude on Vertex AI needs a service account key with a location; an API key reaches Gemini only.'
+      `${modelId} on Vertex AI needs a service account key; Express Mode (API Key) reaches Google's models only.`
     );
   }
-  return createVertexAnthropic({
+  return {
     project: vertexKey.credentials.project_id,
     location: vertexKey.location,
-    googleAuthOptions: {
-      credentials: vertexKey.credentials
-    }
-  });
+    googleAuthOptions: { credentials: vertexKey.credentials }
+  };
+}
+
+/** A language model on Vertex, through the API its publisher's models take. */
+function getVertexLanguageModel(
+  provider: ProviderConfig,
+  modelId: string
+): LanguageModel {
+  const { publisher, name } = splitVertexModelId(modelId);
+  switch (publisher) {
+    case 'google':
+      return createProviderSDK(provider)(name);
+    case 'anthropic':
+      return createVertexAnthropic(vertexServiceAccount(provider, modelId))(
+        name
+      );
+    // These two take the whole id, publisher and all.
+    case 'xai':
+      return createGoogleVertexXai(vertexServiceAccount(provider, modelId))(
+        modelId
+      );
+    default:
+      return createVertexMaas(vertexServiceAccount(provider, modelId))(modelId);
+  }
+}
+
+/**
+ * The id the SDK takes for a model that makes images, video or speech. On
+ * Vertex only Google's models do, and the SDK is given the name after
+ * `google/`.
+ */
+function mediaModelId(provider: Candidate, modelId: string): string {
+  const id = resolveModelId(provider, modelId);
+  if (provider.type !== 'vertex') return id;
+  const { publisher, name } = splitVertexModelId(id);
+  if (publisher !== 'google') {
+    throw new Error(
+      `${id} cannot do this on Vertex AI; only Google's models make images, video and speech there.`
+    );
+  }
+  return name;
 }
 
 /**
@@ -205,8 +239,8 @@ export function getLanguageModel(
   modelId: string
 ): LanguageModel {
   const providerModelId = resolveModelId(provider, modelId);
-  if (provider.type === 'vertex' && isVertexClaude(providerModelId)) {
-    return createVertexClaudeSDK(provider)(providerModelId);
+  if (provider.type === 'vertex') {
+    return getVertexLanguageModel(provider, providerModelId);
   }
   const sdk = createProviderSDK(provider);
   return sdk(providerModelId);
@@ -222,17 +256,20 @@ export function getProviderWebSearchTool(
   modelId: string
 ): Record<string, Tool> | null {
   if (!hasOwnWebSearch(provider.type)) return null;
-  // Claude on Vertex searches as Claude does, with the one version of the
-  // tool Vertex takes.
-  if (
-    provider.type === 'vertex' &&
-    isVertexClaude(resolveModelId(provider, modelId))
-  ) {
-    return {
-      web_search: createVertexClaudeSDK(provider).tools.webSearch_20250305({
-        maxUses: 5
-      })
-    };
+  if (provider.type === 'vertex') {
+    const providerModelId = resolveModelId(provider, modelId);
+    const { publisher } = splitVertexModelId(providerModelId);
+    // Claude on Vertex searches as Claude does, with the one version of the
+    // tool Vertex takes. Other publishers' models there have no search of
+    // their own, and are given the search model's.
+    if (publisher === 'anthropic') {
+      return {
+        web_search: createVertexAnthropic(
+          vertexServiceAccount(provider, providerModelId)
+        ).tools.webSearch_20250305({ maxUses: 5 })
+      };
+    }
+    if (publisher !== 'google') return null;
   }
   const sdk = createProviderSDK(provider);
   switch (provider.type) {
@@ -258,7 +295,7 @@ export function getImageModel(
   modelId: string
 ): ImageModel {
   const sdk = createProviderSDK(provider);
-  return sdk.image(resolveModelId(provider, modelId));
+  return sdk.image(mediaModelId(provider, modelId));
 }
 
 /**
@@ -269,7 +306,7 @@ export function getSpeechModel(
   modelId: string
 ): SpeechModel {
   const sdk = createProviderSDK(provider);
-  return sdk.speech(resolveModelId(provider, modelId));
+  return sdk.speech(mediaModelId(provider, modelId));
 }
 
 /**
@@ -277,7 +314,7 @@ export function getSpeechModel(
  */
 export function getVideoModel(provider: Candidate, modelId: string) {
   const sdk = createProviderSDK(provider);
-  return sdk.video(resolveModelId(provider, modelId));
+  return sdk.video(mediaModelId(provider, modelId));
 }
 
 /**
@@ -288,7 +325,7 @@ export function getTranscriptionModel(
   modelId: string
 ): TranscriptionModel {
   const sdk = createProviderSDK(provider);
-  return sdk.transcription(resolveModelId(provider, modelId));
+  return sdk.transcription(mediaModelId(provider, modelId));
 }
 
 // ============================================================================
@@ -296,24 +333,13 @@ export function getTranscriptionModel(
 // ============================================================================
 
 /**
- * The upstream model id a provider type actually receives for a logical modelId.
- * Vertex/Bedrock rename Anthropic models; everyone else uses modelId as-is.
- * Used to match a model against a provider's listed models (compatibility check).
- */
-export function toProviderModelId(type: ProviderType, modelId: string): string {
-  if (type === 'vertex') return toVertexModelId(modelId);
-  if (type === 'bedrock') return toBedrockModelId(modelId);
-  return modelId;
-}
-
-/**
  * The id to send this candidate for the model: the one its binding names,
- * if it names one, else the model's own — renamed for Vertex and Bedrock,
- * which list the same models under ids of their own.
+ * if it names one, else the model's own. Either is the provider's own id
+ * for it, sent as it is.
  */
 export function resolveModelId(candidate: Candidate, modelId: string): string {
   const routed = candidate.routedModelId?.trim();
-  return routed || toProviderModelId(candidate.type, modelId);
+  return routed || modelId;
 }
 
 export class AllProvidersFailedError extends Error {
@@ -427,6 +453,51 @@ export async function runWithProviderFailover<T>(
   throw new AllProvidersFailedError(PROVIDER_FAILURE_MESSAGE, attempts);
 }
 
+/**
+ * Every model Vertex offers at the provider's location, from every
+ * publisher, as `publisher/model`. Only v1beta1 lists them across
+ * publishers, and only to a service account.
+ */
+async function listVertexModels(
+  vertexKey: VertexServiceAccountKey
+): Promise<string[]> {
+  const auth = new GoogleAuth({
+    credentials: vertexKey.credentials,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform']
+  });
+  const token = await auth.getAccessToken();
+  const host =
+    vertexKey.location === 'global'
+      ? 'aiplatform.googleapis.com'
+      : `${vertexKey.location}-aiplatform.googleapis.com`;
+  const modelIds: string[] = [];
+  let pageToken = '';
+
+  do {
+    const url = new URL(`https://${host}/v1beta1/publishers/*/models`);
+    url.searchParams.set('pageSize', '100');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch provider models: ${response.status}`);
+    }
+    const data = (await response.json()) as {
+      publisherModels?: { name?: string }[];
+      nextPageToken?: string;
+    };
+    for (const model of data.publisherModels ?? []) {
+      // publishers/google/models/gemini-2.5-pro
+      const [, publisher, , name] = model.name?.split('/') ?? [];
+      if (publisher && name) modelIds.push(`${publisher}/${name}`);
+    }
+    pageToken = data.nextPageToken ?? '';
+  } while (pageToken);
+
+  return modelIds;
+}
+
 export async function getProviderModels(
   provider: ProviderConfig
 ): Promise<string[]> {
@@ -475,36 +546,11 @@ export async function getProviderModels(
       break;
 
     case 'vertex': {
-      let vertexKey: VertexServiceAccountKey | null = null;
-
-      try {
-        vertexKey = JSON.parse(apiKey) as VertexServiceAccountKey;
-      } catch {}
-
-      const ai =
-        vertexKey?.location && vertexKey.credentials
-          ? new GoogleGenAI({
-              vertexai: true,
-              project: vertexKey.credentials.project_id,
-              location: vertexKey.location,
-              googleAuthOptions: {
-                credentials: vertexKey.credentials
-              }
-            })
-          : new GoogleGenAI({
-              vertexai: true,
-              apiKey
-            });
-      const pager = await ai.models.list();
-      const vertexModels: string[] = [];
-
-      for await (const model of pager) {
-        if (!model.name) continue;
-
-        vertexModels.push(model.name.split('/').pop() ?? model.name);
+      const vertexKey = parseVertexKey(apiKey);
+      if (!vertexKey?.location || !vertexKey.credentials) {
+        throw new Error("Express Mode (API Key) can't sync models");
       }
-
-      return vertexModels;
+      return listVertexModels(vertexKey);
     }
 
     case 'bedrock': {
