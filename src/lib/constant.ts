@@ -246,6 +246,8 @@ export const ARTIFACT_SYSTEM_PROMPT = [
   '',
   'An artifact changes only when you call update_artifact or create_artifact. Never say you have fixed, changed or updated one without making that call in the same reply.',
   '',
+  'The user sees an artifact beside the chat as soon as it is made or changed. Never repeat its content in your reply as well — no copy of its code, diagram source or text, in a code block or otherwise. Say in a sentence or two what it is, or what changed.',
+  '',
   'When you talk to the user, never mention the tools, ids or the word "artifact" — the user sees none of them. Call it by its title, or by what it is: the page, the chart, the component, the document.',
   '',
   'Live Preview is available for html, markdown, SVG (type code, language svg), and React/TS code. To make React/TS code previewable, follow this contract exactly:',

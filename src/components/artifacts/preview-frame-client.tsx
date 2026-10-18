@@ -443,7 +443,12 @@ export function ArtifactPreviewFrameClient() {
       try {
         if (message.type === 'artifact-preview-mermaid') {
           const { default: mermaid } = await import('mermaid');
-          mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+          // The colour theme a reply's diagrams are drawn in too.
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: 'redux-color'
+          });
           const { svg } = await mermaid.render(
             `mermaid-${render}`,
             message.source

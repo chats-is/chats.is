@@ -60,7 +60,6 @@ const code: CodeHighlighterPlugin = {
 const MERMAID_DEFAULTS: MermaidConfig = {
   startOnLoad: false,
   securityLevel: 'strict',
-  fontFamily: 'monospace',
   suppressErrorRendering: true
 };
 
@@ -293,11 +292,14 @@ export function MessageMarkdown({
   className
 }: MessageMarkdownProps) {
   // Mermaid colours a diagram itself, and its light theme left an arrow's
-  // label dark on the dark page.
+  // label dark on the dark page. Its colour theme, as an artifact's preview
+  // draws it, in the page's light or dark.
   const { resolvedTheme } = useTheme();
   const mermaidOptions = useMemo(
     () => ({
-      config: { theme: resolvedTheme === 'dark' ? 'dark' : 'default' }
+      config: {
+        theme: resolvedTheme === 'dark' ? 'redux-dark-color' : 'redux-color'
+      }
     }),
     [resolvedTheme]
   );
