@@ -18,10 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-import {
-  ArtifactActionsMenu,
-  type DuplicateSource
-} from '@/components/artifacts/artifact-actions-menu';
+import { ArtifactActionsMenu } from '@/components/artifacts/artifact-actions-menu';
 import {
   artifactRegistry,
   artifactSourceUsesCodeChrome,
@@ -49,8 +46,8 @@ interface ArtifactViewerProps {
   onEdit?: (artifact: Artifact, selection: string, request: string) => void;
   /** Offers to share the artifact on its own: in the chat, between turns. */
   canShare?: boolean;
-  /** Offers to duplicate it into a new chat, found this way. */
-  duplicateFrom?: DuplicateSource;
+  /** False while it may still be changing: in its chat, during a turn. */
+  canDuplicate?: boolean;
 }
 
 export function ArtifactViewer({
@@ -65,7 +62,7 @@ export function ArtifactViewer({
   onFix,
   onEdit,
   canShare,
-  duplicateFrom
+  canDuplicate
 }: ArtifactViewerProps) {
   const [uncontrolledViewMode, setUncontrolledViewMode] = useState<
     'source' | 'preview'
@@ -287,7 +284,7 @@ export function ArtifactViewer({
               disabled={isHeaderActionDisabled}
               onDownload={canDownload ? handleDownload : undefined}
               canShare={canShare}
-              duplicateFrom={duplicateFrom}
+              canDuplicate={canDuplicate}
               className={headerActionButtonClassName}
             />
             {onClose && (

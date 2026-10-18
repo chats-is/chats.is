@@ -242,9 +242,11 @@ describe('duplicateArtifact', () => {
       { id: 'owner', name: 'Owner', email: 'owner@example.com' },
       { id: 'other', name: 'Other', email: 'other@example.com' }
     ]);
-    await h.db
-      .insert(schema.chats)
-      .values({ id: 'c1', title: 'Chat', userId: 'owner', modelId: 'm' });
+    await h.db.insert(schema.chats).values([
+      { id: 'c1', title: 'Chat', userId: 'owner', modelId: 'm' },
+      { id: 'c2', title: 'Shared chat', userId: 'owner', modelId: 'm' },
+      { id: 'c3', title: 'Private chat', userId: 'owner', modelId: 'm' }
+    ]);
     await h.db.insert(schema.messages).values([
       {
         id: 'u1',
@@ -270,22 +272,59 @@ describe('duplicateArtifact', () => {
         role: 'user',
         parts: [file('owner', 'later.csv')],
         createdAt: at(3)
+      },
+      {
+        id: 'r2',
+        chatId: 'c2',
+        userId: 'owner',
+        role: 'assistant',
+        parts: [],
+        createdAt: at(4)
+      },
+      {
+        id: 'r3',
+        chatId: 'c3',
+        userId: 'owner',
+        role: 'assistant',
+        parts: [],
+        createdAt: at(5)
       }
     ]);
-    await h.db.insert(schema.artifacts).values({
-      id: 'art',
-      chatId: 'c1',
-      messageId: 'r1',
-      userId: 'owner',
-      title: 'Counter',
-      type: 'code',
-      language: 'tsx',
-      fileName: 'index.tsx',
-      content: 'export default () => null'
-    });
+    // Shared on its own; in a shared chat; and in neither.
+    await h.db.insert(schema.artifacts).values([
+      {
+        id: 'art',
+        chatId: 'c1',
+        messageId: 'r1',
+        userId: 'owner',
+        title: 'Counter',
+        type: 'code',
+        language: 'tsx',
+        fileName: 'index.tsx',
+        content: 'export default () => null'
+      },
+      {
+        id: 'art-in-chat',
+        chatId: 'c2',
+        messageId: 'r2',
+        userId: 'owner',
+        title: 'Notes',
+        type: 'text',
+        content: 'notes'
+      },
+      {
+        id: 'art-private',
+        chatId: 'c3',
+        messageId: 'r3',
+        userId: 'owner',
+        title: 'Draft',
+        type: 'text',
+        content: 'draft'
+      }
+    ]);
     await h.db.insert(schema.shares).values([
       { id: 'art-link', artifactId: 'art', userId: 'owner' },
-      { id: 'chat-link', chatId: 'c1', userId: 'owner' }
+      { id: 'chat-link', chatId: 'c2', userId: 'owner' }
     ]);
   });
 
@@ -309,7 +348,7 @@ describe('duplicateArtifact', () => {
   it("opens a chat of the user's own with a duplicate of their artifact", async () => {
     copy.mockClear();
     const { chatId, artifactId } = await duplicateArtifact('owner', {
-      from: { artifactId: 'art' }
+      artifactId: 'art'
     });
     const { chat, messages, artifacts } = await opened(chatId);
 
@@ -361,11 +400,9 @@ describe('duplicateArtifact', () => {
     ).toMatchObject({ chatId: 'c1', messageId: 'r1' });
   });
 
-  it("copies someone else's files into the user's own, by its link", async () => {
+  it("copies someone else's files into the user's own, when it is shared", async () => {
     copy.mockClear();
-    const { chatId } = await duplicateArtifact('other', {
-      from: { shareId: 'art-link' }
-    });
+    const { chatId } = await duplicateArtifact('other', { artifactId: 'art' });
     const { messages } = await opened(chatId);
 
     expect(copy).toHaveBeenCalledTimes(2);
@@ -379,14 +416,43 @@ describe('duplicateArtifact', () => {
     }
   });
 
-  it('refuses what is not the user’s, or not shared on its own', async () => {
+  it('duplicates someone else’s artifact in a chat they shared', async () => {
+    const { chatId } = await duplicateArtifact('other', {
+      artifactId: 'art-in-chat'
+    });
+    const { chat, artifacts } = await opened(chatId);
+
+    expect(chat).toMatchObject({ title: 'Notes (Copy)', userId: 'other' });
+    expect(artifacts).toEqual([
+      expect.objectContaining({ title: 'Notes', content: 'notes' })
+    ]);
+  });
+
+  it('refuses someone else’s artifact that no link shows', async () => {
     await expect(
-      duplicateArtifact('other', { from: { artifactId: 'art' } })
+      duplicateArtifact('other', { artifactId: 'art-private' })
     ).rejects.toThrow('no longer available');
     await expect(
-      duplicateArtifact('other', {
-        from: { shareId: 'chat-link' }
-      })
+      duplicateArtifact('other', { artifactId: 'missing' })
     ).rejects.toThrow('no longer available');
+    // Only a link its maker made counts: one in another's name does not.
+    await h.db
+      .insert(schema.shares)
+      .values({ id: 'not-theirs', chatId: 'c3', userId: 'other' });
+    await expect(
+      duplicateArtifact('other', { artifactId: 'art-private' })
+    ).rejects.toThrow('no longer available');
+  });
+
+  it('refuses it once the link that showed it is taken back', async () => {
+    await h.db.delete(schema.shares).where(eq(schema.shares.id, 'chat-link'));
+
+    await expect(
+      duplicateArtifact('other', { artifactId: 'art-in-chat' })
+    ).rejects.toThrow('no longer available');
+    // Its owner still can.
+    await expect(
+      duplicateArtifact('owner', { artifactId: 'art-in-chat' })
+    ).resolves.toMatchObject({ chatId: expect.any(String) });
   });
 });

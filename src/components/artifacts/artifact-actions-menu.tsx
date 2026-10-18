@@ -34,10 +34,6 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 
-/** The artifact duplicated: one in the user's own chat, or the one a
- *  share link opens. */
-export type DuplicateSource = { artifactId: string } | { shareId: string };
-
 /**
  * What can be done with an artifact, each said in words: duplicate it into
  * a new chat, copy its content, download it, and — in its own chat — share
@@ -54,7 +50,7 @@ export function ArtifactActionsMenu({
   disabled,
   onDownload,
   canShare,
-  duplicateFrom,
+  canDuplicate = true,
   className
 }: {
   artifact: Artifact;
@@ -63,8 +59,8 @@ export function ArtifactActionsMenu({
   onDownload?: () => void;
   /** Offers to share it on its own: in its chat, between turns. */
   canShare?: boolean;
-  /** Offers to duplicate it, found this way. */
-  duplicateFrom?: DuplicateSource;
+  /** False while it may still be changing: in its chat, during a turn. */
+  canDuplicate?: boolean;
   className?: string;
 }) {
   const navigate = useNavigate();
@@ -82,7 +78,7 @@ export function ArtifactActionsMenu({
   const [duplicating, setDuplicating] = useState(false);
   const content = artifact.content ?? '';
 
-  const duplicate = async (from: DuplicateSource) => {
+  const duplicate = async () => {
     if (!user) {
       void navigate({ to: '/login', search: { redirect: location.href } });
       return;
@@ -90,7 +86,9 @@ export function ArtifactActionsMenu({
     setDuplicating(true);
     const note = toast.loading('Duplicating…');
     try {
-      const made = await duplicateArtifact({ data: { from } });
+      const made = await duplicateArtifact({
+        data: { artifactId: artifact.id }
+      });
       void queryClient.invalidateQueries({
         queryKey: chatQueries.key.infinite()
       });
@@ -167,12 +165,13 @@ export function ArtifactActionsMenu({
         <TooltipContent>More actions</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end">
-        {duplicateFrom && (
-          <DropdownMenuItem onSelect={() => void duplicate(duplicateFrom)}>
-            <CopyPlus className="size-4" />
-            Duplicate
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem
+          disabled={!canDuplicate}
+          onSelect={() => void duplicate()}
+        >
+          <CopyPlus className="size-4" />
+          Duplicate
+        </DropdownMenuItem>
         {content.trim() && (
           <DropdownMenuItem
             onSelect={async () => {

@@ -1,7 +1,7 @@
 import '@tanstack/react-start/server-only';
 
 import { generateId } from 'ai';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import ts from 'typescript';
 import { type z } from 'zod';
 
@@ -67,10 +67,10 @@ export async function listArtifacts(userId: string, chatId: string) {
 }
 
 /**
- * A new chat of the user's that begins with a duplicate of an artifact: one
- * of their own, or one shared on its own, by its link. The original and its
- * chat are left as they were; the chat is named after it, with "(Copy)"
- * after the name.
+ * A new chat of the user's that begins with a duplicate of an artifact: any
+ * they can see — one of their own, or one shared, on its own or in a chat
+ * that is. The original and its chat are left as they were; the chat is
+ * named after it, with "(Copy)" after the name.
  *
  * The chat opens as an ordinary exchange: the user asking for the duplicate,
  * with the files the artifact can read, and a reply that makes it with
@@ -85,7 +85,7 @@ export async function duplicateArtifact(
   userId: string,
   input: z.infer<typeof artifactDuplicateSchema>
 ): Promise<{ chatId: string; artifactId: string }> {
-  const source = await duplicateSource(userId, input.from);
+  const source = await duplicateSource(userId, input.artifactId);
   if (!source) {
     throw new PublicError('This is no longer available.');
   }
@@ -193,31 +193,25 @@ export async function duplicateArtifact(
   return { chatId, artifactId };
 }
 
-/** The artifact duplicated: the user's own, or the one a link shares on its
- *  own, made by whoever shared it. */
-async function duplicateSource(
-  userId: string,
-  from: z.infer<typeof artifactDuplicateSchema>['from']
-) {
-  if ('artifactId' in from) {
-    return await db.query.artifacts.findFirst({
-      where: and(
-        eq(artifacts.id, from.artifactId),
-        eq(artifacts.userId, userId)
-      )
-    });
-  }
+/** The artifact duplicated, if the user can see it: their own, or one
+ *  shared by whoever made it. */
+async function duplicateSource(userId: string, artifactId: string) {
+  const artifact = await db.query.artifacts.findFirst({
+    where: eq(artifacts.id, artifactId)
+  });
+  if (!artifact) return undefined;
+  if (artifact.userId === userId) return artifact;
+
+  // Someone else's: only while a link of theirs shows it, as the share
+  // pages do — its own link, or the link to the chat it is in.
   const link = await db.query.shares.findFirst({
-    where: eq(shares.id, from.shareId),
-    columns: { artifactId: true, userId: true }
-  });
-  if (!link?.artifactId) return undefined;
-  return await db.query.artifacts.findFirst({
     where: and(
-      eq(artifacts.id, link.artifactId),
-      eq(artifacts.userId, link.userId)
-    )
+      eq(shares.userId, artifact.userId),
+      or(eq(shares.artifactId, artifact.id), eq(shares.chatId, artifact.chatId))
+    ),
+    columns: { id: true }
   });
+  return link ? artifact : undefined;
 }
 
 /**

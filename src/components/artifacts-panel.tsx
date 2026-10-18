@@ -27,7 +27,7 @@ interface ArtifactsPanelProps {
   onEdit?: (artifact: Artifact, selection: string, request: string) => void;
   /** Offers to share an artifact on its own; not on a share page. */
   canShare?: boolean;
-  /** Offers to duplicate one into a new chat; not on a share page. */
+  /** False while one may still be changing: in its chat, during a turn. */
   canDuplicate?: boolean;
 }
 
@@ -109,9 +109,7 @@ export function ArtifactsPanel({
             viewMode={effectiveViewMode}
             onViewModeChange={setViewMode}
             canShare={canShare}
-            duplicateFrom={
-              canDuplicate ? { artifactId: selected.id } : undefined
-            }
+            canDuplicate={canDuplicate}
           />
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
