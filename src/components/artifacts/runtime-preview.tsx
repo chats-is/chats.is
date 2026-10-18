@@ -619,7 +619,7 @@ export function ArtifactRuntimePreview({
 }) {
   if (artifact.type === 'markdown') {
     return (
-      <div className="h-full overflow-auto border bg-background p-4">
+      <div className="h-full overflow-auto p-4">
         <MessageMarkdown content={artifact.content ?? ''} />
       </div>
     );
@@ -627,7 +627,7 @@ export function ArtifactRuntimePreview({
 
   if (artifact.type === 'json') {
     return (
-      <div className="h-full overflow-auto border bg-background">
+      <div className="h-full overflow-auto">
         {artifactRegistry.sheet.renderContent(artifact)}
       </div>
     );

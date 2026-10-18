@@ -3,6 +3,7 @@ import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
 import { pageTitle } from '@/lib/head';
+import { useSidebarOpen } from '@/hooks/use-sidebar-open';
 import { sessionQueries } from '@/server/functions/auth';
 import { settingsQueries } from '@/server/functions/settings';
 import { userQueries } from '@/server/functions/user';
@@ -41,21 +42,27 @@ export const Route = createFileRoute('/console')({
 
 function ConsoleLayout() {
   const { settings } = Route.useLoaderData();
+  const [sidebarOpen, setSidebarOpen] = useSidebarOpen();
 
   return (
     <SystemSettingsProvider settings={settings}>
       <PreferencesProvider>
         <PlansDialogProvider>
           <SettingsDialogProvider>
-            <SidebarProvider>
+            {/* Exactly one viewport tall, and it says so: the header is meant to
+              sit still while the page under it scrolls, so nothing inside is
+              allowed to push the page taller than the screen. Without the
+              clip a tall page scrolls the whole console — header included —
+              and the reader gets a second scrollbar beside the one that is
+              supposed to be there. The card takes the height left inside
+              its margin by stretching, not by a height of its own. */}
+            <SidebarProvider
+              open={sidebarOpen}
+              onOpenChange={setSidebarOpen}
+              className="h-svh overflow-hidden"
+            >
               <Sidebar />
-              {/* Exactly one viewport tall, and it says so: the header is meant to
-                sit still while the page under it scrolls, so nothing inside is
-                allowed to push this box taller than the screen. Without the
-                clip a tall page scrolls the whole console — header included —
-                and the reader gets a second scrollbar beside the one that is
-                supposed to be there. */}
-              <SidebarInset className="h-svh overflow-hidden">
+              <SidebarInset className="overflow-hidden md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-0">
                 <ConsoleHeader />
                 <div className="min-h-0 flex-1 overflow-y-auto p-6">
                   <Outlet />

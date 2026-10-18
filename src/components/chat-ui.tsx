@@ -681,7 +681,13 @@ export function ChatUI({
                 refusedHere={session.refusedHere}
               />
             </ResizablePanel>
-            <ResizableHandle withHandle />
+            {/* The grip shows only while the divider is pointed at, held or
+                reached by keyboard; otherwise it is a plain line. A drag
+                leaves the divider focused, so focus alone does not show it. */}
+            <ResizableHandle
+              withHandle
+              className="[&>div]:opacity-0 [&>div]:transition-opacity hover:[&>div]:opacity-100 focus-visible:[&>div]:opacity-100 data-[separator=active]:[&>div]:opacity-100 data-[separator=hover]:[&>div]:opacity-100"
+            />
             <ResizablePanel
               defaultSize="56%"
               minSize="25%"

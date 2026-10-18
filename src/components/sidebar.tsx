@@ -2,7 +2,6 @@ import * as React from 'react';
 import { Link } from '@tanstack/react-router';
 
 import { useAppName } from '@/lib/head';
-import { Separator } from '@/components/ui/separator';
 import {
   SidebarContent,
   SidebarFooter,
@@ -11,7 +10,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   Sidebar as SidebarPrimitive,
-  SidebarRail,
   SidebarTrigger
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
@@ -25,13 +23,13 @@ export function Sidebar({
   const appName = useAppName();
 
   return (
-    <SidebarPrimitive collapsible="icon" {...props}>
-      <SidebarHeader className="h-16 justify-center border-b border-sidebar-border">
+    <SidebarPrimitive variant="inset" collapsible="icon" {...props}>
+      <SidebarHeader className="h-12 justify-center">
         <SidebarMenu>
           <SidebarMenuItem className="relative">
             <SidebarMenuButton
               size="lg"
-              className="gap-1 p-0 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:group-hover/menu-item:opacity-0 hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground motion-reduce:transition-none"
+              className="h-8 gap-1 p-0 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:group-hover/menu-item:opacity-0 hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground motion-reduce:transition-none"
               asChild
             >
               <Link to="/">
@@ -49,15 +47,11 @@ export function Sidebar({
       </SidebarHeader>
       <SidebarContent>
         <NewContent />
-        <div className="px-2">
-          <Separator className="bg-sidebar-border" />
-        </div>
         <SidebarList />
       </SidebarContent>
       <SidebarFooter>
         <UserMenu />
       </SidebarFooter>
-      <SidebarRail />
     </SidebarPrimitive>
   );
 }

@@ -120,7 +120,7 @@ export function ArtifactViewer({
       ref={contentRef}
       className={cn(
         'relative h-full min-h-0 overflow-auto bg-background',
-        artifactSourceUsesCodeChrome(artifact) ? 'p-0' : 'border p-4'
+        artifactSourceUsesCodeChrome(artifact) ? 'p-0' : 'p-4'
       )}
     >
       {registry.renderSource(artifact)}

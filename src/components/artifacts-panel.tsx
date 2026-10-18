@@ -77,7 +77,7 @@ export function ArtifactsPanel({
   const content =
     artifacts.length === 0 ? (
       <div className="flex h-full flex-col">
-        <div className="sticky top-0 z-10 flex h-16 items-center justify-end border-b bg-background px-4">
+        <div className="sticky top-0 z-10 flex h-12 items-center justify-end border-b bg-background px-4">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -99,7 +99,7 @@ export function ArtifactsPanel({
       </div>
     ) : (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="sticky top-0 z-10 flex h-16 items-center border-b bg-background px-4">
+        <div className="sticky top-0 z-10 flex h-12 items-center border-b bg-background px-4">
           <ArtifactViewer
             artifact={selected}
             artifacts={sortedArtifacts}

@@ -16,7 +16,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   Sidebar as SidebarPrimitive,
-  SidebarRail,
   SidebarTrigger
 } from '@/components/ui/sidebar';
 import { refundRequestTableInput } from '@/components/console/table-filters';
@@ -34,13 +33,13 @@ export function Sidebar({
   const pendingRequests = requests?.pendingApproval ?? 0;
 
   return (
-    <SidebarPrimitive collapsible="icon" {...props}>
-      <SidebarHeader className="h-16 justify-center border-b border-sidebar-border">
+    <SidebarPrimitive variant="inset" collapsible="icon" {...props}>
+      <SidebarHeader className="h-12 justify-center">
         <SidebarMenu>
           <SidebarMenuItem className="relative">
             <SidebarMenuButton
               size="lg"
-              className="gap-1 p-0 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:group-hover/menu-item:opacity-0 hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground motion-reduce:transition-none"
+              className="h-8 gap-1 p-0 transition-opacity duration-150 ease-out group-data-[collapsible=icon]:group-hover/menu-item:opacity-0 hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground motion-reduce:transition-none"
               asChild
             >
               <Link to="/console">
@@ -96,7 +95,6 @@ export function Sidebar({
       <SidebarFooter>
         <UserMenu />
       </SidebarFooter>
-      <SidebarRail />
     </SidebarPrimitive>
   );
 }

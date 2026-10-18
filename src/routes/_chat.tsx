@@ -3,6 +3,7 @@ import { ArtifactProvider } from '@/contexts/artifact-context';
 import { PreferencesProvider } from '@/contexts/preferences-context';
 import { SystemSettingsProvider } from '@/contexts/system-settings-context';
 
+import { useSidebarOpen } from '@/hooks/use-sidebar-open';
 import { sessionQueries } from '@/server/functions/auth';
 import { chatQueries } from '@/server/functions/chat';
 import { settingsQueries } from '@/server/functions/settings';
@@ -63,6 +64,7 @@ export const Route = createFileRoute('/_chat')({
 
 function ChatLayout() {
   const settings = Route.useLoaderData();
+  const [sidebarOpen, setSidebarOpen] = useSidebarOpen();
 
   if (!settings) {
     return (
@@ -78,9 +80,13 @@ function ChatLayout() {
         <ArtifactProvider>
           <PlansDialogProvider>
             <SettingsDialogProvider>
-              <SidebarProvider className="h-svh overflow-hidden">
+              <SidebarProvider
+                open={sidebarOpen}
+                onOpenChange={setSidebarOpen}
+                className="h-svh overflow-hidden"
+              >
                 <Sidebar />
-                <SidebarInset className="h-full overflow-hidden">
+                <SidebarInset className="overflow-hidden md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-0">
                   <Outlet />
                 </SidebarInset>
               </SidebarProvider>

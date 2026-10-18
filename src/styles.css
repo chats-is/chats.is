@@ -243,20 +243,17 @@
 }
 
 @layer base {
-  ::-webkit-scrollbar {
-    width: 5px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    @apply rounded-md;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply rounded-md bg-muted-foreground/30;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/50;
+  /* Thin and in the theme's grey, through the standard properties rather
+     than ::-webkit-scrollbar: those turn macOS's overlay scrollbars into ones
+     drawn all the time, where these keep them hidden until something
+     scrolls. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 30%,
+        transparent
+      )
+      transparent;
   }
 }
