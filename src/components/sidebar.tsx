@@ -14,6 +14,7 @@ import {
   SidebarRail,
   SidebarTrigger
 } from '@/components/ui/sidebar';
+import { Logo } from '@/components/logo';
 import { NewContent } from '@/components/new-content';
 import { SidebarList } from '@/components/sidebar-list';
 import { UserMenu } from '@/components/user-menu';
@@ -35,7 +36,7 @@ export function Sidebar({
             >
               <Link to="/">
                 <div className="flex aspect-square size-8 items-center justify-center">
-                  <img src="/favicon.svg" alt="Logo" className="size-7" />
+                  <Logo label="Logo" />
                 </div>
                 <div className="grid flex-1 text-left text-lg font-medium group-data-[collapsible=icon]:hidden">
                   <span className="truncate">{appName}</span>

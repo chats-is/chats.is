@@ -23,8 +23,8 @@ import { useOpenPlans } from '@/components/plans-dialog';
 import { useOpenLogin } from '@/components/site-dialogs';
 import { usePlansOnSale } from '@/components/site-layout';
 
-/** The one colour the front page adds to the theme's own. */
-const ACCENT = 'text-blue-600 dark:text-blue-400';
+/** The one colour the front page adds to the theme's own: the logo's blue. */
+const ACCENT = 'text-brand';
 
 /** What a visitor might ask first, shown under the composer's picture. */
 const SUGGESTIONS = [

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAppName } from '@/lib/head';
 import { sessionQueries } from '@/server/functions/auth';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/logo';
 import { PlansDialogProvider, useOpenPlans } from '@/components/plans-dialog';
 import { LoginDialogProvider, useOpenLogin } from '@/components/site-dialogs';
 
@@ -61,7 +62,7 @@ function SiteHeader() {
           to="/"
           className="flex items-center gap-2 text-[17px] font-semibold"
         >
-          <img src="/favicon.svg" alt="" className="size-7" />
+          <Logo />
           <span className="truncate">{appName}</span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground sm:flex">

@@ -75,6 +75,10 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  /* The blue of the logo's dot, which the front page takes as its one
+     accent. */
+  --color-brand: #3b82f6;
+
   /* Media generation placeholder: a wide soft luminance band drifts across
      the skeleton while the icon breathes in the same rhythm. */
   --animate-media-flow: media-flow 3s ease-in-out infinite;

@@ -20,6 +20,7 @@ import {
   SidebarTrigger
 } from '@/components/ui/sidebar';
 import { refundRequestTableInput } from '@/components/console/table-filters';
+import { Logo } from '@/components/logo';
 import { UserMenu } from '@/components/user-menu';
 
 export function Sidebar({
@@ -44,7 +45,7 @@ export function Sidebar({
             >
               <Link to="/console">
                 <div className="flex aspect-square size-8 items-center justify-center">
-                  <img src="/favicon.svg" alt="Logo" className="size-7" />
+                  <Logo label="Logo" />
                 </div>
                 <div className="grid flex-1 text-left text-lg font-medium group-data-[collapsible=icon]:hidden">
                   <span className="truncate">Console</span>
