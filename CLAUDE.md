@@ -256,7 +256,7 @@ machine has sat idle a while, and a wait for a frame, a click or a screenshot th
 The plans dialog opens from the Upgrade pill for a user with no subscription, and from Settings →
 Billing → Upgrade plan for one who has. Its choice of interval shows only once the plans have arrived, and a press
 made before then is lost: check that the interval wanted is the one pressed, and the card's price,
-before pressing Subscribe — otherwise another plan is bought. Pay with the sandbox test card
+before pressing Upgrade — otherwise another plan is bought. Pay with the sandbox test card
 `4242 4242 4242 4242`:
 
 - **Paddle** — an overlay in a frame from `sandbox-buy.paddle.com/checkout`: the postcode first, then

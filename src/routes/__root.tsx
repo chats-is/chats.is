@@ -35,6 +35,7 @@ const FRAME_SETTINGS = {
   appName: DEFAULT_APP_NAME,
   appSubtitle: DEFAULT_APP_SUBTITLE,
   appDescription: DEFAULT_APP_DESCRIPTION,
+  plansOnSale: false,
   umamiScriptUrl: null,
   umamiWebsiteId: null
 };

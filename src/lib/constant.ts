@@ -5,6 +5,7 @@ import {
   CircleDollarSign,
   Cpu,
   CreditCard,
+  FileText,
   Gauge,
   LayoutGrid,
   LibraryBig,
@@ -43,6 +44,12 @@ export const DEFAULT_APP_NAME = 'Chats.is';
 export const DEFAULT_APP_SUBTITLE = 'Your AI Assistant';
 export const DEFAULT_APP_DESCRIPTION =
   'Chats.is is an AI assistant that answers questions, writes, makes images and video, and turns ideas into code you can run.';
+
+/**
+ * The site's own pages, each written by the operator in the console (setting
+ * `pages.<page>`) and shown to anyone at `/<page>`.
+ */
+export const SITE_PAGES = ['about', 'terms', 'privacy'] as const;
 
 /**
  * Provider types for the console
@@ -565,6 +572,11 @@ export const CONSOLE_NAVIGATION = {
       title: 'Logs',
       url: '/console/logs',
       icon: Logs
+    },
+    {
+      title: 'Pages',
+      url: '/console/pages',
+      icon: FileText
     },
     {
       title: 'Settings',

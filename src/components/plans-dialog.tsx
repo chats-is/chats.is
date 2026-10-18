@@ -20,6 +20,7 @@ import {
 import { BILLING_INTERVALS } from '@/lib/constant';
 import { formatPrice } from '@/lib/format-amount';
 import { cn } from '@/lib/utils';
+import { sessionQueries } from '@/server/functions/auth';
 import { quotaQueries } from '@/server/functions/quota';
 import { settingsQueries } from '@/server/functions/settings';
 import {
@@ -59,38 +60,79 @@ import { LocalTime } from '@/components/local-time';
 type PlanForSale = Awaited<ReturnType<typeof listPlansForSale>>[number];
 type Mine = NonNullable<Awaited<ReturnType<typeof getMySubscription>>>;
 
+/** What a plan's button does for the reader, from where they stand. */
+type PlanAction =
+  /** Not signed in: signing in comes first. */
+  | 'sign-in'
+  /** No subscription: from the free plan to this one, through checkout. */
+  | 'subscribe'
+  /** Their plan, canceled and still in effect: renewing again. */
+  | 'resubscribe'
+  /** Their plan. */
+  | 'current'
+  /** Dearer, at the same interval and processor: changed now. */
+  | 'upgrade'
+  /** Anything else: a new subscription, once theirs has ended. */
+  | 'later';
+
+function actionFor(
+  plan: PlanForSale,
+  { signedIn, mine }: { signedIn: boolean; mine: Mine | null }
+): PlanAction {
+  if (!signedIn) return 'sign-in';
+  if (!mine) return 'subscribe';
+  if (mine.planId === plan.id)
+    return mine.canResume ? 'resubscribe' : 'current';
+  if (
+    mine.canUpgrade &&
+    canUpgrade(
+      { price: mine.price, interval: mine.interval, processor: mine.processor },
+      plan
+    )
+  ) {
+    return 'upgrade';
+  }
+  return 'later';
+}
+
 /**
- * The plans to subscribe to, over the page rather than instead of it, one
+ * The plans to choose from, over the page rather than instead of it, one
  * interval at a time: where plans are sold at more than one, a choice
  * above them picks which are shown.
  *
- * Without a subscription, a plan is bought on its payment processor's own
- * checkout page, which sends the user back with `?checkout=` in the
- * address. With one, the only move is up — to a plan that costs more at the
- * same interval — and it starts now. Anything else waits until the current
- * subscription has ended.
+ * Everyone starts on the free plan, so a plan is an upgrade from it. Without
+ * a subscription, a plan is bought on its payment processor's own checkout
+ * page, which sends the user back with `?checkout=` in the address. With
+ * one, the only move is up — to a plan that costs more at the same interval
+ * — and it starts now. Anything else waits until the current subscription
+ * has ended. Someone not signed in sees the same plans, and signs in first.
  */
 function PlansDialog({
   open,
   onOpenChange,
+  onSignIn,
   returning,
   returned
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** How someone not signed in is asked to sign in. */
+  onSignIn?: () => void;
   /** Back from paying, and waiting for the subscription to arrive. */
   returning: boolean;
   /** The checkout come back from, to ask its processor about. */
   returned: Returned | null;
 }) {
   const queryClient = useQueryClient();
+  const { data: user } = useQuery(sessionQueries.me());
+  const signedIn = !!user;
   const { data: plans, isLoading } = useQuery({
     ...subscriptionQueries.plans(),
     enabled: open
   });
   const { data: mine } = useQuery({
     ...subscriptionQueries.mine(),
-    enabled: open,
+    enabled: open && signedIn,
     // The plan arrives by webhook, so ask until it has.
     refetchInterval: query => (returning && !query.state.data ? 2000 : false)
   });
@@ -172,18 +214,20 @@ function PlansDialog({
   const busy =
     checkout.isPending || upgrade.isPending || resubscribing.isPending;
 
+  /** What doing a plan's action sets off. */
+  const run = (action: PlanAction, plan: PlanForSale) => {
+    if (action === 'sign-in') onSignIn?.();
+    else if (action === 'subscribe') checkout.mutate(plan.id);
+    else if (action === 'resubscribe') resubscribing.mutate();
+    else if (action === 'upgrade') setUpgradeTo(plan);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="max-h-[calc(100dvh-4rem)] gap-6 overflow-y-auto pb-10 sm:max-w-6xl"
-          // Closed by its X alone: a click beside it or Escape would lose
-          // the choice mid-way.
-          onInteractOutside={e => e.preventDefault()}
-          onEscapeKeyDown={e => e.preventDefault()}
-        >
+        <DialogContent className="max-h-[calc(100dvh-4rem)] gap-6 overflow-y-auto pb-10 sm:max-w-6xl">
           <DialogHeader className="items-center text-center sm:text-center">
-            <DialogTitle className="text-2xl">Upgrade your plan</DialogTitle>
+            <DialogTitle className="text-2xl">Choose your plan</DialogTitle>
             <DialogDescription>
               {mine ? (
                 <>
@@ -229,23 +273,34 @@ function PlansDialog({
             // Centred rows of one width, so two plans sit in the middle
             // rather than leaving a third of the dialog empty.
             <div className="flex flex-wrap justify-center gap-4">
-              {shown.map(plan => (
-                <PlanCard
-                  key={plan.id}
-                  plan={plan}
-                  saving={savingOf(plan, plans ?? [])}
-                  mine={mine ?? null}
-                  busy={busy}
-                  loading={
-                    (checkout.isPending && checkout.variables === plan.id) ||
-                    (upgrade.isPending && upgrade.variables === plan.id) ||
-                    (resubscribing.isPending && mine?.planId === plan.id)
-                  }
-                  onSubscribe={() => checkout.mutate(plan.id)}
-                  onUpgrade={() => setUpgradeTo(plan)}
-                  onResubscribe={() => resubscribing.mutate()}
-                />
-              ))}
+              {shown.map(plan => {
+                const action = actionFor(plan, {
+                  signedIn,
+                  mine: mine ?? null
+                });
+                return (
+                  <PlanCard
+                    key={plan.id}
+                    plan={plan}
+                    saving={savingOf(plan, plans ?? [])}
+                    current={mine?.planId === plan.id}
+                    action={
+                      <PlanActionButton
+                        action={action}
+                        busy={busy}
+                        loading={
+                          (checkout.isPending &&
+                            checkout.variables === plan.id) ||
+                          (upgrade.isPending &&
+                            upgrade.variables === plan.id) ||
+                          (resubscribing.isPending && mine?.planId === plan.id)
+                        }
+                        onClick={() => run(action, plan)}
+                      />
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </DialogContent>
@@ -333,87 +388,29 @@ function IntervalSwitch({
 function PlanCard({
   plan,
   saving,
-  mine,
-  busy,
-  loading,
-  onSubscribe,
-  onUpgrade,
-  onResubscribe
+  current = false,
+  action
 }: {
   plan: PlanForSale;
   /** What it saves over its name at a shorter interval, where it does. */
   saving: { percent: number; than: BillingInterval } | null;
-  mine: Mine | null;
-  busy: boolean;
-  loading: boolean;
-  onSubscribe: () => void;
-  onUpgrade: () => void;
-  onResubscribe: () => void;
+  /** The plan the reader is on. */
+  current?: boolean;
+  /** What can be done about it, from where the reader stands. */
+  action: React.ReactNode;
 }) {
-  const isCurrent = mine?.planId === plan.id;
   const features = (plan.description ?? '')
     .split('\n')
     .map(line => line.trim())
     .filter(Boolean);
-  const spinner = loading && <Loader2 className="size-4 animate-spin" />;
-
-  let button: React.ReactNode;
-  if (!mine) {
-    button = (
-      <Button className="w-full" disabled={busy} onClick={onSubscribe}>
-        {spinner}
-        Subscribe
-      </Button>
-    );
-  } else if (isCurrent && mine.canResume) {
-    // Canceled, and still in effect: the same plan, renewing again.
-    button = (
-      <Button className="w-full" disabled={busy} onClick={onResubscribe}>
-        {spinner}
-        Resubscribe
-      </Button>
-    );
-  } else if (isCurrent) {
-    button = (
-      <Button variant="outline" className="w-full" disabled>
-        <Check className="size-4" />
-        Your plan
-      </Button>
-    );
-  } else if (
-    mine.canUpgrade &&
-    canUpgrade(
-      {
-        price: mine.price,
-        interval: mine.interval,
-        processor: mine.processor
-      },
-      plan
-    )
-  ) {
-    button = (
-      <Button className="w-full" disabled={busy} onClick={onUpgrade}>
-        {spinner}
-        Upgrade
-      </Button>
-    );
-  } else {
-    // Cheaper, another interval, another processor: a new subscription,
-    // once the current one has ended.
-    button = (
-      <Button variant="outline" className="w-full" disabled>
-        After your subscription ends
-      </Button>
-    );
-  }
 
   return (
-    <Card className={cn('w-full py-0 sm:w-80', isCurrent && 'border-primary')}>
+    <Card className={cn('w-full py-0 sm:w-80', current && 'border-primary')}>
       <CardContent className="flex h-full flex-col gap-4 p-5">
         <div className="flex h-7 items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <h2 className="truncate font-semibold">{plan.name}</h2>
-            {isCurrent && <Badge>Current</Badge>}
+            {current && <Badge>Current</Badge>}
           </div>
           {saving && (
             <span className="shrink-0 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
@@ -430,7 +427,7 @@ function PlanCard({
           </span>
         </div>
 
-        <div>{button}</div>
+        <div>{action}</div>
 
         {/* The plan's description, a point to a line, as the admin wrote
             it. */}
@@ -449,6 +446,58 @@ function PlanCard({
   );
 }
 
+/** A plan's button, as its action reads. */
+function PlanActionButton({
+  action,
+  busy,
+  loading,
+  onClick
+}: {
+  action: PlanAction;
+  busy: boolean;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  const spinner = loading && <Loader2 className="size-4 animate-spin" />;
+
+  switch (action) {
+    case 'sign-in':
+      return (
+        <Button className="w-full" onClick={onClick}>
+          Get started
+        </Button>
+      );
+    case 'subscribe':
+    case 'upgrade':
+      return (
+        <Button className="w-full" disabled={busy} onClick={onClick}>
+          {spinner}
+          Upgrade
+        </Button>
+      );
+    case 'resubscribe':
+      return (
+        <Button className="w-full" disabled={busy} onClick={onClick}>
+          {spinner}
+          Resubscribe
+        </Button>
+      );
+    case 'current':
+      return (
+        <Button variant="outline" className="w-full" disabled>
+          <Check className="size-4" />
+          Your plan
+        </Button>
+      );
+    case 'later':
+      return (
+        <Button variant="outline" className="w-full" disabled>
+          After your subscription ends
+        </Button>
+      );
+  }
+}
+
 /** A checkout come back from: its processor, and what the return carried. */
 type Returned = { via: PaymentProcessorId; ref: string | null };
 
@@ -461,9 +510,12 @@ const OpenPlans = createContext<(() => void) | null>(null);
  * `?checkout=canceled` opens it back on the plans the user left.
  */
 export function PlansDialogProvider({
-  children
+  children,
+  onSignIn
 }: {
   children: React.ReactNode;
+  /** How someone not signed in is asked to sign in, where they can be. */
+  onSignIn?: () => void;
 }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -518,6 +570,13 @@ export function PlansDialogProvider({
       {children}
       <PlansDialog
         open={open}
+        onSignIn={
+          onSignIn &&
+          (() => {
+            setOpen(false);
+            onSignIn();
+          })
+        }
         onOpenChange={next => {
           setOpen(next);
           if (!next) setReturning(false);

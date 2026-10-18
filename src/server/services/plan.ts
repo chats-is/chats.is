@@ -23,26 +23,6 @@ import {
   plansWithSubscriptions
 } from '@/server/services/subscription';
 
-/**
- * Plans as the user end may see them: id, name, description, order.
- *
- * Deliberately omits the linked quota row — the amounts in it are not
- * for the user end.
- */
-export async function listPublicPlans() {
-  return await db.query.plans.findMany({
-    columns: {
-      id: true,
-      name: true,
-      description: true,
-      displayOrder: true,
-      createdAt: true,
-      updatedAt: true
-    },
-    orderBy: (p, { asc }) => [asc(p.displayOrder), asc(p.name)]
-  });
-}
-
 /** One page of plans, each with its quota and how many users are on it. */
 export async function listPlans(page: z.infer<typeof planListSchema>) {
   const [rows, [totalRow], counts] = await Promise.all([

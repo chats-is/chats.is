@@ -19,10 +19,11 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware, authedMiddleware } from '@/server/middleware';
 import * as subscription from '@/server/services/subscription';
 
-/** The plans to subscribe to, with their prices and the models each opens. */
-export const listPlansForSale = createServerFn({ method: 'GET' })
-  .middleware([authedMiddleware])
-  .handler(() => subscription.listPlansForSale());
+/** The plans to subscribe to, with their prices and the models each opens —
+ *  for anyone, since the site offers them before signing in. */
+export const listPlansForSale = createServerFn({ method: 'GET' }).handler(() =>
+  subscription.listPlansForSale()
+);
 
 /** The signed-in user's subscription, or null. */
 export const getMySubscription = createServerFn({ method: 'GET' })

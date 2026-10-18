@@ -14,11 +14,6 @@ import { adminMiddleware } from '@/server/middleware';
 import * as plans from '@/server/services/plan';
 import { lookupProcessorPrice } from '@/server/services/subscription';
 
-/** Public list — no quota amounts. */
-export const listPublicPlans = createServerFn({ method: 'GET' }).handler(() =>
-  plans.listPublicPlans()
-);
-
 /** Admin list — one page, and the user count per plan. */
 export const listPlans = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])

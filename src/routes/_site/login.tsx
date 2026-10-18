@@ -17,7 +17,7 @@ const searchSchema = z.object({
   redirect: z.string().refine(staysOnThisSite).optional().catch(undefined)
 });
 
-export const Route = createFileRoute('/login')({
+export const Route = createFileRoute('/_site/login')({
   validateSearch: searchSchema,
   beforeLoad: async ({ context, search }) => {
     // Already signed in — go where they were headed.
@@ -36,8 +36,8 @@ function LoginPage() {
   const { redirect: redirectTo } = Route.useSearch();
 
   return (
-    <div className="flex size-full items-center justify-center">
-      <div className="mx-6 w-full sm:w-[350px]">
+    <div className="flex justify-center px-4 py-20 sm:py-28">
+      <div className="w-full sm:w-[350px]">
         <LoginForm {...methods} redirectTo={redirectTo ?? '/'} />
       </div>
     </div>

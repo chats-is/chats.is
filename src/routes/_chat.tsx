@@ -8,10 +8,12 @@ import { chatQueries } from '@/server/functions/chat';
 import { settingsQueries } from '@/server/functions/settings';
 import { userQueries } from '@/server/functions/user';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { Landing } from '@/components/landing';
 import { PlansDialogProvider } from '@/components/plans-dialog';
 import { RoutePending } from '@/components/route-pending';
 import { SettingsDialogProvider } from '@/components/settings-dialog';
 import { Sidebar } from '@/components/sidebar';
+import { SiteLayout } from '@/components/site-layout';
 
 /**
  * Everything a signed-in user sees sits under here: the chat itself, the
@@ -19,6 +21,10 @@ import { Sidebar } from '@/components/sidebar';
  * subtree, rather than by each page — and it runs before any of their loaders,
  * so a signed-out visitor is sent to sign in instead of watching a page render
  * whose every read would then be refused.
+ *
+ * The one exception is `/` itself, the address everyone arrives at: to a
+ * visitor who is not signed in it is the site's front page, drawn here in
+ * the site's frame instead of the app's, with none of the app's data read.
  */
 // The wait for this subtree is the wait for the shell itself: until the guard
 // has answered and the settings are in, there is no sidebar to keep and no page
@@ -26,6 +32,7 @@ import { Sidebar } from '@/components/sidebar';
 export const Route = createFileRoute('/_chat')({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(sessionQueries.me());
+    if (!user && location.pathname === '/') return { user: null };
     if (!user) {
       throw redirect({ to: '/login', search: { redirect: location.href } });
     }
@@ -37,6 +44,7 @@ export const Route = createFileRoute('/_chat')({
   // is here for the same reason: it is not read during a server render, so
   // left to the component it would arrive as placeholders and a second trip.
   loader: async ({ context }) => {
+    if (!context.user) return null;
     const [settings] = await Promise.all([
       context.queryClient.ensureQueryData(settingsQueries.system()),
       context.queryClient.ensureQueryData(userQueries.me()),
@@ -55,6 +63,14 @@ export const Route = createFileRoute('/_chat')({
 
 function ChatLayout() {
   const settings = Route.useLoaderData();
+
+  if (!settings) {
+    return (
+      <SiteLayout>
+        <Landing />
+      </SiteLayout>
+    );
+  }
 
   return (
     <SystemSettingsProvider settings={settings}>

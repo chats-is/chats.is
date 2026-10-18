@@ -71,15 +71,21 @@ export function LoginForm({
       )}
 
       <p className="text-center text-xs leading-relaxed text-muted-foreground">
-        By signing in, you agree to our{' '}
+        By continuing, you agree to our{' '}
+        <Link
+          to="/terms"
+          className="underline underline-offset-2 hover:text-primary"
+        >
+          Terms of Service
+        </Link>{' '}
+        and{' '}
         <Link
           to="/privacy"
           className="underline underline-offset-2 hover:text-primary"
         >
           Privacy Policy
         </Link>
-        {', '}
-        This is an open source project{' '}
+        . This is an open source project.{' '}
         <a
           href="https://github.com/chats-is/chats.is"
           target="_blank"

@@ -4,7 +4,8 @@ import { queryOptions } from '@tanstack/react-query';
 import {
   settingKeySchema,
   settingsBulkSchema,
-  settingSchema
+  settingSchema,
+  sitePageSchema
 } from '@/types/settings';
 import { adminMiddleware, optionalAuthMiddleware } from '@/server/middleware';
 import * as settings from '@/server/services/settings';
@@ -16,8 +17,9 @@ export const listSettings = createServerFn({ method: 'GET' })
 
 /**
  * What the document itself needs: the name the installation gives itself,
- * which the title and description follow from, and the two ids that decide
- * whether an analytics script is written into the page.
+ * which the title and description follow from, whether its pages offer
+ * plans, and the two ids that decide whether an analytics script is
+ * written into the page.
  */
 export const getAppSettings = createServerFn({ method: 'GET' }).handler(() =>
   settings.getAppSettings()
@@ -34,6 +36,11 @@ export const getSystemSettings = createServerFn({ method: 'GET' })
       context.user ? await getUserTier(context.user.id) : null
     )
   );
+
+/** One of the site's own pages — about, terms, privacy — for anyone. */
+export const getSitePage = createServerFn({ method: 'GET' })
+  .validator(sitePageSchema)
+  .handler(({ data }) => settings.getSitePage(data.page));
 
 export const updateSetting = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])

@@ -10,7 +10,11 @@ import {
   refundFeeOf,
   refundRequestsOf
 } from '@/types/payment';
-import { SETTING_VALUE_SCHEMAS, type settingSchema } from '@/types/settings';
+import {
+  SETTING_VALUE_SCHEMAS,
+  type settingSchema,
+  type SitePage
+} from '@/types/settings';
 import {
   DEFAULT_APP_DESCRIPTION,
   DEFAULT_APP_NAME,
@@ -239,8 +243,9 @@ export const getSystemPrompt = perRequest(
 
 /**
  * What the document itself needs: the name the installation gives itself,
- * which the title and description follow from, and the two ids that decide
- * whether an analytics script is written into the page.
+ * which the title and description follow from, whether its pages offer
+ * plans, and the two ids that decide whether an analytics script is
+ * written into the page.
  */
 export const getAppSettings = perRequest('getAppSettings', async () => {
   // `env` is imported here rather than at the top of the file: importing it
@@ -248,17 +253,36 @@ export const getAppSettings = perRequest('getAppSettings', async () => {
   // that have no environment to validate.
   const [{ env }, values] = await Promise.all([
     import('@/lib/env'),
-    getSettings(['app.name', 'app.subtitle', 'app.description'])
+    getSettings([
+      'app.name',
+      'app.subtitle',
+      'app.description',
+      'subscriptions.enabled'
+    ])
   ]);
 
   return {
     appName: values['app.name'] || DEFAULT_APP_NAME,
     appSubtitle: values['app.subtitle'] || DEFAULT_APP_SUBTITLE,
     appDescription: values['app.description'] || DEFAULT_APP_DESCRIPTION,
+    // Whether the site offers its plans, which it does only while they are
+    // on sale.
+    plansOnSale: values['subscriptions.enabled'] === 'true',
     umamiScriptUrl: env.UMAMI_SCRIPT_URL ?? null,
     umamiWebsiteId: env.UMAMI_WEBSITE_ID ?? null
   };
 });
+
+/** One of the site's own pages, as the operator wrote it — empty when
+ *  nothing has been written. */
+export const getSitePage = perRequest(
+  'getSitePage',
+  async (page: SitePage): Promise<{ markdown: string }> => {
+    const key = `pages.${page}`;
+    const values = await getSettings([key]);
+    return { markdown: values[key]?.trim() ?? '' };
+  }
+);
 
 /**
  * A model as a browser may hold it.

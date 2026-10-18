@@ -10,13 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ChatRouteImport } from './routes/_chat'
+import { Route as SiteRouteImport } from './routes/_site'
 import { Route as ArtifactPreviewFrameRouteImport } from './routes/artifact-preview-frame'
 import { Route as ConsoleRouteImport } from './routes/console'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ChatIndexRouteImport } from './routes/_chat/index'
 import { Route as ChatLibraryRouteImport } from './routes/_chat/library'
 import { Route as ChatPromptsRouteImport } from './routes/_chat/prompts'
+import { Route as SiteAboutRouteImport } from './routes/_site/about'
+import { Route as SiteLoginRouteImport } from './routes/_site/login'
+import { Route as SitePrivacyRouteImport } from './routes/_site/privacy'
+import { Route as SiteTermsRouteImport } from './routes/_site/terms'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCronRouteImport } from './routes/api/cron'
 import { Route as ApiFilesRouteRouteImport } from './routes/api/files/route'
@@ -25,6 +28,7 @@ import { Route as ArtifactIdRouteImport } from './routes/artifact/$id'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
 import { Route as ConsoleLogsRouteImport } from './routes/console/logs'
 import { Route as ConsoleModelsRouteImport } from './routes/console/models'
+import { Route as ConsolePagesRouteImport } from './routes/console/pages'
 import { Route as ConsolePaymentsRouteImport } from './routes/console/payments'
 import { Route as ConsolePlansRouteImport } from './routes/console/plans'
 import { Route as ConsolePricingRouteImport } from './routes/console/pricing'
@@ -53,6 +57,10 @@ const ChatRoute = ChatRouteImport.update({
   id: '/_chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SiteRoute = SiteRouteImport.update({
+  id: '/_site',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ArtifactPreviewFrameRoute = ArtifactPreviewFrameRouteImport.update({
   id: '/artifact-preview-frame',
   path: '/artifact-preview-frame',
@@ -61,16 +69,6 @@ const ArtifactPreviewFrameRoute = ArtifactPreviewFrameRouteImport.update({
 const ConsoleRoute = ConsoleRouteImport.update({
   id: '/console',
   path: '/console',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatIndexRoute = ChatIndexRouteImport.update({
@@ -87,6 +85,26 @@ const ChatPromptsRoute = ChatPromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
   getParentRoute: () => ChatRoute,
+} as any)
+const SiteAboutRoute = SiteAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => SiteRoute,
+} as any)
+const SiteLoginRoute = SiteLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => SiteRoute,
+} as any)
+const SitePrivacyRoute = SitePrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => SiteRoute,
+} as any)
+const SiteTermsRoute = SiteTermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => SiteRoute,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
@@ -126,6 +144,11 @@ const ConsoleLogsRoute = ConsoleLogsRouteImport.update({
 const ConsoleModelsRoute = ConsoleModelsRouteImport.update({
   id: '/models',
   path: '/models',
+  getParentRoute: () => ConsoleRoute,
+} as any)
+const ConsolePagesRoute = ConsolePagesRouteImport.update({
+  id: '/pages',
+  path: '/pages',
   getParentRoute: () => ConsoleRoute,
 } as any)
 const ConsolePaymentsRoute = ConsolePaymentsRouteImport.update({
@@ -249,17 +272,20 @@ export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
   '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
   '/console': typeof ConsoleRouteWithChildren
-  '/login': typeof LoginRoute
-  '/privacy': typeof PrivacyRoute
   '/api/files': typeof ApiFilesRouteRouteWithChildren
   '/library': typeof ChatLibraryRoute
   '/prompts': typeof ChatPromptsRoute
+  '/about': typeof SiteAboutRoute
+  '/login': typeof SiteLoginRoute
+  '/privacy': typeof SitePrivacyRoute
+  '/terms': typeof SiteTermsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
   '/artifact/$id': typeof ArtifactIdRoute
   '/console/logs': typeof ConsoleLogsRoute
   '/console/models': typeof ConsoleModelsRoute
+  '/console/pages': typeof ConsolePagesRoute
   '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
   '/console/pricing': typeof ConsolePricingRoute
@@ -286,18 +312,22 @@ export interface FileRoutesByFullPath {
   '/api/payments/$processor/webhook': typeof ApiPaymentsProcessorWebhookRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof ChatIndexRoute
   '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
-  '/login': typeof LoginRoute
-  '/privacy': typeof PrivacyRoute
   '/api/files': typeof ApiFilesRouteRouteWithChildren
   '/library': typeof ChatLibraryRoute
   '/prompts': typeof ChatPromptsRoute
+  '/about': typeof SiteAboutRoute
+  '/login': typeof SiteLoginRoute
+  '/privacy': typeof SitePrivacyRoute
+  '/terms': typeof SiteTermsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
   '/artifact/$id': typeof ArtifactIdRoute
   '/console/logs': typeof ConsoleLogsRoute
   '/console/models': typeof ConsoleModelsRoute
+  '/console/pages': typeof ConsolePagesRoute
   '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
   '/console/pricing': typeof ConsolePricingRoute
@@ -314,7 +344,6 @@ export interface FileRoutesByTo {
   '/embed/$id': typeof EmbedIdRoute
   '/pay/paddle': typeof PayPaddleRoute
   '/share/$id': typeof ShareIdRoute
-  '/': typeof ChatIndexRoute
   '/console': typeof ConsoleIndexRoute
   '/chat/$chatId': typeof ChatChatChatIdRoute
   '/api/artifacts/preview': typeof ApiArtifactsPreviewRoute
@@ -327,19 +356,23 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_chat': typeof ChatRouteWithChildren
+  '/_site': typeof SiteRouteWithChildren
   '/artifact-preview-frame': typeof ArtifactPreviewFrameRoute
   '/console': typeof ConsoleRouteWithChildren
-  '/login': typeof LoginRoute
-  '/privacy': typeof PrivacyRoute
   '/api/files': typeof ApiFilesRouteRouteWithChildren
   '/_chat/library': typeof ChatLibraryRoute
   '/_chat/prompts': typeof ChatPromptsRoute
+  '/_site/about': typeof SiteAboutRoute
+  '/_site/login': typeof SiteLoginRoute
+  '/_site/privacy': typeof SitePrivacyRoute
+  '/_site/terms': typeof SiteTermsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/cron': typeof ApiCronRoute
   '/api/speech': typeof ApiSpeechRoute
   '/artifact/$id': typeof ArtifactIdRoute
   '/console/logs': typeof ConsoleLogsRoute
   '/console/models': typeof ConsoleModelsRoute
+  '/console/pages': typeof ConsolePagesRoute
   '/console/payments': typeof ConsolePaymentsRoute
   '/console/plans': typeof ConsolePlansRoute
   '/console/pricing': typeof ConsolePricingRoute
@@ -372,17 +405,20 @@ export interface FileRouteTypes {
     | '/'
     | '/artifact-preview-frame'
     | '/console'
-    | '/login'
-    | '/privacy'
     | '/api/files'
     | '/library'
     | '/prompts'
+    | '/about'
+    | '/login'
+    | '/privacy'
+    | '/terms'
     | '/api/chat'
     | '/api/cron'
     | '/api/speech'
     | '/artifact/$id'
     | '/console/logs'
     | '/console/models'
+    | '/console/pages'
     | '/console/payments'
     | '/console/plans'
     | '/console/pricing'
@@ -409,18 +445,22 @@ export interface FileRouteTypes {
     | '/api/payments/$processor/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/artifact-preview-frame'
-    | '/login'
-    | '/privacy'
     | '/api/files'
     | '/library'
     | '/prompts'
+    | '/about'
+    | '/login'
+    | '/privacy'
+    | '/terms'
     | '/api/chat'
     | '/api/cron'
     | '/api/speech'
     | '/artifact/$id'
     | '/console/logs'
     | '/console/models'
+    | '/console/pages'
     | '/console/payments'
     | '/console/plans'
     | '/console/pricing'
@@ -437,7 +477,6 @@ export interface FileRouteTypes {
     | '/embed/$id'
     | '/pay/paddle'
     | '/share/$id'
-    | '/'
     | '/console'
     | '/chat/$chatId'
     | '/api/artifacts/preview'
@@ -449,19 +488,23 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_chat'
+    | '/_site'
     | '/artifact-preview-frame'
     | '/console'
-    | '/login'
-    | '/privacy'
     | '/api/files'
     | '/_chat/library'
     | '/_chat/prompts'
+    | '/_site/about'
+    | '/_site/login'
+    | '/_site/privacy'
+    | '/_site/terms'
     | '/api/chat'
     | '/api/cron'
     | '/api/speech'
     | '/artifact/$id'
     | '/console/logs'
     | '/console/models'
+    | '/console/pages'
     | '/console/payments'
     | '/console/plans'
     | '/console/pricing'
@@ -491,10 +534,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
+  SiteRoute: typeof SiteRouteWithChildren
   ArtifactPreviewFrameRoute: typeof ArtifactPreviewFrameRoute
   ConsoleRoute: typeof ConsoleRouteWithChildren
-  LoginRoute: typeof LoginRoute
-  PrivacyRoute: typeof PrivacyRoute
   ApiFilesRouteRoute: typeof ApiFilesRouteRouteWithChildren
   ApiChatRoute: typeof ApiChatRoute
   ApiCronRoute: typeof ApiCronRoute
@@ -518,6 +560,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_site': {
+      id: '/_site'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof SiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/artifact-preview-frame': {
       id: '/artifact-preview-frame'
       path: '/artifact-preview-frame'
@@ -530,20 +579,6 @@ declare module '@tanstack/react-router' {
       path: '/console'
       fullPath: '/console'
       preLoaderRoute: typeof ConsoleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_chat/': {
@@ -566,6 +601,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/prompts'
       preLoaderRoute: typeof ChatPromptsRouteImport
       parentRoute: typeof ChatRoute
+    }
+    '/_site/about': {
+      id: '/_site/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof SiteAboutRouteImport
+      parentRoute: typeof SiteRoute
+    }
+    '/_site/login': {
+      id: '/_site/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof SiteLoginRouteImport
+      parentRoute: typeof SiteRoute
+    }
+    '/_site/privacy': {
+      id: '/_site/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof SitePrivacyRouteImport
+      parentRoute: typeof SiteRoute
+    }
+    '/_site/terms': {
+      id: '/_site/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof SiteTermsRouteImport
+      parentRoute: typeof SiteRoute
     }
     '/api/chat': {
       id: '/api/chat'
@@ -621,6 +684,13 @@ declare module '@tanstack/react-router' {
       path: '/models'
       fullPath: '/console/models'
       preLoaderRoute: typeof ConsoleModelsRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
+    '/console/pages': {
+      id: '/console/pages'
+      path: '/pages'
+      fullPath: '/console/pages'
+      preLoaderRoute: typeof ConsolePagesRouteImport
       parentRoute: typeof ConsoleRoute
     }
     '/console/payments': {
@@ -803,9 +873,26 @@ const ChatRouteChildren: ChatRouteChildren = {
 
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
+interface SiteRouteChildren {
+  SiteAboutRoute: typeof SiteAboutRoute
+  SiteLoginRoute: typeof SiteLoginRoute
+  SitePrivacyRoute: typeof SitePrivacyRoute
+  SiteTermsRoute: typeof SiteTermsRoute
+}
+
+const SiteRouteChildren: SiteRouteChildren = {
+  SiteAboutRoute: SiteAboutRoute,
+  SiteLoginRoute: SiteLoginRoute,
+  SitePrivacyRoute: SitePrivacyRoute,
+  SiteTermsRoute: SiteTermsRoute,
+}
+
+const SiteRouteWithChildren = SiteRoute._addFileChildren(SiteRouteChildren)
+
 interface ConsoleRouteChildren {
   ConsoleLogsRoute: typeof ConsoleLogsRoute
   ConsoleModelsRoute: typeof ConsoleModelsRoute
+  ConsolePagesRoute: typeof ConsolePagesRoute
   ConsolePaymentsRoute: typeof ConsolePaymentsRoute
   ConsolePlansRoute: typeof ConsolePlansRoute
   ConsolePricingRoute: typeof ConsolePricingRoute
@@ -826,6 +913,7 @@ interface ConsoleRouteChildren {
 const ConsoleRouteChildren: ConsoleRouteChildren = {
   ConsoleLogsRoute: ConsoleLogsRoute,
   ConsoleModelsRoute: ConsoleModelsRoute,
+  ConsolePagesRoute: ConsolePagesRoute,
   ConsolePaymentsRoute: ConsolePaymentsRoute,
   ConsolePlansRoute: ConsolePlansRoute,
   ConsolePricingRoute: ConsolePricingRoute,
@@ -860,10 +948,9 @@ const ApiFilesRouteRouteWithChildren = ApiFilesRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
+  SiteRoute: SiteRouteWithChildren,
   ArtifactPreviewFrameRoute: ArtifactPreviewFrameRoute,
   ConsoleRoute: ConsoleRouteWithChildren,
-  LoginRoute: LoginRoute,
-  PrivacyRoute: PrivacyRoute,
   ApiFilesRouteRoute: ApiFilesRouteRouteWithChildren,
   ApiChatRoute: ApiChatRoute,
   ApiCronRoute: ApiCronRoute,

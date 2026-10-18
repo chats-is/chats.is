@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { SITE_PAGES } from '@/lib/constant';
+
 import {
   graceDaysSchema,
   refundDaysSchema,
@@ -33,3 +35,9 @@ export const SETTING_VALUE_SCHEMAS: Record<string, z.ZodType> = {
   'refunds.days': refundDaysSchema,
   'refunds.maxRequests': refundRequestsSchema
 };
+
+/** Which of the site's own pages to read: the one public read of the
+ *  settings table by key, so it names the only keys it may reach. */
+export const sitePageSchema = z.object({ page: z.enum(SITE_PAGES) });
+
+export type SitePage = z.infer<typeof sitePageSchema>['page'];

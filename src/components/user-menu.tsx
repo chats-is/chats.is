@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ChevronsUpDown,
   ExternalLink,
+  FileText,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -173,6 +174,18 @@ export function UserMenu() {
               </>
             )}
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link
+                to="/terms"
+                className="flex w-full items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="size-4" />
+                  Terms of Service
+                </div>
+                <ExternalLink className="size-4" />
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link
                 to="/privacy"

@@ -43,3 +43,14 @@ export const sessionQueries = {
       queryFn: () => getSignedInUser()
     })
 };
+
+export const authQueries = {
+  /** Which ways in are configured — set by the environment, so they do not
+   *  change while a page is open. */
+  signInMethods: () =>
+    queryOptions({
+      queryKey: ['auth', 'signInMethods'] as const,
+      queryFn: () => getSignInMethods(),
+      staleTime: Infinity
+    })
+};

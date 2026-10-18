@@ -18,7 +18,8 @@ vi.mock('@/db', () => ({
 }));
 vi.mock('@/lib/env', () => ({ env: {} }));
 
-const { bulkUpdateSettings, getSystemSettings } = await import('./settings');
+const { bulkUpdateSettings, getSitePage, getSystemSettings } =
+  await import('./settings');
 
 let client: { close?: () => Promise<void> } | undefined;
 
@@ -243,5 +244,16 @@ describe('bulkUpdateSettings', () => {
 
   it('does nothing when given nothing', async () => {
     await expect(bulkUpdateSettings([])).resolves.toBeUndefined();
+  });
+});
+
+describe('getSitePage', () => {
+  it('shows what the operator wrote, and nothing when nothing is', async () => {
+    await bulkUpdateSettings([{ key: 'pages.about', value: '# Hello\n\nUs.' }]);
+    expect((await getSitePage('about')).markdown).toBe('# Hello\n\nUs.');
+
+    await bulkUpdateSettings([{ key: 'pages.about', value: '  ' }]);
+    expect((await getSitePage('about')).markdown).toBe('');
+    expect((await getSitePage('terms')).markdown).toBe('');
   });
 });
