@@ -5,10 +5,11 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export function ConsoleHeader() {
   const pathname = useLocation({ select: l => l.pathname });
-  const currentItem = CONSOLE_NAVIGATION.navMain.find(item =>
-    item.url === '/console'
-      ? pathname === item.url
-      : pathname.startsWith(item.url)
+  const currentItem = CONSOLE_NAVIGATION.flatMap(group => group.items).find(
+    item =>
+      item.url === '/console'
+        ? pathname === item.url
+        : pathname.startsWith(item.url)
   );
   const fallbackTitle = pathname
     .split('/')

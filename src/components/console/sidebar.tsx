@@ -55,39 +55,42 @@ export function Sidebar({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {CONSOLE_NAVIGATION.navMain.map(item => {
-                const isActive =
-                  item.url === '/console'
-                    ? pathname === '/console'
-                    : pathname.startsWith(item.url);
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      tooltip={item.title}
-                      className="hover:bg-background hover:shadow-sm data-[active=true]:bg-background data-[active=true]:shadow-sm dark:hover:bg-accent dark:data-[active=true]:bg-accent"
-                      asChild
-                    >
-                      <Link to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    {item.url === '/console/refund-requests' &&
-                      pendingRequests > 0 && (
-                        <SidebarMenuBadge>{pendingRequests}</SidebarMenuBadge>
-                      )}
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      {/* Groups close together: their headings already set them apart. */}
+      <SidebarContent className="gap-0 py-1">
+        {CONSOLE_NAVIGATION.map(group => (
+          <SidebarGroup key={group.title} className="py-1">
+            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map(item => {
+                  const isActive =
+                    item.url === '/console'
+                      ? pathname === '/console'
+                      : pathname.startsWith(item.url);
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        tooltip={item.title}
+                        className="hover:bg-background hover:shadow-sm data-[active=true]:bg-background data-[active=true]:shadow-sm dark:hover:bg-accent dark:data-[active=true]:bg-accent"
+                        asChild
+                      >
+                        <Link to={item.url}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      {item.url === '/console/refund-requests' &&
+                        pendingRequests > 0 && (
+                          <SidebarMenuBadge>{pendingRequests}</SidebarMenuBadge>
+                        )}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <UserMenu />
