@@ -85,7 +85,7 @@ function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <Button asChild size="sm" className="rounded-full px-4">
-              <Link to="/">Open app</Link>
+              <Link to="/">Go to Chat</Link>
             </Button>
           ) : (
             <>
@@ -119,7 +119,10 @@ function SiteFooter() {
     <footer className="border-t">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
-          © {new Date().getFullYear()} {appName}
+          © {new Date().getFullYear()}{' '}
+          <Link to="/" className="hover:text-foreground">
+            {appName}
+          </Link>
         </p>
         <nav className="flex flex-wrap gap-x-5 gap-y-2">
           <Link to="/terms" className="hover:text-foreground">

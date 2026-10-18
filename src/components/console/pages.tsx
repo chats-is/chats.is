@@ -60,33 +60,32 @@ function PageEditor({ form, page }: { form: SettingsFormApi; page: SitePage }) {
   const markdown = useStore(form.store, state => readPath(state.values, key));
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end text-sm">
+    <div className="grid gap-4 md:grid-cols-2">
+      <form.AppField name={key}>
+        {field => (
+          <field.TextareaField
+            aria-label={`${PAGE_LABELS[page]} in Markdown`}
+            placeholder="Write the page in Markdown…"
+            className="field-sizing-fixed h-[65vh] resize-none font-mono"
+          />
+        )}
+      </form.AppField>
+
+      {/* The way to the page, at the corner of what it will look like,
+            kept there while the preview scrolls. */}
+      <div className="relative">
+        <div className="h-[65vh] overflow-y-auto rounded-md border px-6 py-4">
+          <MessageMarkdown content={markdown} />
+        </div>
         <a
           href={`/${page}`}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+          className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-md bg-background/90 px-2 py-1 text-sm text-muted-foreground hover:text-foreground"
         >
           View page
           <ExternalLink className="size-3.5" />
         </a>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <form.AppField name={key}>
-          {field => (
-            <field.TextareaField
-              aria-label={`${PAGE_LABELS[page]} in Markdown`}
-              placeholder="Write the page in Markdown…"
-              className="field-sizing-fixed h-[65vh] resize-none font-mono"
-            />
-          )}
-        </form.AppField>
-
-        <div className="h-[65vh] overflow-y-auto rounded-md border px-6 py-4">
-          <MessageMarkdown content={markdown} />
-        </div>
       </div>
     </div>
   );
