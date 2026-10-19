@@ -120,7 +120,11 @@ export function Message({
           : 'done'
       } as any)
     : null;
+  // Thinking is under way only while the reply is still being written: a
+  // turn stopped or cut off in its thinking ends with a reasoning part too,
+  // and is shown finished, closed, rather than thinking for ever.
   const showReasoningLoading =
+    status === 'streaming' &&
     isLastMessage === true &&
     lastReasoningIndex === message.parts.length - 1 &&
     !hasVisibleArtifacts;
