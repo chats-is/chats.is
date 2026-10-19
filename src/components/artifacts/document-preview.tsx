@@ -38,7 +38,7 @@ export function DocumentPreview({
       role="button"
       tabIndex={0}
       className={cn(
-        'w-full rounded-lg border bg-background px-3 py-2.5 text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden'
+        'w-full rounded-2xl border bg-background px-4 py-3 text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden'
       )}
       onClick={() => onOpen?.(artifact.id)}
       onKeyDown={event => {
