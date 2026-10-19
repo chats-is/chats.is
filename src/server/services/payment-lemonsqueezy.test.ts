@@ -229,7 +229,7 @@ describe('the Lemon Squeezy API', () => {
     expect((await renewing('week', 2)).interval).toBeNull();
   });
 
-  it('opens a checkout for the variant, carrying the user and plan', async () => {
+  it('opens a checkout for the variant, in English, carrying the user and plan', async () => {
     replies.push({
       body: {
         data: {
@@ -258,6 +258,7 @@ describe('the Lemon Squeezy API', () => {
         data: {
           type: 'checkouts',
           attributes: {
+            checkout_options: { locale: 'en' },
             checkout_data: {
               email: 'u1@test.com',
               custom: { user_id: 'u1', plan_id: 'pro' }

@@ -387,6 +387,10 @@ export function createLemonSqueezyProcessor(): PaymentProcessor {
           data: {
             type: 'checkouts',
             attributes: {
+              // In the app's own language. Left to the browser, Lemon Squeezy
+              // reads one it has no translation for — Chinese among them —
+              // as another, and opened in Bulgarian.
+              checkout_options: { locale: 'en' },
               checkout_data: {
                 email: input.email,
                 custom: { user_id: input.userId, plan_id: input.planId }
