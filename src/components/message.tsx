@@ -82,6 +82,9 @@ export function Message({
   );
   const hasReasoningPart = reasoningParts.length > 0;
   const hasFilePart = message.parts.some(part => part.type === 'file');
+  // A refusal or a failure is the whole of the reply: nothing is on its way
+  // after it, so nothing waits as if it were.
+  const hasErrorPart = message.parts.some(part => part.type === 'data-error');
   const hasMediaToolPart = message.parts.some(
     part =>
       isMediaToolPart(part) ||
@@ -396,6 +399,7 @@ export function Message({
               !hasVisibleTextContent &&
               !hasFilePart &&
               !hasMediaToolPart &&
+              !hasErrorPart &&
               (supportsReasoning ? (
                 <MessageReasoning
                   isLoading={false}
