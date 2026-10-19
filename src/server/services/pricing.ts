@@ -246,7 +246,8 @@ export function calculateChatCost(
   const cacheReadTokens = usage.cacheReadTokens ?? 0;
   const cacheWriteTokens = usage.cacheWriteTokens ?? 0;
   const reasoningTokens = usage.reasoningTokens ?? 0;
-  // Searches are counted, not measured in tokens: each costs the search rate.
+  // Searches are counted, not measured in tokens: the rate is per thousand,
+  // as providers quote it.
   const webSearches = usage.webSearches ?? 0;
   const webSearchRate = toNum(pricing.webSearch);
 
@@ -256,7 +257,7 @@ export function calculateChatCost(
     (cacheWriteTokens * cacheWriteRate) / 1_000_000 +
     (outputTokens * outputRate) / 1_000_000 +
     (reasoningTokens * reasoningRate) / 1_000_000 +
-    webSearches * webSearchRate;
+    (webSearches * webSearchRate) / 1_000;
 
   return {
     cost: roundCost(cost),

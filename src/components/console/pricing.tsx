@@ -798,8 +798,7 @@ export default function PricingPage() {
                         />
                         <PriceField
                           name="webSearch"
-                          label="Web search / 1 search"
-                          placeholder="e.g. 0.014 = $14 / 1K"
+                          label="Web search / 1K searches"
                         />
                       </>
                     )}

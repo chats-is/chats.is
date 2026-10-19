@@ -27,18 +27,21 @@ const fmt = (v: string | null | undefined): string | null => {
 };
 
 /**
- * Capability-aware pricing lines for the table, in two rows: what the model
- * is billed for on every call first, and the cache rates — which apply only
- * to some calls — beneath. Each entry is `"Label: $X/unit"`; a rate that is
- * not set is left out, and so is a row with nothing in it.
+ * Capability-aware pricing lines for the table, in rows: what the model is
+ * billed for on every call first, then the cache rates and the search rate —
+ * which apply only to some calls — each on a row of its own. Each entry is
+ * `"Label: $X/unit"`; a rate that is not set is left out, and so is a row
+ * with nothing in it.
  *
  *   chat   → [["Input: $2.5/1M", "Output: $15/1M", "Reasoning: $15/1M"],
- *             ["Cache Read: $0.25/1M", "Cache Write: $0/1M"]]
+ *             ["Cache Read: $0.25/1M", "Cache Write: $0/1M"],
+ *             ["Web Search: $10/1K"]]
  *   image  → [["Image: $0.04/image"]]
  *   video  → [["Video: $0.5/video", "Per sec: $0.001/s"]]
  *   audio  → [["Per 1M chars: $15"]] or [["Input: $0.6/1M", "Output: $12/1M"]]
  *
- * Token rates are per 1M tokens; image/video/per-sec are per unit.
+ * Token rates are per 1M tokens, searches per 1K; image/video/per-sec are
+ * per unit.
  */
 export function summarizePricingRows(
   capability: string,
@@ -47,6 +50,7 @@ export function summarizePricingRows(
   if (!pricing) return [];
   const main: string[] = [];
   const cache: string[] = [];
+  const search: string[] = [];
   // `unit` is the pricing basis suffix (e.g. /1M, /image) appended after the
   // dollar amount so each line reads like "Input: $10/1M".
   const push = (
@@ -65,7 +69,7 @@ export function summarizePricingRows(
       push(main, 'Reasoning', pricing.reasoning, '/1M');
       push(cache, 'Cache Read', pricing.cacheRead, '/1M');
       push(cache, 'Cache Write', pricing.cacheWrite, '/1M');
-      push(cache, 'Web Search', pricing.webSearch, '/search');
+      push(search, 'Web Search', pricing.webSearch, '/1K');
       break;
     }
     case 'image': {
@@ -90,7 +94,7 @@ export function summarizePricingRows(
       break;
     }
   }
-  return [main, cache].filter(row => row.length > 0);
+  return [main, cache, search].filter(row => row.length > 0);
 }
 
 /**

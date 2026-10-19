@@ -27,7 +27,8 @@ export type ChatUsage = {
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
   reasoningTokens?: number;
-  /** Web searches the call made, billed each at the model's search rate. */
+  /** Web searches the call made, billed at the model's search rate, which is
+   *  per thousand. */
   webSearches?: number;
 };
 

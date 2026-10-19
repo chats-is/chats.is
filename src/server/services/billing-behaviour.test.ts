@@ -258,11 +258,11 @@ describe('billing', () => {
     expect(Number(row.cost)).toBeCloseTo(0.017, 10);
   });
 
-  it('chat: each web search is billed at the search rate, on top of the tokens', async () => {
+  it('chat: web searches are billed at the per-thousand rate, on top of the tokens', async () => {
     const id = await addModel('chat', 'c1');
-    await savePrice(id, { input: '1', output: '0', webSearch: '0.01' });
+    await savePrice(id, { input: '1', output: '0', webSearch: '10' });
 
-    // A step that searched twice: 2 × $0.01 on top of 1M × $1/1M.
+    // A step that searched twice: 2 × $10/1K on top of 1M × $1/1M.
     await recordChatUsage({
       ...call,
       modelId: 'c1',
@@ -271,7 +271,7 @@ describe('billing', () => {
 
     const [row] = await usageRows();
     expect(row.webSearches).toBe(2);
-    expect(row.webSearchPrice).toBe('0.0100000000');
+    expect(row.webSearchPrice).toBe('10.0000000000');
     expect(Number(row.cost)).toBeCloseTo(1.02, 10);
   });
 

@@ -25,6 +25,22 @@ describe('usageBreakdown', () => {
     ]);
   });
 
+  it('prices web searches per thousand, as providers quote them', () => {
+    const items = usageBreakdown({
+      capability: 'chat',
+      webSearches: 2,
+      webSearchPrice: '14.0000000000'
+    });
+    expect(items).toEqual([
+      {
+        label: 'Web search',
+        quantity: '2 searches',
+        rate: '$14 / 1K searches',
+        subtotal: 0.028
+      }
+    ]);
+  });
+
   it('bills each chat bucket at its own rate, adding up to the cost', () => {
     // A recorded gpt-5.5 row, charged $0.017736.
     const row = {

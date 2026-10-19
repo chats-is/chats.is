@@ -1055,7 +1055,8 @@ export const modelPricings = createTable(
     // falls back to `output`. Some models (Qwen thinking variants) have a
     // distinct reasoning rate — set this column to override.
     reasoning: numeric('reasoning', { precision: 20, scale: 10 }),
-    // Chat models: what one web search costs, on top of the tokens.
+    // Chat models: what a thousand web searches cost, on top of the tokens —
+    // the unit providers quote it in.
     webSearch: numeric('web_search', { precision: 20, scale: 10 }),
     image: numeric('image', { precision: 20, scale: 10 }),
     video: numeric('video', { precision: 20, scale: 10 }),

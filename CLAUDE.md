@@ -14,7 +14,7 @@ What it supports:
 - Image generation and editing, video generation and editing, speech synthesis and transcription — all
   as tools the model can call mid-conversation.
 - Web search: a chat model with a search of its own uses it; any other asks a designated search model
-  through a `web_search` tool. Each search is billed at the model's search rate.
+  through a `web_search` tool. Searches are billed at the model's search rate, priced per thousand.
 - An artifact panel: code and documents the model produces open beside the conversation, with a live
   sandboxed preview for React, HTML and SVG.
 - Conversations that branch, so a message can be regenerated or edited without losing the other reply.

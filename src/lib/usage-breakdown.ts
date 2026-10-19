@@ -71,12 +71,27 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
       subtotal: round((quantity * (rate ?? 0)) / 1_000_000)
     });
   };
+  /** Searches, priced per thousand as providers quote them. */
+  const perThousandSearches = (
+    label: string,
+    quantity: number,
+    price: string | null | undefined
+  ) => {
+    if (quantity <= 0) return;
+    const rate = priced(price);
+    items.push({
+      label,
+      quantity: `${formatNumber(quantity)} ${quantity === 1 ? 'search' : 'searches'}`,
+      rate: `${formatUsd(rate)} / 1K searches`,
+      subtotal: round((quantity * (rate ?? 0)) / 1_000)
+    });
+  };
   /** Images, videos or seconds, priced one by one. */
   const perUnit = (
     label: string,
     quantity: number,
     price: string | null | undefined,
-    unit: 'image' | 'video' | 'search' | 's'
+    unit: 'image' | 'video' | 's'
   ) => {
     if (quantity <= 0) return;
     const rate = priced(price);
@@ -113,7 +128,11 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
         row.reasoningPrice,
         'token'
       );
-      perUnit('Web search', num(row.webSearches), row.webSearchPrice, 'search');
+      perThousandSearches(
+        'Web search',
+        num(row.webSearches),
+        row.webSearchPrice
+      );
       break;
     case 'image':
       if (num(row.imagePrice) > 0) {
