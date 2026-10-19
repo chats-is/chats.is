@@ -132,7 +132,8 @@ export const REASONING_EFFORT_LABELS: Record<string, string> = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
-  xhigh: 'Extra High'
+  xhigh: 'Extra High',
+  max: 'Max'
 };
 
 /**
@@ -483,7 +484,8 @@ export const EFFORTS = [
   'low',
   'medium',
   'high',
-  'xhigh'
+  'xhigh',
+  'max'
 ] as const;
 
 /**

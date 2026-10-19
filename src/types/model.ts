@@ -50,7 +50,14 @@ export type ModelUIOptions = {
  * which is where an effort nobody pinned ends up.
  */
 export type SentEffort =
-  'provider-default' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  | 'provider-default'
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
 
 /**
  * What an admin lists and a user picks. No `'auto'` among them: a level is
