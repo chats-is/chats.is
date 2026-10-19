@@ -134,7 +134,7 @@ function SettingsDialog({
                   onClick={() => setPanel(item.value)}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-9 shrink-0 items-center justify-start gap-2 rounded-md px-2 py-2 text-sm font-medium text-foreground/60 transition-colors hover:bg-muted hover:text-foreground sm:w-full',
+                    'inline-flex h-9 shrink-0 items-center justify-start gap-2 rounded-md px-2 py-2 text-sm font-medium text-foreground/60 transition-colors hover:bg-muted sm:w-full',
                     isActive && 'bg-muted text-foreground'
                   )}
                 >

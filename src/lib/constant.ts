@@ -471,7 +471,7 @@ export const AUTO_OPTION = 'auto';
  * Their colours are in styles.css, under `data-palette`.
  */
 export const PALETTES = [
-  { value: 'sky', label: 'Sky' },
+  { value: 'sky', label: 'Default' },
   { value: 'graphite', label: 'Graphite' },
   { value: 'paper', label: 'Paper' }
 ] as const;
