@@ -9,6 +9,10 @@ import { MessageMarkdown } from '@/components/message-markdown';
 
 export interface MessageReasoningProps {
   isLoading: boolean;
+  /** A reasoning part is being written right now — the clock runs only
+   *  then, and stands still through a search between two of them, as the
+   *  time the reply records leaves the search out. */
+  isThinking?: boolean;
   isWaiting?: boolean;
   part: ReasoningUIPart;
   reasonDuration?: number;
@@ -50,6 +54,7 @@ const formatReasonDuration = (
 
 export function MessageReasoning({
   isLoading,
+  isThinking = isLoading,
   isWaiting,
   part,
   reasonDuration
@@ -83,7 +88,7 @@ export function MessageReasoning({
   const showReasoning = hasText || showThinking;
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading || !isThinking) {
       setLiveDuration(reasonDuration ?? 0);
       return;
     }
@@ -100,7 +105,7 @@ export function MessageReasoning({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [isLoading, reasonDuration]);
+  }, [isLoading, isThinking, reasonDuration]);
 
   const currentThinkingDurationMs = isLoading
     ? Math.max(liveDuration, 100)
@@ -116,7 +121,12 @@ export function MessageReasoning({
   }
 
   return (
-    <div className="mb-2">
+    // Flush against the search when one follows: the thinking and the
+    // searching are one stretch of the reply, read as rows of one list.
+    <div
+      data-slot="message-reasoning"
+      className="mb-2 [&:has(+[data-slot=web-search])]:mb-0"
+    >
       <Button
         variant="link"
         size="sm"

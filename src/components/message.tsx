@@ -98,15 +98,6 @@ export function Message({
   const firstReasoningIndex = message.parts.findIndex(
     part => part.type === 'reasoning'
   );
-  const lastReasoningIndex = (() => {
-    for (let index = message.parts.length - 1; index >= 0; index -= 1) {
-      if (message.parts[index]?.type === 'reasoning') {
-        return index;
-      }
-    }
-
-    return -1;
-  })();
   const mergedReasoningText = reasoningParts
     .map(part => part.text || (part as any).reasoning || '')
     .join('\n')
@@ -120,13 +111,17 @@ export function Message({
           : 'done'
       } as any)
     : null;
-  // Thinking is under way only while the reply is still being written: a
-  // turn stopped or cut off in its thinking ends with a reasoning part too,
-  // and is shown finished, closed, rather than thinking for ever.
+  // Thinking is under way until the answer itself begins, while the reply is
+  // still being written. A model that thinks, searches and thinks again is
+  // thinking all the while — the thoughts are one block, and it stays open
+  // through the search rather than closing and opening again. A turn stopped
+  // or cut off in its thinking is shown finished, closed, not thinking for
+  // ever.
   const showReasoningLoading =
     status === 'streaming' &&
     isLastMessage === true &&
-    lastReasoningIndex === message.parts.length - 1 &&
+    hasReasoningPart &&
+    !hasVisibleTextContent &&
     !hasVisibleArtifacts;
   const hasVisibleReasoningDisplay =
     hasReasoningPart &&
@@ -275,6 +270,11 @@ export function Message({
                     part={mergedReasoningPart}
                     reasonDuration={message.metadata?.reasonDuration}
                     isLoading={showReasoningLoading}
+                    isThinking={
+                      showReasoningLoading &&
+                      message.parts[message.parts.length - 1]?.type ===
+                        'reasoning'
+                    }
                   />
                 );
               }

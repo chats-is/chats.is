@@ -123,7 +123,12 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
   }, [searching]);
 
   return (
-    <div className="mb-2">
+    // Flush against the thinking when it follows, as the thinking is against
+    // a search that follows it.
+    <div
+      data-slot="web-search"
+      className="mb-2 [&:has(+[data-slot=message-reasoning])]:mb-0"
+    >
       <Button
         variant="link"
         size="sm"
