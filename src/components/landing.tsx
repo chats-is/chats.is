@@ -293,7 +293,9 @@ export function Landing() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-24 sm:pb-28">
-        <div className="flex flex-col items-center gap-6 rounded-[28px] bg-foreground px-8 py-20 text-center text-background">
+        {/* On the brand's blue: full in light; in dark a deep wash of it, as
+            a full blue — or the old inverted white — glared on the dark page. */}
+        <div className="flex flex-col items-center gap-6 rounded-[28px] bg-primary px-8 py-20 text-center text-primary-foreground dark:bg-primary/15 dark:text-foreground">
           <h2 className="max-w-3xl text-4xl font-semibold tracking-[-0.035em] sm:text-6xl">
             Start with {appName} today.
           </h2>
@@ -301,7 +303,7 @@ export function Landing() {
             <button
               type="button"
               onClick={() => openLogin()}
-              className="rounded-full bg-background px-6 py-3.5 text-[15px] font-medium text-foreground"
+              className="rounded-full bg-background px-6 py-3.5 text-[15px] font-medium text-foreground dark:bg-primary dark:text-primary-foreground"
             >
               Sign up for free
             </button>
@@ -309,7 +311,7 @@ export function Landing() {
               <button
                 type="button"
                 onClick={openPlans}
-                className="rounded-full border border-background/30 px-6 py-3.5 text-[15px]"
+                className="rounded-full border border-primary-foreground/30 px-6 py-3.5 text-[15px] dark:border-foreground/30"
               >
                 See plans
               </button>
