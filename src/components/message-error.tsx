@@ -1,6 +1,7 @@
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert, RefreshCw } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 /**
  * A failure rendered inside the message thread.
@@ -16,20 +17,35 @@ import { cn } from '@/lib/utils';
  */
 export function MessageError({
   message,
+  onRetry,
   className
 }: {
   message?: string;
+  /** Asks again, from a failure that left no reply to retry from. */
+  onRetry?: () => void;
   className?: string;
 }) {
   return (
+    // The failure in red, and the way out a plain button beside it.
     <div
       className={cn(
-        'my-2 flex w-fit items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive',
+        'my-2 flex w-fit items-center gap-2 text-sm text-destructive first:mt-0 last:mb-0',
         className
       )}
     >
       <CircleAlert className="size-4 shrink-0" />
       <span>{message || 'Something went wrong.'}</span>
+      {onRetry && (
+        <Button
+          variant="outline"
+          size="xs"
+          className="rounded-full text-foreground"
+          onClick={onRetry}
+        >
+          <RefreshCw />
+          Retry
+        </Button>
+      )}
     </div>
   );
 }

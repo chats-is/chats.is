@@ -9,7 +9,7 @@ import {
   chatRequestErrorMessage,
   MessageError
 } from '@/components/message-error';
-import { MessageLoading } from '@/components/message-loading';
+import { MessageLoading, PendingReply } from '@/components/message-loading';
 
 export interface MessagesProps
   extends
@@ -125,6 +125,12 @@ export function Messages({
     });
   });
 
+  const lastItem = displayItems[displayItems.length - 1];
+  // A request that failed before any of the reply came: there is no reply to
+  // retry from, so the retry is offered beside the failure, and not under
+  // the question as well.
+  const failedBeforeReply = !!error && lastItem?.message.role !== 'assistant';
+
   return (
     <div className={cn('mx-auto w-full max-w-4xl flex-1 px-4 py-6', className)}>
       {displayItems.map((item, visibleIndex) => {
@@ -174,6 +180,7 @@ export function Messages({
                   setMessages={setMessages}
                   isLastMessage={isLastMessage}
                   isReadonly={isReadonly}
+                  canRetry={!failedBeforeReply}
                 />
               )}
             </Message>
@@ -190,7 +197,28 @@ export function Messages({
           </div>
         )}
 
-      {error && <MessageError message={chatRequestErrorMessage(error)} />}
+      {/* A request that failed: in the reply's place, or under the part of
+          one that had come — past its avatar, level with its text. */}
+      {error &&
+        (failedBeforeReply ? (
+          <div className="mt-2">
+            <PendingReply image={currentImage || image}>
+              <MessageError
+                message={chatRequestErrorMessage(error)}
+                onRetry={
+                  reload && lastItem
+                    ? () => reload(lastItem.message)
+                    : undefined
+                }
+              />
+            </PendingReply>
+          </div>
+        ) : (
+          <MessageError
+            className="ml-13"
+            message={chatRequestErrorMessage(error)}
+          />
+        ))}
     </div>
   );
 }

@@ -52,6 +52,8 @@ interface MessageActionsProps extends Partial<
   reload?: (message: ChatMessage) => void;
   isReadonly?: boolean;
   isLastMessage?: boolean;
+  /** Off where the retry is offered elsewhere — beside a failure. */
+  canRetry?: boolean;
 }
 
 export function MessageActions({
@@ -61,7 +63,8 @@ export function MessageActions({
   message,
   setMessages,
   isReadonly,
-  isLastMessage
+  isLastMessage,
+  canRetry = true
 }: MessageActionsProps) {
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const [draftContent, setDraftContent] = React.useState('');
@@ -199,7 +202,7 @@ export function MessageActions({
       )}
       {!isReadonly && setMessages && reload && (
         <>
-          {isLastMessage && (
+          {isLastMessage && canRetry && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
