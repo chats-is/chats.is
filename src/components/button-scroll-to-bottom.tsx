@@ -18,9 +18,12 @@ export function ButtonScrollToBottom({
   const [sticky] = useSticky();
   const scrollToBottom = useScrollToBottom();
 
+  // A jump, not a glide: a glide aims at where the bottom was when it began,
+  // and a reply that shrinks under it — its thinking folding away — leaves it
+  // short of a bottom it never reaches, following nothing after.
   useEffect(() => {
     if (status === 'submitted' || status === 'streaming') {
-      scrollToBottom({ behavior: 'smooth' });
+      scrollToBottom({ behavior: 'auto' });
     }
   }, [status, messages, scrollToBottom]);
 
