@@ -8,6 +8,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem
 } from '@/components/ui/sidebar';
+import { HistoryMenu } from '@/components/history-menu';
 
 export function NewContent() {
   const pathname = useLocation({ select: l => l.pathname });
@@ -42,6 +43,7 @@ export function NewContent() {
               </SidebarMenuItem>
             );
           })}
+          <HistoryMenu />
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

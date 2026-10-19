@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { compareDesc } from 'date-fns';
 
 import { useChatsInfinite } from '@/hooks/use-chats';
 import {
@@ -78,10 +77,6 @@ export function SidebarList() {
     return () => el.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
-  const sortedChats = chats
-    ?.filter(chat => chat && chat.createdAt)
-    .sort((a, b) => compareDesc(new Date(a.createdAt), new Date(b.createdAt)));
-
   return (
     <div
       className="flex-1 overflow-auto group-data-[collapsible=icon]:hidden"
@@ -115,7 +110,7 @@ export function SidebarList() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {sortedChats.map(chat => (
+              {chats.map(chat => (
                 <SidebarItem key={chat.id} chat={chat} />
               ))}
               {/* The page being fetched, at the end of the list it is joining. */}

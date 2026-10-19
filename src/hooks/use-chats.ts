@@ -4,6 +4,7 @@ import {
   useQueryClient,
   type InfiniteData
 } from '@tanstack/react-query';
+import { compareDesc } from 'date-fns';
 
 import { type Chat } from '@/types';
 import { mutating, type Input } from '@/lib/mutation';
@@ -31,10 +32,13 @@ export function useChatsInfinite() {
     error
   } = useInfiniteQuery(historyQuery());
 
-  const chats = data ? data.pages.flat() : [];
+  // Newest first, in every list of the history.
+  const chats = (data ? (data.pages.flat() as Chat[]) : [])
+    .filter(chat => chat && chat.createdAt)
+    .sort((a, b) => compareDesc(new Date(a.createdAt), new Date(b.createdAt)));
 
   return {
-    chats: chats as Chat[],
+    chats,
     // Nothing of the history read yet. Not "a first request in flight": a
     // server render never fetches, so only this reads the same on the server
     // and in the browser taking the page over — which then draws the same.
