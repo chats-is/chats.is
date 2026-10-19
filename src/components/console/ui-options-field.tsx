@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 
 import { type ModelCapability, type ProviderType } from '@/types';
-import { REASONING_EFFORT_LABELS } from '@/lib/constant';
+import { AUTO_OPTION, REASONING_EFFORT_LABELS } from '@/lib/constant';
 import {
   vocabularyFor,
   type VocabField,
@@ -132,6 +132,65 @@ function chipLabel(field: VocabField, value: OptionValue): string {
     return REASONING_EFFORT_LABELS[String(value)] ?? String(value);
   if (field === 'duration') return `${value}s`;
   return String(value);
+}
+
+/** One option a model lists: its values, and the one it starts on. */
+export type OptionRow = {
+  field: VocabField;
+  values: OptionValue[];
+  current: unknown;
+};
+
+/**
+ * The options a model lists, as its editor shows them: in its order, and only
+ * what the model's providers accept — a value stored that they have no say in
+ * (a legacy `"auto"` among them) is not offered, so it is not shown either.
+ * With the providers not known, everything stored is.
+ */
+export function optionRows(
+  uiOptions: Record<string, unknown> | null | undefined,
+  vocabulary: Vocabulary
+): OptionRow[] {
+  const known = Object.keys(vocabulary).length > 0;
+  return FIELD_ORDER.flatMap(field => {
+    const list = uiOptions?.[KEYS[field].list];
+    const allowed = vocabulary[field] ?? [];
+    const values = Array.isArray(list)
+      ? (list as OptionValue[]).filter(value =>
+          known ? allowed.includes(value) : value !== AUTO_OPTION
+        )
+      : [];
+    if (values.length === 0) return [];
+    return [{ field, values, current: uiOptions?.[KEYS[field].single] }];
+  });
+}
+
+/**
+ * What a model is set to offer, as the models table shows it: a line for each
+ * option it lists, its values in the editor's wording, and its default in
+ * bold. An option with no default starts on Auto, so nothing in its line is
+ * bold.
+ */
+export function UiOptionsSummary({ rows }: { rows: OptionRow[] }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-xs">
+      {rows.map(({ field, values, current }) => (
+        <Fragment key={field}>
+          <dt className="text-muted-foreground">{KEYS[field].label}:</dt>
+          <dd className="flex flex-wrap gap-x-1.5">
+            {values.map(value => (
+              <span
+                key={String(value)}
+                className={cn(value === current && 'font-semibold')}
+              >
+                {chipLabel(field, value)}
+              </span>
+            ))}
+          </dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
 }
 
 /**

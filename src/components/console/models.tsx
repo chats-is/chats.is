@@ -26,6 +26,7 @@ import { modelCapabilitySchema } from '@/types/model';
 import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { isPriced } from '@/lib/pricing-summary';
+import { vocabularyFor } from '@/lib/provider-vocab';
 import { cn } from '@/lib/utils';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
@@ -93,7 +94,11 @@ import {
   ConsoleSearch,
   ConsoleToolbar
 } from '@/components/console/toolbar';
-import { UiOptionsField } from '@/components/console/ui-options-field';
+import {
+  optionRows,
+  UiOptionsField,
+  UiOptionsSummary
+} from '@/components/console/ui-options-field';
 import { UnpricedBadge } from '@/components/console/unpriced-badge';
 import { ModelIcon } from '@/components/model-icon';
 
@@ -344,21 +349,36 @@ const modelColumns = (actions: {
         meta: { cellClassName: 'whitespace-nowrap' },
         cell: ({ row }) => {
           const features = featuresOf(row.original);
-          return features.length > 0 ? (
-            <div className="flex items-center gap-1">
-              {features.map(feature => (
-                <Tooltip key={feature.flag}>
-                  <TooltipTrigger asChild>
-                    <span className={cn('rounded p-0.5', feature.tint)}>
-                      <feature.icon
-                        className={cn('size-3', feature.tone)}
-                        aria-label={feature.label}
-                      />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{feature.label}</TooltipContent>
-                </Tooltip>
-              ))}
+          const options = optionRows(
+            row.original.uiOptions,
+            vocabularyFor(
+              (row.original.providers ?? [])
+                .map(binding => binding.provider?.type)
+                .filter((type): type is ProviderType => !!type),
+              row.original.capability
+            )
+          );
+          // What the model can do, then what it is set to offer.
+          return features.length > 0 || options.length > 0 ? (
+            <div className="space-y-1.5">
+              {features.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {features.map(feature => (
+                    <Tooltip key={feature.flag}>
+                      <TooltipTrigger asChild>
+                        <span className={cn('rounded p-0.5', feature.tint)}>
+                          <feature.icon
+                            className={cn('size-3', feature.tone)}
+                            aria-label={feature.label}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{feature.label}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              )}
+              {options.length > 0 && <UiOptionsSummary rows={options} />}
             </div>
           ) : (
             <span className="text-muted-foreground">—</span>
