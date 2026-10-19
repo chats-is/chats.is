@@ -91,7 +91,7 @@ export function TablePaginationSkeleton() {
   return (
     <div className="flex h-8 items-center justify-between gap-2">
       <Skeleton className="h-4 w-40 max-w-[35%]" />
-      <Skeleton className="h-8 w-64 max-w-[60%] rounded-full" />
+      <Skeleton className="h-8 w-96 max-w-[60%]" />
     </div>
   );
 }
@@ -140,10 +140,7 @@ function Pager({
               href={hrefFor?.(current - 1)}
               {...roleProps}
               aria-disabled={current <= 1}
-              className={cn(
-                'rounded-full',
-                current <= 1 && 'pointer-events-none opacity-50'
-              )}
+              className={cn(current <= 1 && 'pointer-events-none opacity-50')}
               onClick={goTo(current - 1)}
             />
           </PaginationItem>
@@ -158,7 +155,6 @@ function Pager({
               <PaginationItem key={item}>
                 <PaginationLink
                   size="icon-sm"
-                  className="rounded-full"
                   href={hrefFor?.(item)}
                   {...roleProps}
                   isActive={item === current}
@@ -176,7 +172,6 @@ function Pager({
               {...roleProps}
               aria-disabled={current >= pageCount}
               className={cn(
-                'rounded-full',
                 current >= pageCount && 'pointer-events-none opacity-50'
               )}
               onClick={goTo(current + 1)}
