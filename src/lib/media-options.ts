@@ -158,25 +158,32 @@ export function pickResolution(
  *
  * The values go straight to the AI SDK, which hands them to whichever
  * provider is behind the model — so an effort settled here needs no
- * translation into one vendor's spelling. Nothing pinned means
- * `'provider-default'`, the SDK's own way of saying the same.
+ * translation into one vendor's spelling.
+ *
+ * Auto, as for every option, is no choice: it and nothing chosen alike fall
+ * to the model's default, and a level the model does not offer does too.
+ * With no default either, it is left to the provider — `'provider-default'`,
+ * the SDK's way of saying so.
  */
 export function pickEffort(
   requested: string | undefined,
   selected: string | undefined,
   uiOptions?: ModelUIOptions | null
 ): SentEffort {
-  // The two inputs are strings off the wire; the cast only lets them be
-  // compared against the declared list, which is what decides whether either
-  // is used at all.
-  return (
-    pickOption(
-      requested as ReasoningEffort | undefined,
-      selected as ReasoningEffort | undefined,
-      uiOptions?.efforts,
-      uiOptions?.effort
-    ) ?? OPTION_DEFAULTS.effort
-  );
+  const levels = uiOptions?.efforts;
+  // A model that lists no levels offers no menu, and has only its default to
+  // say.
+  if (!levels?.length) return uiOptions?.effort ?? OPTION_DEFAULTS.effort;
+
+  // The two inputs are strings off the wire; this is what decides whether
+  // either names a level at all.
+  const offered = (value: string | undefined): value is ReasoningEffort =>
+    levels.includes(value as ReasoningEffort);
+
+  if (offered(selected)) return selected;
+  if (offered(requested)) return requested;
+  if (offered(uiOptions?.effort)) return uiOptions.effort;
+  return OPTION_DEFAULTS.effort;
 }
 
 /**

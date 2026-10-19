@@ -4,7 +4,7 @@ import { type UseChatHelpers } from '@ai-sdk/react';
 import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react';
 
 import { type ChatMessage, type Model } from '@/types';
-import { REASONING_EFFORT_LABELS } from '@/lib/constant';
+import { AUTO_OPTION, REASONING_EFFORT_LABELS } from '@/lib/constant';
 import { chooseValue } from '@/lib/media-settings';
 import { cn, modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -136,10 +136,12 @@ export function ModelMenu({
   const isDisabled =
     status === 'submitted' || status === 'streaming' || !models?.length;
 
-  // How hard to think, where the model gives a say. Switching models can
-  // leave a level the new one does not offer, so what is shown is settled
-  // against its list rather than read straight from the preference.
-  const efforts = selectedModel?.uiOptions?.efforts ?? [];
+  // How hard to think, where the model gives a say: Auto, as every option
+  // has, and the levels the model offers. Switching models can leave a level
+  // the new one does not offer, so what is shown is settled against its list
+  // rather than read straight from the preference.
+  const levels = selectedModel?.uiOptions?.efforts ?? [];
+  const efforts = levels.length > 0 ? [AUTO_OPTION, ...levels] : [];
   const effort = chooseValue(
     efforts,
     preferences.chatEffort,
@@ -300,9 +302,7 @@ export function ModelMenu({
             <TooltipTrigger asChild>
               <SelectTrigger className="h-9 rounded-full shadow-none">
                 <span className="text-sm">
-                  {effort
-                    ? (REASONING_EFFORT_LABELS[effort] ?? effort)
-                    : 'Effort'}
+                  {effort ? effortLabel(effort) : 'Effort'}
                 </span>
               </SelectTrigger>
             </TooltipTrigger>
@@ -311,7 +311,7 @@ export function ModelMenu({
           <SelectContent position="popper">
             {efforts.map(value => (
               <SelectItem key={value} value={value}>
-                {REASONING_EFFORT_LABELS[value] ?? value}
+                {effortLabel(value)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -364,4 +364,11 @@ export function ModelMenu({
       )}
     </div>
   );
+}
+
+/** How an effort reads in the menu, Auto among them. */
+function effortLabel(value: string): string {
+  return value === AUTO_OPTION
+    ? 'Auto'
+    : (REASONING_EFFORT_LABELS[value] ?? value);
 }

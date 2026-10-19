@@ -206,9 +206,16 @@ describe('pickEffort', () => {
     expect(pickEffort(undefined, 'minimal', ui)).toBe('medium');
   });
 
-  it('falls to the first level listed when there is no model default', () => {
+  it('leaves it to the provider when nothing is pinned and the model has no default', () => {
     expect(pickEffort(undefined, undefined, { efforts: ['low', 'high'] })).toBe(
-      'low'
+      'provider-default'
+    );
+  });
+
+  it('falls to the model default at Auto, and to the provider without one', () => {
+    expect(pickEffort(undefined, 'auto', ui)).toBe('medium');
+    expect(pickEffort(undefined, 'auto', { efforts: ['low', 'high'] })).toBe(
+      'provider-default'
     );
   });
 

@@ -60,9 +60,10 @@ export type SentEffort =
   | 'max';
 
 /**
- * What an admin lists and a user picks. No `'auto'` among them: a level is
- * either named or not chosen, and the chain already ends in the provider's
- * own default for the second case.
+ * What an admin lists and a user picks from. No `'auto'` among them: the
+ * chat's menu puts Auto ahead of them itself, as it does for every option,
+ * and Auto is no level — it falls to the model's default, and to the
+ * provider's own, `'provider-default'`, without one.
  */
 export type ReasoningEffort = Exclude<SentEffort, 'provider-default'>;
 
