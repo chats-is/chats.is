@@ -142,9 +142,17 @@ export function Messages({
         const beginsExchange =
           message.role === 'user' &&
           displayItems[visibleIndex - 1]?.message.role === 'assistant';
+        // An answer sits a little apart from its question, less than the
+        // exchanges are from each other.
+        const answersQuestion =
+          message.role === 'assistant' &&
+          displayItems[visibleIndex - 1]?.message.role === 'user';
 
         return (
-          <div key={messageKey} className={cn(beginsExchange && 'mt-4')}>
+          <div
+            key={messageKey}
+            className={cn(beginsExchange && 'mt-4', answersQuestion && 'mt-2')}
+          >
             <Message
               status={status}
               message={message}
@@ -175,7 +183,11 @@ export function Messages({
 
       {status === 'submitted' &&
         displayItems[displayItems.length - 1]?.message.role !== 'assistant' && (
-          <MessageLoading image={currentImage || image} />
+          // The space the answer will have, so it does not move when it
+          // takes this one's place.
+          <div className="mt-2">
+            <MessageLoading image={currentImage || image} />
+          </div>
         )}
 
       {error && <MessageError message={chatRequestErrorMessage(error)} />}

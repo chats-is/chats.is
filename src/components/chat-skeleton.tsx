@@ -31,7 +31,8 @@ export function ChatSkeleton() {
                     'mb-6 flex flex-row-reverse items-start',
                     index > 0 && 'mt-4'
                   )
-                : 'mb-6 flex items-start'
+                : // And the space it sets before an answer.
+                  'mt-2 mb-6 flex items-start'
             }
           >
             <Skeleton className="size-9 shrink-0 rounded-full" />
