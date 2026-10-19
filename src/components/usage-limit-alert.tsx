@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button';
 import { useOpenPlans } from '@/components/plans-dialog';
 
 /**
- * Inline alert shown above a generation input. Warns the user as their usage
- * limit runs low and blocks visually when exhausted. Server-side
- * `preflightGate` is the real enforcement — this is just a UI heads-up.
+ * A notice laid over the top edge of the prompt's card, as the composer's
+ * other notices are. Warns the user as their usage limit runs low and blocks
+ * visually when exhausted. Server-side `preflightGate` is the real
+ * enforcement — this is just a UI heads-up.
  *
  * Shows nothing unless enforcement applies AND remaining drops below 20%.
  * No amounts are ever displayed — only a remaining-% gauge and a
@@ -42,8 +43,8 @@ export function UsageLimitAlert() {
     <div
       className={
         exhausted
-          ? 'mx-auto mb-2 flex w-full max-w-4xl items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive'
-          : 'mx-auto mb-2 flex w-full max-w-4xl items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400'
+          ? 'mx-3 flex items-center gap-2 rounded-t-xl border border-b-0 border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900 shadow-md dark:border-red-900 dark:bg-red-950 dark:text-red-50'
+          : 'mx-3 flex items-center gap-2 rounded-t-xl border border-b-0 border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-md dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50'
       }
     >
       <Icon className="size-4 shrink-0" />
@@ -65,7 +66,7 @@ export function UsageLimitAlert() {
         <Button
           size="sm"
           variant={exhausted ? 'destructive' : 'outline'}
-          className="h-7 shrink-0 px-2.5 text-xs"
+          className="h-6 shrink-0 rounded-full px-2.5 text-xs"
           onClick={upgrade}
         >
           Upgrade plan

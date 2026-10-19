@@ -19,6 +19,7 @@ import {
 } from '@/components/attachments-preview';
 import { MediaSettingsMenu } from '@/components/media-settings-menu';
 import { ModelMenu, type ModelOptions } from '@/components/model-menu';
+import { UsageLimitAlert } from '@/components/usage-limit-alert';
 
 export interface ChatPromptFormProps extends Pick<
   UseChatHelpers<ChatMessage>,
@@ -189,6 +190,7 @@ export function ChatPromptForm({
           <span className="flex-1">{unusable.join(' ')}</span>
         </div>
       )}
+      <UsageLimitAlert />
       <div className="w-full rounded-2xl border bg-background p-4 shadow-md">
         <div className="relative flex w-full items-start space-x-2">
           <Textarea

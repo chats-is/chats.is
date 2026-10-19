@@ -11,7 +11,6 @@ import { EmptyScreen } from '@/components/empty-screen';
 import { Messages } from '@/components/messages';
 import { PromptSuggestions } from '@/components/prompt-suggestions';
 import ScrollContainer from '@/components/scroll-to-bottom';
-import { UsageLimitAlert } from '@/components/usage-limit-alert';
 
 // react-scroll-to-bottom measures the scroll container, so it can only run in
 // the browser — which is the whole of the constraint, and ClientOnly is the
@@ -121,7 +120,6 @@ export function ChatPanel({
             text="How can I help you today?"
           />
         )}
-        <UsageLimitAlert />
         <ChatPromptForm
           modelId={currentModelId}
           stop={stop}
