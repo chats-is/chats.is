@@ -58,7 +58,6 @@ export const chatRequestSchema = z.object({
   userMessage: userMessageSchema,
   /** Names the user message itself when a reply is being regenerated. */
   parentMessageId: z.string().min(1).optional(),
-  isReasoning: z.boolean().optional(),
   effort: z.string().max(64).optional(),
   /** IANA zone from the browser, so "now" can be told in the user's terms. */
   timeZone: z.string().max(64).optional(),

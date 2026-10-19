@@ -15,7 +15,6 @@ import { useSystemSettings } from './system-settings-context';
 export interface Preferences {
   // Chat
   chatModelId: string;
-  chatReasoning: boolean;
   chatEffort: string;
   // Image
   imageModelId: string;
@@ -73,7 +72,6 @@ interface PreferencesProviderProps {
 const UNCHOSEN: Preferences = {
   // Chat
   chatModelId: '',
-  chatReasoning: true,
   chatEffort: '',
   // Generation options are left empty until the user picks one. A hardcoded
   // seed is indistinguishable from a choice the user made, and both

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { usePreferences } from '@/contexts/preferences-context';
 import { useSystemSettings } from '@/contexts/system-settings-context';
 import { type UseChatHelpers } from '@ai-sdk/react';
@@ -20,8 +20,6 @@ import {
 import { MediaSettingsMenu } from '@/components/media-settings-menu';
 import { ModelMenu, type ModelOptions } from '@/components/model-menu';
 
-export type { ModelOptions };
-
 export interface ChatPromptFormProps extends Pick<
   UseChatHelpers<ChatMessage>,
   'status' | 'stop'
@@ -35,8 +33,6 @@ export interface ChatPromptFormProps extends Pick<
   onSubmit: (attachments?: Attachment[]) => boolean;
   /** Callback when model changes */
   onModelChange: (model: string) => void;
-  /** Callback when model options change (like reasoning toggle) */
-  onOptionsChange?: (options: ModelOptions) => void;
 }
 
 export function ChatPromptForm({
@@ -47,8 +43,7 @@ export function ChatPromptForm({
   setInput,
   onInputChange,
   onSubmit,
-  onModelChange,
-  onOptionsChange
+  onModelChange
 }: ChatPromptFormProps) {
   const { formRef, onKeyDown } = useEnterSubmit();
   const [uploads, setUploads] = useState<Array<PendingUpload>>([]);
@@ -159,15 +154,6 @@ export function ChatPromptForm({
     setUploads([]);
   };
 
-  const handleOptionsChange = useCallback(
-    (options: ModelOptions) => {
-      setModelOptions(options);
-      // Propagate to parent for isReasoning tracking
-      onOptionsChange?.(options);
-    },
-    [onOptionsChange]
-  );
-
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="w-full">
       {/* Over the whole page, since a drop is taken anywhere on it; it lets
@@ -271,7 +257,7 @@ export function ChatPromptForm({
               status={status}
               modelId={modelId}
               onModelChange={onModelChange}
-              onOptionsChange={handleOptionsChange}
+              onOptionsChange={setModelOptions}
             />
             <MediaSettingsMenu status={status} />
           </div>

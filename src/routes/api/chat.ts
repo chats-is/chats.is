@@ -161,7 +161,6 @@ async function POST({
   const {
     id,
     modelId,
-    isReasoning,
     effort,
     timeZone,
     language,
@@ -777,7 +776,9 @@ async function POST({
           res.toUIMessageStream({
             originalMessages: chatMessages,
             generateMessageId: () => assistantMessageId,
-            sendReasoning: isReasoning,
+            // The thinking always reaches the page, which shows it in a
+            // small window of its own.
+            sendReasoning: true,
             // The pages a provider's own search drew on, kept with the reply
             // as `source-url` parts. Gemini reports them only so; the others
             // put them in their search tool's result as well, and the page

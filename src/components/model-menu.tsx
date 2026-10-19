@@ -6,8 +6,7 @@ import { Eye, Lightbulb, Pencil, Scissors } from 'lucide-react';
 import { type ChatMessage, type Model } from '@/types';
 import { AUTO_OPTION, REASONING_EFFORT_LABELS } from '@/lib/constant';
 import { chooseValue } from '@/lib/media-settings';
-import { cn, modelMatchesId } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { modelMatchesId } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -35,14 +34,12 @@ export interface ModelMenuProps extends Pick<
   modelId: string;
   /** Callback when model changes */
   onModelChange: (modelId: string) => void;
-  /** Callback when model options change (like the reasoning toggle) */
+  /** Callback when what the model takes changes, such as images */
   onOptionsChange?: (options: ModelOptions) => void;
 }
 
 export interface ModelOptions {
-  isReasoning?: boolean;
   supportsVision?: boolean;
-  supportsReasoning?: boolean;
 }
 
 export function ModelMenu({
@@ -57,9 +54,6 @@ export function ModelMenu({
   useEffect(() => setMounted(true), []);
 
   const { preferences, setPreference } = usePreferences();
-
-  // Track isReasoning state from preferences
-  const [isReasoning, setIsReasoning] = useState(preferences.chatReasoning);
 
   // Find selected model from database models
   const selectedModel = useMemo(
@@ -113,24 +107,10 @@ export function ModelMenu({
     // Find the new model and notify about its options
     const newModelData = models?.find(m => m.modelId === newModel);
     if (newModelData) {
-      const supportsReasoning = newModelData.uiOptions?.reasoning;
       onOptionsChange?.({
-        supportsVision: newModelData.supportsVision ?? undefined,
-        supportsReasoning: supportsReasoning ?? undefined,
-        isReasoning: supportsReasoning ? isReasoning : undefined
+        supportsVision: newModelData.supportsVision ?? undefined
       });
     }
-  };
-
-  const handleReasoningToggle = () => {
-    const newValue = !isReasoning;
-    setIsReasoning(newValue);
-    setPreference('chatReasoning', newValue);
-    onOptionsChange?.({
-      supportsVision: selectedModel?.supportsVision ?? undefined,
-      supportsReasoning: selectedModel?.uiOptions?.reasoning ?? undefined,
-      isReasoning: newValue
-    });
   };
 
   const isDisabled =
@@ -316,51 +296,6 @@ export function ModelMenu({
             ))}
           </SelectContent>
         </Select>
-      )}
-
-      {selectedModel?.uiOptions?.reasoning && (
-        <Tooltip>
-          {/* Wrapped in a span: a disabled button takes no pointer events, and
-              the tooltip is most wanted exactly when it is disabled. */}
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                // Think decides whether the thinking is streamed back, and at the
-                // `none` level there is none to stream. Disabled rather than
-                // hidden: the model still offers the control, it just has nothing
-                // to act on until the effort says otherwise.
-                disabled={isDisabled || effort === 'none'}
-                className={cn(
-                  'h-9 rounded-full px-3 font-normal text-muted-foreground shadow-none hover:text-muted-foreground',
-                  {
-                    'border-muted-foreground/30 bg-muted text-foreground hover:text-foreground':
-                      isReasoning && effort !== 'none'
-                  }
-                )}
-                onClick={handleReasoningToggle}
-              >
-                <Lightbulb
-                  className={
-                    // Lit, in the same amber the model list uses to mark a model
-                    // that thinks. Only the glass fills — the outline stays the
-                    // button's own colour.
-                    isReasoning && effort !== 'none'
-                      ? 'fill-amber-300 dark:fill-amber-200'
-                      : 'fill-muted-foreground/30'
-                  }
-                />
-                Think
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            {effort === 'none'
-              ? 'Nothing to show at effort None'
-              : 'Show the thinking'}
-          </TooltipContent>
-        </Tooltip>
       )}
     </div>
   );

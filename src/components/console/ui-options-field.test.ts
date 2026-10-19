@@ -16,8 +16,7 @@ describe('pruneToVocabulary', () => {
           sizes: ['1K', '2K'],
           size: '1K'
         },
-        vocabularyFor(['xai'], 'image'),
-        'image'
+        vocabularyFor(['xai'], 'image')
       )
     ).toEqual({ aspectRatios: ['1:1', '16:9'], aspectRatio: '16:9' });
   });
@@ -26,28 +25,9 @@ describe('pruneToVocabulary', () => {
     expect(
       pruneToVocabulary(
         { sizes: ['1024x1024'], size: '1024x1024' },
-        vocabularyFor(['openai'], 'image'),
-        'image'
+        vocabularyFor(['openai'], 'image')
       )
     ).toEqual({ sizes: ['1024x1024'], size: '1024x1024' });
-  });
-
-  it('keeps `reasoning` for a chat model and nowhere else', () => {
-    expect(
-      pruneToVocabulary(
-        { reasoning: true, efforts: ['low'] },
-        vocabularyFor(['openai'], 'chat'),
-        'chat'
-      )
-    ).toEqual({ reasoning: true, efforts: ['low'] });
-
-    expect(
-      pruneToVocabulary(
-        { reasoning: true },
-        vocabularyFor(['openai'], 'image'),
-        'image'
-      )
-    ).toEqual({});
   });
 
   it('narrows to the intersection when a model can fail over', () => {
@@ -57,8 +37,7 @@ describe('pruneToVocabulary', () => {
     expect(
       pruneToVocabulary(
         { durations: [4, 8], resolutions: ['720p'] },
-        vocabularyFor(['google', 'openai'], 'video'),
-        'video'
+        vocabularyFor(['google', 'openai'], 'video')
       )
     ).toEqual({ durations: [4, 8] });
   });
@@ -66,12 +45,12 @@ describe('pruneToVocabulary', () => {
   it('keeps everything while the providers are still unknown', () => {
     // The provider list arrives a moment after the dialog does, and an empty
     // vocabulary in that moment must not read as "accepts nothing".
-    expect(pruneToVocabulary({ sizes: ['1K'] }, {}, 'image')).toEqual({
+    expect(pruneToVocabulary({ sizes: ['1K'] }, {})).toEqual({
       sizes: ['1K']
     });
-    expect(
-      pruneToVocabulary({ efforts: ['low'], reasoning: true }, {}, 'chat')
-    ).toEqual({ efforts: ['low'], reasoning: true });
+    expect(pruneToVocabulary({ efforts: ['low'] }, {})).toEqual({
+      efforts: ['low']
+    });
   });
 
   /**
@@ -120,12 +99,9 @@ describe('pruneToVocabulary', () => {
         const drawn = (Object.keys(vocabulary) as VocabField[]).flatMap(
           field => KEYS[field]
         );
-        if (capability === 'chat') drawn.push('reasoning');
 
         expect(
-          Object.keys(
-            pruneToVocabulary(everything, vocabulary, capability)
-          ).sort()
+          Object.keys(pruneToVocabulary(everything, vocabulary)).sort()
         ).toEqual(drawn.sort());
       }
     }

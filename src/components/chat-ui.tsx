@@ -37,7 +37,6 @@ import {
 import { useSidebar } from '@/components/ui/sidebar';
 import { ArtifactsPanel } from '@/components/artifacts-panel';
 import { ChatPanel } from '@/components/chat-panel';
-import { type ModelOptions } from '@/components/model-menu';
 
 interface ChatUIProps {
   id: string;
@@ -140,9 +139,6 @@ export function ChatUI({
   const previousPanelOpenRef = useRef(isPanelOpen);
   const streamStatusRef = useRef('ready');
 
-  // Track isReasoning state
-  const [isReasoning, setIsReasoning] = useState(preferences.chatReasoning);
-
   // Find current model in database models (for API request options)
   const currentDbModel = useMemo(
     () => chatModels?.find(m => m.modelId === currentModelId),
@@ -179,7 +175,6 @@ export function ChatUI({
   const chatRequestBody = useMemo(
     () => ({
       modelId: currentModelId,
-      isReasoning: supportsReasoning ? isReasoning : undefined,
       effort: resolveAutoOption(preferences.chatEffort),
       // Where and in what language the user is, so the system prompt can say
       // "now" in their terms and answer in their language when the message
@@ -237,8 +232,6 @@ export function ChatUI({
     }),
     [
       currentModelId,
-      supportsReasoning,
-      isReasoning,
       preferences.chatEffort,
       preferences.imageModelId,
       preferences.imageSize,
@@ -480,17 +473,6 @@ export function ChatUI({
     [setPreference]
   );
 
-  // Handle options change from ModelMenu (like reasoning toggle)
-  const handleOptionsChange = useCallback(
-    (options: ModelOptions) => {
-      if (options.isReasoning !== undefined) {
-        setIsReasoning(options.isReasoning);
-        setPreference('chatReasoning', options.isReasoning);
-      }
-    },
-    [setPreference]
-  );
-
   // Helper to update displayModel optimistically
   const updateDisplayModelOptimistically = useCallback(() => {
     if (currentModelId !== displayModelId) {
@@ -674,7 +656,6 @@ export function ChatUI({
                 onInputChange={e => setInput(e.target.value)}
                 onSubmit={handleSubmit}
                 onModelChange={handleModelChange}
-                onOptionsChange={handleOptionsChange}
                 onSelectArtifact={handleArtifactSelect}
                 onReload={handleReload}
                 error={error}
@@ -728,7 +709,6 @@ export function ChatUI({
               onInputChange={e => setInput(e.target.value)}
               onSubmit={handleSubmit}
               onModelChange={handleModelChange}
-              onOptionsChange={handleOptionsChange}
               onSelectArtifact={handleArtifactSelect}
               onReload={handleReload}
               error={error}

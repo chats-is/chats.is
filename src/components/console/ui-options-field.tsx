@@ -109,8 +109,7 @@ const defaultState = (set: boolean) =>
  */
 export function pruneToVocabulary(
   options: Record<string, unknown>,
-  vocabulary: Vocabulary,
-  capability: ModelCapability
+  vocabulary: Vocabulary
 ): Record<string, unknown> {
   // An empty vocabulary is "nothing is known about the providers" — while the
   // provider list is still loading, say — not "the providers accept nothing".
@@ -123,10 +122,6 @@ export function pruneToVocabulary(
     keep.add(KEYS[field].list);
     keep.add(KEYS[field].single);
   }
-  // Not an option with values, so it has no entry in the catalogue; it is
-  // still a chat model's to declare.
-  if (capability === 'chat') keep.add('reasoning');
-
   return Object.fromEntries(
     Object.entries(options).filter(([key]) => keep.has(key))
   );
@@ -163,7 +158,7 @@ export function UiOptionsField({
   onChange: (next: string) => void;
   capability: ModelCapability;
   providerTypes: ProviderType[];
-  /** A model that does not think has no effort to set and no thinking to show. */
+  /** A model that does not think has no effort to set. */
   supportsReasoning: boolean;
 }) {
   const parsed = useMemo<Record<string, unknown>>(() => {
@@ -187,8 +182,8 @@ export function UiOptionsField({
     // An empty object is stored as an empty field, which is how the form
     // already says "this model declares nothing".
     const cleaned = Object.fromEntries(
-      Object.entries(pruneToVocabulary(next, vocabulary, capability)).filter(
-        ([, v]) => (Array.isArray(v) ? v.length > 0 : v !== undefined)
+      Object.entries(pruneToVocabulary(next, vocabulary)).filter(([, v]) =>
+        Array.isArray(v) ? v.length > 0 : v !== undefined
       )
     );
     onChange(
@@ -240,7 +235,7 @@ export function UiOptionsField({
   const isDisabled = (field: VocabField) =>
     field === 'effort' && !supportsReasoning;
 
-  if (fields.length === 0 && capability !== 'chat') {
+  if (fields.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
         The chosen providers accept no options for a {capability} model.
@@ -319,31 +314,6 @@ export function UiOptionsField({
           </div>
         );
       })}
-
-      {capability === 'chat' && (
-        // A row of values like the others, holding the one value there is:
-        // the chat's own Think button, offered or not. It does not show the
-        // thinking — it decides whether the user gets the switch that does.
-        <div className={cn('space-y-2', !supportsReasoning && 'opacity-50')}>
-          <Label>Thinking control</Label>
-          <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input p-2 shadow-xs dark:bg-input/30">
-            <button
-              type="button"
-              onClick={() =>
-                write({
-                  ...parsed,
-                  reasoning: parsed.reasoning === true ? undefined : true
-                })
-              }
-              aria-pressed={parsed.reasoning === true}
-              disabled={!supportsReasoning}
-              className={cn(CHIP, chipState(parsed.reasoning === true))}
-            >
-              Think
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

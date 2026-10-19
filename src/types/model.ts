@@ -40,8 +40,6 @@ export type ModelUIOptions = {
    */
   effort?: ReasoningEffort;
   efforts?: ReasoningEffort[];
-  /** Whether to show the thinking, not whether to do any. */
-  reasoning?: boolean;
 };
 
 /**
@@ -176,8 +174,7 @@ const modelUIOptionsSchema = z
     // Effort is the one option every provider spells the same way, so
     // unlike its neighbours it can be checked against the list itself.
     effort: z.enum(EFFORTS).optional(),
-    efforts: z.array(z.enum(EFFORTS)).optional(),
-    reasoning: z.boolean().optional()
+    efforts: z.array(z.enum(EFFORTS)).optional()
   })
   .strict();
 

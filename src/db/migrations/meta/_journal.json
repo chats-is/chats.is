@@ -288,6 +288,13 @@
       "when": 1792246441057,
       "tag": "0040_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792393567051,
+      "tag": "0041_drop_ui_options_reasoning",
+      "breakpoints": true
     }
   ]
 }

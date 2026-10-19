@@ -6,10 +6,7 @@ import { MessageSquare } from 'lucide-react';
 import { type Artifact, type Attachment, type ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { ChatHeader } from '@/components/chat-header';
-import {
-  ChatPromptForm,
-  type ModelOptions
-} from '@/components/chat-prompt-form';
+import { ChatPromptForm } from '@/components/chat-prompt-form';
 import { EmptyScreen } from '@/components/empty-screen';
 import { Messages } from '@/components/messages';
 import { PromptSuggestions } from '@/components/prompt-suggestions';
@@ -49,7 +46,6 @@ interface ChatPanelProps extends Pick<
   /** The replies refused while this chat was open, shown with their reason. */
   refusedHere?: ReadonlySet<string>;
   onModelChange: (modelId: string) => void;
-  onOptionsChange: (options: ModelOptions) => void;
   onSelectArtifact: (artifactId: string) => void;
   onReload: (message: ChatMessage) => void;
 }
@@ -74,7 +70,6 @@ export function ChatPanel({
   error,
   refusedHere,
   onModelChange,
-  onOptionsChange,
   onSelectArtifact,
   onReload
 }: ChatPanelProps) {
@@ -136,7 +131,6 @@ export function ChatPanel({
           onInputChange={onInputChange}
           onSubmit={onSubmit}
           onModelChange={onModelChange}
-          onOptionsChange={onOptionsChange}
         />
         {/* Only on a new chat: a prompt seeds the first message, so once the
             conversation has started it is no longer what the user needs. */}
