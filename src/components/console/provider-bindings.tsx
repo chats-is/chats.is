@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils';
 /**
  * A model's providers, as the console's tables show them: in failover order,
  * each with the id it routes to where that is not the model's own, and struck
- * through where the binding is switched off. The whole of what a binding says
+ * through where the binding or the provider itself is switched off — either
+ * way it serves nothing. The whole of what a binding says
  * about who serves a model, so the model and pricing tables say it alike.
  */
 export function ProviderBindings({
@@ -13,7 +14,7 @@ export function ProviderBindings({
     id: string;
     isEnabled: boolean;
     providerModelId?: string | null;
-    provider?: { name: string } | null;
+    provider?: { name: string; isEnabled: boolean } | null;
   }>;
 }) {
   const served = bindings.filter(binding => binding.provider);
@@ -23,7 +24,12 @@ export function ProviderBindings({
     <div className="space-y-0.5">
       {served.map(binding => (
         <div key={binding.id} className="flex items-baseline gap-1.5">
-          <span className={cn(!binding.isEnabled && 'line-through')}>
+          <span
+            className={cn(
+              (!binding.isEnabled || !binding.provider!.isEnabled) &&
+                'line-through'
+            )}
+          >
             {binding.provider!.name}
           </span>
           {binding.providerModelId && (

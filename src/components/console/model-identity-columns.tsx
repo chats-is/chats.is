@@ -15,7 +15,7 @@ type ModelLike = {
     id: string;
     isEnabled: boolean;
     providerModelId?: string | null;
-    provider?: { name: string } | null;
+    provider?: { name: string; isEnabled: boolean } | null;
   }> | null;
 };
 
