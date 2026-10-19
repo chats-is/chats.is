@@ -12,6 +12,7 @@ import {
   DEFAULT_APP_NAME,
   DEFAULT_APP_SUBTITLE
 } from '@/lib/constant';
+import { paletteAttribute, readPalette } from '@/hooks/use-palette';
 import { settingsQueries } from '@/server/functions/settings';
 import { NotFound } from '@/components/not-found';
 import { Providers } from '@/components/providers';
@@ -94,7 +95,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   });
 
   return (
-    <html lang="en" className="h-full" suppressHydrationWarning>
+    <html
+      lang="en"
+      className="h-full"
+      data-palette={paletteAttribute(readPalette())}
+      suppressHydrationWarning
+    >
       <head>
         <HeadContent />
         {umamiScriptUrl && umamiWebsiteId && (

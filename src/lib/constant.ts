@@ -466,6 +466,16 @@ export const GEMINI_WEB_SEARCH_TOOL_NAME = 'server:GOOGLE_SEARCH_WEB';
  */
 export const AUTO_OPTION = 'auto';
 
+/**
+ * The colour palettes a user may draw the app in, the first the default.
+ * Their colours are in styles.css, under `data-palette`.
+ */
+export const PALETTES = [
+  { value: 'sky', label: 'Sky' },
+  { value: 'graphite', label: 'Graphite' },
+  { value: 'paper', label: 'Paper' }
+] as const;
+
 export const CONTENT_TYPES = [
   { type: 'chat', label: 'New Chat', icon: MessageSquare, path: '/' },
   { type: 'library', label: 'Library', icon: LibraryBig, path: '/library' },

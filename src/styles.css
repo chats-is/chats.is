@@ -139,43 +139,45 @@
   }
 }
 
+/* The default palette, Sky: the logo's blue is the primary colour, and the
+   greys lean towards it. */
 :root {
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(222.2 84% 4.9%);
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222.2 84% 4.9%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222.2 84% 4.9%);
-  --primary: hsl(222.2 47.4% 11.2%);
-  --primary-foreground: hsl(210 40% 98%);
-  --secondary: hsl(210 40% 96.1%);
-  --secondary-foreground: hsl(222.2 47.4% 11.2%);
-  --muted: hsl(210 40% 96.1%);
-  --muted-foreground: hsl(215.4 16.3% 46.9%);
-  --accent: hsl(210 40% 96.1%);
-  --accent-foreground: hsl(222.2 47.4% 11.2%);
-  --destructive: hsl(0 84.2% 60.2%);
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #edf2fa;
+  --secondary-foreground: #0f172a;
+  --muted: #e9f0fc;
+  --muted-foreground: #5b6b82;
+  --accent: #edf2fa;
+  --accent-foreground: #0f172a;
+  --destructive: #dc2626;
   --destructive-foreground: hsl(210 40% 98%);
-  --border: hsl(214.3 31.8% 91.4%);
-  --input: hsl(214.3 31.8% 91.4%);
-  --ring: hsl(222.2 84% 4.9%);
+  --border: #e1e8f2;
+  --input: #e1e8f2;
+  --ring: #3b82f6;
   --chart-1: hsl(12 76% 61%);
   --chart-2: hsl(173 58% 39%);
   --chart-3: hsl(197 37% 24%);
   --chart-4: hsl(43 74% 66%);
   --chart-5: hsl(27 87% 67%);
   --radius: 0.5rem;
-  --sidebar-background: hsl(0 0% 98%);
-  --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
-  --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar-background: #f3f6fb;
+  --sidebar-foreground: #334155;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e6edf8;
+  --sidebar-accent-foreground: #334155;
+  --sidebar-border: #e1e8f2;
+  --sidebar-ring: #3b82f6;
   --sidebar-width: 280px;
   --sidebar-width-icon: 3rem;
-  --sidebar: hsl(0 0% 98%);
+  --sidebar: #f3f6fb;
 }
 
 @media (min-width: 1024px) {
@@ -191,39 +193,175 @@
 }
 
 .dark {
-  --background: hsl(222.2 84% 4.9%);
-  --foreground: hsl(210 40% 98%);
-  --card: hsl(222.2 84% 4.9%);
-  --card-foreground: hsl(210 40% 98%);
-  --popover: hsl(222.2 84% 4.9%);
-  --popover-foreground: hsl(210 40% 98%);
-  --primary: hsl(210 40% 98%);
-  --primary-foreground: hsl(222.2 47.4% 11.2%);
-  --secondary: hsl(217.2 32.6% 17.5%);
-  --secondary-foreground: hsl(210 40% 98%);
-  --muted: hsl(217.2 32.6% 17.5%);
-  --muted-foreground: hsl(215 20.2% 65.1%);
-  --accent: hsl(217.2 32.6% 17.5%);
-  --accent-foreground: hsl(210 40% 98%);
+  --background: #0f1a2e;
+  --foreground: #e7eef9;
+  --card: #0f1a2e;
+  --card-foreground: #e7eef9;
+  --popover: #0f1a2e;
+  --popover-foreground: #e7eef9;
+  --primary: #60a5fa;
+  --primary-foreground: #0b1220;
+  --secondary: #18253d;
+  --secondary-foreground: #e7eef9;
+  --muted: #1a2a47;
+  --muted-foreground: #8a9bb6;
+  --accent: #18253d;
+  --accent-foreground: #e7eef9;
   --destructive: hsl(0 62.8% 30.6%);
   --destructive-foreground: hsl(210 40% 98%);
-  --border: hsl(217.2 32.6% 17.5%);
-  --input: hsl(217.2 32.6% 17.5%);
-  --ring: hsl(212.7 26.8% 83.9%);
+  --border: #1d2b45;
+  --input: #1d2b45;
+  --ring: #60a5fa;
   --chart-1: hsl(220 70% 50%);
   --chart-2: hsl(160 60% 45%);
   --chart-3: hsl(30 80% 55%);
   --chart-4: hsl(280 65% 60%);
   --chart-5: hsl(340 75% 55%);
-  --sidebar-background: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
-  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-background: #0a1120;
+  --sidebar-foreground: #c9d5e8;
+  --sidebar-primary: #60a5fa;
+  --sidebar-primary-foreground: #0b1220;
+  --sidebar-accent: #16233a;
+  --sidebar-accent-foreground: #c9d5e8;
+  --sidebar-border: #1d2b45;
+  --sidebar-ring: #60a5fa;
+  --sidebar: #0a1120;
+}
+
+/* The palettes a user may pick instead, set on <html> as `data-palette`.
+   Each redefines the colours only; a palette's attribute on any element
+   also draws that element in it, which is how the settings show each one's
+   swatch. Sky is named too, so its swatch is Sky's wherever it sits. */
+[data-palette='sky'] {
+  --primary: #2563eb;
+  --sidebar-background: #f3f6fb;
+  --sidebar: #f3f6fb;
+}
+.dark [data-palette='sky'],
+.dark[data-palette='sky'] {
+  --primary: #60a5fa;
+  --sidebar-background: #0a1120;
+  --sidebar: #0a1120;
+}
+
+/* Graphite: neutral zinc greys and a black primary; the blue is left to
+   focus. */
+[data-palette='graphite'] {
+  --background: #ffffff;
+  --foreground: #18181b;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #68686f;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #3b82f6;
+  --sidebar-background: #f4f4f5;
+  --sidebar-foreground: #3f3f46;
+  --sidebar-primary: #18181b;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #e9e9ec;
+  --sidebar-accent-foreground: #3f3f46;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #3b82f6;
+  --sidebar: #f4f4f5;
+}
+.dark [data-palette='graphite'],
+.dark[data-palette='graphite'] {
+  --background: #18181b;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --card-foreground: #fafafa;
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #60a5fa;
+  --sidebar-background: #0c0c0e;
+  --sidebar-foreground: #d4d4d8;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #18181b;
+  --sidebar-accent: #1f1f23;
+  --sidebar-accent-foreground: #d4d4d8;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #60a5fa;
+  --sidebar: #0c0c0e;
+}
+
+/* Paper: warm stone greys, softer to read on, with the blue as the
+   primary. */
+[data-palette='paper'] {
+  --background: #fffefb;
+  --foreground: #1c1917;
+  --card: #fffefb;
+  --card-foreground: #1c1917;
+  --popover: #fffefb;
+  --popover-foreground: #1c1917;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1eee9;
+  --secondary-foreground: #1c1917;
+  --muted: #efebe4;
+  --muted-foreground: #6e6762;
+  --accent: #f1eee9;
+  --accent-foreground: #1c1917;
+  --border: #e7e2da;
+  --input: #e7e2da;
+  --ring: #3b82f6;
+  --sidebar-background: #f4f2ee;
+  --sidebar-foreground: #44403c;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ebe7e0;
+  --sidebar-accent-foreground: #44403c;
+  --sidebar-border: #e7e2da;
+  --sidebar-ring: #3b82f6;
+  --sidebar: #f4f2ee;
+}
+.dark [data-palette='paper'],
+.dark[data-palette='paper'] {
+  --background: #1c1a17;
+  --foreground: #f5f2ed;
+  --card: #1c1a17;
+  --card-foreground: #f5f2ed;
+  --popover: #1c1a17;
+  --popover-foreground: #f5f2ed;
+  --primary: #60a5fa;
+  --primary-foreground: #0c1424;
+  --secondary: #2a2723;
+  --secondary-foreground: #f5f2ed;
+  --muted: #2a2723;
+  --muted-foreground: #a8a29e;
+  --accent: #2a2723;
+  --accent-foreground: #f5f2ed;
+  --border: #2e2a25;
+  --input: #2e2a25;
+  --ring: #60a5fa;
+  --sidebar-background: #141210;
+  --sidebar-foreground: #d6d3d1;
+  --sidebar-primary: #60a5fa;
+  --sidebar-primary-foreground: #0c1424;
+  --sidebar-accent: #221f1c;
+  --sidebar-accent-foreground: #d6d3d1;
+  --sidebar-border: #2e2a25;
+  --sidebar-ring: #60a5fa;
+  --sidebar: #141210;
 }
 
 @layer base {

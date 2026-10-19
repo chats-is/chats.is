@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
+import { type Palette } from '@/types/palette';
+import { PALETTES } from '@/lib/constant';
+import { usePalette } from '@/hooks/use-palette';
 import { Button } from '@/components/ui/button';
 import { Label as UiLabel } from '@/components/ui/label';
 import {
@@ -15,6 +18,7 @@ import { ClearHistoryDialog } from '@/components/clear-history-dialog';
 
 export const SettingsGeneral = () => {
   const { theme, setTheme } = useTheme();
+  const [palette, setPalette] = usePalette();
   const [mounted, setMounted] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
@@ -72,6 +76,31 @@ export const SettingsGeneral = () => {
                 Dark
               </div>
             </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-center justify-between gap-4">
+        <UiLabel>Color</UiLabel>
+        <Select
+          onValueChange={value => setPalette(value as Palette)}
+          value={palette}
+        >
+          <SelectTrigger className="w-auto rounded-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PALETTES.map(({ value, label }) => (
+              <SelectItem key={value} value={value}>
+                <div className="flex items-center gap-2">
+                  {/* Drawn in its own palette: its sidebar and its primary. */}
+                  <span
+                    data-palette={value}
+                    className="size-4 overflow-hidden rounded-full border bg-[linear-gradient(135deg,var(--sidebar-background)_50%,var(--primary)_50%)]"
+                  />
+                  {label}
+                </div>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
