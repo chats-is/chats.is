@@ -1,3 +1,5 @@
+import { CornerDownRight } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 
 /**
@@ -23,7 +25,9 @@ export function ProviderBindings({
   return (
     <div className="space-y-0.5">
       {served.map(binding => (
-        <div key={binding.id} className="flex items-baseline gap-1.5">
+        // The id it routes to on a line of its own, under the provider's
+        // name, rather than wrapping beside it in a narrow column.
+        <div key={binding.id} className="flex flex-col">
           <span
             className={cn(
               (!binding.isEnabled || !binding.provider!.isEnabled) &&
@@ -33,8 +37,9 @@ export function ProviderBindings({
             {binding.provider!.name}
           </span>
           {binding.providerModelId && (
-            <span className="font-mono text-xs text-muted-foreground">
-              → {binding.providerModelId}
+            <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+              <CornerDownRight className="size-3 shrink-0" />
+              {binding.providerModelId}
             </span>
           )}
         </div>
