@@ -209,12 +209,10 @@ export function SettingsBilling() {
         </section>
       ) : (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
-          <span className="text-sm text-muted-foreground">
-            You have no subscription.
-          </span>
+          <span className="font-medium">Free</span>
           {subscriptionsEnabled && (
-            <Button size="sm" onClick={showPlans}>
-              Subscribe
+            <Button variant="outline" size="sm" onClick={showPlans}>
+              Upgrade plan
             </Button>
           )}
         </section>
