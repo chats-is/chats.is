@@ -26,7 +26,7 @@ export function SharedArtifactView({
   return (
     <ArtifactFilesContext.Provider value={files}>
       <div className="flex h-svh w-full flex-col overflow-hidden bg-background">
-        <div className="flex h-12 shrink-0 items-center border-b px-4">
+        <div className="flex h-12 shrink-0 items-center border-b px-4 dark:border-border/50">
           <ArtifactViewer
             artifact={shown}
             hideContent={true}

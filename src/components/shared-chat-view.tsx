@@ -52,7 +52,7 @@ export function SharedChatView({
 
   const thread = (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-      <header className="flex h-12 shrink-0 flex-col items-center justify-center border-b px-4">
+      <header className="flex h-12 shrink-0 flex-col items-center justify-center border-b px-4 dark:border-border/50">
         <span className="max-w-full truncate font-semibold">{title}</span>
         <span className="text-xs text-muted-foreground">{subtitle}</span>
       </header>

@@ -35,7 +35,7 @@ export function ChatHeader({ title }: ChatHeaderProps) {
   }, [title, appName]);
 
   return (
-    <header className="relative flex h-12 shrink-0 items-center gap-2 border-b px-4">
+    <header className="relative flex h-12 shrink-0 items-center gap-2 border-b px-4 dark:border-border/50">
       <SidebarTrigger className="-ml-1 md:hidden" />
       <div className="pointer-events-none absolute inset-x-14 flex items-center justify-center px-1 font-semibold md:inset-x-4">
         <span className="truncate">{title}</span>
