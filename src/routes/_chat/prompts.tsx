@@ -13,7 +13,9 @@ import { PromptsView } from '@/components/prompts-view';
  *  there directly and a refresh doesn't bounce back to Trending. Trending is
  *  the default, so it stays absent from an untouched URL. */
 const searchSchema = z.object({
-  tab: z.enum(['trending', 'my']).optional()
+  tab: z.enum(['trending', 'my']).optional(),
+  /** The tag the gallery is narrowed to, picked from a card. */
+  tag: z.string().max(100).optional()
 });
 
 export const Route = createFileRoute('/_chat/prompts')({

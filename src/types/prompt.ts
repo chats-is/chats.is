@@ -52,6 +52,8 @@ export const promptPageSchema = z
   .object({
     limit: z.number().min(1).max(100).optional(),
     cursor: z.number().min(0).nullish(),
-    search: z.string().max(200).optional()
+    search: z.string().max(200).optional(),
+    /** Only prompts carrying this tag. */
+    tag: z.string().max(100).optional()
   })
   .optional();

@@ -123,19 +123,22 @@ export const promptQueries = {
       staleTime: 5 * 60 * 1000
     }),
   /** The gallery scrolls; the cursor is the row offset, as the sidebar's is.
-   *  `search` is part of the key so a new term starts paging over. */
+   *  `search` and `tag` are part of the key so a new filter starts paging
+   *  over. */
   usableInfinite: ({
     limit = 24,
-    search
-  }: { limit?: number; search?: string } = {}) =>
+    search,
+    tag
+  }: { limit?: number; search?: string; tag?: string } = {}) =>
     infiniteQueryOptions({
       queryKey: [
         ...promptQueries.key.usableInfinite(),
         limit,
-        search ?? ''
+        search ?? '',
+        tag ?? ''
       ] as const,
       queryFn: ({ pageParam }) =>
-        listUsablePrompts({ data: { limit, cursor: pageParam, search } }),
+        listUsablePrompts({ data: { limit, cursor: pageParam, search, tag } }),
       initialPageParam: 0,
       getNextPageParam: (lastPage, allPages) =>
         lastPage.length < limit
@@ -145,16 +148,18 @@ export const promptQueries = {
   /** My Prompts scrolls the same way the gallery does. */
   listInfinite: ({
     limit = 24,
-    search
-  }: { limit?: number; search?: string } = {}) =>
+    search,
+    tag
+  }: { limit?: number; search?: string; tag?: string } = {}) =>
     infiniteQueryOptions({
       queryKey: [
         ...promptQueries.key.listInfinite(),
         limit,
-        search ?? ''
+        search ?? '',
+        tag ?? ''
       ] as const,
       queryFn: ({ pageParam }) =>
-        listPrompts({ data: { limit, cursor: pageParam, search } }),
+        listPrompts({ data: { limit, cursor: pageParam, search, tag } }),
       initialPageParam: 0,
       getNextPageParam: (lastPage, allPages) =>
         lastPage.length < limit

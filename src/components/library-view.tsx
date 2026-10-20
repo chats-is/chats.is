@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AudioLines,
   Code2,
   Download,
   FileText,
+  Image as ImageIcon,
   LibraryBig,
   MessageSquare,
   Pause,
@@ -12,6 +14,7 @@ import {
   Search,
   Share2,
   Table,
+  Video,
   X
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -34,84 +37,57 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ChatHeader } from '@/components/chat-header';
+import { GalleryCard, type GalleryCardAction } from '@/components/gallery-card';
 import {
   GalleryCardSkeletons,
   GalleryGridSkeleton
 } from '@/components/gallery-skeleton';
 
-/** Hover corner actions — uniform across all card kinds: download and
- *  open-chat side by side at the top-right, and for an artifact shared on
- *  its own, its link to copy. `dark` for image/video overlays. */
-function CardActions({
+/** A card's actions, the same for every kind: for an artifact shared on its
+ *  own, its link to copy; a download; and the chat it came from. */
+function useCardActions({
   chatId,
   shareId,
-  onDownload,
-  dark
+  onDownload
 }: {
   chatId: string | null;
   shareId?: string | null;
-  onDownload?: () => void;
-  dark?: boolean;
-}) {
+  onDownload: () => void;
+}): GalleryCardAction[] {
+  const router = useRouter();
   const { copyToClipboard } = useCopyToClipboard();
-  // Solid backgrounds — no translucency over the card content.
-  const buttonClass = dark
-    ? 'rounded-full bg-black p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-700'
-    : 'rounded-full border bg-background p-1.5 text-muted-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-foreground';
-
-  return (
-    <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
-      {shareId && (
-        <button
-          type="button"
-          title="Copy share link"
-          onClick={async event => {
-            event.stopPropagation();
-            const link = new URL(window.location.origin);
-            link.pathname = `/artifact/${shareId}`;
-            await copyToClipboard(link.toString());
-            toast.success('Share link copied to clipboard', { duration: 2000 });
-          }}
-          className={buttonClass}
-        >
-          <Share2 className="size-3.5" />
-        </button>
-      )}
-      {onDownload && (
-        <button
-          type="button"
-          title="Download"
-          onClick={event => {
-            event.stopPropagation();
-            onDownload();
-          }}
-          className={buttonClass}
-        >
-          <Download className="size-3.5" />
-        </button>
-      )}
-      {chatId && (
-        <Link
-          to="/chat/$chatId"
-          params={{ chatId: chatId }}
-          title="Open chat"
-          className={buttonClass}
-        >
-          <MessageSquare className="size-3.5" />
-        </Link>
-      )}
-    </div>
-  );
-}
-
-/** Hover title strip along the bottom edge of image/video cards. */
-function CardTitle({ title }: { title?: string }) {
-  if (!title) return null;
-  return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-      <span className="line-clamp-2 text-xs text-white">{title}</span>
-    </div>
-  );
+  return [
+    ...(shareId
+      ? [
+          {
+            label: 'Copy share link',
+            icon: Share2,
+            onClick: async () => {
+              const link = new URL(window.location.origin);
+              link.pathname = `/artifact/${shareId}`;
+              await copyToClipboard(link.toString());
+              toast.success('Share link copied to clipboard', {
+                duration: 2000
+              });
+            }
+          }
+        ]
+      : []),
+    { label: 'Download', icon: Download, onClick: onDownload },
+    ...(chatId
+      ? [
+          {
+            label: 'Open',
+            icon: MessageSquare,
+            onClick: () =>
+              void router.navigate({
+                to: '/chat/$chatId',
+                params: { chatId }
+              })
+          }
+        ]
+      : [])
+  ];
 }
 
 /** Fullscreen preview dialog for image/video cards (Library-local). */
@@ -170,7 +146,8 @@ const ARTIFACT_KIND_META: Record<
   sheet: { label: 'Sheet', icon: Table }
 };
 
-/** Large content preview filling the artifact card (Library-local). */
+/** Large content preview filling the artifact card (Library-local), faded
+ *  out along the bottom where the card cuts it off. */
 function ArtifactCardPreview({ artifact }: { artifact: Artifact }) {
   const kind = artifactKindFromType(artifact.type);
 
@@ -190,21 +167,21 @@ function ArtifactCardPreview({ artifact }: { artifact: Artifact }) {
   }
   if (kind === 'code') {
     return (
-      <pre className="line-clamp-[14] overflow-hidden font-mono text-xs whitespace-pre-wrap text-muted-foreground">
+      <pre className="h-full overflow-hidden mask-b-from-75% font-mono text-xs whitespace-pre-wrap text-muted-foreground">
         {artifact.content ?? ''}
       </pre>
     );
   }
   // text / markdown
   return (
-    <div className="line-clamp-[14] text-xs text-muted-foreground">
+    <div className="h-full overflow-hidden mask-b-from-75% text-xs text-muted-foreground">
       {artifact.content ?? ''}
     </div>
   );
 }
 
 /** Card-sized large audio player: big central play control + seek bar. */
-function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
+function LibraryAudioPlayer({ src }: { src: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -238,7 +215,9 @@ function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
   );
 
   return (
-    <div className="relative flex h-full w-full flex-col px-2">
+    // A control of its own, over the card's button. Not positioned itself, so
+    // the play control is centred on the card, not on what its title leaves.
+    <div className="pointer-events-auto flex h-full w-full flex-col">
       <audio
         ref={audioRef}
         src={src}
@@ -252,13 +231,8 @@ function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
           setIsPlaying(false);
         }}
       />
-      {/* Title along the top edge; the play control sits at the exact card
-          center; the seek bar hugs the bottom edge. */}
-      {title && (
-        <span className="line-clamp-2 px-6 pt-1 text-center text-xs text-muted-foreground">
-          {title}
-        </span>
-      )}
+      {/* The play control sits at the card's centre; the seek bar hugs the
+          bottom edge. */}
       <button
         type="button"
         onClick={togglePlay}
@@ -267,7 +241,8 @@ function LibraryAudioPlayer({ src, title }: { src: string; title?: string }) {
         {isPlaying ? (
           <Pause className="size-7 fill-current" />
         ) : (
-          <Play className="ml-1 size-7 fill-current" />
+          // Nudged right by as much as the triangle's weight sits left.
+          <Play className="ml-0.5 size-7 fill-current" />
         )}
         <span className="sr-only">{isPlaying ? 'Pause' : 'Play'}</span>
       </button>
@@ -306,6 +281,15 @@ function LibraryCard({ item }: { item: LibraryItem }) {
     if (full) downloadArtifact(full);
   };
 
+  const actions = useCardActions({
+    chatId: item.chatId,
+    shareId: item.type === 'artifact' ? item.shareId : null,
+    onDownload: () =>
+      item.type === 'artifact'
+        ? void handleArtifactDownload(item.artifact.id)
+        : downloadFileFromUrl(item.url)
+  });
+
   if (item.type === 'artifact') {
     const { artifact } = item;
     const kind = artifactKindFromType(artifact.type);
@@ -317,122 +301,95 @@ function LibraryCard({ item }: { item: LibraryItem }) {
         : '';
 
     return (
-      <div className="group relative aspect-square">
-        <div
-          role="button"
-          tabIndex={0}
-          className="flex h-full w-full flex-col rounded-2xl border bg-background px-3 py-2.5 text-left transition hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
-          onClick={() =>
-            item.chatId &&
-            router.navigate({
-              to: '/chat/$chatId',
-              params: { chatId: item.chatId }
-            })
-          }
-          onKeyDown={event => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              if (item.chatId)
-                router.navigate({
+      <GalleryCard
+        icon={<Icon />}
+        title={artifact.title}
+        titleNote={languageLabel || meta.label}
+        actions={actions}
+        onOpen={
+          item.chatId
+            ? () =>
+                void router.navigate({
                   to: '/chat/$chatId',
-                  params: { chatId: item.chatId }
-                });
-            }
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <Icon className="size-4" />
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <div className="truncate text-sm font-medium">
-                {artifact.title}
-              </div>
-              <div className="shrink-0 text-xs text-muted-foreground">
-                {languageLabel || meta.label}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 min-h-0 flex-1 overflow-hidden">
-            <ArtifactCardPreview artifact={artifact} />
-          </div>
-        </div>
-        <CardActions
-          chatId={item.chatId}
-          shareId={item.shareId}
-          onDownload={() => void handleArtifactDownload(item.artifact.id)}
-        />
-      </div>
+                  params: { chatId: item.chatId! }
+                })
+            : undefined
+        }
+      >
+        <ArtifactCardPreview artifact={artifact} />
+      </GalleryCard>
     );
   }
 
   if (item.kind === 'image') {
     return (
-      <div className="group relative overflow-hidden rounded-2xl border">
-        <LibraryLightbox
-          type="image"
-          src={item.url}
-          alt={item.title}
-          trigger={
-            <img
-              src={item.url}
-              alt={item.title || 'Generated image'}
-              loading="lazy"
-              className="aspect-square w-full cursor-zoom-in object-cover transition-transform group-hover:scale-105"
-            />
-          }
-        />
-        <CardTitle title={item.title} />
-        <CardActions
-          chatId={item.chatId}
-          onDownload={() => downloadFileFromUrl(item.url)}
-          dark
-        />
-      </div>
+      <GalleryCard
+        icon={<ImageIcon />}
+        title={item.title || 'Image'}
+        actions={actions}
+        wrapOpen={button => (
+          <LibraryLightbox
+            type="image"
+            src={item.url}
+            alt={item.title}
+            trigger={button}
+          />
+        )}
+        media={
+          <img
+            src={item.url}
+            alt={item.title || 'Generated image'}
+            loading="lazy"
+            className="size-full object-cover transition-transform group-hover:scale-105"
+          />
+        }
+      />
     );
   }
 
   if (item.kind === 'video') {
     return (
-      <div className="group relative overflow-hidden rounded-2xl border">
-        <LibraryLightbox
-          type="video"
-          src={item.url}
-          alt={item.title}
-          trigger={
-            <div className="relative cursor-pointer">
-              <video
-                src={item.url}
-                preload="metadata"
-                muted
-                playsInline
-                className="aspect-square w-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="rounded-full bg-black/50 p-3 text-white">
-                  <Play className="size-5 fill-current" />
-                </span>
-              </div>
-            </div>
-          }
-        />
-        <CardTitle title={item.title} />
-        <CardActions
-          chatId={item.chatId}
-          onDownload={() => downloadFileFromUrl(item.url)}
-          dark
-        />
-      </div>
+      <GalleryCard
+        icon={<Video />}
+        title={item.title || 'Video'}
+        actions={actions}
+        wrapOpen={button => (
+          <LibraryLightbox
+            type="video"
+            src={item.url}
+            alt={item.title}
+            trigger={button}
+          />
+        )}
+        media={
+          <>
+            <video
+              src={item.url}
+              preload="metadata"
+              muted
+              playsInline
+              className="size-full object-cover"
+            />
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="rounded-full bg-black/50 p-3 text-white">
+                <Play className="size-5 fill-current" />
+              </span>
+            </span>
+          </>
+        }
+      />
     );
   }
 
-  // Audio — card-sized large player.
+  // Audio — a card-sized player, which is itself the control.
   return (
-    <div className="group relative flex aspect-square flex-col rounded-2xl border bg-muted/30 p-3">
-      <LibraryAudioPlayer src={item.url} title={item.title} />
-      <CardActions
-        chatId={item.chatId}
-        onDownload={() => downloadFileFromUrl(item.url)}
-      />
-    </div>
+    <GalleryCard
+      icon={<AudioLines />}
+      title={item.title || 'Audio'}
+      actions={actions}
+    >
+      <LibraryAudioPlayer src={item.url} />
+    </GalleryCard>
   );
 }
 

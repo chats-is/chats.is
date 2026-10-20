@@ -4,7 +4,7 @@ import {
   useMutation,
   useQueryClient
 } from '@tanstack/react-query';
-import { Copy, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Loader2, Pencil, SquareSparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { uploadFile } from '@/lib/api';
@@ -40,13 +40,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
+  GalleryCardSkeletons,
+  GalleryGridSkeleton
+} from '@/components/gallery-skeleton';
+import { PromptCard } from '@/components/prompt-card';
 
 type MyPrompt = Awaited<ReturnType<typeof listPrompts>>[number];
 
@@ -72,25 +71,6 @@ const parseList = (value: string) =>
     .filter(Boolean);
 
 const joinList = (value?: string[] | null) => (value ?? []).join(', ');
-
-const LabelBadges = ({
-  values,
-  className
-}: {
-  values?: string[] | null;
-  className: string;
-}) => {
-  if (!values?.length) return null;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {values.map(value => (
-        <span key={value} className={className}>
-          {value}
-        </span>
-      ))}
-    </div>
-  );
-};
 
 const PromptThumbnail = ({
   content,
@@ -120,53 +100,8 @@ const PromptThumbnail = ({
   );
 };
 
-/** Rows in the table's own shape — the initial load, and the page being
- *  fetched as it joins the rows already on screen. */
-const MY_PROMPTS_SKELETON_ROWS = 5;
-const NEXT_PAGE_PLACEHOLDER_ROWS = 3;
-
-function MyPromptsSkeletonRows({ count }: { count: number }) {
-  return (
-    <>
-      {Array.from({ length: count }).map((_, i) => (
-        <tr key={i} className="border-b last:border-b-0">
-          <td className="p-3">
-            <Skeleton className="size-8 rounded" />
-          </td>
-          <td className="p-3">
-            <Skeleton className="h-4 w-32" />
-          </td>
-          <td className="p-3">
-            <Skeleton className="h-4 w-20" />
-          </td>
-          <td className="p-3">
-            <Skeleton className="ml-auto h-4 w-16" />
-          </td>
-        </tr>
-      ))}
-    </>
-  );
-}
-
-function MyPromptsSkeleton() {
-  return (
-    <div className="overflow-x-auto rounded-2xl border">
-      <table className="w-full min-w-[640px]">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="w-20 p-3 text-left text-sm font-medium">Image</th>
-            <th className="p-3 text-left text-sm font-medium">Name</th>
-            <th className="p-3 text-left text-sm font-medium">Tags</th>
-            <th className="w-28 p-3 text-right text-sm font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <MyPromptsSkeletonRows count={MY_PROMPTS_SKELETON_ROWS} />
-        </tbody>
-      </table>
-    </div>
-  );
-}
+/** One row of the widest grid, so a page on its way reads as a row of cards. */
+const NEXT_PAGE_PLACEHOLDER_CARDS = 4;
 
 /** Your own prompt library — add, edit and delete. Everything you save here
  *  is private to you; sharing a prompt with everyone else is an admin action
@@ -179,10 +114,15 @@ function MyPromptsSkeleton() {
  *  `active` flag to gate the scroll listener. */
 export function MyPrompts({
   search,
+  tag,
+  onTag,
   createRequestId,
   scrollRef
 }: {
   search: string;
+  /** The tag the page is narrowed to; `onTag` is a card's tag being picked. */
+  tag?: string;
+  onTag: (tag: string) => void;
   createRequestId: number;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -207,7 +147,8 @@ export function MyPrompts({
     useInfiniteQuery(
       promptQueries.listInfinite({
         limit: 24,
-        search: debouncedSearch || undefined
+        search: debouncedSearch || undefined,
+        tag
       })
     );
 
@@ -378,115 +319,53 @@ export function MyPrompts({
   };
 
   if (isLoading) {
-    return <MyPromptsSkeleton />;
+    return <GalleryGridSkeleton />;
   }
 
   return (
     <div className="flex flex-col">
-      <div className="space-y-4">
-        <div className="overflow-x-auto rounded-2xl border">
-          <table className="w-full min-w-[640px]">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="w-20 p-3 text-left text-sm font-medium">
-                  Image
-                </th>
-                <th className="p-3 text-left text-sm font-medium">Name</th>
-                <th className="p-3 text-left text-sm font-medium">Tags</th>
-                <th className="w-28 p-3 text-right text-sm font-medium">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {myPrompts.map(prompt => (
-                <tr
-                  key={prompt.id}
-                  className="border-b transition-colors hover:bg-muted/30"
-                >
-                  <td className="p-3">
-                    {prompt.image ? (
-                      <img
-                        src={prompt.image}
-                        alt=""
-                        className="size-8 rounded border object-cover"
-                      />
-                    ) : (
-                      <div className="size-8 rounded border bg-muted" />
-                    )}
-                  </td>
-                  <td className="p-3">{prompt.name}</td>
-                  <td className="p-3">
-                    <LabelBadges
-                      values={prompt.tags}
-                      className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                    />
-                  </td>
-                  <td className="p-3 text-right whitespace-nowrap">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(prompt.content)}
-                        >
-                          <Copy className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Copy Prompt</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(prompt)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit Prompt</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteId(prompt.id)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Delete Prompt</TooltipContent>
-                    </Tooltip>
-                  </td>
-                </tr>
-              ))}
-
-              {/* The page being fetched, in the table it is joining. */}
-              {isFetchingNextPage && (
-                <MyPromptsSkeletonRows count={NEXT_PAGE_PLACEHOLDER_ROWS} />
-              )}
-
-              {!isFetchingNextPage && myPrompts.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="p-6 text-center text-muted-foreground"
-                  >
-                    {debouncedSearch
-                      ? 'No prompts match your search.'
-                      : 'No prompts yet. Add your first prompt to get started.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {myPrompts.length === 0 && !isFetchingNextPage ? (
+        <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+          <SquareSparkles className="size-12 opacity-50" />
+          <p className="text-sm">
+            {debouncedSearch || tag
+              ? 'No prompts match your search.'
+              : 'No prompts yet. Add your first prompt to get started.'}
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {myPrompts.map(prompt => (
+            <PromptCard
+              key={prompt.id}
+              prompt={prompt}
+              activeTag={tag}
+              onTag={onTag}
+              actions={[
+                {
+                  label: 'Copy',
+                  icon: Copy,
+                  onClick: () => copyToClipboard(prompt.content)
+                },
+                {
+                  label: 'Edit',
+                  icon: Pencil,
+                  onClick: () => handleEdit(prompt)
+                },
+                {
+                  label: 'Delete',
+                  icon: Trash2,
+                  onClick: () => setDeleteId(prompt.id)
+                }
+              ]}
+            />
+          ))}
+          {/* The page being fetched, in the grid it is joining. */}
+          {isFetchingNextPage && (
+            <GalleryCardSkeletons count={NEXT_PAGE_PLACEHOLDER_CARDS} />
+          )}
+        </div>
+      )}
 
       <Dialog
         open={isOpen}

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,8 @@ export function PromptsView() {
   // Reading the loose union of every route's search — rather than this
   // route's own `Route.useSearch` — avoids a circular import between the
   // route file and this component, which the route file already imports.
-  const view = useSearch({ strict: false }).tab ?? 'trending';
+  const { tab, tag } = useSearch({ strict: false });
+  const view = tab ?? 'trending';
 
   const setView = (next: View) => {
     void navigate({
@@ -34,6 +35,22 @@ export function PromptsView() {
       replace: false
     });
   };
+
+  // The tag picked from a card, kept in the address as the tab is, and
+  // shared by both tabs. Picking the one in effect again lets it go.
+  const setTag = (next: string | undefined) => {
+    void navigate({
+      to: '.',
+      search: (previous: Record<string, unknown>) => {
+        const rest = { ...previous };
+        delete rest.tag;
+        return next ? { ...rest, tag: next } : rest;
+      },
+      replace: false
+    });
+  };
+  const toggleTag = (picked: string) =>
+    setTag(picked === tag ? undefined : picked);
 
   // Each tab keeps its own typed search, so switching tabs and back doesn't
   // clear what you'd typed in the other one.
@@ -88,6 +105,18 @@ export function PromptsView() {
               />
             </div>
 
+            {tag && (
+              <button
+                type="button"
+                onClick={() => setTag(undefined)}
+                aria-label={`Show all prompts, not only those tagged ${tag}`}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-3 text-sm text-primary transition-colors hover:bg-primary/15"
+              >
+                {tag}
+                <X className="size-3.5" />
+              </button>
+            )}
+
             {view === 'my' && (
               <Button
                 className="gap-2 rounded-full"
@@ -106,11 +135,15 @@ export function PromptsView() {
               active={view === 'trending'}
               scrollRef={scrollRef}
               search={trendingSearch}
+              tag={tag}
+              onTag={toggleTag}
             />
           </div>
           {view === 'my' && (
             <MyPrompts
               search={mineSearch}
+              tag={tag}
+              onTag={toggleTag}
               createRequestId={createRequestId}
               scrollRef={scrollRef}
             />

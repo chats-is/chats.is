@@ -99,23 +99,30 @@ export async function adminListPrompts(
   };
 }
 
+/** What a page of prompts is narrowed to: a term in the name or the content,
+ *  and a tag the prompt carries. */
+function pageFilter(page: z.infer<typeof promptPageSchema>) {
+  const search = page?.search?.trim();
+  return [
+    search
+      ? or(
+          ilike(prompts.name, `%${search}%`),
+          ilike(prompts.content, `%${search}%`)
+        )
+      : undefined,
+    page?.tag
+      ? sql`${prompts.tags} @> ${JSON.stringify([page.tag])}::jsonb`
+      : undefined
+  ];
+}
+
 /** The user's own prompts, for managing their personal library. Paged, like
  *  `listUsablePrompts`. */
 export async function listPrompts(
   userId: string,
   page?: z.infer<typeof promptPageSchema>
 ) {
-  const owner = eq(prompts.userId, userId);
-  const search = page?.search?.trim();
-  const where = search
-    ? and(
-        owner,
-        or(
-          ilike(prompts.name, `%${search}%`),
-          ilike(prompts.content, `%${search}%`)
-        )
-      )
-    : owner;
+  const where = and(eq(prompts.userId, userId), ...pageFilter(page));
 
   return await db.query.prompts.findMany({
     limit: page?.limit,
@@ -133,20 +140,10 @@ export async function listUsablePrompts(
   userId: string,
   page?: z.infer<typeof promptPageSchema>
 ) {
-  const usable = or(
-    eq(prompts.userId, userId),
-    eq(prompts.visibility, 'public')
+  const where = and(
+    or(eq(prompts.userId, userId), eq(prompts.visibility, 'public')),
+    ...pageFilter(page)
   );
-  const search = page?.search?.trim();
-  const where = search
-    ? and(
-        usable,
-        or(
-          ilike(prompts.name, `%${search}%`),
-          ilike(prompts.content, `%${search}%`)
-        )
-      )
-    : usable;
 
   return await db.query.prompts.findMany({
     limit: page?.limit,
