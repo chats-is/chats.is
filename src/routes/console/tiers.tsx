@@ -17,7 +17,8 @@ export const Route = createFileRoute('/console/tiers')({
   /** The unfiltered first page, awaited, under the key the component asks
    *  for on a plain visit — see the plans route for why not the address. */
   loader: ({ context }) => {
-    // The models fill the picker inside the dialog; nothing waits for them.
+    // The models say how each listed one stands and fill the picker inside
+    // the dialog; nothing waits for them.
     void context.queryClient.prefetchQuery(modelQueries.forSelect());
     return context.queryClient.ensureQueryData(
       tierQueries.list(tierTableInput({}))

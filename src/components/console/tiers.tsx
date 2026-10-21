@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -13,7 +13,10 @@ import { mutating } from '@/lib/mutation';
 import { cn, isSttModel, isTtsModel } from '@/lib/utils';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
-import { modelQueries } from '@/server/functions/model';
+import {
+  modelQueries,
+  type listModelsForSelect
+} from '@/server/functions/model';
 import { planQueries } from '@/server/functions/plan';
 import {
   createTier,
@@ -63,6 +66,7 @@ import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
 import { ModelIcon } from '@/components/model-icon';
 
 type Tier = Awaited<ReturnType<typeof listTiers>>['rows'][number];
+type ConsoleModel = Awaited<ReturnType<typeof listModelsForSelect>>[number];
 /** What the edit form is filled from: the tier as read when it opens. */
 type EditableTier = NonNullable<Awaited<ReturnType<typeof getTier>>>;
 
@@ -102,6 +106,7 @@ const MODEL_RESTRICTION_MODES = [
 const helper = createAppColumnHelper<Tier>();
 
 const tierColumns = (actions: {
+  model: (modelId: string) => ConsoleModel | undefined;
   edit: (tier: Tier) => void;
   remove: (id: string) => void;
 }) =>
@@ -137,7 +142,8 @@ const tierColumns = (actions: {
       // widest thing here.
       meta: { cellClassName: 'text-sm' },
       // The mode as a word, and the models by id: what the tier lets through
-      // is read off the row, not opened for.
+      // is read off the row, not opened for. Each says whether it answers,
+      // as the console names a model everywhere.
       cell: ({ row }) =>
         row.original.modelIds.length === 0 ? (
           <span className="text-muted-foreground">All</span>
@@ -149,7 +155,21 @@ const tierColumns = (actions: {
                 : 'Blocked'}
             </div>
             <div className="font-mono text-xs break-all text-muted-foreground">
-              {row.original.modelIds.join(', ')}
+              {row.original.modelIds.map((modelId, index) => {
+                const model = actions.model(modelId);
+                return (
+                  <Fragment key={modelId}>
+                    {index > 0 && ', '}
+                    {model ? (
+                      <ModelStatusName status={model.status}>
+                        {modelId}
+                      </ModelStatusName>
+                    ) : (
+                      modelId
+                    )}
+                  </Fragment>
+                );
+              })}
             </div>
           </>
         )
@@ -208,7 +228,11 @@ const noop = () => {};
 export function TiersPending() {
   return (
     <ConsoleTableSkeleton
-      columns={tierColumns({ edit: noop, remove: noop })}
+      columns={tierColumns({
+        model: () => undefined,
+        edit: noop,
+        remove: noop
+      })}
       search={false}
     />
   );
@@ -227,6 +251,8 @@ export default function TiersPage() {
     tierQueries.list(tierTableInput({ page }))
   );
   const { data: models } = useQuery(modelQueries.forSelect());
+  const model = (modelId: string) =>
+    models?.find(each => each.modelId === modelId);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -334,8 +360,8 @@ export default function TiersPage() {
   };
 
   const columns = useMemo(
-    () => tierColumns({ edit: openEdit, remove: setDeleteId }),
-    []
+    () => tierColumns({ model, edit: openEdit, remove: setDeleteId }),
+    [models]
   );
 
   // What the models are for, by the names the app gives them elsewhere —
