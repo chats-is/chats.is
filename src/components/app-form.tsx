@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ModelStatusName } from '@/components/console/model-status';
+import { ModelStatusName } from '@/components/console/model-status-name';
 import { ModelIcon } from '@/components/model-icon';
 
 /**

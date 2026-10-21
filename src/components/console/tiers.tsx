@@ -52,7 +52,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ModelStatusName } from '@/components/console/model-status';
+import { ModelStatusName } from '@/components/console/model-status-name';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { tierTableInput } from '@/components/console/table-filters';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';

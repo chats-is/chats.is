@@ -50,7 +50,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ModelStatusName } from '@/components/console/model-status';
+import { ModelStatusName } from '@/components/console/model-status-name';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { promptTableInput } from '@/components/console/table-filters';
 import {

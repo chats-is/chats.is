@@ -15,7 +15,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { DataTable } from '@/components/console/data-table';
-import { ModelStatusName } from '@/components/console/model-status';
+import { ModelStatusName } from '@/components/console/model-status-name';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import {
   ConsoleFilters,
