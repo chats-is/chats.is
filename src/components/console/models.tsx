@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient
+} from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowDown,
@@ -85,6 +90,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { EnabledSwitch } from '@/components/console/enabled-switch';
 import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
 import { modelIdentityColumns } from '@/components/console/model-identity-columns';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
@@ -331,8 +337,14 @@ const featuresOf = (model: Model) =>
 
 const helper = createAppColumnHelper<Model>();
 
+/** The switch's writes, told apart from the page's others so the rows still
+ *  being switched can be found. */
+const TOGGLE_KEY = ['model', 'toggle'];
+
 const modelColumns = (actions: {
   toggle: (model: Model, isEnabled: boolean) => void;
+  /** The models whose switch is still on its way. */
+  toggling: string[];
   edit: (model: Model) => void;
   remove: (id: string) => void;
 }) =>
@@ -406,8 +418,9 @@ const modelColumns = (actions: {
       header: 'Enabled',
       meta: { align: 'center', headClassName: 'w-20' },
       cell: ({ row }) => (
-        <Switch
+        <EnabledSwitch
           checked={row.original.isEnabled}
+          pending={actions.toggling.includes(row.original.id)}
           onCheckedChange={checked => actions.toggle(row.original, checked)}
         />
       )
@@ -468,7 +481,12 @@ const noop = () => {};
 export function ModelsPending() {
   return (
     <ConsoleTableSkeleton
-      columns={modelColumns({ toggle: noop, edit: noop, remove: noop })}
+      columns={modelColumns({
+        toggle: noop,
+        toggling: [],
+        edit: noop,
+        remove: noop
+      })}
       filters={2}
     />
   );
@@ -527,9 +545,19 @@ export default function ModelsPage() {
   });
 
   const toggleMutation = useMutation({
+    mutationKey: TOGGLE_KEY,
     mutationFn: mutating(toggleEnabledModel),
-    onSuccess: invalidate,
+    // Pending until the list has been read back, so the switch comes back
+    // already showing the change.
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: settingsQueries.key.system() });
+      return queryClient.invalidateQueries({ queryKey: modelQueries.all() });
+    },
     onError: error => toast.error(error.message)
+  });
+  const toggling = useMutationState({
+    filters: { mutationKey: TOGGLE_KEY, status: 'pending' },
+    select: mutation => (mutation.state.variables as { id: string }).id
   });
 
   const [defaults, setDefaults] = useState(EMPTY_FORM);
@@ -665,10 +693,11 @@ export default function ModelsPage() {
       modelColumns({
         toggle: (model, isEnabled) =>
           toggleMutation.mutate({ id: model.id, isEnabled }),
+        toggling,
         edit: openEdit,
         remove: setDeleteId
       }),
-    []
+    [toggling]
   );
 
   // Every provider that is switched on. Which of them serves a given model id

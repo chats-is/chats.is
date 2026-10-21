@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '@tanstack/react-form';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient
+} from '@tanstack/react-query';
 import { Loader2, Lock, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -50,7 +55,6 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,
   TooltipContent,
@@ -61,6 +65,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { EnabledSwitch } from '@/components/console/enabled-switch';
 import { PaymentHelpAlert } from '@/components/console/payment-help';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { planTableInput } from '@/components/console/table-filters';
@@ -121,10 +126,16 @@ const processorLabel = (id: string | null) =>
 
 const helper = createAppColumnHelper<Plan>();
 
+/** The switch's writes, told apart from the page's others so the rows still
+ *  being switched can be found. */
+const TOGGLE_KEY = ['plan', 'toggle'];
+
 const planColumns = (actions: {
   edit: (plan: Plan) => void;
   remove: (id: string) => void;
   setEnabled: (id: string, isEnabled: boolean) => void;
+  /** The plans whose switch is still on its way. */
+  toggling: string[];
 }) =>
   helper.columns([
     helper.accessor('name', {
@@ -209,12 +220,13 @@ const planColumns = (actions: {
       // Open to new subscriptions. Off, it is not offered; those already on
       // it go on renewing.
       cell: ({ row }) => (
-        <Switch
+        <EnabledSwitch
           checked={row.original.isEnabled}
+          pending={actions.toggling.includes(row.original.id)}
           onCheckedChange={checked =>
             actions.setEnabled(row.original.id, checked)
           }
-          aria-label={`Enable ${row.original.name}`}
+          label={`Enable ${row.original.name}`}
         />
       )
     }),
@@ -283,7 +295,12 @@ const noop = () => {};
 export function PlansPending() {
   return (
     <ConsoleTableSkeleton
-      columns={planColumns({ edit: noop, remove: noop, setEnabled: noop })}
+      columns={planColumns({
+        edit: noop,
+        remove: noop,
+        setEnabled: noop,
+        toggling: []
+      })}
       search={false}
     />
   );
@@ -319,13 +336,20 @@ export default function PlansPage() {
   });
 
   const toggle = useMutation({
+    mutationKey: TOGGLE_KEY,
     mutationFn: (data: { id: string; isEnabled: boolean }) =>
       setPlanEnabled({ data }),
-    onSuccess: (_, { isEnabled }) => {
-      queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
+    // Pending until the list has been read back, so the switch comes back
+    // already showing the change.
+    onSuccess: async (_, { isEnabled }) => {
+      await queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
       toast.success(isEnabled ? 'Plan enabled' : 'Plan disabled');
     },
     onError: e => toast.error(e.message)
+  });
+  const toggling = useMutationState({
+    filters: { mutationKey: TOGGLE_KEY, status: 'pending' },
+    select: mutation => (mutation.state.variables as { id: string }).id
   });
 
   const del = useMutation({
@@ -448,9 +472,10 @@ export default function PlansPage() {
       planColumns({
         edit: openEdit,
         remove: setDeleteId,
-        setEnabled: (id, isEnabled) => toggle.mutate({ id, isEnabled })
+        setEnabled: (id, isEnabled) => toggle.mutate({ id, isEnabled }),
+        toggling
       }),
-    []
+    [toggling]
   );
 
   const quotaSelectOptions = useMemo(

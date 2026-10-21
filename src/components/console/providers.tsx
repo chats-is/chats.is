@@ -1,6 +1,11 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from '@tanstack/react-form';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient
+} from '@tanstack/react-query';
 import {
   Image as ImageIcon,
   Loader2,
@@ -58,7 +63,6 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
@@ -70,6 +74,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
+import { EnabledSwitch } from '@/components/console/enabled-switch';
 import { IconPicker, iconSearchSeed } from '@/components/console/icon-picker';
 import { ProviderModelSyncDialog } from '@/components/console/provider-model-sync-dialog';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
@@ -205,8 +210,14 @@ const validateProvider = (
 
 const helper = createAppColumnHelper<Provider>();
 
+/** The switch's writes, told apart from the page's others so the rows still
+ *  being switched can be found. */
+const TOGGLE_KEY = ['provider', 'toggle'];
+
 const providerColumns = (actions: {
   toggle: (provider: Provider, isEnabled: boolean) => void;
+  /** The providers whose switch is still on its way. */
+  toggling: string[];
   sync: (id: string) => void;
   edit: (provider: Provider) => void;
   remove: (id: string) => void;
@@ -236,8 +247,9 @@ const providerColumns = (actions: {
       header: 'Enabled',
       meta: { align: 'center', headClassName: 'w-20' },
       cell: ({ row }) => (
-        <Switch
+        <EnabledSwitch
           checked={row.original.isEnabled}
+          pending={actions.toggling.includes(row.original.id)}
           onCheckedChange={checked => actions.toggle(row.original, checked)}
         />
       )
@@ -325,6 +337,7 @@ export function ProvidersPending() {
     <ConsoleTableSkeleton
       columns={providerColumns({
         toggle: noop,
+        toggling: [],
         sync: noop,
         edit: noop,
         remove: noop
@@ -378,9 +391,20 @@ export default function ProvidersPage() {
   });
 
   const toggleMutation = useMutation({
+    mutationKey: TOGGLE_KEY,
     mutationFn: mutating(toggleEnabledProvider),
-    onSuccess: invalidate,
+    // Pending until the list has been read back, so the switch comes back
+    // already showing the change.
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: modelQueries.all() });
+      queryClient.invalidateQueries({ queryKey: settingsQueries.key.system() });
+      return queryClient.invalidateQueries({ queryKey: providerQueries.all() });
+    },
     onError: error => toast.error(error.message)
+  });
+  const toggling = useMutationState({
+    filters: { mutationKey: TOGGLE_KEY, status: 'pending' },
+    select: mutation => (mutation.state.variables as { id: string }).id
   });
 
   // The provider the form was filled from, for what the form shows of the
@@ -520,11 +544,12 @@ export default function ProvidersPage() {
       providerColumns({
         toggle: (provider, isEnabled) =>
           toggleMutation.mutate({ id: provider.id, isEnabled }),
+        toggling,
         sync: setModelSyncProviderId,
         edit: openEdit,
         remove: setDeleteId
       }),
-    []
+    [toggling]
   );
 
   // Changing the type invalidates the secret it was entered for.
