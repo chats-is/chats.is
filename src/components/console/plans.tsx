@@ -341,10 +341,8 @@ export default function PlansPage() {
       setPlanEnabled({ data }),
     // Pending until the list has been read back, so the switch comes back
     // already showing the change.
-    onSuccess: async (_, { isEnabled }) => {
-      await queryClient.invalidateQueries({ queryKey: planQueries.key.list() });
-      toast.success(isEnabled ? 'Plan enabled' : 'Plan disabled');
-    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: planQueries.key.list() }),
     onError: e => toast.error(e.message)
   });
   const toggling = useMutationState({
