@@ -2,7 +2,13 @@ import '@/lib/serializable';
 
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  type Query
+} from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { isUnauthorized } from '@/lib/auth-error';
 import { RouteError } from '@/components/route-error';
@@ -27,12 +33,37 @@ function onSessionLost(error: unknown) {
   );
 }
 
+/**
+ * A read that failed behind a page already drawn — coming back to it, or the
+ * refresh after a save. The page goes on showing what it had, which reads as
+ * current, so it is said. A first read that fails has its own error page, and
+ * a session that ended its own way back, so neither is said again here. One
+ * notice for any number of them: they tend to fail together.
+ */
+function onRefreshFailed(
+  error: unknown,
+  query: Query<unknown, unknown, unknown>
+) {
+  if (typeof window === 'undefined' || isUnauthorized(error)) return;
+  if (query.state.data === undefined) return;
+
+  toast.error("Couldn't load the latest data", {
+    id: 'refresh-failed',
+    description: error instanceof Error ? error.message : undefined
+  });
+}
+
 export function getRouter() {
   // One client per request on the server, one for the session in the browser.
   // Routes reach it through context, so a loader can prime the same cache the
   // components below it will read from.
   const queryClient = new QueryClient({
-    queryCache: new QueryCache({ onError: onSessionLost }),
+    queryCache: new QueryCache({
+      onError: (error, query) => {
+        onSessionLost(error);
+        onRefreshFailed(error, query);
+      }
+    }),
     mutationCache: new MutationCache({ onError: onSessionLost }),
     defaultOptions: {
       queries: {
