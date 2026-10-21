@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { count, eq } from 'drizzle-orm';
+import { asc, count, eq } from 'drizzle-orm';
 import { type z } from 'zod';
 
 import { type UserTier } from '@/types';
@@ -15,19 +15,33 @@ import { allowsModel } from '@/lib/model-access';
 import { perRequest } from '@/lib/request-cache';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { plans, tiers, users } from '@/db/schema';
+import { plans, tierModels, tiers, users } from '@/db/schema';
 import { PublicError } from '@/server/public-error';
+import { type Tx } from '@/server/services/db-utils';
 import { getDefaultTierId } from '@/server/services/settings';
 
 // ============================================================================
 // Reads
 // ============================================================================
 
+/** A tier's models as a query reads them along, by modelId. */
+const withModelIds = {
+  models: {
+    columns: { modelId: true as const },
+    orderBy: [asc(tierModels.modelId)]
+  }
+};
+
+/** The models read along, as the list of modelIds the rest go by. */
+const modelIdsOf = (models: Array<{ modelId: string }>) =>
+  models.map(row => row.modelId);
+
 /** One page of tiers, each with how many plans and users are on it. */
 export async function listTiers(page: z.infer<typeof tierListSchema>) {
   const [rows, [totalRow], planCounts, userCounts] = await Promise.all([
     db.query.tiers.findMany({
       ...pageWindow(page),
+      with: withModelIds,
       // `id` last so the order is total, which offset paging depends on.
       orderBy: (t, { asc }) => [asc(t.name), asc(t.id)]
     }),
@@ -47,8 +61,9 @@ export async function listTiers(page: z.infer<typeof tierListSchema>) {
   const byPlan = new Map(planCounts.map(c => [c.tierId, Number(c.count)]));
   const byUser = new Map(userCounts.map(c => [c.tierId, Number(c.count)]));
   return {
-    rows: rows.map(t => ({
+    rows: rows.map(({ models, ...t }) => ({
       ...t,
+      modelIds: modelIdsOf(models),
       planCount: byPlan.get(t.id) ?? 0,
       userCount: byUser.get(t.id) ?? 0
     })),
@@ -68,9 +83,13 @@ export async function listTiersForSelect() {
 
 /** One tier as the console edits it, read at the moment the form opens. */
 export async function getTier(id: string) {
-  return await db.query.tiers.findFirst({
-    where: eq(tiers.id, id)
+  const tier = await db.query.tiers.findFirst({
+    where: eq(tiers.id, id),
+    with: withModelIds
   });
+  if (!tier) return tier;
+  const { models, ...rest } = tier;
+  return { ...rest, modelIds: modelIdsOf(models) };
 }
 
 /**
@@ -87,19 +106,19 @@ export const getUserTier = perRequest(
       where: eq(users.id, userId),
       columns: { id: true },
       with: {
-        tier: true,
-        plan: { columns: { id: true }, with: { tier: true } }
+        tier: { with: withModelIds },
+        plan: { columns: { id: true }, with: { tier: { with: withModelIds } } }
       }
     });
 
     const inForce = (
-      tier: typeof tiers.$inferSelect,
+      tier: typeof tiers.$inferSelect & { models: Array<{ modelId: string }> },
       source: UserTier['source']
     ): UserTier => ({
       tier: { id: tier.id, name: tier.name },
       priceMultiplier: effectiveMultiplier(tier.priceMultiplier),
       modelRestrictionMode: tier.modelRestrictionMode,
-      modelIds: tier.modelIds ?? [],
+      modelIds: modelIdsOf(tier.models),
       source
     });
 
@@ -109,7 +128,8 @@ export const getUserTier = perRequest(
     const defaultId = await getDefaultTierId();
     if (defaultId) {
       const tier = await db.query.tiers.findFirst({
-        where: eq(tiers.id, defaultId)
+        where: eq(tiers.id, defaultId),
+        with: withModelIds
       });
       if (tier) return inForce(tier, 'default');
     }
@@ -151,13 +171,15 @@ export async function assertModelAccess(
 
 export async function createTier(input: z.infer<typeof tierCreateSchema>) {
   const id = generateUUID();
-  await db.insert(tiers).values({
-    id,
-    name: input.name,
-    description: input.description ?? null,
-    priceMultiplier: input.priceMultiplier,
-    modelRestrictionMode: input.modelRestrictionMode,
-    modelIds: input.modelIds
+  await db.transaction(async tx => {
+    await tx.insert(tiers).values({
+      id,
+      name: input.name,
+      description: input.description ?? null,
+      priceMultiplier: input.priceMultiplier,
+      modelRestrictionMode: input.modelRestrictionMode
+    });
+    await insertModels(tx, id, input.modelIds);
   });
   return { id };
 }
@@ -172,9 +194,23 @@ export async function updateTier(input: z.infer<typeof tierUpdateSchema>) {
     patch.priceMultiplier = updates.priceMultiplier;
   if (updates.modelRestrictionMode !== undefined)
     patch.modelRestrictionMode = updates.modelRestrictionMode;
-  if (updates.modelIds !== undefined) patch.modelIds = updates.modelIds;
 
-  await db.update(tiers).set(patch).where(eq(tiers.id, id));
+  await db.transaction(async tx => {
+    await tx.update(tiers).set(patch).where(eq(tiers.id, id));
+    // Replace the models when a list is supplied; leaving it out keeps them.
+    if (updates.modelIds !== undefined) {
+      await tx.delete(tierModels).where(eq(tierModels.tierId, id));
+      await insertModels(tx, id, updates.modelIds);
+    }
+  });
+}
+
+/** A tier's models, a row each; none to write for an empty list. */
+async function insertModels(tx: Tx, tierId: string, modelIds: string[]) {
+  if (modelIds.length === 0) return;
+  await tx
+    .insert(tierModels)
+    .values(modelIds.map(modelId => ({ id: generateUUID(), tierId, modelId })));
 }
 
 /**

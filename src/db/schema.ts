@@ -675,9 +675,9 @@ export const quotasRelations = relations(quotas, ({ many }) => ({
  *
  * `priceMultiplier` is what a call is charged as a multiple of the cost
  * price the pricing table holds — 0.5 half price, 2 double — and is always
- * above 0. `modelIds` are `model.modelId` values, not `model.id`, read by
- * `modelRestrictionMode`: the only models allowed, or the only ones kept out; empty
- * means every model either way.
+ * above 0. Its models (`tierModels`) are read by `modelRestrictionMode`: the
+ * only models allowed, or the only ones kept out; none means every model
+ * either way.
  */
 export const tiers = createTable('tier', {
   id: varchar('id', { length: 255 }).notNull().primaryKey(),
@@ -690,10 +690,6 @@ export const tiers = createTable('tier', {
     .$type<'allow' | 'deny'>()
     .notNull()
     .default('allow'),
-  modelIds: jsonb('model_ids')
-    .$type<Array<string>>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -704,7 +700,42 @@ export const tiers = createTable('tier', {
 
 export const tiersRelations = relations(tiers, ({ many }) => ({
   plans: many(plans),
-  users: many(users)
+  users: many(users),
+  models: many(tierModels)
+}));
+
+/**
+ * Tier ↔ Model: the models a tier names, one row each. A model deleted
+ * leaves every tier with it, as it leaves its providers.
+ */
+export const tierModels = createTable(
+  'tier_model',
+  {
+    id: varchar('id', { length: 255 }).notNull().primaryKey(),
+    tierId: varchar('tier_id', { length: 255 })
+      .notNull()
+      .references(() => tiers.id, { onDelete: 'cascade' }),
+    modelId: varchar('model_id', { length: 255 })
+      .notNull()
+      .references(() => models.modelId, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  tierModel => [
+    uniqueIndex('tier_model_tier_id_model_id_idx').on(
+      tierModel.tierId,
+      tierModel.modelId
+    )
+  ]
+);
+
+export const tierModelsRelations = relations(tierModels, ({ one }) => ({
+  tier: one(tiers, { fields: [tierModels.tierId], references: [tiers.id] }),
+  model: one(models, {
+    fields: [tierModels.modelId],
+    references: [models.modelId]
+  })
 }));
 
 /**

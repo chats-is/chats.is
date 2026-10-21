@@ -413,9 +413,15 @@ describe('tier', () => {
       id,
       name: `t-${id}`,
       priceMultiplier,
-      modelRestrictionMode,
-      modelIds
+      modelRestrictionMode
     });
+    if (modelIds.length > 0) {
+      await h.db
+        .insert(schema.tierModels)
+        .values(
+          modelIds.map(modelId => ({ id: randomUUID(), tierId: id, modelId }))
+        );
+    }
     return id;
   }
 
@@ -490,6 +496,7 @@ describe('tier', () => {
   });
 
   it('a tier that names its models refuses the others before the call; one that names none allows all', async () => {
+    await addModel('chat', 'c1');
     await givePlan(await addTier('1', ['c1']));
     await expect(assertModelAccess('u1', 'c1', 'c1')).resolves.toBeUndefined();
     await expect(assertModelAccess('u1', 'c2', 'c2')).rejects.toBeInstanceOf(
@@ -501,6 +508,7 @@ describe('tier', () => {
   });
 
   it('a tier that keeps models out refuses those and allows the rest', async () => {
+    await addModel('chat', 'c1');
     await givePlan(await addTier('1', ['c1'], 'deny'));
     await expect(assertModelAccess('u1', 'c1', 'c1')).rejects.toBeInstanceOf(
       ModelAccessDeniedError

@@ -385,17 +385,26 @@ beforeEach(async () => {
   await h.db.delete(schema.plans);
   await h.db.delete(schema.tiers);
   await h.db.delete(schema.quotas);
+  await h.db.delete(schema.models);
 
   await h.db.insert(schema.quotas).values([
     { id: 'q1', name: 'q1', isUnlimited: true },
     { id: 'q2', name: 'q2', isUnlimited: true }
   ]);
+  await h.db.insert(schema.models).values({
+    id: 'm-cheap',
+    name: 'Cheap',
+    modelId: 'cheap',
+    capability: 'chat'
+  });
   await h.db.insert(schema.tiers).values({
     id: 't-cheap',
     name: 'Cheap only',
-    modelRestrictionMode: 'allow',
-    modelIds: ['cheap']
+    modelRestrictionMode: 'allow'
   });
+  await h.db
+    .insert(schema.tierModels)
+    .values({ id: 'tm-cheap', tierId: 't-cheap', modelId: 'cheap' });
   await h.db.insert(schema.plans).values([
     plan('basic', 'month', [10, 'price_basic_m'], {
       tierId: 't-cheap',
