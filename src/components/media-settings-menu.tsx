@@ -21,18 +21,18 @@ import {
   type LucideIcon
 } from 'lucide-react';
 
-import { type ChatMessage, type Model, type ProviderType } from '@/types';
-import { MEDIA_OPTION_LABELS } from '@/lib/constant';
+import { type ChatMessage, type Model } from '@/types';
+import { MEDIA_KIND_LABELS, MEDIA_OPTION_LABELS } from '@/lib/constant';
 import {
   allowedValues,
   chooseValue,
   defaultValue,
+  modelVocabulary,
   optionLabel,
   optionShape,
   type MediaOptionKey,
   type OptionShape
 } from '@/lib/media-settings';
-import { vocabularyFor } from '@/lib/provider-vocab';
 import { modelMatchesId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,6 +77,22 @@ const ShapeIcons: Record<OptionShape, LucideIcon | null> = {
   portrait: RectangleVertical,
   plain: null
 };
+
+/** Which way round a value comes out — square, landscape or portrait — or
+ *  nothing for a value that says how much rather than which way. Shared with
+ *  a prompt's options, so a ratio is drawn alike in both. */
+export function OptionShapeIcon({
+  optionKey,
+  value,
+  className
+}: {
+  optionKey: MediaOptionKey;
+  value: string;
+  className?: string;
+}) {
+  const Icon = ShapeIcons[optionShape(optionKey, value)];
+  return Icon ? <Icon className={className} /> : null;
+}
 
 type OptionBinding = {
   key: MediaOptionKey;
@@ -162,22 +178,7 @@ function MediaKind({
   // model configured before it closed can still carry values its providers
   // have no parameter for, and a row for one of those would promise a setting
   // that never leaves the browser.
-  // Only the providers a call may reach: a binding switched off, or one
-  // whose provider is, has no say in what the menu offers — it was left in
-  // the list to name the model, not to answer for it.
-  const providerTypes = (selected?.providers ?? [])
-    .filter(binding => binding.isEnabled && binding.provider?.isEnabled)
-    .map(binding => binding.provider?.type)
-    .filter((type): type is ProviderType => !!type);
-
-  // Undefined, not an empty vocabulary, when nothing is known about the
-  // providers: `{}` reads as "this provider accepts nothing" and would empty
-  // the menu, and a model whose bindings are all disabled is the case that
-  // gets there.
-  const vocabulary =
-    selected && providerTypes.length > 0
-      ? vocabularyFor(providerTypes, selected.capability)
-      : undefined;
+  const vocabulary = modelVocabulary(selected);
 
   const rows = options
     .map(option => ({
@@ -282,7 +283,6 @@ function MediaKind({
                 {MEDIA_OPTION_LABELS[row.key]}
               </DropdownMenuLabel>
               {row.allowed.map(value => {
-                const ShapeIcon = ShapeIcons[optionShape(row.key, value)];
                 return (
                   <ChoiceItem
                     key={value}
@@ -290,8 +290,12 @@ function MediaKind({
                     // value, so every line in the panel starts its text at the
                     // same place.
                     icon={
-                      ShapeIcon ? (
-                        <ShapeIcon className="size-4 shrink-0" />
+                      optionShape(row.key, value) !== 'plain' ? (
+                        <OptionShapeIcon
+                          optionKey={row.key}
+                          value={value}
+                          className="size-4 shrink-0"
+                        />
                       ) : (
                         <span className="size-4 shrink-0" />
                       )
@@ -414,7 +418,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         {hasImageModels && (
           <MediaKind
             icon={<ImageIcon />}
-            label="Image"
+            label={MEDIA_KIND_LABELS.image}
             models={imageModels}
             modelId={preferences.imageModelId}
             onModelChange={modelId => setPreference('imageModelId', modelId)}
@@ -441,7 +445,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         {editModels.length > 0 && (
           <MediaKind
             icon={<Pencil />}
-            label="Image editing"
+            label={MEDIA_KIND_LABELS.imageEdit}
             models={editModels}
             modelId={preferences.imageEditModelId}
             onModelChange={modelId =>
@@ -453,7 +457,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         {hasVideoModels && (
           <MediaKind
             icon={<Clapperboard />}
-            label="Video"
+            label={MEDIA_KIND_LABELS.video}
             models={videoModels}
             modelId={preferences.videoModelId}
             onModelChange={modelId => setPreference('videoModelId', modelId)}
@@ -499,7 +503,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
           // other for as long as this menu is open.
           <MediaKind
             icon={<ImagePlay />}
-            label="Video from image"
+            label={MEDIA_KIND_LABELS.videoImage}
             models={animateModels}
             modelId={preferences.videoImageModelId}
             onModelChange={modelId =>
@@ -511,7 +515,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         {videoEditModels.length > 0 && (
           <MediaKind
             icon={<Scissors />}
-            label="Video editing"
+            label={MEDIA_KIND_LABELS.videoEdit}
             models={videoEditModels}
             modelId={preferences.videoEditModelId}
             onModelChange={modelId =>
@@ -523,7 +527,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         {hasTtsModels && (
           <MediaKind
             icon={<AudioLines />}
-            label="Text → Speech"
+            label={MEDIA_KIND_LABELS.audio}
             models={ttsModels}
             modelId={preferences.audioModelId}
             onModelChange={modelId => setPreference('audioModelId', modelId)}
@@ -540,7 +544,7 @@ export function MediaSettingsMenu({ status }: MediaSettingsMenuProps) {
         {hasSttModels && (
           <MediaKind
             icon={<Captions />}
-            label="Speech → Text"
+            label={MEDIA_KIND_LABELS.stt}
             models={sttModels}
             modelId={preferences.sttModelId}
             onModelChange={modelId => setPreference('sttModelId', modelId)}

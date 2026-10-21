@@ -48,3 +48,20 @@ describe('prompt', () => {
     ).toBe(false);
   });
 });
+
+describe('prompt preset', () => {
+  it('is a chat prompt with no reference unless told', () => {
+    const base = { name: 'n', content: 'c' };
+    expect(promptCreateSchema.parse(base)).toMatchObject({
+      type: 'chat',
+      needsReference: false
+    });
+    expect(
+      promptCreateSchema.safeParse({ ...base, type: 'document' }).success
+    ).toBe(false);
+    // An edit that leaves them out leaves them as they are.
+    const edit = promptUpdateSchema.parse({ id: 'i', name: 'm' });
+    expect(edit).not.toHaveProperty('type');
+    expect(edit).not.toHaveProperty('needsReference');
+  });
+});

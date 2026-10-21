@@ -4,12 +4,15 @@ import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-import { uploadFile } from '@/lib/api';
+import { modelCapabilitySchema } from '@/types/model';
+import { CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
-import { useCurrentUser } from '@/hooks/use-current-user';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
-import { modelQueries } from '@/server/functions/model';
+import {
+  modelQueries,
+  type listModelsForSelect
+} from '@/server/functions/model';
 import {
   adminCreatePrompt,
   adminDeletePrompt,
@@ -30,7 +33,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -38,7 +40,6 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
@@ -49,7 +50,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ModelStatusBadge } from '@/components/console/model-status';
+import { ModelStatusName } from '@/components/console/model-status';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { promptTableInput } from '@/components/console/table-filters';
 import {
@@ -57,6 +58,8 @@ import {
   ConsoleSearch,
   ConsoleToolbar
 } from '@/components/console/toolbar';
+import { ImageUpload } from '@/components/image-upload';
+import { PromptPresetFields } from '@/components/prompt-preset-fields';
 
 type AdminPrompt = Awaited<ReturnType<typeof adminListPrompts>>['rows'][number];
 /** What the edit form is filled from: the prompt as read when it opens. */
@@ -67,8 +70,11 @@ const promptSchema = z.object({
   content: z.string().trim().min(1, 'Content is required'),
   image: z.string().max(500),
   tags: z.string(),
-  providers: z.string(),
-  models: z.array(z.string())
+  preset: z.object({
+    type: modelCapabilitySchema,
+    needsReference: z.boolean(),
+    modelId: z.string().nullable()
+  })
 });
 
 type PromptForm = z.infer<typeof promptSchema>;
@@ -78,8 +84,7 @@ const EMPTY_FORM: PromptForm = {
   content: '',
   image: '',
   tags: '',
-  providers: '',
-  models: []
+  preset: { type: 'chat', needsReference: false, modelId: null }
 };
 
 const parseList = (value: string) =>
@@ -90,21 +95,33 @@ const parseList = (value: string) =>
 
 const joinList = (value?: string[] | null) => (value ?? []).join(', ');
 
-const LabelBadges = ({
-  values,
-  className
+/** Every model, as the console's selectors have them: with why it will not
+ *  answer, where it will not. */
+type ConsoleModel = Awaited<ReturnType<typeof listModelsForSelect>>[number];
+
+/** The model a prompt is tried on by default, whether it answers, and what
+ *  the prompt is for. */
+const PresetModel = ({
+  model,
+  prompt
 }: {
-  values?: string[] | null;
-  className: string;
+  model: ConsoleModel | undefined;
+  prompt: Pick<AdminPrompt, 'modelId' | 'type' | 'needsReference'>;
 }) => {
-  if (!values?.length) return null;
+  const kind = `${CAPABILITIES.find(({ value }) => value === prompt.type)?.label}${prompt.needsReference ? ' · Reference' : ''}`;
+  if (!prompt.modelId) {
+    return <span className="text-sm text-muted-foreground">{kind}</span>;
+  }
   return (
-    <div className="flex flex-wrap gap-1">
-      {values.map(value => (
-        <span key={value} className={className}>
-          {value}
-        </span>
-      ))}
+    <div className="min-w-0">
+      {model ? (
+        <ModelStatusName status={model.status} className="max-w-full">
+          {model.name}
+        </ModelStatusName>
+      ) : (
+        <div className="truncate">{prompt.modelId}</div>
+      )}
+      <div className="truncate text-xs text-muted-foreground">{kind}</div>
     </div>
   );
 };
@@ -112,7 +129,7 @@ const LabelBadges = ({
 const helper = createAppColumnHelper<AdminPrompt>();
 
 const promptColumns = (ctx: {
-  modelName: (modelId: string) => string;
+  model: (modelId: string | null) => ConsoleModel | undefined;
   edit: (prompt: AdminPrompt) => void;
   remove: (prompt: AdminPrompt) => void;
 }) =>
@@ -150,12 +167,12 @@ const promptColumns = (ctx: {
           </div>
         ) : null
     }),
-    helper.accessor('models', {
-      header: 'Models',
+    helper.accessor('modelId', {
+      header: 'Model',
       cell: ({ row }) => (
-        <LabelBadges
-          values={row.original.models?.map(ctx.modelName)}
-          className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300"
+        <PresetModel
+          model={ctx.model(row.original.modelId)}
+          prompt={row.original}
         />
       )
     }),
@@ -231,14 +248,16 @@ const noop = () => {};
 export function PromptsPending() {
   return (
     <ConsoleTableSkeleton
-      columns={promptColumns({ modelName: () => '', edit: noop, remove: noop })}
+      columns={promptColumns({
+        model: () => undefined,
+        edit: noop,
+        remove: noop
+      })}
     />
   );
 }
 
 export default function PromptsPage() {
-  const { user } = useCurrentUser();
-
   const [isOpen, setIsOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<EditablePrompt | null>(
     null
@@ -251,10 +270,9 @@ export default function PromptsPage() {
   const { data, isLoading, isPlaceholderData } = useQuery(
     promptQueries.adminList(promptTableInput({ q: search, page }))
   );
-  const { data: models } = useQuery(modelQueries.forSelect());
-
-  const modelName = (modelId: string) =>
-    models?.find(m => m.modelId === modelId)?.name ?? modelId;
+  const { data: models = [] } = useQuery(modelQueries.forSelect());
+  const model = (modelId: string | null) =>
+    models.find(each => each.modelId === modelId);
 
   const invalidate = () =>
     Promise.all([
@@ -299,14 +317,12 @@ export default function PromptsPage() {
     validators: { onChange: promptSchema },
     onSubmit: async ({ value }) => {
       const tags = parseList(value.tags);
-      const providers = parseList(value.providers);
       const payload = {
         name: value.name.trim(),
         content: value.content.trim(),
         image: value.image || null,
         tags: tags.length > 0 ? tags : null,
-        providers: providers.length > 0 ? providers : null,
-        models: value.models.length > 0 ? value.models : null
+        ...value.preset
       };
 
       try {
@@ -333,8 +349,11 @@ export default function PromptsPage() {
           content: prompt.content,
           image: prompt.image || '',
           tags: joinList(prompt.tags),
-          providers: joinList(prompt.providers),
-          models: prompt.models || []
+          preset: {
+            type: prompt.type,
+            needsReference: prompt.needsReference,
+            modelId: prompt.modelId
+          }
         }
       : EMPTY_FORM;
     setDefaults(values);
@@ -361,7 +380,7 @@ export default function PromptsPage() {
   };
 
   const columns = useMemo(
-    () => promptColumns({ modelName, edit: openEdit, remove: setDeletePrompt }),
+    () => promptColumns({ model, edit: openEdit, remove: setDeletePrompt }),
     [models]
   );
 
@@ -386,7 +405,7 @@ export default function PromptsPage() {
               Add Prompt
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-3xl">
             <DialogHeader>
               <DialogTitle>
                 {editingPrompt ? 'Edit Prompt' : 'Add Prompt'}
@@ -399,151 +418,81 @@ export default function PromptsPage() {
               }}
               className="space-y-3.5"
             >
+              {/* The words on the left, with room to write them; what the
+                  prompt presets on the right. One column on a phone. */}
               <fieldset
                 disabled={record.isLoading}
-                className="-mx-6 max-h-[60vh] min-w-0 space-y-3.5 overflow-y-auto px-6"
+                className="-mx-6 grid max-h-[70vh] min-w-0 gap-x-6 gap-y-3.5 overflow-y-auto px-6 md:grid-cols-2"
               >
-                <form.AppField name="name">
-                  {field => (
-                    <field.TextField
-                      label="Name"
-                      placeholder="Research prompt"
-                    />
-                  )}
-                </form.AppField>
+                <div className="min-w-0 space-y-3.5">
+                  <form.AppField name="name">
+                    {field => (
+                      <field.TextField
+                        label="Name"
+                        placeholder="Research prompt"
+                      />
+                    )}
+                  </form.AppField>
 
-                <form.AppField name="content">
-                  {field => (
-                    <field.TextareaField
-                      label="Content"
-                      rows={6}
-                      placeholder="Rewrite this draft to sound more concise..."
-                    />
-                  )}
-                </form.AppField>
-
-                <div className="grid gap-3 sm:grid-cols-2">
                   <form.AppField name="tags">
                     {field => (
                       <field.TextField
                         label="Tags"
                         placeholder="writing, english"
-                        hint="Comma-separated. Used for filtering."
+                        hint="Comma-separated."
                       />
                     )}
                   </form.AppField>
-                  <form.AppField name="providers">
+
+                  <form.AppField name="content">
                     {field => (
-                      <field.TextField
-                        label="Providers"
-                        placeholder="openai, anthropic"
-                        hint="Comma-separated labels (display only)."
+                      <field.TextareaField
+                        label="Content"
+                        rows={6}
+                        placeholder="Rewrite this draft to sound more concise..."
+                        // About sixteen lines to start; it grows with what is
+                        // written, then scrolls.
+                        className="max-h-[50vh] min-h-80"
                       />
                     )}
                   </form.AppField>
                 </div>
 
-                <form.Field name="models" mode="array">
-                  {field => (
-                    <div className="space-y-2">
-                      <Label>Models</Label>
-                      <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border p-2.5">
-                        {models?.length ? (
-                          models.map(model => (
-                            <label
-                              key={model.id}
-                              className="flex items-center gap-2 text-sm"
-                            >
-                              <Checkbox
-                                checked={field.state.value.includes(
-                                  model.modelId
-                                )}
-                                onCheckedChange={() =>
-                                  field.handleChange(current =>
-                                    current.includes(model.modelId)
-                                      ? current.filter(
-                                          item => item !== model.modelId
-                                        )
-                                      : [...current, model.modelId]
-                                  )
-                                }
+                <div className="min-w-0 space-y-3.5">
+                  <form.Field name="preset">
+                    {field => (
+                      <PromptPresetFields
+                        models={models}
+                        renderModel={groups => (
+                          <form.AppField name="preset.modelId">
+                            {modelField => (
+                              <modelField.ModelField
+                                models={models}
+                                groups={groups}
+                                empty
                               />
-                              <span className="truncate">{model.name}</span>
-                              <ModelStatusBadge status={model.status} />
-                            </label>
-                          ))
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            No models.
-                          </p>
+                            )}
+                          </form.AppField>
                         )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Target models — used for filtering.
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        disabled={record.isLoading}
+                      />
+                    )}
+                  </form.Field>
 
-                <form.Field name="image">
-                  {field => (
-                    <div className="space-y-2">
-                      <Label>Image</Label>
-                      <div className="flex items-start gap-4">
-                        {field.state.value ? (
-                          <div className="relative">
-                            <img
-                              src={field.state.value}
-                              alt="Preview"
-                              className="size-24 rounded border object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => field.handleChange('')}
-                              className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-                            >
-                              <Trash2 className="size-3" />
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="flex size-24 cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50">
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/gif,image/webp"
-                              className="hidden"
-                              onChange={async e => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-
-                                if (!user?.id) {
-                                  toast.error('Please sign in again to upload');
-                                  return;
-                                }
-
-                                const result = await uploadFile(file, {
-                                  userId: user.id,
-                                  type: 'prompts'
-                                });
-                                if ('error' in result) {
-                                  toast.error(result.error || 'Upload failed');
-                                  return;
-                                }
-                                field.handleChange(result.url);
-                              }}
-                            />
-                            <Plus className="size-6 text-muted-foreground" />
-                            <span className="mt-1 text-xs text-muted-foreground">
-                              Upload
-                            </span>
-                          </label>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Max 5MB. Supports JPEG, PNG, GIF, WebP.
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
+                  <form.Field name="image">
+                    {field => (
+                      <ImageUpload
+                        type="prompts"
+                        label="Image"
+                        hint="JPEG, PNG, GIF or WebP, up to 5MB."
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                      />
+                    )}
+                  </form.Field>
+                </div>
               </fieldset>
 
               <div className="flex justify-end gap-2">

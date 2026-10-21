@@ -43,7 +43,6 @@ import { modelQueries } from '@/server/functions/model';
 import { quotaQueries } from '@/server/functions/quota';
 import { tierQueries } from '@/server/functions/tier';
 import { Switch } from '@/components/ui/switch';
-import { ModelStatusBadge } from '@/components/console/model-status';
 import { PaymentHelpButton } from '@/components/console/payment-help';
 import { TierLabel } from '@/components/console/tier-label';
 
@@ -390,23 +389,6 @@ function ModelPickRow({
   state: RowState;
   models: Array<ModelLike> | undefined;
 }) {
-  // Every model the job could use, the ones that cannot answer today
-  // included: a model that is switched off is a thing the admin can go and
-  // switch on, and leaving it out only raises the question of where it went.
-  // The badge says which; it does not bar the choice.
-  const options = (models ?? [])
-    .filter(model => row.can(model))
-    .map(model => ({
-      value: model.modelId,
-      label: model.name,
-      node: (
-        <span className="flex items-center gap-2">
-          {model.name}
-          <ModelStatusBadge status={model.status} />
-        </span>
-      )
-    }));
-
   return (
     <SettingsRow
       icon={row.icon}
@@ -416,14 +398,15 @@ function ModelPickRow({
       settingKey={row.key}
       state={state}
     >
+      {/* Every model the job could use, the ones that cannot answer today
+          included: a model that is switched off is a thing the admin can go
+          and switch on, and leaving it out only raises the question of where
+          it went. */}
       <form.AppField name={row.key}>
         {field => (
-          <field.SelectField
-            options={options}
-            disabled={options.length === 0}
-            placeholder={
-              options.length === 0 ? 'No available models' : 'Select model'
-            }
+          <field.ModelField
+            models={models ?? []}
+            groups={[{ label: row.label, can: row.can }]}
           />
         )}
       </form.AppField>

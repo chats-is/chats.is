@@ -20,8 +20,11 @@ import {
   Users
 } from 'lucide-react';
 
-import { type ChatMediaToolName } from '@/types/chat-tools';
-import { type ModelCapability } from '@/types/model';
+import {
+  type ChatMediaToolName,
+  type MediaToolsOptions
+} from '@/types/chat-tools';
+import { type ModelCapability, type ModelStatus } from '@/types/model';
 import {
   type BillingInterval,
   type PaymentKind,
@@ -630,6 +633,25 @@ export const MEDIA_OPTION_LABELS: Record<MediaOptionKey, string> = {
   resolution: 'Resolution',
   duration: 'Duration',
   voice: 'Voice'
+};
+
+/** Why a model will not answer, in words; a working model has none. */
+export const MODEL_STATUS_LABELS: Record<ModelStatus, string | null> = {
+  available: null,
+  disabled: 'Disabled',
+  'no-enabled-provider': 'Providers unavailable'
+};
+
+/** The media generation settings' entries by name, keyed as the chat
+ *  request's `mediaOptions` is. */
+export const MEDIA_KIND_LABELS: Record<keyof MediaToolsOptions, string> = {
+  image: 'Image',
+  imageEdit: 'Image editing',
+  video: 'Video',
+  videoImage: 'Video from image',
+  videoEdit: 'Video editing',
+  audio: 'Text → Speech',
+  stt: 'Speech → Text'
 };
 
 /**

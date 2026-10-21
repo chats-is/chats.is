@@ -3,6 +3,7 @@ import '@tanstack/react-start/server-only';
 import { and, asc, count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { type z } from 'zod';
 
+import { type ModelCapability } from '@/types';
 import { pageWindow } from '@/types/pagination';
 import {
   type promptCreateSchema,
@@ -10,9 +11,11 @@ import {
   type promptPageSchema,
   type promptUpdateSchema
 } from '@/types/prompt';
+import { fitsMediaKind, promptMediaKinds } from '@/lib/prompt';
 import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
-import { prompts } from '@/db/schema';
+import { models, prompts } from '@/db/schema';
+import { PublicError } from '@/server/public-error';
 
 // `id` last so the order is total: prompts seeded together share a display
 // order and a creation time, and paging by row offset over an order that
@@ -44,6 +47,33 @@ async function getPromptByIdOrThrow(id: string) {
   }
 
   return prompt;
+}
+
+/**
+ * Whether what a prompt presets holds together: its model, where it names
+ * one, is a model there is, and one its type and reference call for — a chat
+ * model for a chat prompt, else one an entry of the media generation
+ * settings it is tried on can use.
+ */
+async function checkPreset(preset: {
+  type: ModelCapability;
+  needsReference: boolean;
+  modelId: string | null;
+}) {
+  if (!preset.modelId) return;
+  const model = await db.query.models.findFirst({
+    where: eq(models.modelId, preset.modelId)
+  });
+  if (!model) throw new PublicError('The model does not exist.');
+  const fits =
+    preset.type === 'chat'
+      ? model.capability === 'chat'
+      : promptMediaKinds(preset.type, preset.needsReference).some(kind =>
+          fitsMediaKind(kind, model)
+        );
+  if (!fits) {
+    throw new PublicError(`${model.name} cannot be this prompt’s model.`);
+  }
 }
 
 export async function getPromptStats() {
@@ -152,8 +182,9 @@ export async function listUsablePrompts(
       id: true,
       name: true,
       tags: true,
-      providers: true,
-      models: true,
+      type: true,
+      needsReference: true,
+      modelId: true,
       image: true,
       content: true
     },
@@ -176,6 +207,12 @@ export async function createPrompt(
   visibility: 'private' | 'public'
 ) {
   const id = generateUUID();
+  const preset = {
+    type: input.type,
+    needsReference: input.needsReference,
+    modelId: input.modelId ?? null
+  };
+  await checkPreset(preset);
 
   await db.insert(prompts).values({
     id,
@@ -183,8 +220,7 @@ export async function createPrompt(
     userId,
     visibility,
     tags: input.tags,
-    providers: input.providers,
-    models: input.models,
+    ...preset,
     image: input.image,
     content: input.content,
     displayOrder: input.displayOrder
@@ -193,8 +229,28 @@ export async function createPrompt(
   return { id };
 }
 
-async function writePromptFields(input: z.infer<typeof promptUpdateSchema>) {
+/** An edit that changes what the prompt presets is checked as the prompt it
+ *  leaves: what it changes over what the prompt already said. One that leaves
+ *  the preset alone is not held to it. */
+async function writePromptFields(
+  input: z.infer<typeof promptUpdateSchema>,
+  current: Pick<
+    typeof prompts.$inferSelect,
+    'type' | 'needsReference' | 'modelId'
+  >
+) {
   const { id, ...updates } = input;
+  if (
+    updates.type !== undefined ||
+    updates.needsReference !== undefined ||
+    updates.modelId !== undefined
+  ) {
+    await checkPreset({
+      type: updates.type ?? current.type,
+      needsReference: updates.needsReference ?? current.needsReference,
+      modelId: updates.modelId !== undefined ? updates.modelId : current.modelId
+    });
+  }
 
   await db
     .update(prompts)
@@ -216,7 +272,7 @@ export async function updatePrompt(
   if (prompt.userId !== userId) {
     throw new Response('You can only edit your own prompts', { status: 403 });
   }
-  await writePromptFields(input);
+  await writePromptFields(input, prompt);
 }
 
 /** One prompt as the console edits it, whoever owns it, read at the moment
@@ -231,8 +287,8 @@ export async function adminGetPrompt(id: string) {
 export async function adminUpdatePrompt(
   input: z.infer<typeof promptUpdateSchema>
 ) {
-  await getPromptByIdOrThrow(input.id);
-  await writePromptFields(input);
+  const prompt = await getPromptByIdOrThrow(input.id);
+  await writePromptFields(input, prompt);
 }
 
 export async function deletePrompt(userId: string, id: string) {

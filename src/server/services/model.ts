@@ -239,12 +239,20 @@ export async function listModelsForSelect() {
       asc(models.displayOrder),
       desc(models.createdAt)
     ],
-    with: { providers: { with: { provider: true } } }
+    // The bindings in priority order, with no more of them than the status
+    // and the icon need: a provider's keys stay on the server.
+    with: {
+      providers: {
+        columns: { isEnabled: true },
+        orderBy: (binding, { asc }) => [asc(binding.priority), asc(binding.id)],
+        with: { provider: { columns: { isEnabled: true, image: true } } }
+      }
+    }
   });
 
-  return rows.map(({ providers, ...model }) => ({
+  return rows.map(model => ({
     ...model,
-    status: statusOf(model.isEnabled, providers)
+    status: statusOf(model.isEnabled, model.providers)
   }));
 }
 

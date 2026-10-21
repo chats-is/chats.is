@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { modelCapabilitySchema } from './model';
 import { paginationSchema } from './pagination';
 
 /** The console's prompt table: narrowed, then cut to one page. */
@@ -10,6 +11,11 @@ export const promptListSchema = z.object({
 });
 
 const promptLabelsSchema = z.array(z.string()).nullable().optional();
+
+/** The model a prompt is tried on by default, by its `modelId`: a chat model
+ *  for a chat prompt, else the media model its type and reference call for.
+ *  Null leaves it to the user's own settings. */
+const promptModelSchema = z.string().max(255).nullable().optional();
 
 /**
  * What the prompt server functions accept.
@@ -26,8 +32,12 @@ export const promptCreateSchema = z.object({
   content: z.string().min(1),
   image: z.string().max(500).nullable().optional(),
   tags: promptLabelsSchema,
-  providers: promptLabelsSchema,
-  models: promptLabelsSchema,
+  /** What it is for: a chat reply, or the kind of media its model makes. */
+  type: modelCapabilitySchema.default('chat'),
+  /** Whether trying it needs a reference — an image, a video, audio or a
+   *  file, by its type. */
+  needsReference: z.boolean().default(false),
+  modelId: promptModelSchema,
   displayOrder: z.number().int().default(0)
 });
 
@@ -37,8 +47,9 @@ export const promptUpdateSchema = z.object({
   content: z.string().min(1).optional(),
   image: z.string().max(500).nullable().optional(),
   tags: promptLabelsSchema,
-  providers: promptLabelsSchema,
-  models: promptLabelsSchema,
+  type: modelCapabilitySchema.optional(),
+  needsReference: z.boolean().optional(),
+  modelId: promptModelSchema,
   displayOrder: z.number().int().optional()
 });
 

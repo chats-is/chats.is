@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useSystemSettings } from '@/contexts/system-settings-context';
 import {
   useInfiniteQuery,
   useMutation,
@@ -7,10 +8,8 @@ import {
 import { Copy, Loader2, Pencil, SquareSparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { uploadFile } from '@/lib/api';
 import { mutating } from '@/lib/mutation';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { useCurrentUser } from '@/hooks/use-current-user';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import {
   createPrompt,
@@ -45,7 +44,13 @@ import {
   GalleryCardSkeletons,
   GalleryGridSkeleton
 } from '@/components/gallery-skeleton';
+import { ImageUpload } from '@/components/image-upload';
+import { ModelSelect } from '@/components/model-select';
 import { PromptCard } from '@/components/prompt-card';
+import {
+  PromptPresetFields,
+  type PromptPreset
+} from '@/components/prompt-preset-fields';
 
 type MyPrompt = Awaited<ReturnType<typeof listPrompts>>[number];
 
@@ -55,13 +60,15 @@ type PromptFormData = {
   image: string;
   // A comma-separated string of free-text labels.
   tags: string;
+  preset: PromptPreset;
 };
 
 const EMPTY_FORM: PromptFormData = {
   name: '',
   content: '',
   image: '',
-  tags: ''
+  tags: '',
+  preset: { type: 'chat', needsReference: false, modelId: null }
 };
 
 const parseList = (value: string) =>
@@ -71,34 +78,6 @@ const parseList = (value: string) =>
     .filter(Boolean);
 
 const joinList = (value?: string[] | null) => (value ?? []).join(', ');
-
-const PromptThumbnail = ({
-  content,
-  image,
-  name
-}: {
-  content: string;
-  image?: string | null;
-  name: string;
-}) => {
-  if (image) {
-    return (
-      <img
-        src={image}
-        alt={name}
-        className="size-12 rounded-md border object-cover"
-      />
-    );
-  }
-
-  return (
-    <div className="flex size-12 items-start overflow-hidden rounded-md border bg-muted p-1">
-      <p className="line-clamp-4 text-[9px] leading-3 whitespace-pre-wrap text-muted-foreground">
-        {content}
-      </p>
-    </div>
-  );
-};
 
 /** One row of the widest grid, so a page on its way reads as a row of cards. */
 const NEXT_PAGE_PLACEHOLDER_CARDS = 4;
@@ -127,9 +106,16 @@ export function MyPrompts({
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
   const { copyToClipboard } = useCopyToClipboard();
+  // The models a prompt here may preset: those on offer to the user.
+  const settings = useSystemSettings();
+  const presetModels = [
+    ...settings.chatModels,
+    ...settings.imageModels,
+    ...settings.videoModels,
+    ...settings.ttsModels,
+    ...settings.sttModels
+  ];
   const queryClient = useQueryClient();
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const { user } = useCurrentUser();
 
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -163,9 +149,6 @@ export function MyPrompts({
     setEditingId(null);
     setFormData(EMPTY_FORM);
     setIsUploadingImage(false);
-    if (imageInputRef.current) {
-      imageInputRef.current.value = '';
-    }
   };
 
   const closeDialog = () => {
@@ -234,9 +217,6 @@ export function MyPrompts({
     setEditingId(null);
     setFormData(EMPTY_FORM);
     setIsUploadingImage(false);
-    if (imageInputRef.current) {
-      imageInputRef.current.value = '';
-    }
     setIsOpen(true);
   }, [createRequestId]);
 
@@ -246,7 +226,12 @@ export function MyPrompts({
       name: prompt.name,
       content: prompt.content,
       image: prompt.image || '',
-      tags: joinList(prompt.tags)
+      tags: joinList(prompt.tags),
+      preset: {
+        type: prompt.type,
+        needsReference: prompt.needsReference,
+        modelId: prompt.modelId
+      }
     });
     setIsOpen(true);
   };
@@ -265,14 +250,12 @@ export function MyPrompts({
     const tags = parseList(formData.tags);
     // No visibility field: prompts added here are always private to you. The
     // server enforces this too, so this is only ever a UI-level shortcut.
-    // Providers/models aren't offered here either — nothing in the app
-    // filters or targets by them, so asking for a choice with no effect
-    // would only slow down adding a prompt.
     const payload = {
       name,
       content,
       image: formData.image || null,
-      tags: tags.length > 0 ? tags : null
+      tags: tags.length > 0 ? tags : null,
+      ...formData.preset
     };
 
     if (editingId) {
@@ -281,41 +264,6 @@ export function MyPrompts({
     }
 
     createMutation.mutate(payload);
-  };
-
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be 5MB or smaller');
-      e.target.value = '';
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error('Please sign in again to upload');
-      return;
-    }
-
-    setIsUploadingImage(true);
-
-    try {
-      const result = await uploadFile(file, {
-        userId: user.id,
-        type: 'prompts'
-      });
-
-      if ('error' in result) {
-        toast.error(result.error || 'Upload failed');
-        return;
-      }
-
-      setFormData(current => ({ ...current, image: result.url }));
-    } finally {
-      setIsUploadingImage(false);
-      e.target.value = '';
-    }
   };
 
   if (isLoading) {
@@ -378,7 +326,7 @@ export function MyPrompts({
           setIsOpen(true);
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {editingId ? 'Edit Prompt' : 'Add Prompt'}
@@ -389,111 +337,107 @@ export function MyPrompts({
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
-            <div className="-mx-6 max-h-[60vh] space-y-3.5 overflow-y-auto px-6">
-              <div className="space-y-2">
-                <Label htmlFor="prompt-name">Name</Label>
-                <Input
-                  id="prompt-name"
-                  value={formData.name}
-                  onChange={e =>
-                    setFormData(current => ({
-                      ...current,
-                      name: e.target.value
-                    }))
-                  }
-                  placeholder="Research prompt"
-                  required
-                  disabled={isFormBusy}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="prompt-content">Content</Label>
-                <Textarea
-                  id="prompt-content"
-                  value={formData.content}
-                  onChange={e =>
-                    setFormData(current => ({
-                      ...current,
-                      content: e.target.value
-                    }))
-                  }
-                  rows={6}
-                  placeholder="Rewrite this draft to sound more concise and confident..."
-                  required
-                  disabled={isFormBusy}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="prompt-tags">Tags</Label>
-                <Input
-                  id="prompt-tags"
-                  value={formData.tags}
-                  onChange={e =>
-                    setFormData(current => ({
-                      ...current,
-                      tags: e.target.value
-                    }))
-                  }
-                  placeholder="writing, english"
-                  disabled={isFormBusy}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Comma-separated, shown as labels in your prompt list.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Image</Label>
-                <div className="flex items-center gap-3">
-                  <PromptThumbnail
-                    name={formData.name || 'Prompt image'}
-                    image={formData.image}
-                    content={formData.content || 'Preview'}
-                  />
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
+            {/* The words on the left, with room to write them; what the
+                prompt presets on the right. One column on a phone. */}
+            <div className="-mx-6 grid max-h-[70vh] gap-x-6 gap-y-3.5 overflow-y-auto px-6 md:grid-cols-2">
+              <div className="min-w-0 space-y-3.5">
+                <div className="space-y-2">
+                  <Label htmlFor="prompt-name">Name</Label>
+                  <Input
+                    id="prompt-name"
+                    value={formData.name}
+                    onChange={e =>
+                      setFormData(current => ({
+                        ...current,
+                        name: e.target.value
+                      }))
+                    }
+                    placeholder="Research prompt"
+                    required
                     disabled={isFormBusy}
-                    onChange={handleImageChange}
                   />
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => imageInputRef.current?.click()}
-                      disabled={isFormBusy}
-                    >
-                      {isUploadingImage && (
-                        <Loader2 className="size-4 animate-spin" />
-                      )}
-                      {formData.image ? 'Replace image' : 'Upload image'}
-                    </Button>
-                    {formData.image && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          setFormData(current => ({
-                            ...current,
-                            image: ''
-                          }))
-                        }
-                        disabled={isFormBusy}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  JPEG, PNG, GIF or WebP, up to 5MB.
-                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="prompt-tags">Tags</Label>
+                  <Input
+                    id="prompt-tags"
+                    value={formData.tags}
+                    onChange={e =>
+                      setFormData(current => ({
+                        ...current,
+                        tags: e.target.value
+                      }))
+                    }
+                    placeholder="writing, english"
+                    disabled={isFormBusy}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="prompt-content">Content</Label>
+                  <Textarea
+                    id="prompt-content"
+                    value={formData.content}
+                    onChange={e =>
+                      setFormData(current => ({
+                        ...current,
+                        content: e.target.value
+                      }))
+                    }
+                    rows={6}
+                    placeholder="Rewrite this draft to sound more concise and confident..."
+                    // About sixteen lines to start; it grows with what is
+                    // written, then scrolls.
+                    className="max-h-[50vh] min-h-80"
+                    required
+                    disabled={isFormBusy}
+                  />
+                </div>
+              </div>
+
+              <div className="min-w-0 space-y-3.5">
+                <PromptPresetFields
+                  models={presetModels}
+                  renderModel={groups => (
+                    <ModelSelect
+                      groups={groups.map(group => ({
+                        label: group.label,
+                        models: presetModels.filter(group.can)
+                      }))}
+                      value={formData.preset.modelId}
+                      onValueChange={modelId =>
+                        setFormData(current => ({
+                          ...current,
+                          preset: { ...current.preset, modelId }
+                        }))
+                      }
+                      empty
+                      disabled={isFormBusy}
+                      className="w-full"
+                    />
+                  )}
+                  value={formData.preset}
+                  onChange={preset =>
+                    setFormData(current => ({ ...current, preset }))
+                  }
+                  disabled={isFormBusy}
+                />
+
+                <ImageUpload
+                  type="prompts"
+                  label="Image"
+                  hint="JPEG, PNG, GIF or WebP, up to 5MB."
+                  value={formData.image}
+                  onChange={image =>
+                    setFormData(current => ({ ...current, image }))
+                  }
+                  onUploadingChange={setIsUploadingImage}
+                  disabled={isFormBusy}
+                />
               </div>
             </div>
 

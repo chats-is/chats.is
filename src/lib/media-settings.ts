@@ -1,11 +1,11 @@
-import { type ModelUIOptions } from '@/types/model';
+import { type Model, type ModelUIOptions, type ProviderType } from '@/types';
 import {
   ASPECT_RATIO_LABELS,
   AUTO_OPTION,
   IMAGE_SIZE_LABELS,
   VIDEO_RESOLUTION_LABELS
 } from '@/lib/constant';
-import { type Vocabulary } from '@/lib/provider-vocab';
+import { vocabularyFor, type Vocabulary } from '@/lib/provider-vocab';
 
 /**
  * The generation options a media model exposes, as the settings menu needs
@@ -134,4 +134,27 @@ export function optionShape(key: MediaOptionKey, value: string): OptionShape {
     return 'plain';
   }
   return w === h ? 'square' : w > h ? 'landscape' : 'portrait';
+}
+
+/**
+ * What a model's providers can be sent, for `allowedValues` to narrow its
+ * options to. Only the providers a call may reach: a binding switched off, or
+ * one whose provider is, has no say — it was left in the list to name the
+ * model, not to answer for it.
+ *
+ * Undefined, not an empty vocabulary, when nothing is known about the
+ * providers: `{}` reads as "this provider accepts nothing" and would empty
+ * every option, and a model whose bindings are all disabled is the case that
+ * gets there.
+ */
+export function modelVocabulary(
+  model: Pick<Model, 'capability' | 'providers'> | undefined
+): Vocabulary | undefined {
+  const providerTypes = (model?.providers ?? [])
+    .filter(binding => binding.isEnabled && binding.provider?.isEnabled)
+    .map(binding => binding.provider?.type)
+    .filter((type): type is ProviderType => !!type);
+  return model && providerTypes.length > 0
+    ? vocabularyFor(providerTypes, model.capability)
+    : undefined;
 }

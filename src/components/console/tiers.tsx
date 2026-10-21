@@ -52,7 +52,7 @@ import {
   createAppColumnHelper,
   DataTable
 } from '@/components/console/data-table';
-import { ModelStatusBadge } from '@/components/console/model-status';
+import { ModelStatusName } from '@/components/console/model-status';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { tierTableInput } from '@/components/console/table-filters';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
@@ -449,10 +449,12 @@ export default function TiersPage() {
                                           )
                                         }
                                       />
-                                      <span className="truncate font-mono text-xs">
+                                      <ModelStatusName
+                                        status={m.status}
+                                        className="font-mono text-xs"
+                                      >
                                         {m.modelId}
-                                      </span>
-                                      <ModelStatusBadge status={m.status} />
+                                      </ModelStatusName>
                                     </label>
                                   ))}
                                 </div>

@@ -24,7 +24,7 @@ import {
 import { artifactFiles } from '@/lib/document';
 import { resolveAutoOption } from '@/lib/media-options';
 import { markStopped } from '@/lib/message-content';
-import { takePendingPrompt } from '@/lib/pending-prompt';
+import { takePendingPrompt, type PendingPrompt } from '@/lib/pending-prompt';
 import { modelMatchesId } from '@/lib/utils';
 import { useChats } from '@/hooks/use-chats';
 import { artifactQueries } from '@/server/functions/artifact';
@@ -435,16 +435,6 @@ export function ChatUI({
     setPanelOpen(false);
   }, [id, setPanelOpen]);
 
-  // Seed the composer from a prompt picked on the Prompts page. Read after
-  // mount (not during render) to avoid a hydration mismatch, and only for a
-  // fresh chat so an in-progress conversation is never clobbered.
-  useEffect(() => {
-    if (initialMessages.length > 0) return;
-    const pending = takePendingPrompt();
-    if (pending) setInput(pending);
-    // Mount-only: consume the one-shot hand-off exactly once.
-  }, []);
-
   useEffect(() => {
     const wasPanelOpen = previousPanelOpenRef.current;
     previousPanelOpenRef.current = isPanelOpen;
@@ -507,13 +497,12 @@ export function ChatUI({
     return true;
   }, [chatModels, currentModelId]);
 
-  const handleSubmit = useCallback(
-    (attachments?: Attachment[]) => {
-      if (!input.trim()) return false;
+  const sendText = useCallback(
+    (text: string, attachments?: Attachment[]) => {
       if (!hasUsableModel()) return false;
       updateDisplayModelOptimistically();
       sendMessage({
-        text: input,
+        text,
         files: attachments?.map(attachment => ({
           type: 'file',
           mediaType: attachment.contentType,
@@ -523,8 +512,46 @@ export function ChatUI({
       });
       return true;
     },
-    [input, hasUsableModel, sendMessage, updateDisplayModelOptimistically]
+    [hasUsableModel, sendMessage, updateDisplayModelOptimistically]
   );
+
+  const handleSubmit = useCallback(
+    (attachments?: Attachment[]) => {
+      if (!input.trim()) return false;
+      return sendText(input, attachments);
+    },
+    [input, sendText]
+  );
+
+  // A prompt tried from its dialog, sent as the next message — handed over
+  // from the Prompts page into this new chat, or tried here from the
+  // suggestions under the composer. Sent from an effect, so the settings the
+  // dialog has just made the user's own are already in the request.
+  const [triedPrompt, setTriedPrompt] = useState<PendingPrompt | null>(null);
+  useEffect(() => {
+    if (!triedPrompt) return;
+    setTriedPrompt(null);
+    sendText(triedPrompt.content, triedPrompt.attachments);
+  }, [triedPrompt, sendText]);
+
+  // Read after mount (not during render) to avoid a hydration mismatch, and
+  // only for a fresh chat so an in-progress conversation is never clobbered.
+  // Set only when there is one: in development the effect runs twice, and
+  // the second read, finding the hand-off already taken, must not undo the
+  // first.
+  useEffect(() => {
+    if (initialMessages.length > 0) return;
+    const pending = takePendingPrompt();
+    if (pending) setTriedPrompt(pending);
+    // Mount-only: consume the one-shot hand-off exactly once.
+  }, []);
+
+  const handleTryPrompt = useCallback((prompt: PendingPrompt) => {
+    // The dialog has made its chat model the user's own; one picked here
+    // before gives way to it.
+    setPickedModelId('');
+    setTriedPrompt(prompt);
+  }, []);
 
   // A code's error, sent as the reader's own message. What they see is
   // the error alone, in no language of ours and with no word for what
@@ -656,6 +683,7 @@ export function ChatUI({
                 onInputChange={e => setInput(e.target.value)}
                 onSubmit={handleSubmit}
                 onModelChange={handleModelChange}
+                onTryPrompt={handleTryPrompt}
                 onSelectArtifact={handleArtifactSelect}
                 onReload={handleReload}
                 error={error}
@@ -709,6 +737,7 @@ export function ChatUI({
               onInputChange={e => setInput(e.target.value)}
               onSubmit={handleSubmit}
               onModelChange={handleModelChange}
+              onTryPrompt={handleTryPrompt}
               onSelectArtifact={handleArtifactSelect}
               onReload={handleReload}
               error={error}

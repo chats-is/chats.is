@@ -1,7 +1,7 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
-import { type Attachment } from '@/types';
+import { type Attachment, type Model } from '@/types';
 import { uploadFile } from '@/lib/api';
 import { UPLOAD_CONFIG } from '@/lib/constant';
 import { documentMediaTypeOf } from '@/lib/document';
@@ -15,33 +15,56 @@ const MAX_ATTACHMENTS = 20;
 const ALLOWED_TYPES = new Set<string>(UPLOAD_CONFIG.attachment.allowedTypes);
 
 /**
- * Adding files to the message being written — picked from the `+` menu,
- * dropped on the page, or pasted — each held to the same terms: a kind this
- * setup can do something with, no larger than storage takes, and no more of
- * them than a message carries. Each is shown the moment it is added and
- * uploads on its own, so more can be added while others are on their way, and
- * one that fails stays in view, marked.
+ * What kinds of file a message can take. An image is worth taking for either
+ * of two things, each decided on its own: the chat model looking at it, or a
+ * tool working from it — editing it, or animating it into a video. Whether
+ * the model itself sees an image stays with `supportsVision`: without it, the
+ * server hands the model the image's address, which is what the tools take.
+ * Audio and video are taken on the same terms: when a tool can act on them —
+ * transcribing audio, editing a video. With the media tools switched off,
+ * none of those is offered.
  */
-export function useAttachmentUpload({
-  canAttachImages,
-  canAttachAudio,
-  canAttachVideo,
-  uploads,
-  setUploads,
-  attachments,
-  setAttachments
+function canAttach({
+  supportsVision,
+  mediaGeneration,
+  imageModels,
+  videoModels,
+  sttModels
 }: {
-  /** The chat model sees an image, or a tool edits or animates one. */
-  canAttachImages: boolean;
-  /** A model transcribes audio. */
-  canAttachAudio: boolean;
-  /** A model edits video. */
-  canAttachVideo: boolean;
-  uploads: PendingUpload[];
-  setUploads: Dispatch<SetStateAction<Array<PendingUpload>>>;
-  attachments: Attachment[];
-  setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
+  supportsVision: boolean;
+  mediaGeneration: boolean;
+  imageModels?: Model[];
+  videoModels?: Model[];
+  sttModels?: Model[];
 }) {
+  return {
+    canAttachImages:
+      supportsVision ||
+      (mediaGeneration &&
+        (!!imageModels?.some(model => model.supportsImageEdit) ||
+          !!videoModels?.some(model => model.supportsImageToVideo))),
+    canAttachAudio: mediaGeneration && !!sttModels?.length,
+    canAttachVideo:
+      mediaGeneration && !!videoModels?.some(model => model.supportsVideoEdit)
+  };
+}
+
+/**
+ * The files of a message being written — the chat's, and a prompt's tried
+ * from its dialog, which goes to the chat as one: what kinds it can take for
+ * the models it goes to (`canAttach`), the files attached and those on their
+ * way, and adding them — picked, dropped on the page, or pasted — each held
+ * to the same terms: a kind those models can do something with, no larger
+ * than storage takes, and no more of them than a message carries. Each is
+ * shown the moment it is added and uploads on its own, so more can be added
+ * while others are on their way, and one that fails stays in view, marked.
+ * `preview` is what `AttachmentsPreview` shows them from.
+ */
+export function useAttachmentUpload(models: Parameters<typeof canAttach>[0]) {
+  const { canAttachImages, canAttachAudio, canAttachVideo } = canAttach(models);
+  const [uploads, setUploads] = useState<PendingUpload[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+
   // The upload goes straight to blob storage under this user's own path, which
   // the token route checks against the session before it signs anything.
   const { user } = useCurrentUser();
@@ -161,5 +184,29 @@ export function useAttachmentUpload({
     return true;
   }, [occupied, limitMessage]);
 
-  return { addFiles, refuseWhenFull };
+  /** Lets every file go, once the message is on its way. Only failed
+   *  uploads can be left by then — sending waits for the rest. */
+  const clear = useCallback(() => {
+    setAttachments([]);
+    setUploads(current => {
+      for (const upload of current) {
+        if (upload.previewUrl) URL.revokeObjectURL(upload.previewUrl);
+      }
+      return [];
+    });
+  }, []);
+
+  return {
+    canAttachImages,
+    canAttachAudio,
+    canAttachVideo,
+    attachments,
+    /** Sending waits for what is still uploading; a failed one does not
+     *  hold it. */
+    uploading: uploads.some(upload => !upload.error),
+    addFiles,
+    refuseWhenFull,
+    clear,
+    preview: { uploads, setUploads, attachments, setAttachments }
+  };
 }

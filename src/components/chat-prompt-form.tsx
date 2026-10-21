@@ -13,10 +13,7 @@ import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { useFileDrop } from '@/hooks/use-file-drop';
 import { Button } from '@/components/ui/button';
 import { AddFilesMenu } from '@/components/add-files-menu';
-import {
-  AttachmentsPreview,
-  type PendingUpload
-} from '@/components/attachments-preview';
+import { AttachmentsPreview } from '@/components/attachments-preview';
 import { MediaSettingsMenu } from '@/components/media-settings-menu';
 import { ModelMenu, type ModelOptions } from '@/components/model-menu';
 import { UsageLimitAlert } from '@/components/usage-limit-alert';
@@ -47,10 +44,6 @@ export function ChatPromptForm({
   onModelChange
 }: ChatPromptFormProps) {
   const { formRef, onKeyDown } = useEnterSubmit();
-  const [uploads, setUploads] = useState<Array<PendingUpload>>([]);
-  // Sending waits for what is still uploading; a failed one does not hold it.
-  const uploading = uploads.some(upload => !upload.error);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [modelOptions, setModelOptions] = useState<ModelOptions>({});
 
   const { chatModels, imageModels, videoModels, sttModels, webSearch } =
@@ -78,35 +71,25 @@ export function ChatPromptForm({
       ? 'Select a model to start.'
       : 'Send a message.';
 
-  // An image is worth taking for either of two things, each decided on its
-  // own: the chat model looking at it, or a tool working from it — editing it,
-  // or animating it into a video. Whether the model itself sees an image stays
-  // with `supportsVision`: without it, the server hands the model the image's
-  // address, which is what the tools take. Audio and video are taken on the
-  // same terms: when a tool can act on them — transcribing audio, editing a
-  // video. With the media tools switched off, none of those is offered.
-  const toolsOn = preferences.mediaGeneration;
-  const canAttachImages =
-    !!modelOptions.supportsVision ||
-    (toolsOn &&
-      (!!imageModels?.some(model => model.supportsImageEdit) ||
-        !!videoModels?.some(model => model.supportsImageToVideo)));
-  const canAttachAudio = toolsOn && !!sttModels?.length;
-  const canAttachVideo =
-    toolsOn && !!videoModels?.some(model => model.supportsVideoEdit);
-
   // Files come into the message three ways — the `+` menu, a drop anywhere on
   // the page, a paste into the input — all on the same terms.
   const busy = status === 'submitted' || status === 'streaming';
-  const { addFiles, refuseWhenFull } = useAttachmentUpload({
+  const files = useAttachmentUpload({
+    supportsVision: !!modelOptions.supportsVision,
+    mediaGeneration: preferences.mediaGeneration,
+    imageModels,
+    videoModels,
+    sttModels
+  });
+  const {
     canAttachImages,
     canAttachAudio,
     canAttachVideo,
-    uploads,
-    setUploads,
     attachments,
-    setAttachments
-  });
+    uploading,
+    addFiles,
+    refuseWhenFull
+  } = files;
   const dropping = useFileDrop(files => void addFiles(files), !busy);
 
   // Whether this model can search at all — the server's own rule, so the
@@ -147,12 +130,7 @@ export function ChatPromptForm({
     // what the user typed along with any uploaded attachments.
     if (!onSubmit(attachments)) return;
     setInput('');
-    setAttachments([]);
-    // Only failed ones can be left by now — sending waits for the rest.
-    for (const upload of uploads) {
-      if (upload.previewUrl) URL.revokeObjectURL(upload.previewUrl);
-    }
-    setUploads([]);
+    files.clear();
   };
 
   return (
@@ -174,10 +152,7 @@ export function ChatPromptForm({
           sight could be neither seen nor removed. */}
       <AttachmentsPreview
         disabled={status === 'submitted' || status === 'streaming'}
-        uploads={uploads}
-        setUploads={setUploads}
-        attachments={attachments}
-        setAttachments={setAttachments}
+        {...files.preview}
         // Room under the thumbnails for the notice that tucks over its edge.
         className={unusable.length ? 'pb-6' : undefined}
       />

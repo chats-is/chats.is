@@ -18,6 +18,7 @@ import {
 
 import {
   type ChatMessage,
+  type ModelCapability,
   type ProviderType,
   type ReasoningEffort
 } from '@/types';
@@ -456,10 +457,18 @@ export const prompts = createTable(
       .$type<'private' | 'public'>(),
     // Free-text labels for browsing/filtering.
     tags: jsonb('tags').$type<Array<string>>(),
-    // Free-text display labels only (NOT linked to the providers table, not filtered).
-    providers: jsonb('providers').$type<Array<string>>(),
-    // Model ids (from the models table) this prompt targets — used for filtering.
-    models: jsonb('models').$type<Array<string>>(),
+    // What the prompt is for: chat, image, video or audio.
+    type: varchar('type', { length: 20 })
+      .notNull()
+      .default('chat')
+      .$type<ModelCapability>(),
+    // Whether trying it needs a reference — an image, a video, audio or a
+    // file, by its type.
+    needsReference: boolean('needs_reference').notNull().default(false),
+    // The model it is tried on by default, by its modelId: a chat model for a
+    // chat prompt, else the media model its type and reference call for.
+    // Null leaves it to the user's own settings.
+    modelId: varchar('model_id', { length: 255 }),
     image: text('image'),
     content: text('content').notNull(),
     displayOrder: integer('display_order').notNull().default(0),

@@ -4,6 +4,7 @@ import { type UseChatHelpers } from '@ai-sdk/react';
 import { MessageSquare } from 'lucide-react';
 
 import { type Artifact, type Attachment, type ChatMessage } from '@/types';
+import { type PendingPrompt } from '@/lib/pending-prompt';
 import { cn } from '@/lib/utils';
 import { ChatHeader } from '@/components/chat-header';
 import { ChatPromptForm } from '@/components/chat-prompt-form';
@@ -45,6 +46,8 @@ interface ChatPanelProps extends Pick<
   /** The replies refused while this chat was open, shown with their reason. */
   refusedHere?: ReadonlySet<string>;
   onModelChange: (modelId: string) => void;
+  /** A prompt tried from a suggestion's dialog, to be sent here. */
+  onTryPrompt: (prompt: PendingPrompt) => void;
   onSelectArtifact: (artifactId: string) => void;
   onReload: (message: ChatMessage) => void;
 }
@@ -69,6 +72,7 @@ export function ChatPanel({
   error,
   refusedHere,
   onModelChange,
+  onTryPrompt,
   onSelectArtifact,
   onReload
 }: ChatPanelProps) {
@@ -136,6 +140,7 @@ export function ChatPanel({
           <PromptSuggestions
             currentValue={input}
             onInsert={setInput}
+            onTry={onTryPrompt}
             disabled={status === 'submitted' || status === 'streaming'}
           />
         )}

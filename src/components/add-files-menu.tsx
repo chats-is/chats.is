@@ -36,6 +36,25 @@ const DOCUMENT_TYPES = Object.keys(DOCUMENT_MEDIA_TYPES).map(
   extension => `.${extension}`
 );
 
+/** The file picker's list of types, for what can be taken — a document
+ *  always. Shared with a prompt's dialog, so both offer the same files. */
+export function acceptedFiles({
+  canAttachImages,
+  canAttachAudio,
+  canAttachVideo
+}: {
+  canAttachImages: boolean;
+  canAttachAudio: boolean;
+  canAttachVideo: boolean;
+}) {
+  return [
+    ...(canAttachImages ? IMAGE_TYPES : []),
+    ...(canAttachAudio ? AUDIO_TYPES : []),
+    ...(canAttachVideo ? VIDEO_TYPES : []),
+    ...DOCUMENT_TYPES
+  ].join(',');
+}
+
 interface AddFilesMenuProps {
   disabled?: boolean;
   /** An image can be taken: the chat model sees it, or a tool uses it. */
@@ -106,12 +125,11 @@ export function AddFilesMenu({
     }
   }, [refuseWhenFull, addFiles]);
 
-  const accept = [
-    ...(canAttachImages ? IMAGE_TYPES : []),
-    ...(canAttachAudio ? AUDIO_TYPES : []),
-    ...(canAttachVideo ? VIDEO_TYPES : []),
-    ...DOCUMENT_TYPES
-  ].join(',');
+  const accept = acceptedFiles({
+    canAttachImages,
+    canAttachAudio,
+    canAttachVideo
+  });
   // A screenshot is an image, so it goes where images may — and only where
   // the browser can capture the screen at all.
   const canScreenshot = canAttachImages && canCaptureScreen();
