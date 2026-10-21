@@ -1,12 +1,16 @@
 import { useMemo, useState } from 'react';
+import { useStore } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { type ModelCapability } from '@/types';
 import { describeMultiplier } from '@/lib/billing';
+import { CAPABILITIES, MEDIA_KIND_LABELS } from '@/lib/constant';
 import { describeModelList } from '@/lib/model-access';
 import { mutating } from '@/lib/mutation';
+import { cn, isSttModel, isTtsModel } from '@/lib/utils';
 import { useEditRecord } from '@/hooks/use-edit-record';
 import { useSearchFilter } from '@/hooks/use-search-filter';
 import { modelQueries } from '@/server/functions/model';
@@ -56,6 +60,7 @@ import { ModelStatusName } from '@/components/console/model-status-name';
 import { ConsoleTableSkeleton } from '@/components/console/skeletons';
 import { tierTableInput } from '@/components/console/table-filters';
 import { ConsoleFilters, ConsoleToolbar } from '@/components/console/toolbar';
+import { ModelIcon } from '@/components/model-icon';
 
 type Tier = Awaited<ReturnType<typeof listTiers>>['rows'][number];
 /** What the edit form is filled from: the tier as read when it opens. */
@@ -225,6 +230,8 @@ export default function TiersPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  // The groups of the model list folded away, by name.
+  const [folded, setFolded] = useState<string[]>([]);
 
   // A tier's name and multiplier show on the plans and the users that chose
   // it, so those lists are stale once one is written.
@@ -331,15 +338,36 @@ export default function TiersPage() {
     []
   );
 
-  const modelsByCapability = useMemo(() => {
-    const groups: Record<string, NonNullable<typeof models>> = {};
-    (models ?? []).forEach(m => {
-      const cap = m.capability;
-      if (!groups[cap]) groups[cap] = [];
-      groups[cap].push(m);
-    });
-    return groups;
+  // What the models are for, by the names the app gives them elsewhere —
+  // audio split, as the media generation settings split it, into speaking
+  // and transcribing — each in the order the console sets.
+  const modelGroups = useMemo(() => {
+    const named = (capability: ModelCapability) =>
+      CAPABILITIES.find(({ value }) => value === capability)!.label;
+    const all = models ?? [];
+    return [
+      {
+        label: named('chat'),
+        models: all.filter(m => m.capability === 'chat')
+      },
+      {
+        label: named('image'),
+        models: all.filter(m => m.capability === 'image')
+      },
+      {
+        label: named('video'),
+        models: all.filter(m => m.capability === 'video')
+      },
+      { label: MEDIA_KIND_LABELS.audio, models: all.filter(isTtsModel) },
+      { label: MEDIA_KIND_LABELS.stt, models: all.filter(isSttModel) }
+    ].filter(group => group.models.length > 0);
   }, [models]);
+
+  // What a checked model is, under the mode in force: allowed or blocked.
+  const restriction = useStore(
+    form.store,
+    state => state.values.modelRestrictionMode
+  );
 
   return (
     <div className="space-y-6">
@@ -408,63 +436,143 @@ export default function TiersPage() {
                   )}
                 </form.AppField>
                 <form.Field name="modelIds" mode="array">
-                  {field => (
-                    <div className="space-y-2">
-                      <Label>
-                        <span className="text-xs font-normal text-muted-foreground">
-                          {field.state.value.length === 0
-                            ? 'Nothing checked: all models are allowed.'
-                            : `${field.state.value.length} checked`}
-                        </span>
-                      </Label>
-                      <div className="max-h-64 overflow-auto rounded-md border p-3">
-                        {Object.keys(modelsByCapability).length === 0 ? (
-                          <div className="text-sm text-muted-foreground">
-                            No models configured.
-                          </div>
-                        ) : (
-                          Object.entries(modelsByCapability).map(
-                            ([cap, items]) => (
-                              <div key={cap} className="mb-3 last:mb-0">
-                                <div className="mb-1 text-xs font-semibold text-muted-foreground uppercase">
-                                  {cap}
-                                </div>
-                                <div className="grid grid-cols-2 gap-1">
-                                  {items.map(m => (
-                                    <label
-                                      key={m.id}
-                                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/40"
-                                    >
+                  {field => {
+                    const checked = field.state.value;
+                    const check = (ids: string[], on: boolean) =>
+                      field.handleChange(current =>
+                        on
+                          ? [...new Set([...current, ...ids])]
+                          : current.filter(id => !ids.includes(id))
+                      );
+                    return (
+                      <div className="space-y-2">
+                        <Label>
+                          <span className="text-xs font-normal text-muted-foreground">
+                            {checked.length === 0
+                              ? 'Nothing checked: all models are allowed.'
+                              : describeModelList({
+                                  modelRestrictionMode: restriction,
+                                  modelIds: checked
+                                })}
+                          </span>
+                        </Label>
+                        {/* At its full length, scrolled with the form rather
+                            than in a box of its own inside it. */}
+                        <div className="rounded-md border p-3">
+                          {modelGroups.length === 0 ? (
+                            <div className="text-sm text-muted-foreground">
+                              No models configured.
+                            </div>
+                          ) : (
+                            modelGroups.map(group => {
+                              const ids = group.models.map(m => m.modelId);
+                              const all = ids.every(id => checked.includes(id));
+                              return (
+                                <div
+                                  key={group.label}
+                                  className="mb-3 last:mb-0"
+                                >
+                                  {/* The whole group at once: checked once
+                                      every model in it is, and unchecking it
+                                      lets them all go. */}
+                                  <div className="mb-1 flex items-center gap-2 px-2">
+                                    <label className="flex cursor-pointer items-center gap-2">
                                       <Checkbox
-                                        checked={field.state.value.includes(
-                                          m.modelId
-                                        )}
-                                        onCheckedChange={() =>
-                                          field.handleChange(current =>
-                                            current.includes(m.modelId)
-                                              ? current.filter(
-                                                  id => id !== m.modelId
-                                                )
-                                              : [...current, m.modelId]
-                                          )
+                                        aria-label={`All ${group.label} models`}
+                                        checked={all}
+                                        onCheckedChange={on =>
+                                          check(ids, on === true)
                                         }
                                       />
-                                      <ModelStatusName
-                                        status={m.status}
-                                        className="font-mono text-xs"
-                                      >
-                                        {m.modelId}
-                                      </ModelStatusName>
+                                      <span className="text-xs font-semibold text-muted-foreground select-none">
+                                        {group.label}
+                                      </span>
                                     </label>
-                                  ))}
+                                    <button
+                                      type="button"
+                                      aria-expanded={
+                                        !folded.includes(group.label)
+                                      }
+                                      aria-label={`${folded.includes(group.label) ? 'Show' : 'Hide'} ${group.label} models`}
+                                      onClick={() =>
+                                        setFolded(current =>
+                                          current.includes(group.label)
+                                            ? current.filter(
+                                                label => label !== group.label
+                                              )
+                                            : [...current, group.label]
+                                        )
+                                      }
+                                      className="ml-auto rounded p-0.5 text-muted-foreground hover:bg-muted"
+                                    >
+                                      <ChevronDown
+                                        className={cn(
+                                          'size-4 transition-transform',
+                                          folded.includes(group.label) &&
+                                            '-rotate-90'
+                                        )}
+                                      />
+                                    </button>
+                                  </div>
+                                  <div
+                                    className={cn(
+                                      'grid grid-cols-2 gap-1',
+                                      folded.includes(group.label) && 'hidden'
+                                    )}
+                                  >
+                                    {group.models.map(m => (
+                                      <label
+                                        key={m.id}
+                                        className="flex cursor-pointer items-start gap-2 rounded px-2 py-1 hover:bg-muted/40"
+                                      >
+                                        <Checkbox
+                                          className="mt-0.5"
+                                          checked={checked.includes(m.modelId)}
+                                          onCheckedChange={on =>
+                                            check([m.modelId], on === true)
+                                          }
+                                        />
+                                        {/* A slot of its own, so a model with
+                                            no mark starts its name where the
+                                            others do. */}
+                                        <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
+                                          <ModelIcon
+                                            image={
+                                              m.image ||
+                                              m.providers[0]?.provider?.image ||
+                                              null
+                                            }
+                                            className="size-4"
+                                          />
+                                        </span>
+                                        <span className="flex min-w-0 flex-col">
+                                          <ModelStatusName
+                                            status={m.status}
+                                            className="text-sm"
+                                          >
+                                            {m.name}
+                                          </ModelStatusName>
+                                          <span
+                                            className={cn(
+                                              'truncate text-xs text-muted-foreground',
+                                              m.status !== 'available' &&
+                                                'line-through'
+                                            )}
+                                          >
+                                            {m.modelId}
+                                          </span>
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )
-                          )
-                        )}
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  }}
                 </form.Field>
               </fieldset>
               <DialogFooter>
