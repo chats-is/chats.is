@@ -4,9 +4,7 @@ A self-hosted AI chat app. You run it for your own users, with your own
 provider keys, and decide in an admin console which models they can use and how
 much they may spend.
 
-<p align="center">
-  <a href="docs/promo.mp4"><img src="docs/promo-poster.png" alt="chats.is — watch the tour (1:38)" width="800"></a>
-</p>
+https://github.com/user-attachments/assets/1028102d-5e8f-445f-bb8e-aa86aba0e2f6
 
 ## Features
 
