@@ -82,6 +82,12 @@ export function Message({
   );
   const hasReasoningPart = reasoningParts.length > 0;
   const hasFilePart = message.parts.some(part => part.type === 'file');
+  // What goes in a user's bubble: their words, and the passage they are about.
+  const hasUserWords = message.parts.some(
+    part =>
+      (part.type === 'text' && part.text.trim().length > 0) ||
+      (part.type === 'data-artifactRef' && !!part.data.selection)
+  );
   // A refusal or a failure is the whole of the reply: nothing is on its way
   // after it, so nothing waits as if it were.
   const hasErrorPart = message.parts.some(part => part.type === 'data-error');
@@ -185,8 +191,91 @@ export function Message({
     };
   }, [message.parts, artifacts]);
 
+  // A file the message carries: an image, a sound, a video, or any other
+  // file by its name. What the user attached is drawn smaller than what a
+  // reply made — it is what they sent along, not the answer: an image as a
+  // square thumbnail that opens full size, a video small but still playable.
+  // Whatever a file is, it keeps its room below and none above, so one that
+  // opens a message stands level with the avatar.
+  const renderFilePart = (
+    part: Extract<ChatMessage['parts'][number], { type: 'file' }>,
+    index: number
+  ) => {
+    const attached = message.role === 'user';
+    // Render image
+    if (part.mediaType.startsWith('image/')) {
+      return (
+        <div key={index} className={cn('mb-2', !attached && 'max-w-80')}>
+          <MediaLightbox
+            type="image"
+            src={part.url}
+            alt={part.filename || 'Generated image'}
+            trigger={
+              <img
+                className={cn(
+                  'cursor-zoom-in rounded-lg transition-opacity hover:opacity-90',
+                  attached ? 'size-20 object-cover' : 'max-h-96'
+                )}
+                src={part.url}
+                alt={part.filename || 'Generated image'}
+              />
+            }
+          />
+        </div>
+      );
+    }
+
+    // Render audio
+    if (part.mediaType.startsWith('audio/')) {
+      return (
+        <div key={index} className="mb-2 w-80 max-w-full">
+          <AudioPlayer src={part.url} />
+        </div>
+      );
+    }
+
+    // Render video
+    if (part.mediaType.startsWith('video/')) {
+      return (
+        <div
+          key={index}
+          className={cn('mb-2', attached ? 'max-w-60' : 'max-w-80')}
+        >
+          <VideoPlayer src={part.url} />
+        </div>
+      );
+    }
+
+    // A document, or any other file: its name, opening the file.
+    // As wide as its name, up to a limit, and inline — so the
+    // files of one message sit side by side.
+    return (
+      <Tooltip key={index}>
+        <TooltipTrigger asChild>
+          <a
+            href={part.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'inline-flex max-w-60 items-center gap-2 rounded-lg border bg-background px-3 py-2 align-top text-sm hover:bg-muted',
+              'mb-2',
+              !attached && 'mr-2'
+            )}
+          >
+            <FileTypeIcon
+              contentType={part.mediaType}
+              className="size-4 shrink-0 text-muted-foreground/60"
+            />
+            <span className="min-w-0 truncate">{part.filename || 'File'}</span>
+          </a>
+        </TooltipTrigger>
+        <TooltipContent>{part.filename || 'File'}</TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const renderArtifactCard = (artifact: Artifact) => (
-    <div className="my-2">
+    <div className="mb-2">
       <DocumentPreview
         artifact={artifact}
         onOpen={onSelectArtifact}
@@ -219,217 +308,171 @@ export function Message({
             !isReadonly && (message.role === 'user' ? 'mr-3' : 'ml-3')
           )}
         >
-          <div
-            className={cn(
-              message.role === 'user'
-                ? 'ml-12 rounded-2xl bg-muted px-3 py-1.5'
-                : 'w-full pr-12'
-            )}
-          >
-            {message.parts.map((part, index) => {
-              if (isMediaToolPart(part)) {
-                return <MediaToolPart key={index} part={part} />;
-              }
-
-              if (isTranscribeToolPart(part)) {
-                return <TranscribeToolPart key={index} part={part} />;
-              }
-
-              if (isWebSearchPart(part)) {
-                return index === firstWebSearchIndex ? (
-                  <WebSearchBlock key={index} parts={webSearchParts} />
-                ) : null;
-              }
-
-              // A turn that failed — refused before it began, or cut off part
-              // way. Refused just now, the reason is what to act on, so it is
-              // shown; read back later, what is left is that nothing came
-              // back.
-              if (part.type === 'data-error') {
-                return refusedHere ? (
-                  <MessageError key={index} message={part.data.message} />
-                ) : (
-                  <MessageIncomplete key={index} />
-                );
-              }
-
-              if (isArtifactToolPart(part)) {
-                const artifact = partArtifact.get(index);
-                return artifact ? (
-                  <React.Fragment key={index}>
-                    {renderArtifactCard(artifact)}
-                  </React.Fragment>
-                ) : null;
-              }
-
-              if (part.type === 'reasoning') {
-                if (index !== firstReasoningIndex || !mergedReasoningPart) {
-                  return null;
+          {/* What the user attached, on a line of its own above their words,
+              to the right as the message is — not inside the bubble. */}
+          {message.role === 'user' && hasFilePart && (
+            <div className="flex flex-wrap justify-end gap-x-2">
+              {message.parts.map((part, index) =>
+                part.type === 'file' ? renderFilePart(part, index) : null
+              )}
+            </div>
+          )}
+          {/* A user's words in a bubble as wide as they are, up to most of
+              the row; one that only carried files has none. */}
+          {(message.role !== 'user' || hasUserWords) && (
+            <div
+              className={cn(
+                message.role === 'user'
+                  ? 'max-w-[80%] rounded-2xl bg-muted px-3 py-1.5'
+                  : 'w-full pr-12'
+              )}
+            >
+              {message.parts.map((part, index) => {
+                if (isMediaToolPart(part)) {
+                  return <MediaToolPart key={index} part={part} />;
                 }
 
-                return (
-                  <MessageReasoning
-                    key={index}
-                    part={mergedReasoningPart}
-                    reasonDuration={message.metadata?.reasonDuration}
-                    isLoading={showReasoningLoading}
-                    isThinking={
-                      showReasoningLoading &&
-                      message.parts[message.parts.length - 1]?.type ===
-                        'reasoning'
-                    }
-                  />
-                );
-              }
+                if (isTranscribeToolPart(part)) {
+                  return <TranscribeToolPart key={index} part={part} />;
+                }
 
-              // The passage a request is about, above it, as the reader
-              // chose it in the artifact.
-              if (part.type === 'data-artifactRef') {
-                return part.data.selection ? (
-                  <p
-                    key={index}
-                    className="my-1 line-clamp-3 border-l-2 border-muted-foreground/30 pl-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
-                  >
-                    {part.data.selection}
-                  </p>
-                ) : null;
-              }
+                if (isWebSearchPart(part)) {
+                  return index === firstWebSearchIndex ? (
+                    <WebSearchBlock key={index} parts={webSearchParts} />
+                  ) : null;
+                }
 
-              if (part.type === 'text') {
-                if (message.role === 'user') {
+                // A turn that failed — refused before it began, or cut off part
+                // way. Refused just now, the reason is what to act on, so it is
+                // shown; read back later, what is left is that nothing came
+                // back.
+                if (part.type === 'data-error') {
+                  return refusedHere ? (
+                    <MessageError key={index} message={part.data.message} />
+                  ) : (
+                    <MessageIncomplete key={index} />
+                  );
+                }
+
+                if (isArtifactToolPart(part)) {
+                  const artifact = partArtifact.get(index);
+                  return artifact ? (
+                    <React.Fragment key={index}>
+                      {renderArtifactCard(artifact)}
+                    </React.Fragment>
+                  ) : null;
+                }
+
+                if (part.type === 'reasoning') {
+                  if (index !== firstReasoningIndex || !mergedReasoningPart) {
+                    return null;
+                  }
+
                   return (
-                    <p key={index} className="whitespace-pre-wrap">
-                      {part.text.split('\n').map((line, i) => (
-                        <React.Fragment key={i}>
-                          {i > 0 && <br />}
-                          {line}
-                        </React.Fragment>
-                      ))}
+                    <MessageReasoning
+                      key={index}
+                      part={mergedReasoningPart}
+                      reasonDuration={message.metadata?.reasonDuration}
+                      isLoading={showReasoningLoading}
+                      isThinking={
+                        showReasoningLoading &&
+                        message.parts[message.parts.length - 1]?.type ===
+                          'reasoning'
+                      }
+                    />
+                  );
+                }
+
+                // The passage a request is about, above it, as the reader
+                // chose it in the artifact.
+                if (part.type === 'data-artifactRef') {
+                  return part.data.selection ? (
+                    <p
+                      key={index}
+                      className="my-1 line-clamp-3 border-l-2 border-muted-foreground/30 pl-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
+                    >
+                      {part.data.selection}
                     </p>
-                  );
-                }
-                // Drawn once, at the start of the piece it belongs to.
-                const run = runs.get(index);
-                return run ? (
-                  <MessageMarkdown
-                    key={index}
-                    content={run.text}
-                    streaming={run.streaming}
-                  />
-                ) : null;
-              }
-
-              if (part.type === 'file') {
-                // Render image
-                if (part.mediaType.startsWith('image/')) {
-                  return (
-                    <div key={index} className="my-2 max-w-80">
-                      <MediaLightbox
-                        type="image"
-                        src={part.url}
-                        alt={part.filename || 'Generated image'}
-                        trigger={
-                          <img
-                            className="max-h-96 cursor-zoom-in rounded-lg transition-opacity hover:opacity-90"
-                            src={part.url}
-                            alt={part.filename || 'Generated image'}
-                          />
-                        }
-                      />
-                    </div>
-                  );
+                  ) : null;
                 }
 
-                // Render audio
-                if (part.mediaType.startsWith('audio/')) {
-                  return (
-                    <div key={index} className="my-2 w-80 max-w-full">
-                      <AudioPlayer src={part.url} />
-                    </div>
-                  );
+                if (part.type === 'text') {
+                  if (message.role === 'user') {
+                    return (
+                      <p key={index} className="whitespace-pre-wrap">
+                        {part.text.split('\n').map((line, i) => (
+                          <React.Fragment key={i}>
+                            {i > 0 && <br />}
+                            {line}
+                          </React.Fragment>
+                        ))}
+                      </p>
+                    );
+                  }
+                  // Drawn once, at the start of the piece it belongs to.
+                  const run = runs.get(index);
+                  return run ? (
+                    <MessageMarkdown
+                      key={index}
+                      content={run.text}
+                      streaming={run.streaming}
+                    />
+                  ) : null;
                 }
 
-                // Render video
-                if (part.mediaType.startsWith('video/')) {
-                  return (
-                    <div key={index} className="my-2 max-w-80">
-                      <VideoPlayer src={part.url} />
-                    </div>
-                  );
+                if (part.type === 'file') {
+                  return message.role === 'user'
+                    ? null
+                    : renderFilePart(part, index);
                 }
-
-                // A document, or any other file: its name, opening the file.
-                // As wide as its name, up to a limit, and inline — so the
-                // files of one message sit side by side.
-                return (
-                  <Tooltip key={index}>
-                    <TooltipTrigger asChild>
-                      <a
-                        href={part.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="my-1 mr-2 inline-flex max-w-60 items-center gap-2 rounded-lg border bg-background px-3 py-2 align-top text-sm hover:bg-muted"
-                      >
-                        <FileTypeIcon
-                          contentType={part.mediaType}
-                          className="size-4 shrink-0 text-muted-foreground/60"
-                        />
-                        <span className="min-w-0 truncate">
-                          {part.filename || 'File'}
-                        </span>
-                      </a>
-                    </TooltipTrigger>
-                    <TooltipContent>{part.filename || 'File'}</TooltipContent>
-                  </Tooltip>
-                );
-              }
-            })}
-            {unpositionedArtifacts.map(artifact => (
-              <React.Fragment key={artifact.id}>
-                {renderArtifactCard(artifact)}
-              </React.Fragment>
-            ))}
-            {message.role === 'assistant' && status !== 'streaming' && (
-              <MessageSources sources={sources} />
-            )}
-            {status === 'streaming' &&
-              isLastMessage &&
-              !hasVisibleArtifacts &&
-              !hasReasoningPart &&
-              !hasVisibleTextContent &&
-              !hasFilePart &&
-              !hasMediaToolPart &&
-              !hasErrorPart &&
-              (supportsReasoning ? (
-                <MessageReasoning
-                  isLoading={false}
-                  isWaiting={true}
-                  part={{ type: 'reasoning', text: '' } as any}
-                  reasonDuration={message.metadata?.reasonDuration}
-                />
-              ) : (
-                <div className="my-1">
-                  <IconLoading className="text-muted-foreground" />
-                </div>
+              })}
+              {unpositionedArtifacts.map(artifact => (
+                <React.Fragment key={artifact.id}>
+                  {renderArtifactCard(artifact)}
+                </React.Fragment>
               ))}
-            {showSubmittedAssistantLoading && (
-              <div className="my-1">
-                <IconLoading className="text-muted-foreground" />
-              </div>
-            )}
-            {status === 'streaming' &&
-              isLastMessage &&
-              !hasVisibleArtifacts &&
-              !hasVisibleReasoningDisplay &&
-              !hasVisibleTextContent &&
-              !hasFilePart &&
-              !hasMediaToolPart &&
-              hasReasoningPart && (
+              {message.role === 'assistant' && status !== 'streaming' && (
+                <MessageSources sources={sources} />
+              )}
+              {status === 'streaming' &&
+                isLastMessage &&
+                !hasVisibleArtifacts &&
+                !hasReasoningPart &&
+                !hasVisibleTextContent &&
+                !hasFilePart &&
+                !hasMediaToolPart &&
+                !hasErrorPart &&
+                (supportsReasoning ? (
+                  <MessageReasoning
+                    isLoading={false}
+                    isWaiting={true}
+                    part={{ type: 'reasoning', text: '' } as any}
+                    reasonDuration={message.metadata?.reasonDuration}
+                  />
+                ) : (
+                  <div className="my-1">
+                    <IconLoading className="text-muted-foreground" />
+                  </div>
+                ))}
+              {showSubmittedAssistantLoading && (
                 <div className="my-1">
                   <IconLoading className="text-muted-foreground" />
                 </div>
               )}
-          </div>
+              {status === 'streaming' &&
+                isLastMessage &&
+                !hasVisibleArtifacts &&
+                !hasVisibleReasoningDisplay &&
+                !hasVisibleTextContent &&
+                !hasFilePart &&
+                !hasMediaToolPart &&
+                hasReasoningPart && (
+                  <div className="my-1">
+                    <IconLoading className="text-muted-foreground" />
+                  </div>
+                )}
+            </div>
+          )}
         </div>
       </div>
       {children}

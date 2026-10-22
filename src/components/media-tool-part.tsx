@@ -92,8 +92,11 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
         ? preferences?.videoAspectRatio
         : preferences?.imageAspectRatio);
 
+    // Room below and none above, as the media it stands in for, so nothing
+    // moves when that lands and one that opens a reply is level with the
+    // avatar.
     return (
-      <div className="my-2">
+      <div className="mb-2">
         <MediaPlaceholder
           type={placeholderType}
           aspectRatio={aspectRatio}
@@ -116,7 +119,7 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
 
   if (output.mediaType.startsWith('image/')) {
     return (
-      <div className="my-2 max-w-80">
+      <div className="mb-2 max-w-80">
         <MediaLightbox
           type="image"
           src={output.url}
@@ -135,7 +138,7 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
 
   if (output.mediaType.startsWith('audio/')) {
     return (
-      <div className="my-2 w-80 max-w-full">
+      <div className="mb-2 w-80 max-w-full">
         <AudioPlayer src={output.url} />
       </div>
     );
@@ -143,7 +146,7 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
 
   if (output.mediaType.startsWith('video/')) {
     return (
-      <div className="my-2 max-w-80">
+      <div className="mb-2 max-w-80">
         <VideoPlayer src={output.url} />
       </div>
     );
