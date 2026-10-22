@@ -98,7 +98,8 @@ import { modelTableInput } from '@/components/console/table-filters';
 import {
   ConsoleFilters,
   ConsoleSearch,
-  ConsoleToolbar
+  ConsoleToolbar,
+  ProviderFilter
 } from '@/components/console/toolbar';
 import {
   optionRows,
@@ -487,7 +488,8 @@ export function ModelsPending() {
         edit: noop,
         remove: noop
       })}
-      filters={2}
+      // Capability, priced, provider — at the widths they are drawn.
+      filters={['w-40', 'w-36', 'w-44']}
     />
   );
 }
@@ -497,6 +499,10 @@ export default function ModelsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filterPriced, setFilterPriced] = useSearchFilter('priced', 'all');
+  const [filterProvider, setFilterProvider] = useSearchFilter(
+    'provider',
+    'all'
+  );
   const [filterCapability, setFilterCapability] = useSearchFilter(
     'capability',
     'all'
@@ -510,6 +516,7 @@ export default function ModelsPage() {
       modelTableInput({
         capability: filterCapability,
         priced: filterPriced,
+        provider: filterProvider,
         q: search,
         page
       })
@@ -743,6 +750,11 @@ export default function ModelsPage() {
               <SelectItem value="unpriced">Unpriced</SelectItem>
             </SelectContent>
           </Select>
+          <ProviderFilter
+            providers={providers}
+            value={filterProvider}
+            onChange={setFilterProvider}
+          />
         </ConsoleFilters>
 
         <Dialog

@@ -14,6 +14,7 @@ import { modelTableInput } from '@/components/console/table-filters';
 const searchSchema = z.object({
   capability: z.string().optional(),
   priced: z.string().optional(),
+  provider: z.string().optional(),
   q: z.string().optional(),
   page: pageSearchSchema
 });
@@ -31,9 +32,9 @@ export const Route = createFileRoute('/console/models')({
    * The key is the one the component asks for on a plain visit, so it mounts
    * with data rather than skeletoning a second time.
    *
-   * The provider list is started alongside but not waited for: it fills a
-   * select inside the Add Model dialog, and nothing on the page behind that
-   * dialog is waiting to know it.
+   * The provider list is started alongside but not waited for: it fills the
+   * provider filter's options and a select inside the Add Model dialog, and
+   * the table does not wait on either.
    */
   loader: ({ context }) => {
     void context.queryClient.prefetchQuery(providerQueries.forSelect());

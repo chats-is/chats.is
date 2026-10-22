@@ -1,6 +1,13 @@
 import { Search } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 
 /**
  * The row above a console table.
@@ -53,5 +60,36 @@ export function ConsoleSearch({
         className="pl-9"
       />
     </div>
+  );
+}
+
+/**
+ * The provider filter a console table narrows by: every provider, or one.
+ * The providers are its options once their list lands; a provider chosen
+ * before then — named in the address — shows its name when it does.
+ */
+export function ProviderFilter({
+  providers,
+  value,
+  onChange
+}: {
+  providers: Array<{ id: string; name: string }> | undefined;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-44">
+        <SelectValue placeholder="All Providers" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All Providers</SelectItem>
+        {providers?.map(provider => (
+          <SelectItem key={provider.id} value={provider.id}>
+            {provider.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

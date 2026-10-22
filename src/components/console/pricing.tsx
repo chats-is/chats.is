@@ -26,6 +26,7 @@ import {
   upsertPricing,
   type listPricingWithModels
 } from '@/server/functions/pricing';
+import { providerQueries } from '@/server/functions/provider';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,7 +77,8 @@ import { pricingTableInput } from '@/components/console/table-filters';
 import {
   ConsoleFilters,
   ConsoleSearch,
-  ConsoleToolbar
+  ConsoleToolbar,
+  ProviderFilter
 } from '@/components/console/toolbar';
 import { UnpricedBadge } from '@/components/console/unpriced-badge';
 
@@ -365,7 +367,10 @@ export function PricingPending() {
   return (
     <ConsoleTableSkeleton
       columns={pricingColumns({ edit: noop, remove: noop, sync: noop })}
-      filters={2}
+      // Capability, priced, provider — at the widths they are drawn.
+      filters={['w-40', 'w-36', 'w-44']}
+      // Sync prices, wider than the usual button.
+      actionWidth="w-36"
     />
   );
 }
@@ -377,7 +382,12 @@ export default function PricingPage() {
     'all'
   );
   const [filterPriced, setFilterPriced] = useSearchFilter('priced', 'all');
+  const [filterProvider, setFilterProvider] = useSearchFilter(
+    'provider',
+    'all'
+  );
   const [search, setSearch] = useSearchFilter('q', '');
+  const { data: providers } = useQuery(providerQueries.forSelect());
   const [edit, setEdit] = useState<EditTarget | null>(null);
 
   // Source selection — held in the popover before opening preview.
@@ -394,6 +404,7 @@ export default function PricingPage() {
       pricingTableInput({
         capability: filterCapability,
         priced: filterPriced,
+        provider: filterProvider,
         q: search,
         page
       })
@@ -718,6 +729,11 @@ export default function PricingPage() {
               <SelectItem value="unpriced">Unpriced</SelectItem>
             </SelectContent>
           </Select>
+          <ProviderFilter
+            providers={providers}
+            value={filterProvider}
+            onChange={setFilterProvider}
+          />
         </ConsoleFilters>
 
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>

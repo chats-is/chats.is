@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { pageSearchSchema } from '@/types/pagination';
 import { pageTitle } from '@/lib/head';
 import { pricingQueries } from '@/server/functions/pricing';
+import { providerQueries } from '@/server/functions/provider';
 import Pricing, { PricingPending } from '@/components/console/pricing';
 import { pricingTableInput } from '@/components/console/table-filters';
 
@@ -13,6 +14,7 @@ import { pricingTableInput } from '@/components/console/table-filters';
 const searchSchema = z.object({
   capability: z.string().optional(),
   priced: z.string().optional(),
+  provider: z.string().optional(),
   q: z.string().optional(),
   page: pageSearchSchema
 });
@@ -28,11 +30,16 @@ export const Route = createFileRoute('/console/pricing')({
    *
    * The key is the one the component asks for on a plain visit, so it mounts
    * with data rather than skeletoning a second time.
+   *
+   * The provider list is started alongside but not waited for: it fills the
+   * provider filter's options, and the table does not wait on them.
    */
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(providerQueries.forSelect());
+    return context.queryClient.ensureQueryData(
       pricingQueries.listWithModels(pricingTableInput({}))
-    ),
+    );
+  },
   head: ({ matches }) => ({ meta: [{ title: pageTitle(matches, 'Pricing') }] }),
   pendingComponent: PricingPending,
   component: Pricing

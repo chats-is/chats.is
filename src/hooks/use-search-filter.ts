@@ -6,6 +6,7 @@ type Filters = {
   q: string;
   capability: string;
   priced: string;
+  provider: string;
   model: string;
   user: string;
   status: string;

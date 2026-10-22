@@ -438,7 +438,8 @@ export async function listPricingWithModels(
           // matching providers name the models instead.
           boundTo(ilike(providers.name, term))
         )
-      : undefined
+      : undefined,
+    filter.providerId ? boundTo(eq(providers.id, filter.providerId)) : undefined
   );
 
   const [result, [totalRow]] = await Promise.all([

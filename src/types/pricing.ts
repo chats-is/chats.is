@@ -97,6 +97,8 @@ export const pricingListSchema = z.object({
   priced: z.enum(['priced', 'unpriced']).optional(),
   /** Matches a model's name, its model id, or its provider's name. */
   q: z.string().optional(),
+  /** Only the models bound to this provider. */
+  providerId: z.string().optional(),
   ...paginationSchema.shape
 });
 

@@ -25,9 +25,13 @@ const termOf = (q: string | undefined) => q?.trim() || undefined;
 const pageOf = (page: number | undefined) => page ?? 1;
 
 type CapabilitySearch = { capability?: string; q?: string; page?: number };
-/** A pricing filter beside the capability one: the models and the pricing
- *  tables both take it. */
-type PricingSearch = CapabilitySearch & { priced?: string };
+/** A pricing filter and a provider one beside the capability one: the models
+ *  and the pricing tables both take them. */
+type PricingSearch = CapabilitySearch & { priced?: string; provider?: string };
+
+/** A provider filter sitting at its default means "every provider". */
+const providerOf = (provider: string | undefined) =>
+  !provider || provider === 'all' ? undefined : provider;
 
 /** A priced filter sitting at its default means "every model". */
 const pricedOf = (
@@ -40,6 +44,7 @@ type PageOnly = { page?: number };
 export const modelTableInput = (search: PricingSearch) => ({
   capability: capabilityOf(search.capability),
   priced: pricedOf(search.priced),
+  providerId: providerOf(search.provider),
   q: termOf(search.q),
   page: pageOf(search.page)
 });
@@ -47,6 +52,7 @@ export const modelTableInput = (search: PricingSearch) => ({
 export const pricingTableInput = (search: PricingSearch) => ({
   capability: capabilityOf(search.capability),
   priced: pricedOf(search.priced),
+  providerId: providerOf(search.provider),
   q: termOf(search.q),
   page: pageOf(search.page)
 });

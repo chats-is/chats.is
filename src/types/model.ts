@@ -198,6 +198,8 @@ export const modelListSchema = z.object({
   /** Matches a model's name, its model id, or the name of a provider it is
    *  bound to. */
   q: z.string().optional(),
+  /** Only the models bound to this provider. */
+  providerId: z.string().optional(),
   ...paginationSchema.shape
 });
 

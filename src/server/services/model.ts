@@ -166,7 +166,8 @@ export async function listModels(filter: z.infer<typeof modelListSchema>) {
           // `where` cannot reach one — so name the matching models instead.
           boundTo(ilike(providers.name, term))
         )
-      : undefined
+      : undefined,
+    filter.providerId ? boundTo(eq(providers.id, filter.providerId)) : undefined
   );
 
   const [rows, [totalRow]] = await Promise.all([

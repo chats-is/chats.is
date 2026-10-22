@@ -39,21 +39,30 @@ import { TablePaginationSkeleton } from '@/components/table-pagination';
 function ToolbarSkeleton({
   search,
   filters,
-  action
+  action,
+  actionWidth
 }: {
   search: boolean;
-  filters: number;
+  filters: number | string[];
   action: ToolbarAction;
+  actionWidth: string;
 }) {
+  // A select's width where the page names it, else the usual one.
+  const widths =
+    typeof filters === 'number'
+      ? Array.from({ length: filters }, () => 'w-40')
+      : filters;
   return (
     <div className="flex items-center justify-between gap-4">
-      <div className="flex max-w-2xl flex-1 items-center gap-2">
+      {/* As wide as the filters it stands in for, which take what they need:
+          capped, the search box gave way to the selects beside it. */}
+      <div className="flex flex-1 items-center gap-2">
         {search && <Skeleton className="h-9 w-full max-w-xs" />}
-        {Array.from({ length: filters }).map((_, i) => (
-          <Skeleton key={i} className="h-9 w-40 shrink-0" />
+        {widths.map((width, i) => (
+          <Skeleton key={i} className={`h-9 shrink-0 ${width}`} />
         ))}
       </div>
-      {action === 'button' && <Skeleton className="h-9 w-28" />}
+      {action === 'button' && <Skeleton className={`h-9 ${actionWidth}`} />}
       {action === 'text' && <Skeleton className="h-4 w-44" />}
     </div>
   );
@@ -83,6 +92,7 @@ export function ConsoleTableSkeleton<TData extends RowData>({
   search = true,
   filters = 0,
   action = 'button',
+  actionWidth = 'w-28',
   pager = true
 }: {
   /** The page's real columns, or just how many to hold space for. */
@@ -92,16 +102,25 @@ export function ConsoleTableSkeleton<TData extends RowData>({
   toolbar?: boolean;
   /** Whether the toolbar opens with a search box. */
   search?: boolean;
-  /** Selects the page carries beside its search box. */
-  filters?: number;
+  /** Selects the page carries beside its search box: how many, or each one's
+   *  width class where they differ. */
+  filters?: number | string[];
   /** What closes the toolbar on the right. */
   action?: ToolbarAction;
+  /** The button's width class where it is wider than most — its width moves
+   *  everything beside it. */
+  actionWidth?: string;
   pager?: boolean;
 }) {
   return (
     <div className="space-y-6">
       {toolbar && (
-        <ToolbarSkeleton search={search} filters={filters} action={action} />
+        <ToolbarSkeleton
+          search={search}
+          filters={filters}
+          action={action}
+          actionWidth={actionWidth}
+        />
       )}
       <div className="space-y-3">
         {typeof columns === 'number' ? (

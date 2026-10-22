@@ -215,6 +215,29 @@ describe('listModels', () => {
 
     expect(page.rows.map(r => r.modelId)).toEqual(['dall-e-3']);
   });
+
+  it('narrows to the models bound to one provider', async () => {
+    await seedProvider('p-xai', 'xAI');
+    await seedModel(
+      { id: 'm-grok', name: 'Grok', modelId: 'grok-4', capability: 'chat' },
+      'p-xai'
+    );
+
+    const xai = await listModels({
+      page: 1,
+      pageSize: 50,
+      providerId: 'p-xai'
+    });
+    expect(xai.total).toBe(1);
+    expect(xai.rows.map(r => r.modelId)).toEqual(['grok-4']);
+
+    const openai = await listModels({
+      page: 1,
+      pageSize: 50,
+      providerId: 'p-openai'
+    });
+    expect(openai.total).toBe(25);
+  });
 });
 
 describe('listProviders', () => {
@@ -275,6 +298,31 @@ describe('listPricingWithModels', () => {
 
     expect(page.total).toBe(0);
     expect(page.rows).toEqual([]);
+  });
+
+  it('narrows to the models bound to one provider', async () => {
+    await seedProvider('p-xai', 'xAI');
+    await seedModel(
+      { id: 'm-grok', name: 'Grok', modelId: 'grok-4', capability: 'chat' },
+      'p-xai'
+    );
+
+    const xai = await listPricingWithModels({
+      page: 1,
+      pageSize: 50,
+      providerId: 'p-xai'
+    });
+    expect(xai.total).toBe(1);
+    expect(xai.rows.map(r => r.modelId)).toEqual(['grok-4']);
+    expect(
+      (
+        await listPricingWithModels({
+          page: 1,
+          pageSize: 50,
+          providerId: 'p-openai'
+        })
+      ).total
+    ).toBe(25);
   });
 });
 
