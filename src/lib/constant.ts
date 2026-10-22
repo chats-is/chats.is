@@ -162,6 +162,8 @@ export const MEDIA_TOOL_GUIDANCE: Record<ChatMediaToolName, string> = {
     'Create a new image from a text description. Use when the user asks for a picture, illustration, photo, logo, or any visual.',
   edit_image:
     "Modify an existing image from this conversation (a user upload or a previously generated image). Pass that image's URL as `imageUrl` and describe the change in `prompt`.",
+  remove_background:
+    "Remove the background from an image in this conversation (a user upload or a previously generated image), leaving the subject on a transparent background — use this, not edit_image, when the user asks to remove or cut out the background or for a transparent image. Pass that image's URL as `imageUrl`.",
   generate_video:
     'Create a video from a text description, or animate an image from this conversation by passing its URL as `imageUrl`.',
   edit_video:
@@ -429,6 +431,7 @@ export const GRACE_DAYS_CHOICES = Array.from(
 export const MEDIA_TOOL_NAMES = [
   'generate_image',
   'edit_image',
+  'remove_background',
   'generate_video',
   'edit_video',
   'text_to_speech'

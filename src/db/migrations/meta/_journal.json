@@ -330,6 +330,13 @@
       "when": 1792665139143,
       "tag": "0046_usage_provider_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792682639158,
+      "tag": "0047_message_media_index_remove_background",
+      "breakpoints": true
     }
   ]
 }

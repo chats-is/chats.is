@@ -12,10 +12,12 @@ import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getImageModel,
   getLanguageModel,
+  isRetryableProviderError,
   runWithProviderFailover
 } from '@/lib/provider';
 import { providerRequestsOf } from '@/lib/provider-request';
 import { toRequestParts } from '@/lib/provider-vocab';
+import { ProviderCannotError } from '@/lib/video-generation';
 
 export type InputImage = {
   data: Uint8Array | string;
@@ -32,7 +34,7 @@ export type ImageGenerationResult = StoredMedia & {
 /**
  * Generate an image (optionally editing input images) with provider failover
  * and upload it to Vercel Blob. Shared by the standalone /api/images route and
- * the chat `generate_image` / `edit_image` tools.
+ * the chat `generate_image` / `edit_image` / `remove_background` tools.
  */
 export async function generateAndStoreImage(args: {
   userId: string;
@@ -43,10 +45,20 @@ export async function generateAndStoreImage(args: {
   aspectRatio?: `${number}:${number}`;
   resolution?: string;
   inputImages?: InputImage[];
+  /** On a transparent background, as a PNG. Only OpenAI's and Azure's image
+   *  APIs take one; a provider of any other type is passed over. */
+  transparent?: boolean;
   abortSignal?: AbortSignal;
 }): Promise<ImageGenerationResult> {
-  const { userId, prompt, dbModel, candidates, inputImages, abortSignal } =
-    args;
+  const {
+    userId,
+    prompt,
+    dbModel,
+    candidates,
+    inputImages,
+    transparent,
+    abortSignal
+  } = args;
   // Already settled: the `pick*` helpers chose from what the model declared,
   // so anything undefined here is a model that declared nothing — not an
   // 'auto' waiting to be unwrapped. Which of them a given provider can
@@ -57,6 +69,17 @@ export async function generateAndStoreImage(args: {
   const { result, provider: usedProvider } = await runWithProviderFailover(
     candidates,
     async provider => {
+      // Sent elsewhere, the image would come back on whatever background it
+      // had, which is not what was asked for.
+      if (
+        transparent &&
+        provider.type !== 'openai' &&
+        provider.type !== 'azure'
+      ) {
+        throw new ProviderCannotError(
+          `${dbModel.name} cannot make a transparent background through ${provider.type}.`
+        );
+      }
       // Gemini generates images inside a text turn and reads its settings
       // from a nested object; every other path uses the image API.
       const inline = provider.type === 'google' && modelId.startsWith('gemini');
@@ -127,7 +150,11 @@ export async function generateAndStoreImage(args: {
         providerRequests = providerRequestsOf([genResult.response]);
       } else {
         // Standard image models use generateImage API
-        const providerOpts = { ...provider.apiOptions, ...parts.provider };
+        const providerOpts = {
+          ...provider.apiOptions,
+          ...parts.provider,
+          ...(transparent && { background: 'transparent', outputFormat: 'png' })
+        };
 
         const { image, usage, responses } = await generateImage({
           model: getImageModel(provider, modelId),
@@ -158,6 +185,10 @@ export async function generateAndStoreImage(args: {
         outputTokens,
         providerRequests
       };
+    },
+    {
+      shouldRetry: error =>
+        error instanceof ProviderCannotError || isRetryableProviderError(error)
     }
   );
 

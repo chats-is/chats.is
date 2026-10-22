@@ -10,7 +10,8 @@ import {
   pickResolution,
   pickSize,
   pickVoice,
-  resolveAutoOption
+  resolveAutoOption,
+  sizeNearestInShape
 } from './media-options';
 
 describe('pickAspectRatio', () => {
@@ -250,5 +251,20 @@ describe('pickVoice', () => {
       // name for its default, so it is filled in one step later.
       expect(pickVoice(undefined, undefined, ui)).toBeUndefined();
     }
+  });
+});
+
+describe('sizeNearestInShape', () => {
+  const sizes = { sizes: ['auto', '1024x1024', '1536x1024', '1024x1536'] };
+
+  it('takes the size nearest in shape to the picture', () => {
+    expect(sizeNearestInShape(1024, 1024, sizes)).toBe('1024x1024');
+    expect(sizeNearestInShape(800, 1200, sizes)).toBe('1024x1536');
+    expect(sizeNearestInShape(1920, 1080, sizes)).toBe('1536x1024');
+  });
+
+  it('leaves the size to the provider where the model names none', () => {
+    expect(sizeNearestInShape(800, 1200, null)).toBeUndefined();
+    expect(sizeNearestInShape(800, 1200, { sizes: ['auto'] })).toBeUndefined();
   });
 });

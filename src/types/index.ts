@@ -49,6 +49,7 @@ export {
   updateArtifactInputSchema,
   generateImageInputSchema,
   editImageInputSchema,
+  removeBackgroundInputSchema,
   editVideoInputSchema,
   generateVideoInputSchema,
   textToSpeechInputSchema,

@@ -123,6 +123,33 @@ export function pickSize(
   );
 }
 
+/**
+ * The size, of those a model takes, nearest in shape to a picture this wide
+ * and tall — for an edit that has to keep the picture's proportions.
+ * Undefined where the model names none, leaving the provider its own.
+ */
+export function sizeNearestInShape(
+  width: number,
+  height: number,
+  uiOptions?: ModelUIOptions | null
+): string | undefined {
+  const shape = Math.log(width / height);
+  let nearest: string | undefined;
+  let distance = Infinity;
+  for (const size of uiOptions?.sizes ?? []) {
+    const match = /^(\d+)x(\d+)$/.exec(size);
+    if (!match) continue;
+    const away = Math.abs(
+      Math.log(Number(match[1]) / Number(match[2])) - shape
+    );
+    if (away < distance) {
+      nearest = size;
+      distance = away;
+    }
+  }
+  return nearest;
+}
+
 export function pickDuration(
   requested: number | undefined,
   selected: number | undefined,

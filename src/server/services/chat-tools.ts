@@ -13,6 +13,7 @@ import {
   editVideoInputSchema,
   generateImageInputSchema,
   generateVideoInputSchema,
+  removeBackgroundInputSchema,
   textToSpeechInputSchema,
   transcribeAudioInputSchema,
   updateArtifactInputSchema,
@@ -29,13 +30,15 @@ import { type ChatMediaToolName } from '@/types/chat-tools';
 import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 import { collectConversationMediaUrls } from '@/lib/chat-media-urls';
 import { AUTO_OPTION, MEDIA_TOOL_GUIDANCE } from '@/lib/constant';
+import { imageDimensions } from '@/lib/image-dimensions';
 import { generateAndStoreImage } from '@/lib/image-generation';
 import {
   pickAspectRatio,
   pickDuration,
   pickResolution,
   pickSize,
-  pickVoice
+  pickVoice,
+  sizeNearestInShape
 } from '@/lib/media-options';
 import { allowsModel } from '@/lib/model-access';
 import { resolveModelId } from '@/lib/provider';
@@ -58,7 +61,10 @@ import {
   usableCandidates
 } from '@/server/services/model';
 import { preflightCheck } from '@/server/services/preflight';
-import { getMediaDefaultModelIds } from '@/server/services/settings';
+import {
+  getBackgroundRemovalModelId,
+  getMediaDefaultModelIds
+} from '@/server/services/settings';
 import { getUserTier } from '@/server/services/tier';
 import {
   recordAudioUsage,
@@ -160,6 +166,11 @@ async function resolveWithFallback(
   return null;
 }
 
+/** What the background remover is asked, the same for every image: the
+ *  background gone, and nothing else touched. */
+const BACKGROUND_REMOVAL_PROMPT =
+  'Remove the background entirely, leaving it transparent. Keep the subject exactly as it is — its shape, colours, details and position unchanged.';
+
 const GENERIC_TOOL_ERROR =
   'Generation failed. Please try again or pick a different model.';
 
@@ -198,6 +209,7 @@ export function buildMediaToolsSystemPrompt(
   const producesMedia = has(
     'generate_image',
     'edit_image',
+    'remove_background',
     'generate_video',
     'edit_video',
     'text_to_speech'
@@ -229,7 +241,8 @@ export function buildMediaToolsSystemPrompt(
  * registered when its media model resolves (user selection from the request
  * body, falling back to the admin-configured system default) to one the
  * user's tier allows; `edit_image` additionally requires the image model's
- * `supportsImageEdit` flag.
+ * `supportsImageEdit` flag. `remove_background` runs on the model the admin
+ * picked for it, whatever the user chose, and is there only when one is.
  *
  * Each call re-runs `preflightCheck` against its own media model and returns
  * a structured `{ status: 'error' }` output on any failure so the chat model
@@ -246,59 +259,75 @@ export async function buildMediaTools(args: {
   const { userId, chatId, assistantMessageId, mediaOptions, chatMessages } =
     args;
 
-  const [defaults, tier] = await Promise.all([
+  const [defaults, backgroundRemovalModelId, tier] = await Promise.all([
     getMediaDefaultModelIds(),
+    getBackgroundRemovalModelId(),
     getUserTier(userId)
   ]);
   // A model the user's tier refuses is none to offer a tool with: the page
   // shows them no such model, and every call would be refused.
   const allowed = (accepts?: (model: Model) => boolean) => (model: Model) =>
     allowsModel(tier, model.modelId) && (!accepts || accepts(model));
-  const [image, imageEdit, video, videoImage, videoEdit, audio, stt] =
-    await Promise.all([
-      resolveWithFallback(
-        mediaOptions?.image?.modelId,
-        defaults.imageModelId,
-        'image',
-        allowed()
-      ),
-      resolveWithFallback(
-        mediaOptions?.imageEdit?.modelId,
-        defaults.imageEditModelId,
-        'image',
-        allowed(model => !!model.supportsImageEdit)
-      ),
-      resolveWithFallback(
-        mediaOptions?.video?.modelId,
-        defaults.videoModelId,
-        'video',
-        allowed()
-      ),
-      resolveWithFallback(
-        mediaOptions?.videoImage?.modelId,
-        defaults.videoImageModelId,
-        'video',
-        allowed(model => !!model.supportsImageToVideo)
-      ),
-      resolveWithFallback(
-        mediaOptions?.videoEdit?.modelId,
-        defaults.videoEditModelId,
-        'video',
-        allowed(model => !!model.supportsVideoEdit)
-      ),
-      resolveWithFallback(
-        mediaOptions?.audio?.modelId,
-        defaults.ttsModelId,
-        'audio',
-        allowed(isTtsModel)
-      ),
-      resolveWithFallback(
-        mediaOptions?.stt?.modelId,
-        defaults.sttModelId,
-        'audio',
-        allowed(isSttModel)
-      )
-    ]);
+  const [
+    image,
+    imageEdit,
+    backgroundRemover,
+    video,
+    videoImage,
+    videoEdit,
+    audio,
+    stt
+  ] = await Promise.all([
+    resolveWithFallback(
+      mediaOptions?.image?.modelId,
+      defaults.imageModelId,
+      'image',
+      allowed()
+    ),
+    resolveWithFallback(
+      mediaOptions?.imageEdit?.modelId,
+      defaults.imageEditModelId,
+      'image',
+      allowed(model => !!model.supportsImageEdit)
+    ),
+    // The admin's pick and nothing else: another model would most likely
+    // hand back the background it was asked to take away.
+    resolveMediaModel(
+      backgroundRemovalModelId,
+      'image',
+      allowed(model => !!model.supportsImageEdit)
+    ),
+    resolveWithFallback(
+      mediaOptions?.video?.modelId,
+      defaults.videoModelId,
+      'video',
+      allowed()
+    ),
+    resolveWithFallback(
+      mediaOptions?.videoImage?.modelId,
+      defaults.videoImageModelId,
+      'video',
+      allowed(model => !!model.supportsImageToVideo)
+    ),
+    resolveWithFallback(
+      mediaOptions?.videoEdit?.modelId,
+      defaults.videoEditModelId,
+      'video',
+      allowed(model => !!model.supportsVideoEdit)
+    ),
+    resolveWithFallback(
+      mediaOptions?.audio?.modelId,
+      defaults.ttsModelId,
+      'audio',
+      allowed(isTtsModel)
+    ),
+    resolveWithFallback(
+      mediaOptions?.stt?.modelId,
+      defaults.sttModelId,
+      'audio',
+      allowed(isSttModel)
+    )
+  ]);
 
   // URLs the model may reference: everything already in the conversation,
   // plus outputs generated by tools earlier in this same response (not yet
@@ -389,75 +418,97 @@ export async function buildMediaTools(args: {
     return pre.ok ? null : { status: 'error', message: pre.message };
   };
 
+  // Generating, editing and taking a background away may each run on a
+  // different model, so the work takes the model it runs on rather than
+  // closing over the generator's.
+  const runImage = async (
+    on: ResolvedMediaModel,
+    prompt: string,
+    requested: {
+      aspectRatio?: string;
+      size?: string;
+      resolution?: string;
+    },
+    inputImages: Array<{ data: Uint8Array; mediaType: string }> | undefined,
+    abortSignal: AbortSignal | undefined,
+    options?: { transparent?: boolean }
+  ): Promise<MediaToolOutput> => {
+    const { dbModel, candidates } = on;
+    const blocked = await gate(dbModel, 'image');
+    if (blocked) return blocked;
+    const source =
+      options?.transparent && inputImages?.[0]
+        ? imageDimensions(inputImages[0].data)
+        : null;
+
+    try {
+      const result = await generateAndStoreImage({
+        userId,
+        prompt,
+        dbModel,
+        candidates,
+        // A background taken away leaves the picture the shape it was: the
+        // model's size nearest to it, and none of those chosen for new
+        // images. Left to itself, a provider made a square one wide.
+        ...(options?.transparent
+          ? {
+              size: source
+                ? sizeNearestInShape(
+                    source.width,
+                    source.height,
+                    dbModel.uiOptions
+                  )
+                : undefined
+            }
+          : {
+              size: pickSize(
+                requested.size,
+                mediaOptions?.image?.size,
+                dbModel.uiOptions
+              ),
+              aspectRatio: pickAspectRatio(
+                requested.aspectRatio,
+                mediaOptions?.image?.aspectRatio,
+                dbModel.uiOptions
+              ),
+              resolution: pickResolution(
+                requested.resolution,
+                mediaOptions?.image?.resolution,
+                dbModel.uiOptions
+              )
+            }),
+        inputImages,
+        transparent: options?.transparent,
+        abortSignal
+      });
+
+      await recordImageUsage({
+        userId,
+        chatId,
+        messageId: assistantMessageId,
+        modelId: dbModel.modelId,
+        providerId: result.provider.id,
+        providerModelId: resolveModelId(result.provider, dbModel.modelId),
+        providerRequests: result.providerRequests,
+        imageCount: 1,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens
+      });
+
+      knownUrls.add(result.url);
+      return {
+        status: 'done',
+        url: result.url,
+        mediaType: result.mediaType,
+        filename: result.filename
+      };
+    } catch (err) {
+      console.error('[chat-tools] image generation failed:', err);
+      return { status: 'error', message: GENERIC_TOOL_ERROR };
+    }
+  };
+
   if (image || imageEdit) {
-    // Generating and editing may run on different models, so the work takes
-    // the model it runs on rather than closing over the generator's.
-    const runImage = async (
-      on: ResolvedMediaModel,
-      prompt: string,
-      requested: {
-        aspectRatio?: string;
-        size?: string;
-        resolution?: string;
-      },
-      inputImages: Array<{ data: Uint8Array; mediaType: string }> | undefined,
-      abortSignal: AbortSignal | undefined
-    ): Promise<MediaToolOutput> => {
-      const { dbModel, candidates } = on;
-      const blocked = await gate(dbModel, 'image');
-      if (blocked) return blocked;
-
-      try {
-        const result = await generateAndStoreImage({
-          userId,
-          prompt,
-          dbModel,
-          candidates,
-          size: pickSize(
-            requested.size,
-            mediaOptions?.image?.size,
-            dbModel.uiOptions
-          ),
-          aspectRatio: pickAspectRatio(
-            requested.aspectRatio,
-            mediaOptions?.image?.aspectRatio,
-            dbModel.uiOptions
-          ),
-          resolution: pickResolution(
-            requested.resolution,
-            mediaOptions?.image?.resolution,
-            dbModel.uiOptions
-          ),
-          inputImages,
-          abortSignal
-        });
-
-        await recordImageUsage({
-          userId,
-          chatId,
-          messageId: assistantMessageId,
-          modelId: dbModel.modelId,
-          providerId: result.provider.id,
-          providerModelId: resolveModelId(result.provider, dbModel.modelId),
-          providerRequests: result.providerRequests,
-          imageCount: 1,
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens
-        });
-
-        knownUrls.add(result.url);
-        return {
-          status: 'done',
-          url: result.url,
-          mediaType: result.mediaType,
-          filename: result.filename
-        };
-      } catch (err) {
-        console.error('[chat-tools] image generation failed:', err);
-        return { status: 'error', message: GENERIC_TOOL_ERROR };
-      }
-    };
-
     // Generating needs a generator; editing has its own model and can be the
     // only one configured, which is why this block is entered for either.
     if (image) {
@@ -518,6 +569,32 @@ export async function buildMediaTools(args: {
       }
     });
     registered.push('edit_image');
+  }
+
+  if (backgroundRemover) {
+    tools.remove_background = tool({
+      description: MEDIA_TOOL_GUIDANCE.remove_background,
+      inputSchema: removeBackgroundInputSchema,
+      execute: async (input, { abortSignal }): Promise<MediaToolOutput> => {
+        const media = await fetchKnownMedia(
+          input.imageUrl,
+          'image/',
+          abortSignal
+        );
+        if ('error' in media) {
+          return { status: 'error', message: media.error };
+        }
+        return runImage(
+          backgroundRemover,
+          BACKGROUND_REMOVAL_PROMPT,
+          {},
+          [media],
+          abortSignal,
+          { transparent: true }
+        );
+      }
+    });
+    registered.push('remove_background');
   }
 
   if (video) {

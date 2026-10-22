@@ -2,9 +2,15 @@ import { type InferUIMessageChunk } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type Artifact, type ChatMessage, type Model } from '@/types';
+import { generateAndStoreImage } from '@/lib/image-generation';
 import { getArtifact } from '@/server/services/artifact';
+import { isOwnBlobUrl } from '@/server/services/blob';
 import { findModelByModelId, getAllModels } from '@/server/services/model';
-import { getMediaDefaultModelIds } from '@/server/services/settings';
+import { preflightCheck } from '@/server/services/preflight';
+import {
+  getBackgroundRemovalModelId,
+  getMediaDefaultModelIds
+} from '@/server/services/settings';
 import { getUserTier } from '@/server/services/tier';
 
 import {
@@ -39,7 +45,8 @@ vi.mock('@/server/services/usage', () => ({
   recordVideoUsage: vi.fn()
 }));
 vi.mock('@/server/services/settings', () => ({
-  getMediaDefaultModelIds: vi.fn()
+  getMediaDefaultModelIds: vi.fn(),
+  getBackgroundRemovalModelId: vi.fn()
 }));
 vi.mock('@/server/services/tier', () => ({ getUserTier: vi.fn() }));
 // The artifacts of earlier replies are read from the database; what a call
@@ -72,7 +79,16 @@ const image = (modelId: string): Model =>
     ]
   }) as unknown as Model;
 
-const models = [image('first'), image('second'), image('admin-default')];
+const models = [
+  image('first'),
+  image('second'),
+  image('admin-default'),
+  {
+    ...image('remover'),
+    supportsImageEdit: true,
+    uiOptions: { sizes: ['auto', '1024x1024', '1536x1024', '1024x1536'] }
+  } as Model
+];
 
 vi.mock('@/server/services/model', () => ({
   getAllModels: vi.fn(),
@@ -114,6 +130,7 @@ beforeEach(() => {
   vi.mocked(getMediaDefaultModelIds).mockResolvedValue({
     imageModelId: 'admin-default'
   } as Awaited<ReturnType<typeof getMediaDefaultModelIds>>);
+  vi.mocked(getBackgroundRemovalModelId).mockResolvedValue(null);
 });
 
 describe('the image tool', () => {
@@ -139,6 +156,97 @@ describe('the image tool', () => {
     tier('allow', ['some-chat-model']);
     const { tools } = await build('second');
     expect(tools.generate_image).toBeUndefined();
+  });
+});
+
+describe('the background removal tool', () => {
+  const upload = 'https://blob.example/uploads/cat.jpg';
+  const withUpload = (selected?: string) =>
+    buildMediaTools({
+      userId: 'u1',
+      chatId: 'c1',
+      assistantMessageId: 'a1',
+      mediaOptions: selected ? { image: { modelId: selected } } : undefined,
+      chatMessages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [{ type: 'file', url: upload, mediaType: 'image/jpeg' }]
+        }
+      ]
+    });
+
+  it('is not offered until the admin picks a model for it', async () => {
+    tier('allow', []);
+    const { tools } = await build();
+    expect(tools.remove_background).toBeUndefined();
+  });
+
+  it('is offered on the admin’s pick, whichever image model the user chose', async () => {
+    tier('allow', []);
+    vi.mocked(getBackgroundRemovalModelId).mockResolvedValue('remover');
+    const { tools } = await build('second');
+    expect(tools.remove_background).toBeDefined();
+    expect(imageModelOf(tools)).toBe('second');
+  });
+
+  it('is not offered when the user’s tier refuses that model', async () => {
+    tier('deny', ['remover']);
+    vi.mocked(getBackgroundRemovalModelId).mockResolvedValue('remover');
+    const { tools } = await build();
+    expect(tools.remove_background).toBeUndefined();
+  });
+
+  it('is not offered on a model that cannot edit an image', async () => {
+    tier('allow', []);
+    vi.mocked(getBackgroundRemovalModelId).mockResolvedValue('first');
+    const { tools } = await build();
+    expect(tools.remove_background).toBeUndefined();
+  });
+
+  it('sends the image to that model for a transparent background, at its own size', async () => {
+    tier('allow', []);
+    vi.mocked(getBackgroundRemovalModelId).mockResolvedValue('remover');
+    vi.mocked(isOwnBlobUrl).mockReturnValue(true);
+    vi.mocked(preflightCheck).mockResolvedValue({ ok: true });
+    vi.mocked(generateAndStoreImage).mockResolvedValue({
+      url: 'https://blob.example/x.png',
+      mediaType: 'image/png',
+      filename: 'x.png',
+      provider: { id: 'p1' },
+      providerRequests: []
+    } as unknown as Awaited<ReturnType<typeof generateAndStoreImage>>);
+    // A PNG header of a picture 800 wide and 1200 tall.
+    const portrait = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48,
+      0x44, 0x52, 0, 0, 0x03, 0x20, 0, 0, 0x04, 0xb0, 8, 6, 0, 0, 0
+    ]);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(portrait, { headers: { 'content-type': 'image/png' } })
+    );
+
+    const { tools } = await withUpload('second');
+    // Only the image matters to the tool; the SDK's call options do not.
+    const execute = tools.remove_background.execute as unknown as (
+      input: { imageUrl: string },
+      options: Record<string, unknown>
+    ) => Promise<unknown>;
+    const output = await execute(
+      { imageUrl: upload },
+      { toolCallId: 't1', messages: [], context: {} }
+    );
+
+    expect(output).toMatchObject({ status: 'done', mediaType: 'image/png' });
+    const call = vi.mocked(generateAndStoreImage).mock.calls[0][0];
+    expect(call.dbModel.modelId).toBe('remover');
+    expect(call.transparent).toBe(true);
+    expect(call.inputImages).toEqual([
+      { data: portrait, mediaType: 'image/png' }
+    ]);
+    // The model's size nearest the picture's shape, and no aspect ratio of
+    // those chosen for new images.
+    expect(call.size).toBe('1024x1536');
+    expect(call.aspectRatio).toBeUndefined();
   });
 });
 

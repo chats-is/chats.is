@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   CalendarClock,
   Clapperboard,
+  Eraser,
   Film,
   Gauge,
   Globe,
@@ -90,6 +91,8 @@ type ModelRow = {
   icon: LucideIcon;
   hint: string;
   can: (model: ModelLike) => boolean;
+  /** Offers None: a job the app can go without, switched off by it. */
+  optional?: boolean;
 };
 
 /** The model that names a chat. Its own group: naming is a job of the app's,
@@ -174,6 +177,17 @@ const WEB_SEARCH_MODEL_ROW: ModelRow = {
   can: model => model.capability === 'chat' && !!model.supportsWebSearch
 };
 
+/** The model that takes an image's background away, whichever image model
+ *  the user picked: an image model that edits. */
+const BACKGROUND_REMOVAL_MODEL_ROW: ModelRow = {
+  key: 'backgroundRemoval.modelId',
+  label: 'Background Removal Model',
+  icon: Eraser,
+  hint: "The model the chat's background removal tool uses, whichever image model the user picked. Pick one that can make a transparent background — only OpenAI's and Azure's image APIs can. None leaves the tool off.",
+  can: model => model.capability === 'image' && !!model.supportsImageEdit,
+  optional: true
+};
+
 /** Who searches. Each value names a source, so a third — a search service
  *  of its own — is one more entry here. */
 const WEB_SEARCH_MODES = [
@@ -199,12 +213,13 @@ const REFUND_REQUESTS_OPTIONS = [
   ...REFUND_REQUESTS_CHOICES.map(n => ({ value: n, label: n }))
 ];
 
-/** Every key the page loads and saves: the ten model picks, then the
+/** Every key the page loads and saves: the eleven model picks, then the
  *  fields that are not one. */
 const KEYS = [
   TITLE_MODEL_ROW.key,
   ...MODEL_ROWS.map(row => row.key),
   WEB_SEARCH_MODEL_ROW.key,
+  BACKGROUND_REMOVAL_MODEL_ROW.key,
   'app.name',
   'app.subtitle',
   'app.description',
@@ -261,6 +276,7 @@ export function ConsoleSettings() {
       <ChatSettings form={form} />
       <SpeechSettings form={form} />
       <WebSearchSettings form={form} />
+      <BackgroundRemovalSettings form={form} />
       <QuotaSettings form={form} />
       <BillingSettings form={form} />
       <SubscriptionSettings form={form} />
@@ -407,6 +423,7 @@ function ModelPickRow({
           <field.ModelField
             models={models ?? []}
             groups={[{ label: row.label, can: row.can }]}
+            empty={row.optional}
           />
         )}
       </form.AppField>
@@ -499,6 +516,25 @@ function WebSearchSettings({ form }: { form: SettingsFormApi }) {
         form={form}
         row={WEB_SEARCH_MODEL_ROW}
         state={statusOf(modelId, WEB_SEARCH_MODEL_ROW, models)}
+        models={models}
+      />
+    </SettingsList>
+  );
+}
+
+/** The model the chat's background removal tool runs on. */
+function BackgroundRemovalSettings({ form }: { form: SettingsFormApi }) {
+  const { data: models } = useQuery(modelQueries.forSelect());
+  const modelId = useStore(form.store, state =>
+    readPath(state.values, BACKGROUND_REMOVAL_MODEL_ROW.key)
+  );
+
+  return (
+    <SettingsList title="Background removal">
+      <ModelPickRow
+        form={form}
+        row={BACKGROUND_REMOVAL_MODEL_ROW}
+        state={statusOf(modelId, BACKGROUND_REMOVAL_MODEL_ROW, models)}
         models={models}
       />
     </SettingsList>
