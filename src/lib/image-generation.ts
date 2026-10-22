@@ -8,6 +8,7 @@ import {
   type Provider,
   type ProviderRequest
 } from '@/types';
+import { TRANSPARENT_BACKGROUND_PROVIDERS } from '@/lib/constant';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getImageModel,
@@ -45,8 +46,9 @@ export async function generateAndStoreImage(args: {
   aspectRatio?: `${number}:${number}`;
   resolution?: string;
   inputImages?: InputImage[];
-  /** On a transparent background, as a PNG. Only OpenAI's and Azure's image
-   *  APIs take one; a provider of any other type is passed over. */
+  /** On a transparent background, as a PNG. Only some providers' image APIs
+   *  take one (`TRANSPARENT_BACKGROUND_PROVIDERS`); any other is passed
+   *  over. */
   transparent?: boolean;
   abortSignal?: AbortSignal;
 }): Promise<ImageGenerationResult> {
@@ -73,8 +75,7 @@ export async function generateAndStoreImage(args: {
       // had, which is not what was asked for.
       if (
         transparent &&
-        provider.type !== 'openai' &&
-        provider.type !== 'azure'
+        !TRANSPARENT_BACKGROUND_PROVIDERS.includes(provider.type)
       ) {
         throw new ProviderCannotError(
           `${dbModel.name} cannot make a transparent background through ${provider.type}.`

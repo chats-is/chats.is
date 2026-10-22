@@ -29,7 +29,11 @@ import {
 import { type ChatMediaToolName } from '@/types/chat-tools';
 import { artifactKindFromType, type ArtifactKind } from '@/lib/artifact';
 import { collectConversationMediaUrls } from '@/lib/chat-media-urls';
-import { AUTO_OPTION, MEDIA_TOOL_GUIDANCE } from '@/lib/constant';
+import {
+  AUTO_OPTION,
+  MEDIA_TOOL_GUIDANCE,
+  TRANSPARENT_BACKGROUND_PROVIDERS
+} from '@/lib/constant';
 import { imageDimensions } from '@/lib/image-dimensions';
 import { generateAndStoreImage } from '@/lib/image-generation';
 import {
@@ -166,10 +170,10 @@ async function resolveWithFallback(
   return null;
 }
 
-/** What the background remover is asked, the same for every image: the
- *  background gone, and nothing else touched. */
-const BACKGROUND_REMOVAL_PROMPT =
-  'Remove the background entirely, leaving it transparent. Keep the subject exactly as it is — its shape, colours, details and position unchanged.';
+/** What the background remover is asked: to keep what the chat model
+ *  named, and leave everything else transparent and the rest untouched. */
+const backgroundRemovalPrompt = (subject: string) =>
+  `Keep only ${subject}. Remove everything else, leaving it fully transparent. Keep what stays exactly as it is — its shape, colours, details and position unchanged.`;
 
 const GENERIC_TOOL_ERROR =
   'Generation failed. Please try again or pick a different model.';
@@ -291,11 +295,18 @@ export async function buildMediaTools(args: {
       allowed(model => !!model.supportsImageEdit)
     ),
     // The admin's pick and nothing else: another model would most likely
-    // hand back the background it was asked to take away.
+    // hand back the background it was asked to take away. And only while a
+    // provider that can make one serves it, or every call would fail.
     resolveMediaModel(
       backgroundRemovalModelId,
       'image',
       allowed(model => !!model.supportsImageEdit)
+    ).then(resolved =>
+      resolved?.candidates.some(candidate =>
+        TRANSPARENT_BACKGROUND_PROVIDERS.includes(candidate.type)
+      )
+        ? resolved
+        : null
     ),
     resolveWithFallback(
       mediaOptions?.video?.modelId,
@@ -586,7 +597,7 @@ export async function buildMediaTools(args: {
         }
         return runImage(
           backgroundRemover,
-          BACKGROUND_REMOVAL_PROMPT,
+          backgroundRemovalPrompt(input.subject),
           {},
           [media],
           abortSignal,

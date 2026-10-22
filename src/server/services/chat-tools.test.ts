@@ -87,7 +87,23 @@ const models = [
     ...image('remover'),
     supportsImageEdit: true,
     uiOptions: { sizes: ['auto', '1024x1024', '1536x1024', '1024x1536'] }
-  } as Model
+  } as Model,
+  // An editor served only through xAI, whose image API cannot make a
+  // background transparent.
+  {
+    ...image('xai-editor'),
+    supportsImageEdit: true,
+    providers: [
+      {
+        id: 'b-xai-editor',
+        modelId: 'xai-editor',
+        providerId: 'p2',
+        isEnabled: true,
+        priority: 0,
+        provider: { id: 'p2', name: 'p2', type: 'xai', isEnabled: true }
+      }
+    ]
+  } as unknown as Model
 ];
 
 vi.mock('@/server/services/model', () => ({
@@ -197,6 +213,13 @@ describe('the background removal tool', () => {
     expect(tools.remove_background).toBeUndefined();
   });
 
+  it('is not offered on a model no provider can make a transparent background through', async () => {
+    tier('allow', []);
+    vi.mocked(getBackgroundRemovalModelId).mockResolvedValue('xai-editor');
+    const { tools } = await build();
+    expect(tools.remove_background).toBeUndefined();
+  });
+
   it('is not offered on a model that cannot edit an image', async () => {
     tier('allow', []);
     vi.mocked(getBackgroundRemovalModelId).mockResolvedValue('first');
@@ -226,19 +249,21 @@ describe('the background removal tool', () => {
     );
 
     const { tools } = await withUpload('second');
-    // Only the image matters to the tool; the SDK's call options do not.
+    // Only the input matters to the tool; the SDK's call options do not.
     const execute = tools.remove_background.execute as unknown as (
-      input: { imageUrl: string },
+      input: { imageUrl: string; subject: string },
       options: Record<string, unknown>
     ) => Promise<unknown>;
     const output = await execute(
-      { imageUrl: upload },
+      { imageUrl: upload, subject: 'the cat' },
       { toolCallId: 't1', messages: [], context: {} }
     );
 
     expect(output).toMatchObject({ status: 'done', mediaType: 'image/png' });
     const call = vi.mocked(generateAndStoreImage).mock.calls[0][0];
     expect(call.dbModel.modelId).toBe('remover');
+    // What the chat model named is what is kept.
+    expect(call.prompt).toMatch(/^Keep only the cat\. /);
     expect(call.transparent).toBe(true);
     expect(call.inputImages).toEqual([
       { data: portrait, mediaType: 'image/png' }

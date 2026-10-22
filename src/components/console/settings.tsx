@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 import { type ModelStatus } from '@/types/model';
+import { type ProviderType } from '@/types/provider';
 import { describeMultiplier } from '@/lib/billing';
 import {
   DEFAULT_APP_DESCRIPTION,
@@ -37,7 +38,8 @@ import {
   REFUND_DAYS_DEFAULT,
   REFUND_FEE_DEFAULT,
   REFUND_FEE_OPTIONS,
-  REFUND_REQUESTS_CHOICES
+  REFUND_REQUESTS_CHOICES,
+  TRANSPARENT_BACKGROUND_PROVIDERS
 } from '@/lib/constant';
 import { cn } from '@/lib/utils';
 import { modelQueries } from '@/server/functions/model';
@@ -80,6 +82,9 @@ type ModelLike = {
   supportsVideoEdit?: boolean | null;
   supportsTranscription?: boolean | null;
   supportsWebSearch?: boolean | null;
+  providers?: Array<{
+    provider: { type: ProviderType; image: string | null } | null;
+  }>;
 };
 
 /** One "pick a model for this job" setting. `can` is what the job asks of a
@@ -178,13 +183,21 @@ const WEB_SEARCH_MODEL_ROW: ModelRow = {
 };
 
 /** The model that takes an image's background away, whichever image model
- *  the user picked: an image model that edits. */
+ *  the user picked: an image model that edits, served through a provider
+ *  that can make a background transparent. */
 const BACKGROUND_REMOVAL_MODEL_ROW: ModelRow = {
   key: 'backgroundRemoval.modelId',
   label: 'Background Removal Model',
   icon: Eraser,
-  hint: "The model the chat's background removal tool uses, whichever image model the user picked. Pick one that can make a transparent background — only OpenAI's and Azure's image APIs can. None leaves the tool off.",
-  can: model => model.capability === 'image' && !!model.supportsImageEdit,
+  hint: "The model the chat's background removal tool uses, whichever image model the user picked. Only image models that edit and are served through OpenAI or Azure are listed — no other image API can make a transparent background. None leaves the tool off.",
+  can: model =>
+    model.capability === 'image' &&
+    !!model.supportsImageEdit &&
+    !!model.providers?.some(
+      binding =>
+        binding.provider &&
+        TRANSPARENT_BACKGROUND_PROVIDERS.includes(binding.provider.type)
+    ),
   optional: true
 };
 

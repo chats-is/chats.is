@@ -126,6 +126,12 @@ export const removeBackgroundInputSchema = z.object({
     .url()
     .describe(
       'URL of an image from this conversation (a user upload or a previously generated image)'
+    ),
+  subject: z
+    .string()
+    .min(1)
+    .describe(
+      'What to keep, as a short phrase — e.g. "the red apple", "the woman and her dog". Take it from what the user said; when they named nothing, the main subject of the image.'
     )
 });
 

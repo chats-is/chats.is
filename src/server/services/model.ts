@@ -240,13 +240,16 @@ export async function listModelsForSelect() {
       asc(models.displayOrder),
       desc(models.createdAt)
     ],
-    // The bindings in priority order, with no more of them than the status
-    // and the icon need: a provider's keys stay on the server.
+    // The bindings in priority order, with no more of them than the status,
+    // the icon and a job that needs a kind of provider ask: a provider's
+    // keys stay on the server.
     with: {
       providers: {
         columns: { isEnabled: true },
         orderBy: (binding, { asc }) => [asc(binding.priority), asc(binding.id)],
-        with: { provider: { columns: { isEnabled: true, image: true } } }
+        with: {
+          provider: { columns: { isEnabled: true, image: true, type: true } }
+        }
       }
     }
   });
