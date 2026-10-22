@@ -54,7 +54,9 @@ export default [
       // Installed by the shadcn CLI and left exactly as installed — --fix must
       // not reformat what is not ours to change.
       'src/components/ui/**',
-      'src/routeTree.gen.ts'
+      'src/routeTree.gen.ts',
+      // Written by scripts/gen-provider-options.ts from the AI SDK's types.
+      'src/types/provider-options.gen.ts'
     ]
   }
 ];

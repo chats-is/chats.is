@@ -4,6 +4,8 @@ node_modules
 .vercel
 pnpm-lock.yaml
 src/routeTree.gen.ts
+# Written by scripts/gen-provider-options.ts, and rewritten on every run.
+src/types/provider-options.gen.ts
 
 # Written by drizzle-kit, and rewritten on every `db:generate`. Formatting
 # them only means the next generate undoes it.

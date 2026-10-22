@@ -53,6 +53,8 @@ pnpm test:watch
 
 pnpm db:generate       # generate a migration after editing src/db/schema.ts
 pnpm db:studio
+
+pnpm gen:provider-options  # rewrite src/types/provider-options.gen.ts after upgrading the AI SDK
 ```
 
 A single test file is `pnpm vitest run src/types/quota.test.ts`, and `-t 'name'` narrows it to one case.

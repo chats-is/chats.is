@@ -21,6 +21,7 @@ import {
   type VertexAuthMode,
   type VertexServiceAccountKey
 } from '@/types';
+import { apiOptionsError } from '@/types/provider';
 import { PROVIDER_TYPES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { useEditRecord } from '@/hooks/use-edit-record';
@@ -201,8 +202,11 @@ const validateProvider = (
     fields.apiKey = 'API Key is required';
   }
 
-  if (value.apiOptions.trim() && !isJsonObject(value.apiOptions)) {
-    fields.apiOptions = 'API Options must be a JSON object';
+  if (value.apiOptions.trim()) {
+    const error = isJsonObject(value.apiOptions)
+      ? apiOptionsError(value.type, JSON.parse(value.apiOptions))
+      : 'API Options must be a JSON object';
+    if (error) fields.apiOptions = error;
   }
 
   return Object.keys(fields).length > 0 ? { fields } : undefined;
