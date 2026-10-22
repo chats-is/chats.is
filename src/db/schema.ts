@@ -19,6 +19,7 @@ import {
 import {
   type ChatMessage,
   type ModelCapability,
+  type ProviderRequest,
   type ProviderType,
   type ReasoningEffort
 } from '@/types';
@@ -1168,6 +1169,10 @@ export const usage = createTable(
     // The id the provider was actually asked for, when the binding routed
     // the model to one of its own. Null: the model's id as it is.
     providerModelId: varchar('provider_model_id', { length: 255 }),
+    // The provider's own ids for the calls the row records, to find each in
+    // its logs. Null for a row from before they were kept, or a call that
+    // reported none.
+    providerRequests: jsonb('provider_requests').$type<ProviderRequest[]>(),
     capability: varchar('capability', { length: 32 })
       .notNull()
       .$type<'chat' | 'image' | 'video' | 'audio'>(),

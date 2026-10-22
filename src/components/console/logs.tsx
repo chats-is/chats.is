@@ -43,13 +43,16 @@ export default function LogsPage() {
   const [page, setPage] = useSearchFilter('page', 1);
   const [refreshing, setRefreshing] = useState(false);
 
-  const { window, value, until, setWindow } = useReportWindow();
+  // Every day until a window is chosen: a record looked for may be from any.
+  const { window, value, until, setWindow } = useReportWindow({
+    optional: true
+  });
 
   const { data: models } = useQuery(modelQueries.forSelect());
 
   const { data, isLoading, isPlaceholderData } = useQuery(
     usageQueries.log({
-      from: window.start,
+      from: window?.start,
       to: until,
       userQuery: userQuery.trim() || undefined,
       modelId: modelId || undefined,
@@ -77,7 +80,7 @@ export default function LogsPage() {
       <ConsoleToolbar>
         <ConsoleFilters>
           <ConsoleSearch
-            placeholder="Search user..."
+            placeholder="Search user or ID..."
             value={userQuery}
             onChange={setUserQuery}
           />
@@ -116,9 +119,10 @@ export default function LogsPage() {
             </SelectContent>
           </Select>
           <DateRangeFilter
+            optional
             value={value}
-            start={window.start}
-            last={window.last}
+            start={window?.start}
+            last={window?.last}
             onChange={setWindow}
           />
         </ConsoleFilters>

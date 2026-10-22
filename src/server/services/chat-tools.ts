@@ -439,6 +439,7 @@ export async function buildMediaTools(args: {
           modelId: dbModel.modelId,
           providerId: result.provider.id,
           providerModelId: resolveModelId(result.provider, dbModel.modelId),
+          providerRequests: result.providerRequests,
           imageCount: 1,
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens
@@ -612,6 +613,7 @@ export async function buildMediaTools(args: {
               result.provider,
               on.dbModel.modelId
             ),
+            providerRequests: result.providerRequests,
             videoCount: 1,
             videoSeconds: result.videoSeconds
           });
@@ -698,6 +700,7 @@ export async function buildMediaTools(args: {
             modelId: dbModel.modelId,
             providerId: result.provider.id,
             providerModelId: resolveModelId(result.provider, dbModel.modelId),
+            providerRequests: result.providerRequests,
             videoCount: 1,
             videoSeconds: result.videoSeconds
           });
@@ -757,6 +760,7 @@ export async function buildMediaTools(args: {
             modelId: dbModel.modelId,
             providerId: result.provider.id,
             providerModelId: resolveModelId(result.provider, dbModel.modelId),
+            providerRequests: result.providerRequests,
             // TTS bills per input character (generateSpeech reports no
             // token usage).
             audioCharacters: result.characters
@@ -817,6 +821,7 @@ export async function buildMediaTools(args: {
             modelId: dbModel.modelId,
             providerId: result.provider.id,
             providerModelId: resolveModelId(result.provider, dbModel.modelId),
+            providerRequests: result.providerRequests,
             audioSeconds: result.durationInSeconds
           });
 

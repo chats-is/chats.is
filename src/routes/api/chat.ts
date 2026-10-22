@@ -18,6 +18,7 @@ import {
   type ChatUsage,
   type MessageMetadata,
   type Provider,
+  type ProviderRequest,
   type User
 } from '@/types';
 import { chatRequestSchema } from '@/types/chat';
@@ -48,6 +49,11 @@ import {
   isRetryableProviderError,
   resolveModelId
 } from '@/lib/provider';
+import {
+  providerRequestOf,
+  providerRequestsOf,
+  withRequestTags
+} from '@/lib/provider-request';
 import { getResumableStreamContext } from '@/lib/resumable-stream';
 import { openedWithError } from '@/lib/stream-failover';
 import { buildBaseSystemPrompt } from '@/lib/system-prompt';
@@ -262,10 +268,19 @@ async function POST({
       const input = titleInputFromMessage(userMessage);
       if (!input) return UNTITLED;
 
-      const { text, usage } = await generateText({
+      // Chosen now, so the call can carry the id it is recorded under.
+      const usageId = generateUUID();
+      const { text, usage, response } = await generateText({
         model: getLanguageModel(titleProvider, titleModelId),
         instructions: titlePrompt,
         prompt: input,
+        providerOptions: {
+          [titleProvider.type]: withRequestTags(
+            titleProvider.type,
+            usageId,
+            titleProvider.apiOptions
+          )
+        },
         // The reply's stream is held open for this, and the reply is stored
         // when that stream ends — so a title provider that hangs would hold
         // back the storing of a reply that finished long ago. A name is a
@@ -278,12 +293,14 @@ async function POST({
       // priced model made on this user's behalf, and the usage table is where
       // an operator reads what their keys were spent on.
       await recordChatUsage({
+        id: usageId,
         userId: user.id,
         chatId: id,
         messageId: userMessage.id,
         modelId: titleModelId,
         providerId: titleProvider.id,
         providerModelId: resolveModelId(titleProvider, titleModelId),
+        providerRequests: providerRequestsOf([response]),
         usage: normalizeChatUsage(usage)
       });
 
@@ -527,6 +544,10 @@ async function POST({
 
     // What each step of the turn used, and the provider that served them.
     const spent: ChatUsage[] = [];
+    // The row the reply is recorded under, chosen now so each call can carry
+    // it, and the provider's ids for each step.
+    const usageId = generateUUID();
+    const providerRequests: ProviderRequest[] = [];
     let servedBy: Provider | null = null;
     // The provider the stream was handed to, known before any step ends.
     let lastCandidate: Provider | null = null;
@@ -674,11 +695,14 @@ async function POST({
               // provider's own where it has one, else the delegate tool.
               ...search.toolsFor(failoverProvider)
             },
-            ...(failoverProvider.apiOptions && {
-              providerOptions: {
-                [failoverProvider.type]: failoverProvider.apiOptions
-              } as any
-            }),
+            // The admin's options, with the usage row's id laid in.
+            providerOptions: {
+              [failoverProvider.type]: withRequestTags(
+                failoverProvider.type,
+                usageId,
+                failoverProvider.apiOptions
+              )
+            } as any,
             // The chain has already settled this against what the model
             // declared; the SDK hands it to whichever provider is behind the
             // model, so nothing here spells it that vendor's way.
@@ -717,6 +741,8 @@ async function POST({
                 ...normalizeChatUsage(step.usage),
                 webSearches: countWebSearches(step)
               });
+              const request = providerRequestOf(step.response);
+              if (request) providerRequests.push(request);
               servedBy = failoverProvider;
               artifactTools.discardUnfinished();
             }
@@ -917,12 +943,14 @@ async function POST({
       // if there turns out to be no message to store.
       if (servedBy && spent.length > 0) {
         await recordChatUsage({
+          id: usageId,
           userId: user.id,
           chatId: id,
           messageId: assistantMessageId,
           modelId,
           providerId: servedBy.id,
           providerModelId: resolveModelId(servedBy, modelId),
+          providerRequests,
           usage: sumChatUsage(spent)
         });
       } else {

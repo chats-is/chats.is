@@ -24,7 +24,7 @@ vi.mock('@/db', () => ({
   }
 }));
 
-const { activeUsers, adminUsageStats } =
+const { activeUsers, adminUsageLog, adminUsageStats, recordChatUsage } =
   await import('@/server/services/usage');
 
 let client: { close?: () => Promise<void> } | undefined;
@@ -233,5 +233,98 @@ describe('adminUsageStats', () => {
         { id: 'p2', type: 'xai' }
       ]
     });
+  });
+});
+
+describe('recordChatUsage', () => {
+  it('writes the row under the id the call carried, with the provider’s ids', async () => {
+    await recordChatUsage({
+      id: 'usage-sent',
+      userId: 'a',
+      modelId: 'm',
+      providerId: 'p',
+      providerRequests: [
+        { responseId: 'resp_1', requestId: 'req_1' },
+        { responseId: 'resp_2' }
+      ],
+      usage: { inputTokens: 10, outputTokens: 5 }
+    });
+    const rows = await h.db.select().from(schema.usage);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: 'usage-sent',
+      providerRequests: [
+        { responseId: 'resp_1', requestId: 'req_1' },
+        { responseId: 'resp_2' }
+      ]
+    });
+  });
+
+  it('makes an id, and keeps no ids, for a call that carried none', async () => {
+    await recordChatUsage({
+      userId: 'a',
+      modelId: 'm',
+      providerId: 'p',
+      providerRequests: [],
+      usage: { inputTokens: 10, outputTokens: 5 }
+    });
+    const [row] = await h.db.select().from(schema.usage);
+    expect(row.id).toBeTruthy();
+    expect(row.providerRequests).toBeNull();
+  });
+});
+
+describe('adminUsageLog search', () => {
+  const log = (
+    userQuery: string,
+    more: { from?: Date; modelId?: string } = {}
+  ) => adminUsageLog({ userQuery, page: 1, pageSize: 50, ...more });
+  const ids = async (...args: Parameters<typeof log>) =>
+    (await log(...args)).rows.map(r => r.id);
+
+  beforeEach(async () => {
+    await h.db
+      .insert(schema.users)
+      .values({ id: 'u-42', name: 'Zed', email: 'zed@x.test' });
+    await use('a', day(1), {
+      id: 'row-1',
+      modelId: 'm',
+      providerRequests: [
+        { requestId: 'req_1', responseId: 'resp_1' },
+        { requestId: 'req_2', responseId: 'resp_2' }
+      ]
+    });
+    await use('u-42', day(1), { id: 'zed-early' });
+    await use('u-42', day(6), { id: 'zed-late' });
+  });
+
+  it('finds a record by its own id, or by a request or response id of any of its calls', async () => {
+    for (const id of ['row-1', 'req_1', 'resp_2', '  req_2  ']) {
+      expect(await ids(id)).toEqual(['row-1']);
+    }
+  });
+
+  it('finds a record by id only within the window and the other filters', async () => {
+    expect(await ids('resp_1', { from: day(5) })).toEqual([]);
+    expect(await ids('resp_1', { modelId: 'other' })).toEqual([]);
+    expect(await ids('resp_1', { from: day(1), modelId: 'm' })).toEqual([
+      'row-1'
+    ]);
+  });
+
+  it('finds a user by their id, within the window like any user search', async () => {
+    expect(await ids('u-42')).toEqual(['zed-late', 'zed-early']);
+    expect(await ids('u-42', { from: day(5) })).toEqual(['zed-late']);
+  });
+
+  it('still finds users by name or address in part', async () => {
+    expect(await ids('ze')).toEqual(['zed-late', 'zed-early']);
+    expect(await ids('zed@x')).toEqual(['zed-late', 'zed-early']);
+  });
+
+  it('finds nothing for an id no record has, nor for part of one', async () => {
+    expect((await log('req_9')).total).toBe(0);
+    expect((await log('req_')).total).toBe(0);
+    expect((await log('u-4')).total).toBe(0);
   });
 });

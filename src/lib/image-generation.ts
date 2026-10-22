@@ -2,13 +2,19 @@ import '@tanstack/react-start/server-only';
 
 import { generateImage, generateText, type ModelMessage } from 'ai';
 
-import { type Candidate, type Model, type Provider } from '@/types';
+import {
+  type Candidate,
+  type Model,
+  type Provider,
+  type ProviderRequest
+} from '@/types';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getImageModel,
   getLanguageModel,
   runWithProviderFailover
 } from '@/lib/provider';
+import { providerRequestsOf } from '@/lib/provider-request';
 import { toRequestParts } from '@/lib/provider-vocab';
 
 export type InputImage = {
@@ -20,6 +26,7 @@ export type ImageGenerationResult = StoredMedia & {
   inputTokens?: number;
   outputTokens?: number;
   provider: Provider;
+  providerRequests: ProviderRequest[];
 };
 
 /**
@@ -69,6 +76,7 @@ export async function generateAndStoreImage(args: {
       // per-image pricing.
       let inputTokens: number | undefined;
       let outputTokens: number | undefined;
+      let providerRequests: ProviderRequest[];
 
       // Gemini serves images via generateText (multi-modal); other providers
       // use the generateImage API.
@@ -116,11 +124,12 @@ export async function generateAndStoreImage(args: {
         imageMediaType = imageFile.mediaType;
         inputTokens = genResult.usage?.inputTokens;
         outputTokens = genResult.usage?.outputTokens;
+        providerRequests = providerRequestsOf([genResult.response]);
       } else {
         // Standard image models use generateImage API
         const providerOpts = { ...provider.apiOptions, ...parts.provider };
 
-        const { image, usage } = await generateImage({
+        const { image, usage, responses } = await generateImage({
           model: getImageModel(provider, modelId),
           prompt: inputImages?.length
             ? { text: prompt, images: inputImages.map(image => image.data) }
@@ -139,9 +148,16 @@ export async function generateAndStoreImage(args: {
         imageMediaType = image.mediaType;
         inputTokens = usage?.inputTokens;
         outputTokens = usage?.outputTokens;
+        providerRequests = providerRequestsOf(responses);
       }
 
-      return { imageBase64, imageMediaType, inputTokens, outputTokens };
+      return {
+        imageBase64,
+        imageMediaType,
+        inputTokens,
+        outputTokens,
+        providerRequests
+      };
     }
   );
 
@@ -160,6 +176,7 @@ export async function generateAndStoreImage(args: {
     ...stored,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
-    provider: usedProvider
+    provider: usedProvider,
+    providerRequests: result.providerRequests
   };
 }

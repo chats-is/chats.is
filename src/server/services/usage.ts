@@ -1,6 +1,16 @@
 import '@tanstack/react-start/server-only';
 
-import { and, asc, countDistinct, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  lt,
+  or,
+  sql
+} from 'drizzle-orm';
 import { type z } from 'zod';
 
 import {
@@ -38,6 +48,19 @@ function spent(cost: number, tier: UserTier) {
     tierId: tier.tier?.id ?? null,
     priceMultiplier: tier.priceMultiplier.toString(),
     spend: applyMultiplier(cost, tier.priceMultiplier).toString()
+  };
+}
+
+/**
+ * The row's id — chosen before the call where the call carried it — and the
+ * provider's own ids for the calls it records.
+ */
+function callIds(input: Pick<RecordChatUsageInput, 'id' | 'providerRequests'>) {
+  return {
+    id: input.id ?? generateUUID(),
+    providerRequests: input.providerRequests?.length
+      ? input.providerRequests
+      : null
   };
 }
 
@@ -83,7 +106,7 @@ export async function recordChatUsage(
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
-      id: generateUUID(),
+      ...callIds(input),
       userId: input.userId,
       chatId: input.chatId ?? null,
       messageId: input.messageId,
@@ -143,7 +166,7 @@ export async function recordImageUsage(
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
-      id: generateUUID(),
+      ...callIds(input),
       userId: input.userId,
       chatId: input.chatId ?? null,
       messageId: input.messageId,
@@ -193,7 +216,7 @@ export async function recordVideoUsage(
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
-      id: generateUUID(),
+      ...callIds(input),
       userId: input.userId,
       chatId: input.chatId ?? null,
       messageId: input.messageId,
@@ -240,7 +263,7 @@ export async function recordAudioUsage(
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
-      id: generateUUID(),
+      ...callIds(input),
       userId: input.userId,
       chatId: input.chatId ?? null,
       messageId: input.messageId,
@@ -287,7 +310,7 @@ export async function recordTranscriptionUsage(
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
-      id: generateUUID(),
+      ...callIds(input),
       userId: input.userId,
       chatId: input.chatId ?? null,
       messageId: input.messageId,
@@ -491,6 +514,14 @@ export async function adminUserModels(userId: string) {
   return rows.map(r => r.modelId).filter((id): id is string => Boolean(id));
 }
 
+/** The row an id names: by its own id, or by one its provider gave a call
+ *  it records. */
+function namedBy(id: string) {
+  const call = (key: 'requestId' | 'responseId') =>
+    sql`${usage.providerRequests} @> ${JSON.stringify([{ [key]: id }])}::jsonb`;
+  return or(eq(usage.id, id), call('requestId'), call('responseId'));
+}
+
 /** The admin usage log: one page of rows, plus the total behind it. */
 export async function adminUsageLog(
   data: z.infer<typeof usageLogFilterSchema>
@@ -503,33 +534,36 @@ export async function adminUsageLog(
     data.capability ? eq(usage.capability, data.capability) : undefined
   ];
 
+  // Users by name or address, in part, or by their id whole.
+  const query = data.userQuery?.trim();
   let userIds: string[] | null = null;
-  if (data.userQuery?.trim()) {
-    const q = `%${data.userQuery.trim()}%`;
+  if (query) {
+    const q = `%${query}%`;
     const matched = await db
       .select({ id: users.id })
       .from(users)
-      .where(sql`(${users.name} ilike ${q} or ${users.email} ilike ${q})`)
+      .where(
+        sql`(${users.name} ilike ${q} or ${users.email} ilike ${q} or ${users.id} = ${query})`
+      )
       .limit(200);
     userIds = matched.map(u => u.id);
-    if (userIds.length === 0) {
-      return {
-        rows: [],
-        total: 0,
-        page: data.page,
-        pageSize: data.pageSize
-      };
-    }
   }
   const userWhere =
-    userIds !== null
-      ? sql`${usage.userId} in (${sql.join(
-          userIds.map(id => sql`${id}`),
-          sql`, `
-        )})`
-      : undefined;
+    userIds === null
+      ? undefined
+      : userIds.length > 0
+        ? sql`${usage.userId} in (${sql.join(
+            userIds.map(id => sql`${id}`),
+            sql`, `
+          )})`
+        : sql`false`;
 
-  const where = and(...whereParts.filter(Boolean), userWhere);
+  // The same box takes a record's id, or one its provider gave a call; the
+  // window and the other filters hold for it as for a user.
+  const where = and(
+    ...whereParts.filter(Boolean),
+    query ? or(userWhere, namedBy(query)) : undefined
+  );
 
   const [totalRow] = await db
     .select({ count: sql<number>`count(*)` })
@@ -546,6 +580,7 @@ export async function adminUsageLog(
       userEmail: users.email,
       modelId: usage.modelId,
       providerModelId: usage.providerModelId,
+      providerRequests: usage.providerRequests,
       // Who served the call, as the row recorded it.
       providerName: providers.name,
       capability: usage.capability,

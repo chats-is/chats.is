@@ -8,6 +8,7 @@ import {
   resolveModelId,
   runWithProviderFailover
 } from '@/lib/provider';
+import { providerRequestsOf } from '@/lib/provider-request';
 import { authedRequest } from '@/server/middleware';
 import { findModelByModelId, usableCandidates } from '@/server/services/model';
 import { preflightGate } from '@/server/services/preflight';
@@ -91,9 +92,10 @@ async function POST({
   if (gate) return gate;
 
   try {
-    const { result: audio, provider: usedProvider } =
-      await runWithProviderFailover(candidates, async provider => {
-        const { audio } = await generateSpeech({
+    const { result, provider: usedProvider } = await runWithProviderFailover(
+      candidates,
+      async provider => {
+        const { audio, responses } = await generateSpeech({
           model: getSpeechModel(provider, modelId),
           text,
           voice,
@@ -104,14 +106,17 @@ async function POST({
             }
           })
         });
-        return audio;
-      });
+        return { audio, providerRequests: providerRequestsOf(responses) };
+      }
+    );
+    const { audio } = result;
 
     await recordAudioUsage({
       userId: user.id,
       modelId,
       providerId: usedProvider.id,
       providerModelId: resolveModelId(usedProvider, modelId),
+      providerRequests: result.providerRequests,
       // TTS bills per input character (generateSpeech reports no token usage).
       audioCharacters: text.length
     });

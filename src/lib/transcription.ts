@@ -2,14 +2,21 @@ import '@tanstack/react-start/server-only';
 
 import { transcribe } from 'ai';
 
-import { type Candidate, type Model, type Provider } from '@/types';
+import {
+  type Candidate,
+  type Model,
+  type Provider,
+  type ProviderRequest
+} from '@/types';
 import { audioDurationInSeconds } from '@/lib/media-duration';
 import { getTranscriptionModel, runWithProviderFailover } from '@/lib/provider';
+import { providerRequestsOf } from '@/lib/provider-request';
 
 export type TranscriptionOutput = {
   text: string;
   durationInSeconds?: number;
   provider: Provider;
+  providerRequests: ProviderRequest[];
 };
 
 /**
@@ -43,7 +50,8 @@ export async function transcribeAudio(args: {
       });
       return {
         text: transcript.text,
-        durationInSeconds: transcript.durationInSeconds
+        durationInSeconds: transcript.durationInSeconds,
+        providerRequests: providerRequestsOf(transcript.responses)
       };
     }
   );

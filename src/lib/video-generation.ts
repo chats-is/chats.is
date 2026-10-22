@@ -7,7 +7,8 @@ import {
   type Candidate,
   type Model,
   type Provider,
-  type ProviderConfig
+  type ProviderConfig,
+  type ProviderRequest
 } from '@/types';
 import { decrypt } from '@/lib/crypto';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
@@ -17,6 +18,7 @@ import {
   resolveModelId,
   runWithProviderFailover
 } from '@/lib/provider';
+import { providerRequestsOf } from '@/lib/provider-request';
 import { toRequestParts } from '@/lib/provider-vocab';
 import { resolveVideoSeconds } from '@/lib/video-usage';
 
@@ -83,6 +85,7 @@ export type VideoGenerationResult = {
   mediaType: string;
   /** The duration Sora actually generated (request is bucketed to 4/8/12s). */
   seconds: number;
+  providerRequests: ProviderRequest[];
 };
 
 /**
@@ -188,7 +191,14 @@ export async function generateWithSora(args: {
   return {
     buffer: videoBuffer,
     mediaType: 'video/mp4',
-    seconds: Number.isFinite(generated) ? generated : Number(seconds)
+    seconds: Number.isFinite(generated) ? generated : Number(seconds),
+    // The job is the response; the request that made it, its own id.
+    providerRequests: [
+      {
+        responseId: created.id,
+        ...(created._request_id && { requestId: created._request_id })
+      }
+    ]
   };
 }
 
@@ -238,6 +248,7 @@ async function pollSoraJob(
 export type VideoGenerationOutput = StoredMedia & {
   videoSeconds?: number;
   provider: Provider;
+  providerRequests: ProviderRequest[];
 };
 
 /**
@@ -283,6 +294,7 @@ export async function generateAndStoreVideo(args: {
       // Billable duration in seconds — actual generated length when the
       // provider reports it, else the requested duration.
       let videoSeconds: number | undefined;
+      let providerRequests: ProviderRequest[];
 
       // Sora has no AI SDK support yet — use the custom path. Azure exposes
       // video only through its OpenAI-compatible API (no AI SDK support
@@ -327,6 +339,7 @@ export async function generateAndStoreVideo(args: {
         // Sora returns no duration metadata — bill the bucketed duration the
         // request actually used (4/8/12s), not the raw client input.
         videoSeconds = soraResult.seconds;
+        providerRequests = soraResult.providerRequests;
       } else {
         // Editing a video is provider-specific: the AI SDK has no standard
         // parameter for it, and xAI takes the source as a URL in its own
@@ -365,8 +378,9 @@ export async function generateAndStoreVideo(args: {
 
         let video;
         let providerMetadata;
+        let responses;
         try {
-          ({ video, providerMetadata } = await generateVideo({
+          ({ video, providerMetadata, responses } = await generateVideo({
             model: getVideoModel(provider, modelId),
             // An image turns this into image-to-video: the picture is the
             // opening frame and the text says what happens from there.
@@ -403,9 +417,10 @@ export async function generateAndStoreVideo(args: {
           // estimate, but a per-second model charged for no seconds is free.
           parts.top.duration ?? duration
         );
+        providerRequests = providerRequestsOf(responses);
       }
 
-      return { videoBuffer, videoMediaType, videoSeconds };
+      return { videoBuffer, videoMediaType, videoSeconds, providerRequests };
     },
     {
       // Our own deadline is not a provider fault: the default classifier treats
@@ -433,6 +448,7 @@ export async function generateAndStoreVideo(args: {
   return {
     ...stored,
     videoSeconds: result.videoSeconds,
-    provider: usedProvider
+    provider: usedProvider,
+    providerRequests: result.providerRequests
   };
 }

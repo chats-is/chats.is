@@ -17,6 +17,8 @@ import {
   resolveModelId,
   runWithProviderFailover
 } from '@/lib/provider';
+import { providerRequestsOf, withRequestTags } from '@/lib/provider-request';
+import { generateUUID } from '@/lib/utils';
 import { canSearchWeb, searchesForItself } from '@/lib/web-search';
 import { preflightCheck } from '@/server/services/preflight';
 import { getWebSearchSettings } from '@/server/services/settings';
@@ -133,6 +135,8 @@ export async function setupWebSearch(args: {
             });
             if (!pre.ok) return { status: 'error', message: pre.message };
 
+            // Chosen now, so the call can carry the id it is recorded under.
+            const usageId = generateUUID();
             try {
               const { result, provider } = await runWithProviderFailover(
                 searchable.candidates,
@@ -151,6 +155,13 @@ export async function setupWebSearch(args: {
                     instructions: SEARCH_INSTRUCTIONS,
                     prompt: query,
                     tools: searchTool,
+                    providerOptions: {
+                      [candidate.type]: withRequestTags(
+                        candidate.type,
+                        usageId,
+                        candidate.apiOptions
+                      )
+                    },
                     abortSignal: abortSignal
                       ? AbortSignal.any([
                           abortSignal,
@@ -175,6 +186,7 @@ export async function setupWebSearch(args: {
                 0
               );
               await recordChatUsage({
+                id: usageId,
                 userId,
                 chatId,
                 messageId: assistantMessageId,
@@ -183,6 +195,9 @@ export async function setupWebSearch(args: {
                 providerModelId: resolveModelId(
                   provider,
                   searchable.dbModel.modelId
+                ),
+                providerRequests: providerRequestsOf(
+                  result.steps.map(step => step.response)
                 ),
                 usage: { ...normalizeChatUsage(result.usage), webSearches }
               });

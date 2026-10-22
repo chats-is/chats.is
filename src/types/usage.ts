@@ -3,8 +3,21 @@ import { z } from 'zod';
 import { modelCapabilitySchema } from './model';
 import { type ChatUsage } from './pricing';
 
+/**
+ * How a provider knows one of its calls, to find it again in its own logs:
+ * the id of what it answered, and the id it gave the request. Either may be
+ * missing — Google names no request, a media call names no response.
+ */
+export type ProviderRequest = {
+  responseId?: string;
+  requestId?: string;
+};
+
 /** Shared input fields for `recordXxxUsage` writers. */
 type RecordUsageBase = {
+  /** The row's id, when it was chosen before the call so the call could
+   *  carry it. Absent, one is made as the row is written. */
+  id?: string;
   userId: string;
   chatId?: string | null;
   messageId?: string;
@@ -18,6 +31,8 @@ type RecordUsageBase = {
   providerId: string;
   /** The id the provider was asked for, when it differs from the model's. */
   providerModelId?: string | null;
+  /** The provider's ids for each call the row records, in order. */
+  providerRequests?: ProviderRequest[];
 };
 
 export type RecordChatUsageInput = RecordUsageBase & {
@@ -124,6 +139,8 @@ export const usageLogFilterSchema = z.object({
   /** Up to but not including — the start of the day after the last. */
   to: z.date().optional(),
   userId: z.string().optional(),
+  /** A user's name, address or id — or a record's id, or one its provider
+   *  gave a call it records. */
   userQuery: z.string().optional(),
   modelId: z.string().optional(),
   capability: modelCapabilitySchema.optional(),

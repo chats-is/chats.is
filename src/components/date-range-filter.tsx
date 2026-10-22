@@ -35,11 +35,19 @@ const parseDay = (key: string) => {
 const addDays = (date: Date, n: number) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
 
+type ReportWindow = {
+  custom: boolean;
+  start: Date;
+  last: Date;
+  days: number;
+};
+
 /**
  * The window a report covers, from the address: a chosen range of calendar
- * days when both ends are there, else the last N days ending today.
+ * days when both ends are there, else the last N days ending today. Where
+ * none has to be chosen, an address without one is no window at all.
  */
-function useWindowFromSearch() {
+function useWindowFromSearch(optional: boolean): ReportWindow | null {
   const search: { days?: number; from?: string; to?: string } = useSearch({
     strict: false
   });
@@ -50,36 +58,64 @@ function useWindowFromSearch() {
       const days = Math.round((last.getTime() - start.getTime()) / 864e5) + 1;
       return { custom: true, start, last, days };
     }
+    if (optional && search.days === undefined) return null;
     const days = search.days ?? DEFAULT_DAYS;
     const start = reportWindowStart(days);
     return { custom: false, start, last: addDays(start, days - 1), days };
-  }, [search.days, search.from, search.to]);
+  }, [optional, search.days, search.from, search.to]);
 }
+
+type OptionalReportWindowState = {
+  window: ReportWindow | null;
+  value: DateRangeValue | null;
+  until: Date | undefined;
+  /** A window, or null for none — the page's default. */
+  setWindow: (next: DateRangeValue | null) => void;
+};
+
+type ReportWindowState = OptionalReportWindowState & {
+  window: ReportWindow;
+  value: DateRangeValue;
+};
 
 /**
  * A report window kept in the address — the Overview, Usage, Revenue, the
  * Logs and a user's page read theirs the same way. Gives the days it
  * covers, the value for the filter, the exclusive end to query up to, and
  * the setter.
+ *
+ * A report always covers a window, the last seven days unless another is
+ * chosen. With `optional`, as the Logs has it, none is chosen until one is,
+ * and every day is covered.
  */
-export function useReportWindow() {
+export function useReportWindow(): ReportWindowState;
+export function useReportWindow(options: {
+  optional: true;
+}): OptionalReportWindowState;
+export function useReportWindow({
+  optional = false
+}: { optional?: boolean } = {}): OptionalReportWindowState {
   const navigate = useNavigate();
-  const window = useWindowFromSearch();
+  const window = useWindowFromSearch(optional);
 
-  const value: DateRangeValue = window.custom
-    ? { from: window.start, to: window.last }
-    : { days: window.days };
+  const value: DateRangeValue | null = !window
+    ? null
+    : window.custom
+      ? { from: window.start, to: window.last }
+      : { days: window.days };
   // A chosen range ends at the close of its last day; a preset runs to now.
-  const until = window.custom ? addDays(window.last, 1) : undefined;
+  const until = window?.custom ? addDays(window.last, 1) : undefined;
 
   // One entry per choice, so the back button undoes it. Either kind of
   // window replaces the other, the default leaves the address clean, and a
-  // paged table starts over at its first page.
-  const setWindow = (next: DateRangeValue) =>
+  // paged table starts over at its first page. Where no window is the
+  // default, every preset is written out, since its absence means none.
+  const setWindow = (next: DateRangeValue | null) =>
     void navigate({
       to: '.',
       search: (previous: Record<string, unknown>) => {
         const { days: _d, from: _f, to: _t, page: _p, ...rest } = previous;
+        if (!next) return rest;
         if (!('days' in next)) {
           return {
             ...rest,
@@ -87,7 +123,9 @@ export function useReportWindow() {
             to: format(next.to, 'yyyy-MM-dd')
           };
         }
-        return next.days === DEFAULT_DAYS ? rest : { ...rest, days: next.days };
+        return next.days === DEFAULT_DAYS && !optional
+          ? rest
+          : { ...rest, days: next.days };
       }
     });
 
@@ -105,33 +143,42 @@ export function DateRangeFilter({
   value,
   start,
   last,
+  optional = false,
   onChange
 }: {
-  value: DateRangeValue;
+  /** The window in force; null for none, where none has to be chosen. */
+  value: DateRangeValue | null;
   /** The first and last day the window covers, for the button and the
    *  calendar to show — a preset's are relative to today. */
-  start: Date;
-  last: Date;
-  onChange: (value: DateRangeValue) => void;
+  start?: Date;
+  last?: Date;
+  /** Offers "All time", for a page that needs no window to show anything. */
+  optional?: boolean;
+  onChange: (value: DateRangeValue | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>();
   const preset =
-    'days' in value ? PRESETS.find(p => p.days === value.days) : undefined;
+    value && 'days' in value
+      ? PRESETS.find(p => p.days === value.days)
+      : undefined;
   // The option marked in the popover: the window in force when it opens, and
   // "custom" as soon as that is chosen — before a range has been picked.
-  const [choice, setChoice] = useState<number | 'custom'>('custom');
+  const [choice, setChoice] = useState<number | 'custom' | 'all'>('custom');
 
   const handleOpenChange = (next: boolean) => {
     // Opens on the window in force, so the calendar shows where it is.
     if (next) {
-      setDraft({ from: start, to: last });
-      setChoice(preset?.days ?? 'custom');
+      setDraft(start && last ? { from: start, to: last } : undefined);
+      setChoice(value === null ? 'all' : (preset?.days ?? 'custom'));
     }
     setOpen(next);
   };
 
-  const choose = (next: DateRangeValue) => {
+  // The calendar opens on the window's months, or on this one.
+  const anchor = last ?? new Date();
+
+  const choose = (next: DateRangeValue | null) => {
     onChange(next);
     setOpen(false);
   };
@@ -151,11 +198,13 @@ export function DateRangeFilter({
       <PopoverTrigger asChild>
         <Button variant="outline" className="justify-start font-normal">
           <CalendarIcon className="size-4 text-muted-foreground" />
-          {preset
-            ? preset.label
-            : start.getTime() === last.getTime()
-              ? formatDate(start)
-              : `${formatDate(start)} – ${formatDate(last)}`}
+          {!value || !start || !last
+            ? 'All time'
+            : preset
+              ? preset.label
+              : start.getTime() === last.getTime()
+                ? formatDate(start)
+                : `${formatDate(start)} – ${formatDate(last)}`}
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -166,6 +215,19 @@ export function DateRangeFilter({
         onOpenAutoFocus={e => e.preventDefault()}
       >
         <div className="flex w-36 flex-col gap-1 border-r p-2">
+          {optional && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'justify-start font-normal',
+                choice === 'all' && 'bg-accent'
+              )}
+              onClick={() => choose(null)}
+            >
+              All time
+            </Button>
+          )}
           {PRESETS.map(p => (
             <Button
               key={p.days}
@@ -201,7 +263,7 @@ export function DateRangeFilter({
           mode="range"
           // Two months ending on the window's last, and none past this one —
           // the future has nothing to show.
-          defaultMonth={new Date(last.getFullYear(), last.getMonth() - 1)}
+          defaultMonth={new Date(anchor.getFullYear(), anchor.getMonth() - 1)}
           endMonth={new Date()}
           selected={draft}
           onSelect={(_, day) => handleDayClick(day)}

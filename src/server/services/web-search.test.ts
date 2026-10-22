@@ -233,7 +233,8 @@ describe('delegated search', () => {
             content: [],
             providerMetadata: {
               google: { groundingMetadata: { webSearchQueries: ['q'] } }
-            }
+            },
+            response: { id: 'resp-search', headers: {} }
           }
         ],
         sources: [
@@ -260,12 +261,14 @@ describe('delegated search', () => {
       ]
     });
     expect(recordChatUsage).toHaveBeenCalledWith({
+      id: expect.any(String),
       userId: 'u1',
       chatId: 'c1',
       messageId: 'a1',
       modelId: 'searcher',
       providerId: 'google',
       providerModelId: 'searcher',
+      providerRequests: [{ responseId: 'resp-search' }],
       usage: expect.objectContaining({
         inputTokens: 100,
         outputTokens: 50,

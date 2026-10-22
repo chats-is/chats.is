@@ -124,7 +124,8 @@ beforeEach(() => {
   });
   generateVideoMock.mockResolvedValue({
     video: { uint8Array: new Uint8Array([1, 2, 3]) },
-    providerMetadata: {}
+    providerMetadata: {},
+    responses: [{ headers: { 'x-request-id': 'req-video' } }]
   });
   getVideoModelMock.mockReturnValue({});
   uploadMock.mockResolvedValue({
@@ -399,6 +400,7 @@ describe('generateAndStoreVideo — routing & failover', () => {
     expect(generateVideoMock).toHaveBeenCalledTimes(1);
     expect(videosCreate).not.toHaveBeenCalled();
     expect(out.videoSeconds).toBe(6); // from the resolveVideoSeconds stub
+    expect(out.providerRequests).toEqual([{ requestId: 'req-video' }]);
   });
 
   it('does not fail over on our own timeout — a fresh render would not help', async () => {

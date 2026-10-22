@@ -76,6 +76,7 @@ export type {
 export type { ResolvedSource, UserQuota } from './quota';
 export type { UserTier } from './tier';
 export type {
+  ProviderRequest,
   RecordChatUsageInput,
   RecordImageUsageInput,
   RecordVideoUsageInput,

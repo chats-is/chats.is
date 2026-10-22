@@ -2,14 +2,21 @@ import '@tanstack/react-start/server-only';
 
 import { generateSpeech } from 'ai';
 
-import { type Candidate, type Model, type Provider } from '@/types';
+import {
+  type Candidate,
+  type Model,
+  type Provider,
+  type ProviderRequest
+} from '@/types';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import { getSpeechModel, runWithProviderFailover } from '@/lib/provider';
+import { providerRequestsOf } from '@/lib/provider-request';
 import { defaultVoice } from '@/lib/provider-vocab';
 
 export type SpeechGenerationResult = StoredMedia & {
   characters: number;
   provider: Provider;
+  providerRequests: ProviderRequest[];
 };
 
 /**
@@ -32,9 +39,10 @@ export async function generateAndStoreSpeech(args: {
   const { voice } = args;
   const modelId = dbModel.modelId;
 
-  const { result: audio, provider: usedProvider } =
-    await runWithProviderFailover(candidates, async provider => {
-      const { audio } = await generateSpeech({
+  const { result, provider: usedProvider } = await runWithProviderFailover(
+    candidates,
+    async provider => {
+      const { audio, responses } = await generateSpeech({
         model: getSpeechModel(provider, modelId),
         text,
         voice: voice ?? defaultVoice(provider.type),
@@ -46,20 +54,22 @@ export async function generateAndStoreSpeech(args: {
           }
         })
       });
-      return audio;
-    });
+      return { audio, providerRequests: providerRequestsOf(responses) };
+    }
+  );
 
   const stored = await uploadGeneratedMedia({
     userId,
     kind: 'generate-audios',
-    buffer: Buffer.from(audio.base64, 'base64'),
-    mediaType: audio.mediaType,
+    buffer: Buffer.from(result.audio.base64, 'base64'),
+    mediaType: result.audio.mediaType,
     ext: 'mp3'
   });
 
   return {
     ...stored,
     characters: text.length,
-    provider: usedProvider
+    provider: usedProvider,
+    providerRequests: result.providerRequests
   };
 }
