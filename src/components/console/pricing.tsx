@@ -1312,11 +1312,15 @@ function classify(
   if (!s.matched || !s.remote) return 'missing';
   if (!row.current) return 'new';
   const c = row.current;
+  // A price the source does not list is kept as it is by the sync, so it is
+  // no difference here either: only what the source names is compared.
+  const agrees = (remote: number | undefined, current: number | undefined) =>
+    remote === undefined || remote === current;
   const same =
-    s.remote.input === c.input &&
-    s.remote.output === c.output &&
-    s.remote.cache_read === c.cacheRead &&
-    s.remote.cache_write === c.cacheWrite;
+    agrees(s.remote.input, c.input) &&
+    agrees(s.remote.output, c.output) &&
+    agrees(s.remote.cache_read, c.cacheRead) &&
+    agrees(s.remote.cache_write, c.cacheWrite);
   return same ? 'same' : 'diff';
 }
 
