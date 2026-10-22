@@ -33,6 +33,7 @@ import {
   type VertexServiceAccountKey
 } from '@/types';
 import { PROVIDER_FAILURE_MESSAGE } from '@/lib/constant';
+import { PublicError } from '@/server/public-error';
 
 import { decrypt } from './crypto';
 import { hasOwnWebSearch } from './web-search';
@@ -481,7 +482,9 @@ async function listVertexModels(
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!response.ok) {
-      throw new Error(`Failed to fetch provider models: ${response.status}`);
+      throw new PublicError(
+        `Failed to fetch provider models: ${response.status}`
+      );
     }
     const data = (await response.json()) as {
       publisherModels?: { name?: string }[];
@@ -502,7 +505,7 @@ export async function getProviderModels(
   provider: ProviderConfig
 ): Promise<string[]> {
   if (!provider.apiKey) {
-    throw new Error('Provider API key is required to fetch models');
+    throw new PublicError('Provider API key is required to fetch models');
   }
 
   const apiKey = decrypt(provider.apiKey);
@@ -548,7 +551,7 @@ export async function getProviderModels(
     case 'vertex': {
       const vertexKey = parseVertexKey(apiKey);
       if (!vertexKey?.location || !vertexKey.credentials) {
-        throw new Error("Express Mode (API Key) can't sync models");
+        throw new PublicError("Express Mode (API Key) can't sync models");
       }
       return listVertexModels(vertexKey);
     }
@@ -566,7 +569,7 @@ export async function getProviderModels(
         !credentials.accessKeyId ||
         !credentials.secretAccessKey
       ) {
-        throw new Error(
+        throw new PublicError(
           'Bedrock credentials must include region, accessKeyId, and secretAccessKey'
         );
       }
@@ -592,11 +595,15 @@ export async function getProviderModels(
     }
 
     default:
-      throw new Error(`Fetching models is not supported for ${provider.type}`);
+      throw new PublicError(
+        `Fetching models is not supported for ${provider.type}`
+      );
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch provider models: ${response.status}`);
+    throw new PublicError(
+      `Failed to fetch provider models: ${response.status}`
+    );
   }
 
   const data = await response.json();

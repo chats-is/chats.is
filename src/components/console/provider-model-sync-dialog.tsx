@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { type ModelCapability } from '@/types/model';
@@ -9,8 +9,7 @@ import { mutating, type Output } from '@/lib/mutation';
 import { modelQueries } from '@/server/functions/model';
 import {
   providerQueries,
-  syncProviderModels,
-  type fetchProviderModels
+  syncProviderModels
 } from '@/server/functions/provider';
 import { settingsQueries } from '@/server/functions/settings';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -30,89 +30,18 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import {
-  createAppColumnHelper,
-  DataTable
-} from '@/components/console/data-table';
 
-type RemoteModel = Awaited<ReturnType<typeof fetchProviderModels>>[number];
-
-const helper = createAppColumnHelper<RemoteModel>();
-
-/**
- * A model the provider reports. One that already exists in the model table is
- * shown for context but cannot be selected again.
- */
-const syncColumns = (ctx: {
-  selectedIds: Array<string>;
-  capabilities: Record<string, ModelCapability>;
-  allSelected: boolean;
-  hasNewModels: boolean;
-  isPending: boolean;
-  toggleAll: (checked: boolean) => void;
-  toggleOne: (modelId: string, checked: boolean) => void;
-  setCapability: (modelId: string, capability: ModelCapability) => void;
-}) =>
-  helper.columns([
-    helper.display({
-      id: 'select',
-      meta: {
-        headClassName: 'w-12 p-0',
-        cellClassName: 'w-12 p-0 align-middle'
-      },
-      header: () => (
-        <div className="flex min-h-11 items-center justify-center">
-          <Checkbox
-            checked={ctx.allSelected}
-            disabled={!ctx.hasNewModels}
-            onCheckedChange={checked => ctx.toggleAll(checked === true)}
-          />
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="flex min-h-14 items-center justify-center">
-          <Checkbox
-            checked={ctx.selectedIds.includes(row.original.modelId)}
-            disabled={row.original.exists}
-            onCheckedChange={checked =>
-              ctx.toggleOne(row.original.modelId, checked === true)
-            }
-          />
-        </div>
-      )
-    }),
-    helper.accessor('modelId', {
-      header: 'Model',
-      cell: ({ row }) => (
-        <div className="font-mono text-sm">{row.original.modelId}</div>
-      )
-    }),
-    helper.display({
-      id: 'capability',
-      header: 'Capability',
-      meta: { headClassName: 'w-36', cellClassName: 'align-top' },
-      cell: ({ row }) => (
-        <Select
-          value={ctx.capabilities[row.original.modelId] ?? 'chat'}
-          onValueChange={value =>
-            ctx.setCapability(row.original.modelId, value as ModelCapability)
-          }
-          disabled={row.original.exists || ctx.isPending}
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CAPABILITIES.map(capability => (
-              <SelectItem key={capability.value} value={capability.value}>
-                {capability.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )
-    })
-  ]);
+/** The columns the header and the body tables share, so they line up: the
+ *  box, the model id taking the rest, and the capability. */
+function SyncColgroup() {
+  return (
+    <colgroup>
+      <col style={{ width: '48px' }} />
+      <col />
+      <col style={{ width: '168px' }} />
+    </colgroup>
+  );
+}
 
 type ProviderModelSyncDialogProps = {
   open: boolean;
@@ -132,15 +61,21 @@ export function ProviderModelSyncDialog({
   const [capabilities, setCapabilities] = useState<
     Record<string, ModelCapability>
   >({});
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Narrows the list by model id. What is checked stays checked out of
+  // sight, and is synced with the rest.
+  const [search, setSearch] = useState('');
 
   const {
     data: models,
-    isLoading,
-    isFetching
+    isLoading: isLoadingModels,
+    error
   } = useQuery({
     ...providerQueries.remoteModels({ providerId: providerId || '' }),
-    enabled: open && !!providerId
+    enabled: open && !!providerId,
+    // A provider that refuses — a wrong key, an unknown endpoint — refuses
+    // again: said at once rather than after retries. Opening the dialog again
+    // asks again.
+    retry: false
   });
 
   const syncMutation = useMutation({
@@ -162,11 +97,15 @@ export function ProviderModelSyncDialog({
     onError: error => toast.error(error.message)
   });
 
-  const newModels = models?.filter(model => !model.exists) ?? [];
+  const term = search.trim().toLowerCase();
+  const shownModels = term
+    ? (models ?? []).filter(model => model.modelId.toLowerCase().includes(term))
+    : (models ?? []);
+  // The new models in view: what the header's box checks and unchecks.
+  const newModels = shownModels.filter(model => !model.exists);
   const allNewModelsSelected =
     newModels.length > 0 &&
     newModels.every(model => selectedIds.includes(model.modelId));
-  const isLoadingModels = isLoading || isRefreshing;
 
   useEffect(() => {
     if (!models) return;
@@ -182,7 +121,7 @@ export function ProviderModelSyncDialog({
   const reset = () => {
     setSelectedIds([]);
     setCapabilities({});
-    setIsRefreshing(false);
+    setSearch('');
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -207,54 +146,14 @@ export function ProviderModelSyncDialog({
     }));
   };
 
-  const refreshModels = async () => {
-    if (!providerId) return;
-
-    setIsRefreshing(true);
-    try {
-      queryClient.setQueryData(
-        providerQueries.remoteModels({ providerId }).queryKey,
-        undefined
-      );
-      setSelectedIds([]);
-      setCapabilities({});
-      const refreshedModels = await queryClient.fetchQuery(
-        providerQueries.remoteModels({ providerId })
-      );
-      queryClient.setQueryData(
-        providerQueries.remoteModels({ providerId }).queryKey,
-        refreshedModels
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to refresh models'
-      );
-    } finally {
-      setIsRefreshing(false);
-    }
+  const toggleAll = (checked: boolean) => {
+    const ids = newModels.map(model => model.modelId);
+    setSelectedIds(current =>
+      checked
+        ? Array.from(new Set([...current, ...ids]))
+        : current.filter(id => !ids.includes(id))
+    );
   };
-
-  const columns = useMemo(
-    () =>
-      syncColumns({
-        selectedIds,
-        capabilities,
-        allSelected: allNewModelsSelected,
-        hasNewModels: newModels.length > 0,
-        isPending: syncMutation.isPending,
-        toggleAll: checked =>
-          setSelectedIds(checked ? newModels.map(model => model.modelId) : []),
-        toggleOne: toggleSelection,
-        setCapability: setModelCapability
-      }),
-    [
-      selectedIds,
-      capabilities,
-      allNewModelsSelected,
-      newModels,
-      syncMutation.isPending
-    ]
-  );
 
   const syncSelectedModels = () => {
     if (!providerId || !models) return;
@@ -282,50 +181,137 @@ export function ProviderModelSyncDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm text-muted-foreground">
-            {models
-              ? `${newModels.length} new models, ${models.length - newModels.length} existing`
-              : 'Fetching models from provider API'}
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={isFetching || isRefreshing}
-            onClick={refreshModels}
-          >
-            {isFetching || isRefreshing ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RefreshCw className="size-4" />
-            )}
-            Refresh
-          </Button>
+        <div className="relative">
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by model id..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
 
-        <div className="max-h-[55vh] overflow-auto rounded-md border">
-          {isLoadingModels ? (
-            <div className="flex h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading models...
-            </div>
-          ) : models && models.length > 0 ? (
-            <DataTable
-              columns={columns}
-              data={models}
-              className="rounded-none border-0"
-              empty="No models returned from provider API."
-            />
-          ) : (
-            <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              No models returned from provider API.
-            </div>
-          )}
+        <div className="overflow-hidden rounded-md border">
+          {/* Header table — never scrolls */}
+          <table className="w-full table-fixed">
+            <SyncColgroup />
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="p-2">
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={allNewModelsSelected}
+                      disabled={newModels.length === 0}
+                      onCheckedChange={checked => toggleAll(checked === true)}
+                    />
+                  </div>
+                </th>
+                <th className="px-2 py-3 text-left text-sm font-medium">
+                  Model
+                </th>
+                <th className="px-2 py-3 text-left text-sm font-medium">
+                  Capability
+                </th>
+              </tr>
+            </thead>
+          </table>
+
+          {/* Body table — scrolls, its scrollbar hidden so it fills the width
+              and lines up with the header's columns. */}
+          <div className="max-h-[55vh] [scrollbar-width:none] overflow-y-auto [&::-webkit-scrollbar]:hidden">
+            <table className="w-full table-fixed">
+              <SyncColgroup />
+              <tbody>
+                {/* A model the provider reports. One already in the model
+                    table is shown for context but cannot be selected again. */}
+                {!isLoadingModels &&
+                  shownModels.map(model => (
+                    <tr
+                      key={model.modelId}
+                      className="border-b last:border-0 hover:bg-muted/30"
+                    >
+                      <td className="p-2 align-middle">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={selectedIds.includes(model.modelId)}
+                            disabled={model.exists}
+                            onCheckedChange={checked =>
+                              toggleSelection(model.modelId, checked === true)
+                            }
+                          />
+                        </div>
+                      </td>
+                      <td className="p-2 align-middle">
+                        <div className="font-mono text-sm break-all">
+                          {model.modelId}
+                        </div>
+                      </td>
+                      <td className="p-2 align-middle">
+                        <Select
+                          value={capabilities[model.modelId] ?? 'chat'}
+                          onValueChange={value =>
+                            setModelCapability(
+                              model.modelId,
+                              value as ModelCapability
+                            )
+                          }
+                          disabled={model.exists || syncMutation.isPending}
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CAPABILITIES.map(capability => (
+                              <SelectItem
+                                key={capability.value}
+                                value={capability.value}
+                              >
+                                {capability.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    </tr>
+                  ))}
+                {(isLoadingModels || shownModels.length === 0) && (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="p-6 text-center text-muted-foreground"
+                    >
+                      {isLoadingModels ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="size-4 animate-spin" />
+                          Loading models…
+                        </span>
+                      ) : error && !models ? (
+                        // Why the provider gave no list, in its own words.
+                        <span className="text-destructive">
+                          Couldn’t fetch models from the provider:{' '}
+                          {error.message}
+                        </span>
+                      ) : !models?.length ? (
+                        'No models returned from provider API.'
+                      ) : (
+                        'No model ids match your search.'
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <DialogFooter>
+          {/* At the left of the buttons, once there is a list to count. */}
+          {models && (
+            <span className="self-center text-sm text-muted-foreground sm:mr-auto">
+              {models.filter(model => !model.exists).length} new models,{' '}
+              {models.filter(model => model.exists).length} existing
+            </span>
+          )}
           <Button
             type="button"
             variant="outline"
