@@ -27,6 +27,7 @@ import { maskUnsupportedFileParts } from '@/lib/chat-media-urls';
 import { sanitizeTitle, titleInputFromMessage } from '@/lib/chat-title';
 import {
   countWebSearches,
+  countXSearch,
   normalizeChatUsage,
   sumChatUsage
 } from '@/lib/chat-usage';
@@ -736,10 +737,12 @@ async function POST({
                 console.log('Warnings: ', step.warnings);
               }
               // A search the provider ran inside the step is billed per
-              // search, on top of the step's tokens.
+              // search, on top of the step's tokens — a search of X by what
+              // it fetched.
               spent.push({
                 ...normalizeChatUsage(step.usage),
-                webSearches: countWebSearches(step)
+                webSearches: countWebSearches(step),
+                ...countXSearch(step)
               });
               const request = providerRequestOf(step.response);
               if (request) providerRequests.push(request);

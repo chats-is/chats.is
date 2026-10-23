@@ -1,6 +1,7 @@
 import { useStore } from '@tanstack/react-form';
 import { useQuery } from '@tanstack/react-query';
 import {
+  AtSign,
   AudioLines,
   CalendarCheck,
   CalendarClock,
@@ -178,8 +179,24 @@ const WEB_SEARCH_MODEL_ROW: ModelRow = {
   key: 'webSearch.modelId',
   label: 'Web Search Model',
   icon: Search,
-  hint: 'The model that searches for a chat model without a web search of its own. Its name is never shown to the user.',
-  can: model => model.capability === 'chat' && !!model.supportsWebSearch
+  hint: 'The model that searches for a chat model without a web search of its own. Its name is never shown to the user. None leaves web search to the models with a search of their own.',
+  can: model => model.capability === 'chat' && !!model.supportsWebSearch,
+  optional: true
+};
+
+/** The model that searches X for a chat model that cannot: a chat model with
+ *  search of its own, served through xAI, whose search of X is the only
+ *  one. */
+const X_SEARCH_MODEL_ROW: ModelRow = {
+  key: 'xSearch.modelId',
+  label: 'X Search Model',
+  icon: AtSign,
+  hint: "The model that searches X for a chat model that cannot search X itself. Only chat models with web search that are served through xAI are listed — no other provider can search X. Its name is never shown to the user. None leaves X search to xAI's own models.",
+  can: model =>
+    model.capability === 'chat' &&
+    !!model.supportsWebSearch &&
+    !!model.providers?.some(binding => binding.provider?.type === 'xai'),
+  optional: true
 };
 
 /** The model that takes an image's background away, whichever image model
@@ -226,12 +243,13 @@ const REFUND_REQUESTS_OPTIONS = [
   ...REFUND_REQUESTS_CHOICES.map(n => ({ value: n, label: n }))
 ];
 
-/** Every key the page loads and saves: the eleven model picks, then the
+/** Every key the page loads and saves: the twelve model picks, then the
  *  fields that are not one. */
 const KEYS = [
   TITLE_MODEL_ROW.key,
   ...MODEL_ROWS.map(row => row.key),
   WEB_SEARCH_MODEL_ROW.key,
+  X_SEARCH_MODEL_ROW.key,
   BACKGROUND_REMOVAL_MODEL_ROW.key,
   'app.name',
   'app.subtitle',
@@ -504,12 +522,16 @@ function ChatSettings({ form }: { form: SettingsFormApi }) {
   );
 }
 
-/** How a chat searches: the mode, and the model the mode falls back on or
- *  always uses. Read together, so they sit together. */
+/** How a chat searches: the mode, and the models — of the web, and of X —
+ *  the mode falls back on or always uses. Read together, so they sit
+ *  together. */
 function WebSearchSettings({ form }: { form: SettingsFormApi }) {
   const { data: models } = useQuery(modelQueries.forSelect());
   const modelId = useStore(form.store, state =>
     readPath(state.values, WEB_SEARCH_MODEL_ROW.key)
+  );
+  const xModelId = useStore(form.store, state =>
+    readPath(state.values, X_SEARCH_MODEL_ROW.key)
   );
 
   return (
@@ -518,7 +540,7 @@ function WebSearchSettings({ form }: { form: SettingsFormApi }) {
         icon={Globe}
         label="Search Mode"
         htmlFor="webSearch.mode"
-        hint="Auto uses the chat model's own web search when it has one, and the web search model otherwise. Model always uses the web search model."
+        hint="Auto uses the chat model's own search when it has one, and the search models otherwise — the web search model for the web, the X search model for X. Model always uses the search models."
         settingKey="webSearch.mode"
       >
         <form.AppField name="webSearch.mode">
@@ -529,6 +551,12 @@ function WebSearchSettings({ form }: { form: SettingsFormApi }) {
         form={form}
         row={WEB_SEARCH_MODEL_ROW}
         state={statusOf(modelId, WEB_SEARCH_MODEL_ROW, models)}
+        models={models}
+      />
+      <ModelPickRow
+        form={form}
+        row={X_SEARCH_MODEL_ROW}
+        state={statusOf(xModelId, X_SEARCH_MODEL_ROW, models)}
         models={models}
       />
     </SettingsList>

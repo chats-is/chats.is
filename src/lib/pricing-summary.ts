@@ -9,6 +9,8 @@ export type PricingRates = {
   cacheWrite?: string | null;
   reasoning?: string | null;
   webSearch?: string | null;
+  xPost?: string | null;
+  xProfile?: string | null;
   image?: string | null;
   video?: string | null;
   videoSeconds?: string | null;
@@ -28,20 +30,20 @@ const fmt = (v: string | null | undefined): string | null => {
 
 /**
  * Capability-aware pricing lines for the table, in rows: what the model is
- * billed for on every call first, then the cache rates and the search rate —
+ * billed for on every call first, then the cache rates and the search rates —
  * which apply only to some calls — each on a row of its own. Each entry is
  * `"Label: $X/unit"`; a rate that is not set is left out, and so is a row
  * with nothing in it.
  *
  *   chat   → [["Input: $2.5/1M", "Output: $15/1M", "Reasoning: $15/1M"],
  *             ["Cache Read: $0.25/1M", "Cache Write: $0/1M"],
- *             ["Web Search: $10/1K"]]
+ *             ["Web Search: $10/1K", "X Posts: $5/1K", "X Profiles: $10/1K"]]
  *   image  → [["Image: $0.04/image"]]
  *   video  → [["Video: $0.5/video", "Per sec: $0.001/s"]]
  *   audio  → [["Per 1M chars: $15"]] or [["Input: $0.6/1M", "Output: $12/1M"]]
  *
- * Token rates are per 1M tokens, searches per 1K; image/video/per-sec are
- * per unit.
+ * Token rates are per 1M tokens, searches and X posts or profiles per 1K;
+ * image/video/per-sec are per unit.
  */
 export function summarizePricingRows(
   capability: string,
@@ -70,6 +72,8 @@ export function summarizePricingRows(
       push(cache, 'Cache Read', pricing.cacheRead, '/1M');
       push(cache, 'Cache Write', pricing.cacheWrite, '/1M');
       push(search, 'Web Search', pricing.webSearch, '/1K');
+      push(search, 'X Posts', pricing.xPost, '/1K');
+      push(search, 'X Profiles', pricing.xProfile, '/1K');
       break;
     }
     case 'image': {

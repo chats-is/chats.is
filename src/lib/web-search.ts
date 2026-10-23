@@ -61,3 +61,41 @@ export function searchesForItself(args: {
     args.model.providerTypes.some(hasOwnWebSearch)
   );
 }
+
+/**
+ * Whether a chat on this model can search X — the web's rule, asked of X:
+ * the X search model is there to be asked, or the model searches X itself.
+ * xAI's is the only search of X, and the model's search switch governs it
+ * as it does the web's.
+ */
+export function canSearchX(args: {
+  mode: WebSearchMode;
+  /** The X search model, when one is set and can answer. */
+  xSearchModelId: string | null;
+  model: {
+    modelId: string;
+    supportsWebSearch?: boolean | null;
+    providerTypes: ProviderType[];
+  };
+}): boolean {
+  if (args.xSearchModelId) return true;
+  return searchesXForItself(args);
+}
+
+/** Whether the model searches X with xAI's own search. */
+export function searchesXForItself(args: {
+  mode: WebSearchMode;
+  xSearchModelId: string | null;
+  model: {
+    modelId: string;
+    supportsWebSearch?: boolean | null;
+    providerTypes: ProviderType[];
+  };
+}): boolean {
+  const selfServes = args.xSearchModelId === args.model.modelId;
+  return (
+    (args.mode === 'auto' || selfServes) &&
+    !!args.model.supportsWebSearch &&
+    args.model.providerTypes.includes('xai')
+  );
+}

@@ -35,6 +35,8 @@ const EMPTY_SNAPSHOT: PriceSnapshot = {
   cacheWritePrice: null,
   reasoningPrice: null,
   webSearchPrice: null,
+  xPostPrice: null,
+  xProfilePrice: null,
   imagePrice: null,
   videoPrice: null,
   videoSecondsPrice: null,
@@ -250,6 +252,9 @@ export function calculateChatCost(
   // as providers quote it.
   const webSearches = usage.webSearches ?? 0;
   const webSearchRate = toNum(pricing.webSearch);
+  // A search of X is billed by what it fetched, each per thousand too.
+  const xPosts = usage.xPosts ?? 0;
+  const xProfiles = usage.xProfiles ?? 0;
 
   const cost =
     (inputTokens * inputRate) / 1_000_000 +
@@ -257,7 +262,9 @@ export function calculateChatCost(
     (cacheWriteTokens * cacheWriteRate) / 1_000_000 +
     (outputTokens * outputRate) / 1_000_000 +
     (reasoningTokens * reasoningRate) / 1_000_000 +
-    (webSearches * webSearchRate) / 1_000;
+    (webSearches * webSearchRate) / 1_000 +
+    (xPosts * toNum(pricing.xPost)) / 1_000 +
+    (xProfiles * toNum(pricing.xProfile)) / 1_000;
 
   return {
     cost: roundCost(cost),
@@ -268,7 +275,9 @@ export function calculateChatCost(
       cacheReadPrice: numToStr(pricing.cacheRead),
       cacheWritePrice: numToStr(pricing.cacheWrite),
       reasoningPrice: numToStr(reasoningRateStr),
-      webSearchPrice: numToStr(pricing.webSearch)
+      webSearchPrice: numToStr(pricing.webSearch),
+      xPostPrice: numToStr(pricing.xPost),
+      xProfilePrice: numToStr(pricing.xProfile)
     }
   };
 }
@@ -594,6 +603,8 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
     // Reasoning stays null when not set — cost engine falls back to output.
     reasoning: data.reasoning,
     webSearch: data.webSearch,
+    xPost: data.xPost,
+    xProfile: data.xProfile,
     image: data.image,
     video: data.video,
     videoSeconds: data.videoSeconds,

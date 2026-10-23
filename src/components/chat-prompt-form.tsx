@@ -7,7 +7,7 @@ import Textarea from 'react-textarea-autosize';
 
 import { type Attachment, type ChatMessage } from '@/types';
 import { modelMatchesId } from '@/lib/utils';
-import { canSearchWeb } from '@/lib/web-search';
+import { canSearchWeb, canSearchX } from '@/lib/web-search';
 import { useAttachmentUpload } from '@/hooks/use-attachment-upload';
 import { useEnterSubmit } from '@/hooks/use-enter-submit';
 import { useFileDrop } from '@/hooks/use-file-drop';
@@ -97,18 +97,26 @@ export function ChatPromptForm({
   const selectedModel = chatModels?.find(model =>
     modelMatchesId(model, modelId)
   );
+  // The web or X: the one switch turns on both.
+  const searchedModel = selectedModel && {
+    modelId: selectedModel.modelId,
+    supportsWebSearch: selectedModel.supportsWebSearch,
+    providerTypes: (selectedModel.providers ?? [])
+      .filter(binding => binding.isEnabled && binding.provider?.isEnabled)
+      .map(binding => binding.provider!.type)
+  };
   const canSearch =
-    !!selectedModel &&
-    canSearchWeb({
-      ...webSearch,
-      model: {
-        modelId: selectedModel.modelId,
-        supportsWebSearch: selectedModel.supportsWebSearch,
-        providerTypes: (selectedModel.providers ?? [])
-          .filter(binding => binding.isEnabled && binding.provider?.isEnabled)
-          .map(binding => binding.provider!.type)
-      }
-    });
+    !!searchedModel &&
+    (canSearchWeb({
+      mode: webSearch.mode,
+      searchModelId: webSearch.searchModelId,
+      model: searchedModel
+    }) ||
+      canSearchX({
+        mode: webSearch.mode,
+        xSearchModelId: webSearch.xSearchModelId,
+        model: searchedModel
+      }));
 
   // An attachment taken under other settings — another model, the media
   // tools on — still goes with the message. For each kind nothing can now use,

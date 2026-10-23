@@ -30,6 +30,10 @@ export type ChatUsage = {
   /** Web searches the call made, billed at the model's search rate, which is
    *  per thousand. */
   webSearches?: number;
+  /** What its searches of X fetched — posts, and profiles — each billed at
+   *  its own rate per thousand, as xAI bills them. */
+  xPosts?: number;
+  xProfiles?: number;
 };
 
 /** Subset of `model_pricing` rates this call actually used, snapshotted at
@@ -44,6 +48,8 @@ export type PriceSnapshot = {
    *  `pricing.reasoning` when fallback kicked in (defaults to output rate). */
   reasoningPrice: string | null;
   webSearchPrice: string | null;
+  xPostPrice: string | null;
+  xProfilePrice: string | null;
   imagePrice: string | null;
   videoPrice: string | null;
   videoSecondsPrice: string | null;
@@ -110,6 +116,8 @@ export const pricingUpsertSchema = z.object({
   cacheWrite: priceNumberSchema,
   reasoning: priceNumberSchema,
   webSearch: priceNumberSchema,
+  xPost: priceNumberSchema,
+  xProfile: priceNumberSchema,
   image: priceNumberSchema,
   video: priceNumberSchema,
   videoSeconds: priceNumberSchema,

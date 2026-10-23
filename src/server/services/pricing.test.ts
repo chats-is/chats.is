@@ -27,6 +27,8 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     cacheWrite: null,
     reasoning: null,
     webSearch: null,
+    xPost: null,
+    xProfile: null,
     image: null,
     video: null,
     videoSeconds: null,
@@ -70,6 +72,17 @@ describe('calculateChatCost', () => {
     );
     // 1M*3 + 2M*0.3 + 0.5M*3.75, per 1M = 3 + 0.6 + 1.875 = 5.475
     expect(cost).toBeCloseTo(5.475, 10);
+  });
+
+  it('bills a search of X by the posts and profiles it fetched, per thousand, and snapshots both rates', () => {
+    const { cost, snapshot } = calculateChatCost(
+      { inputTokens: 1_000_000, webSearches: 2, xPosts: 10, xProfiles: 3 },
+      pricing({ input: '1', webSearch: '5', xPost: '5', xProfile: '10' })
+    );
+    // 1 + 2*5/1000 + 10*5/1000 + 3*10/1000 = 1 + 0.01 + 0.05 + 0.03
+    expect(cost).toBeCloseTo(1.09, 10);
+    expect(snapshot.xPostPrice).toBe('5');
+    expect(snapshot.xProfilePrice).toBe('10');
   });
 
   it('bills text output and reasoning separately; reasoning falls back to output rate', () => {

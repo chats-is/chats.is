@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canSearchWeb, hasOwnWebSearch } from './web-search';
+import { canSearchWeb, canSearchX, hasOwnWebSearch } from './web-search';
 
 const model = (
   supportsWebSearch: boolean,
@@ -76,5 +76,41 @@ describe('canSearchWeb', () => {
         model: model(true, 'anthropic')
       })
     ).toBe(true);
+  });
+});
+
+describe('canSearchX', () => {
+  it('is yes whenever an X search model is there to ask', () => {
+    expect(
+      canSearchX({
+        mode: 'model',
+        xSearchModelId: 'grok',
+        model: model(false, 'deepseek')
+      })
+    ).toBe(true);
+  });
+
+  it('is yes for a model served through xAI with its search on, in auto mode', () => {
+    expect(
+      canSearchX({
+        mode: 'auto',
+        xSearchModelId: null,
+        model: model(true, 'xai')
+      })
+    ).toBe(true);
+  });
+
+  it('is no for any other provider’s own search, the switch off, or model mode', () => {
+    const none = { mode: 'auto' as const, xSearchModelId: null };
+    // Its own search is of the web, not of X.
+    expect(canSearchX({ ...none, model: model(true, 'openai') })).toBe(false);
+    expect(canSearchX({ ...none, model: model(false, 'xai') })).toBe(false);
+    expect(
+      canSearchX({
+        mode: 'model',
+        xSearchModelId: null,
+        model: model(true, 'xai')
+      })
+    ).toBe(false);
   });
 });

@@ -121,6 +121,8 @@ type EditTarget = {
   modelDbId: string;
   modelName: string;
   capability: 'chat' | 'image' | 'video' | 'audio';
+  /** Served through xAI, and so able to search X, which is priced apart. */
+  searchesX: boolean;
 };
 
 /** Every rate a model can carry, as typed. Blank means "not priced". */
@@ -131,6 +133,8 @@ type PricingForm = {
   cacheWrite: string;
   reasoning: string;
   webSearch: string;
+  xPost: string;
+  xProfile: string;
   image: string;
   video: string;
   videoSeconds: string;
@@ -149,6 +153,8 @@ const EMPTY_PRICING: PricingForm = {
   cacheWrite: '',
   reasoning: '',
   webSearch: '',
+  xPost: '',
+  xProfile: '',
   image: '',
   video: '',
   videoSeconds: '',
@@ -492,7 +498,10 @@ export default function PricingPage() {
     setEdit({
       modelDbId: row.id,
       modelName: row.name,
-      capability: row.capability
+      capability: row.capability,
+      searchesX: (row.providers ?? []).some(
+        binding => binding.provider?.type === 'xai'
+      )
     });
     const values = {
       input: fromNum(row.pricing?.input),
@@ -501,6 +510,8 @@ export default function PricingPage() {
       cacheWrite: fromNum(row.pricing?.cacheWrite),
       reasoning: fromNum(row.pricing?.reasoning),
       webSearch: fromNum(row.pricing?.webSearch),
+      xPost: fromNum(row.pricing?.xPost),
+      xProfile: fromNum(row.pricing?.xProfile),
       image: fromNum(row.pricing?.image),
       video: fromNum(row.pricing?.video),
       videoSeconds: fromNum(row.pricing?.videoSeconds),
@@ -816,6 +827,19 @@ export default function PricingPage() {
                           name="webSearch"
                           label="Web search / 1K searches"
                         />
+                        {/* xAI bills a search of X by what it fetched. */}
+                        {edit.searchesX && (
+                          <>
+                            <PriceField
+                              name="xPost"
+                              label="X posts / 1K posts"
+                            />
+                            <PriceField
+                              name="xProfile"
+                              label="X profiles / 1K profiles"
+                            />
+                          </>
+                        )}
                       </>
                     )}
                     {edit.capability === 'image' && (

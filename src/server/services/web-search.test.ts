@@ -24,6 +24,10 @@ vi.mock('@/lib/provider', () => ({
       own: candidate.type
     }
   })),
+  // xAI's search of X, stood in the same way; none elsewhere.
+  getProviderXSearchTool: vi.fn((candidate: Candidate) =>
+    candidate.type === 'xai' ? { x_search: { own: 'xai' } } : null
+  ),
   isRetryableProviderError: vi.fn(() => false),
   resolveModelId: vi.fn((_c: Candidate, modelId: string) => modelId),
   runWithProviderFailover: vi.fn()
@@ -73,18 +77,27 @@ const searchModel = model('searcher', { supportsWebSearch: true }, [
   provider('google')
 ]);
 
+const xSearchModel = model('grok', { supportsWebSearch: true }, [
+  provider('xai')
+]);
+
+const searchingWith = (search: Model | null) =>
+  search
+    ? {
+        dbModel: search,
+        candidates: (search.providers ?? []).map(b => b.provider as Candidate)
+      }
+    : null;
+
 const settings = (
   mode: 'auto' | 'model',
-  search: Model | null = searchModel
+  search: Model | null = searchModel,
+  xSearch: Model | null = null
 ) => {
   vi.mocked(getWebSearchSettings).mockResolvedValue({
     mode,
-    searchModel: search
-      ? {
-          dbModel: search,
-          candidates: (search.providers ?? []).map(b => b.provider as Candidate)
-        }
-      : null
+    searchModel: searchingWith(search),
+    xSearchModel: searchingWith(xSearch)
   } as Awaited<ReturnType<typeof getWebSearchSettings>>);
 };
 
@@ -317,6 +330,117 @@ describe('delegated search', () => {
     expect(await search('one more')).toMatchObject({ status: 'error' });
     expect(runWithProviderFailover).toHaveBeenCalledTimes(
       MAX_WEB_SEARCHES_PER_TURN
+    );
+  });
+});
+
+describe('searching X', () => {
+  it('auto: a model served through xAI searches X itself, beside its own web search', async () => {
+    settings('auto', searchModel, xSearchModel);
+    const chat = model('grok-chat', { supportsWebSearch: true }, [
+      provider('xai')
+    ]);
+    const search = await setup(chat);
+
+    expect(search.toolsFor(provider('xai'))).toEqual({
+      web_search: { own: 'xai' },
+      x_search: { own: 'xai' }
+    });
+    expect(search.systemPrompt).toContain('x_search');
+  });
+
+  it('auto: any other model asks the X search model', async () => {
+    settings('auto', searchModel, xSearchModel);
+    const chat = model('gpt', { supportsWebSearch: true }, [
+      provider('openai')
+    ]);
+    const search = await setup(chat);
+
+    const tools = search.toolsFor(provider('openai'));
+    expect(tools.web_search).toEqual({ own: 'openai' });
+    expect(tools.x_search.execute).toBeTypeOf('function');
+  });
+
+  it('model: the X search model answers even for a model served through xAI', async () => {
+    settings('model', searchModel, xSearchModel);
+    const chat = model('grok-chat', { supportsWebSearch: true }, [
+      provider('xai')
+    ]);
+    const search = await setup(chat);
+
+    expect(search.toolsFor(provider('xai')).x_search.execute).toBeTypeOf(
+      'function'
+    );
+  });
+
+  it('no X search model and not served through xAI: no search of X, and no mention of one', async () => {
+    settings('auto', searchModel, null);
+    const chat = model('gpt', { supportsWebSearch: true }, [
+      provider('openai')
+    ]);
+    const search = await setup(chat);
+
+    expect(search.toolsFor(provider('openai'))).toEqual({
+      web_search: { own: 'openai' }
+    });
+    expect(search.systemPrompt).not.toContain('x_search');
+  });
+
+  it('a delegated search of X is recorded on the X search model with what it fetched', async () => {
+    settings('auto', null, xSearchModel);
+    const chat = model('deepseek', {}, [provider('deepseek')]);
+    const search = await setup(chat);
+    const execute = search.toolsFor(provider('deepseek')).x_search
+      .execute as unknown as (
+      input: { query: string },
+      options: Record<string, unknown>
+    ) => Promise<unknown>;
+    vi.mocked(runWithProviderFailover).mockResolvedValue({
+      provider: provider('xai'),
+      result: {
+        text: '@xai posted about Grok.',
+        usage: { inputTokens: 100, outputTokens: 20 },
+        steps: [
+          {
+            content: [],
+            usage: {
+              raw: {
+                server_side_tool_usage_details: {
+                  x_search_calls: 2,
+                  x_posts_fetched: 10,
+                  x_users_fetched: 3
+                }
+              }
+            },
+            response: { id: 'resp-x', headers: {} }
+          }
+        ],
+        sources: [
+          { sourceType: 'url', url: 'https://x.com/xai/status/1', title: '1' }
+        ]
+      }
+    });
+
+    const output = await execute(
+      { query: 'what has @xai posted' },
+      { toolCallId: 't1', messages: [], context: {} }
+    );
+
+    expect(output).toEqual({
+      status: 'done',
+      answer: '@xai posted about Grok.',
+      sources: [{ title: '1', url: 'https://x.com/xai/status/1' }]
+    });
+    expect(recordChatUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: 'grok',
+        providerId: 'xai',
+        usage: expect.objectContaining({
+          inputTokens: 100,
+          xPosts: 10,
+          xProfiles: 3
+        })
+      })
     );
   });
 });

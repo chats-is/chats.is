@@ -71,18 +71,21 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
       subtotal: round((quantity * (rate ?? 0)) / 1_000_000)
     });
   };
-  /** Searches, priced per thousand as providers quote them. */
-  const perThousandSearches = (
+  /** Searches, or what a search of X fetched, priced per thousand as
+   *  providers quote them. */
+  const perThousand = (
     label: string,
     quantity: number,
-    price: string | null | undefined
+    price: string | null | undefined,
+    unit: 'search' | 'post' | 'profile'
   ) => {
     if (quantity <= 0) return;
     const rate = priced(price);
+    const units = unit === 'search' ? 'searches' : `${unit}s`;
     items.push({
       label,
-      quantity: `${formatNumber(quantity)} ${quantity === 1 ? 'search' : 'searches'}`,
-      rate: `${formatUsd(rate)} / 1K searches`,
+      quantity: `${formatNumber(quantity)} ${quantity === 1 ? unit : units}`,
+      rate: `${formatUsd(rate)} / 1K ${units}`,
       subtotal: round((quantity * (rate ?? 0)) / 1_000)
     });
   };
@@ -128,10 +131,18 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
         row.reasoningPrice,
         'token'
       );
-      perThousandSearches(
+      perThousand(
         'Web search',
         num(row.webSearches),
-        row.webSearchPrice
+        row.webSearchPrice,
+        'search'
+      );
+      perThousand('X posts', num(row.xPosts), row.xPostPrice, 'post');
+      perThousand(
+        'X profiles',
+        num(row.xProfiles),
+        row.xProfilePrice,
+        'profile'
       );
       break;
     case 'image':

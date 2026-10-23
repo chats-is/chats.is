@@ -262,7 +262,19 @@ export const webSearchInputSchema = z.object({
 
 export type WebSearchInput = z.infer<typeof webSearchInputSchema>;
 
-/** A web search made on the chat's behalf: what was found, and where. */
+export const xSearchInputSchema = z.object({
+  query: z
+    .string()
+    .min(1)
+    .describe(
+      'What to look up on X: a topic, an account (as @handle), or what people are saying about something'
+    )
+});
+
+export type XSearchInput = z.infer<typeof xSearchInputSchema>;
+
+/** A web search — or a search of X — made on the chat's behalf: what was
+ *  found, and where. */
 export type WebSearchToolOutput =
   | {
       status: 'done';
@@ -286,4 +298,5 @@ export type ChatTools = {
     output: TranscribeToolOutput;
   };
   web_search: { input: WebSearchInput; output: WebSearchToolOutput };
+  x_search: { input: XSearchInput; output: WebSearchToolOutput };
 };

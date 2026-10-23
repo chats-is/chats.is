@@ -23,7 +23,12 @@ export interface SystemSettings {
   ttsModels: Model[];
   sttModels: Model[];
   defaults: SystemDefaults;
-  /** How a chat searches, and the search model when one is set and can
-   *  answer — enough for the page to know whether to offer the switch. */
-  webSearch: { mode: WebSearchMode; searchModelId: string | null };
+  /** How a chat searches, and the search models — of the web, and of X —
+   *  when one is set and can answer: enough for the page to know whether to
+   *  offer the switch. */
+  webSearch: {
+    mode: WebSearchMode;
+    searchModelId: string | null;
+    xSearchModelId: string | null;
+  };
 }

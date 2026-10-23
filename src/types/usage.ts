@@ -77,6 +77,8 @@ export type UsageRowLike = {
   cacheWriteTokens?: number | null;
   reasoningTokens?: number | null;
   webSearches?: number | null;
+  xPosts?: number | null;
+  xProfiles?: number | null;
   imageCount?: number | null;
   videoCount?: number | null;
   videoSeconds?: string | number | null;
@@ -95,6 +97,8 @@ export type UsageRowLike = {
   cacheWritePrice?: string | null;
   reasoningPrice?: string | null;
   webSearchPrice?: string | null;
+  xPostPrice?: string | null;
+  xProfilePrice?: string | null;
   imagePrice?: string | null;
   videoPrice?: string | null;
   videoSecondsPrice?: string | null;

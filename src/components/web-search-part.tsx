@@ -11,18 +11,23 @@ type ChatPart = ChatMessage['parts'][number];
 
 /** A search: the delegate's tool or a provider's own, under the tool's name —
  *  or Gemini's, which the SDK reports as a tool it has no schema for, named
- *  by its kind. */
+ *  by its kind. A search of X is one too, shown with the web's. */
 export type WebSearchUIPart =
   | Extract<ChatPart, { type: 'tool-web_search' }>
+  | Extract<ChatPart, { type: 'tool-x_search' }>
   | Extract<ChatPart, { type: 'dynamic-tool' }>;
 
 export function isWebSearchPart(part: ChatPart): part is WebSearchUIPart {
   return (
     part.type === 'tool-web_search' ||
+    part.type === 'tool-x_search' ||
     (part.type === 'dynamic-tool' &&
       part.toolName === GEMINI_WEB_SEARCH_TOOL_NAME)
   );
 }
+
+/** A search of X rather than of the web. */
+const searchesX = (part: WebSearchUIPart) => part.type === 'tool-x_search';
 
 /** One page a reply drew on. */
 export type WebSource = { title: string; url: string };
@@ -115,6 +120,12 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
   const found = parts.some(
     part => part.state === 'output-available' && !reportsError(part)
   );
+  // What was searched: the web, X, or both.
+  const what = parts.every(searchesX)
+    ? 'X'
+    : parts.some(searchesX)
+      ? 'the web and X'
+      : 'the web';
   // Open while searching, so it can be watched, and closed once done — as
   // the reasoning is. The reader can open or close it either way.
   const [isExpanded, setIsExpanded] = useState(searching);
@@ -138,17 +149,17 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
         {searching ? (
           <>
             <Loader2 className="animate-spin text-muted-foreground" />
-            <span className="text-muted-foreground">Searching the web...</span>
+            <span className="text-muted-foreground">Searching {what}...</span>
           </>
         ) : (
           <>
             <Globe />
             <span>
               {!found
-                ? 'Could not search the web'
+                ? `Could not search ${what}`
                 : parts.length === 1
-                  ? 'Searched the web'
-                  : `Searched the web ${parts.length} times`}
+                  ? `Searched ${what}`
+                  : `Searched ${what} ${parts.length} times`}
             </span>
           </>
         )}
@@ -176,11 +187,12 @@ export function WebSearchBlock({ parts }: { parts: WebSearchUIPart[] }) {
                 // so in its output, a stopped call in its state.
                 const failed =
                   part.state === 'output-error' || reportsError(part);
-                const verb = running
-                  ? 'Searching'
-                  : failed
-                    ? 'Could not search'
-                    : 'Searched';
+                const verb =
+                  (running
+                    ? 'Searching'
+                    : failed
+                      ? 'Could not search'
+                      : 'Searched') + (searchesX(part) ? ' X' : '');
                 const queries = queriesOf(part);
                 return (queries.length ? queries : [undefined]).map(
                   (query, queryIndex) => (

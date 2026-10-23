@@ -99,7 +99,9 @@ export function sumChatUsage(steps: ChatUsage[]): ChatUsage {
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
     reasoningTokens: 0,
-    webSearches: 0
+    webSearches: 0,
+    xPosts: 0,
+    xProfiles: 0
   };
 
   for (const step of steps) {
@@ -109,6 +111,8 @@ export function sumChatUsage(steps: ChatUsage[]): ChatUsage {
     total.cacheWriteTokens += step.cacheWriteTokens ?? 0;
     total.reasoningTokens += step.reasoningTokens ?? 0;
     total.webSearches += step.webSearches ?? 0;
+    total.xPosts += step.xPosts ?? 0;
+    total.xProfiles += step.xProfiles ?? 0;
   }
 
   return total;
@@ -169,4 +173,32 @@ export function countWebSearches(step: SearchStepLike): number {
 function queriesIn(input: unknown): number {
   const queries = (input as { queries?: unknown } | null)?.queries;
   return Array.isArray(queries) ? queries.length : 0;
+}
+
+/**
+ * What a step's searches of X fetched, as xAI bills them: each post — those
+ * a search or a thread found, and the posts they reply to or quote — and
+ * each profile, rather than each search. Only xAI's own usage says, and the
+ * SDK hands that over raw, step by step: the turn's total drops it.
+ */
+export function countXSearch(step: { usage?: { raw?: unknown } }): {
+  xPosts: number;
+  xProfiles: number;
+} {
+  const details = (
+    step.usage?.raw as
+      | {
+          server_side_tool_usage_details?: {
+            x_posts_fetched?: unknown;
+            x_users_fetched?: unknown;
+          };
+        }
+      | undefined
+  )?.server_side_tool_usage_details;
+  const count = (value: unknown) =>
+    typeof value === 'number' && value > 0 ? value : 0;
+  return {
+    xPosts: count(details?.x_posts_fetched),
+    xProfiles: count(details?.x_users_fetched)
+  };
 }

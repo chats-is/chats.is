@@ -41,6 +41,30 @@ describe('usageBreakdown', () => {
     ]);
   });
 
+  it('prices what a search of X fetched — posts and profiles — each per thousand', () => {
+    const items = usageBreakdown({
+      capability: 'chat',
+      xPosts: 10,
+      xProfiles: 1,
+      xPostPrice: '5.0000000000',
+      xProfilePrice: '10.0000000000'
+    });
+    expect(items).toEqual([
+      {
+        label: 'X posts',
+        quantity: '10 posts',
+        rate: '$5 / 1K posts',
+        subtotal: 0.05
+      },
+      {
+        label: 'X profiles',
+        quantity: '1 profile',
+        rate: '$10 / 1K profiles',
+        subtotal: 0.01
+      }
+    ]);
+  });
+
   it('bills each chat bucket at its own rate, adding up to the cost', () => {
     // A recorded gpt-5.5 row, charged $0.017736.
     const row = {

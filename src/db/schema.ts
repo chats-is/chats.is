@@ -1099,6 +1099,11 @@ export const modelPricings = createTable(
     // Chat models: what a thousand web searches cost, on top of the tokens —
     // the unit providers quote it in.
     webSearch: numeric('web_search', { precision: 20, scale: 10 }),
+    // Chat models served through xAI: what a search of X costs, which xAI
+    // bills by what it fetched rather than by search — a thousand posts, and
+    // a thousand profiles.
+    xPost: numeric('x_post', { precision: 20, scale: 10 }),
+    xProfile: numeric('x_profile', { precision: 20, scale: 10 }),
     image: numeric('image', { precision: 20, scale: 10 }),
     video: numeric('video', { precision: 20, scale: 10 }),
     videoSeconds: numeric('video_seconds', { precision: 20, scale: 10 }),
@@ -1184,6 +1189,8 @@ export const usage = createTable(
     cacheWriteTokens: integer('cache_write_tokens').notNull().default(0),
     reasoningTokens: integer('reasoning_tokens').notNull().default(0),
     webSearches: integer('web_searches').notNull().default(0),
+    xPosts: integer('x_posts').notNull().default(0),
+    xProfiles: integer('x_profiles').notNull().default(0),
     imageCount: integer('image_count').notNull().default(0),
     videoCount: integer('video_count').notNull().default(0),
     videoSeconds: numeric('video_seconds', { precision: 12, scale: 3 })
@@ -1203,6 +1210,8 @@ export const usage = createTable(
     cacheWritePrice: numeric('cache_write_price', { precision: 20, scale: 10 }),
     reasoningPrice: numeric('reasoning_price', { precision: 20, scale: 10 }),
     webSearchPrice: numeric('web_search_price', { precision: 20, scale: 10 }),
+    xPostPrice: numeric('x_post_price', { precision: 20, scale: 10 }),
+    xProfilePrice: numeric('x_profile_price', { precision: 20, scale: 10 }),
     imagePrice: numeric('image_price', { precision: 20, scale: 10 }),
     videoPrice: numeric('video_price', { precision: 20, scale: 10 }),
     videoSecondsPrice: numeric('video_seconds_price', {

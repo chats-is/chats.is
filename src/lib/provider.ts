@@ -289,6 +289,17 @@ export function getProviderWebSearchTool(
 }
 
 /**
+ * xAI's search of X, which runs on its side as its web search does. Null for
+ * any other provider: none has one.
+ */
+export function getProviderXSearchTool(
+  provider: Candidate
+): Record<string, Tool> | null {
+  if (provider.type !== 'xai') return null;
+  return { x_search: createProviderSDK(provider).tools.xSearch({}) };
+}
+
+/**
  * Get an image model by provider config and model ID
  */
 export function getImageModel(

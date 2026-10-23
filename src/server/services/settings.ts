@@ -221,19 +221,40 @@ export const getTitleSettings = perRequest('getTitleSettings', async () => {
  * rest to the search model. The search model is a chat model with search of
  * its own. Each value names a source, so a search service of its own would
  * be one more.
+ *
+ * X is searched by the same rule, through the X search model: a chat model
+ * with search of its own, reached only through xAI, whose search of X is the
+ * only one.
  */
 export const getWebSearchSettings = perRequest(
   'getWebSearchSettings',
   async () => {
-    const values = await getSettings(['webSearch.mode', 'webSearch.modelId']);
-    const modelId = values['webSearch.modelId'];
-    const model = modelId ? await findModelByModelId(modelId, 'chat') : null;
+    const values = await getSettings([
+      'webSearch.mode',
+      'webSearch.modelId',
+      'xSearch.modelId'
+    ]);
+    const searchModelId = values['webSearch.modelId'];
+    const xSearchModelId = values['xSearch.modelId'];
+    const [model, xModel] = await Promise.all([
+      searchModelId ? findModelByModelId(searchModelId, 'chat') : null,
+      xSearchModelId ? findModelByModelId(xSearchModelId, 'chat') : null
+    ]);
 
     return {
       mode: values['webSearch.mode'] === 'model' ? 'model' : 'auto',
       searchModel:
         model && model.supportsWebSearch
           ? { dbModel: model, candidates: usableCandidates(model) }
+          : null,
+      xSearchModel:
+        xModel && xModel.supportsWebSearch
+          ? {
+              dbModel: xModel,
+              candidates: usableCandidates(xModel).filter(
+                candidate => candidate.type === 'xai'
+              )
+            }
           : null
     } as const;
   }
@@ -369,6 +390,10 @@ export async function getSystemSettings(
     webSearch.searchModel && webSearch.searchModel.candidates.length > 0
       ? webSearch.searchModel.dbModel.modelId
       : null;
+  const xSearchModelId =
+    webSearch.xSearchModel && webSearch.xSearchModel.candidates.length > 0
+      ? webSearch.xSearchModel.dbModel.modelId
+      : null;
 
   return {
     speechEnabled: values['speech.enabled'] === 'true',
@@ -397,7 +422,9 @@ export async function getSystemSettings(
       // A search model the tier keeps them from is one they cannot search
       // through: the server would refuse it.
       searchModelId:
-        searchModelId && allowed(searchModelId) ? searchModelId : null
+        searchModelId && allowed(searchModelId) ? searchModelId : null,
+      xSearchModelId:
+        xSearchModelId && allowed(xSearchModelId) ? xSearchModelId : null
     }
   };
 }

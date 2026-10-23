@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   countWebSearches,
+  countXSearch,
   normalizeChatUsage,
   sumChatUsage
 } from './chat-usage';
@@ -112,7 +113,8 @@ describe('sumChatUsage', () => {
     expect(
       sumChatUsage([
         { inputTokens: 100, outputTokens: 20, cacheReadTokens: 5 },
-        { inputTokens: 130, outputTokens: 40, reasoningTokens: 7 }
+        { inputTokens: 130, outputTokens: 40, reasoningTokens: 7, xPosts: 10 },
+        { xPosts: 4, xProfiles: 3 }
       ])
     ).toEqual({
       inputTokens: 230,
@@ -120,7 +122,9 @@ describe('sumChatUsage', () => {
       cacheReadTokens: 5,
       cacheWriteTokens: 0,
       reasoningTokens: 7,
-      webSearches: 0
+      webSearches: 0,
+      xPosts: 14,
+      xProfiles: 3
     });
   });
 });
@@ -180,5 +184,35 @@ describe('countWebSearches', () => {
         providerMetadata: { google: { groundingMetadata: null } }
       })
     ).toBe(0);
+  });
+});
+
+describe('countXSearch', () => {
+  it('reads the posts and profiles xAI says the step fetched', () => {
+    // As a search of X answered: two searches, which fetched ten posts and
+    // three profiles — what is billed, rather than the searches.
+    expect(
+      countXSearch({
+        usage: {
+          raw: {
+            input_tokens: 13659,
+            server_side_tool_usage_details: {
+              web_search_calls: 0,
+              x_search_calls: 2,
+              x_posts_fetched: 10,
+              x_users_fetched: 3
+            }
+          }
+        }
+      })
+    ).toEqual({ xPosts: 10, xProfiles: 3 });
+  });
+
+  it('is nothing for a step that did not search X, or a provider that does not say', () => {
+    expect(countXSearch({ usage: { raw: { input_tokens: 5 } } })).toEqual({
+      xPosts: 0,
+      xProfiles: 0
+    });
+    expect(countXSearch({})).toEqual({ xPosts: 0, xProfiles: 0 });
   });
 });
