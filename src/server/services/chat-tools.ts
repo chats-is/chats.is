@@ -568,15 +568,19 @@ export async function buildMediaTools(args: {
           };
         }
 
-        const media = await fetchKnownMedia(
-          input.imageUrl,
-          'image/',
-          abortSignal
+        // Every image goes to the model in the order named, the one to
+        // change first.
+        const media = await Promise.all(
+          input.imageUrls.map(url =>
+            fetchKnownMedia(url, 'image/', abortSignal)
+          )
         );
-        if ('error' in media) {
-          return { status: 'error', message: media.error };
+        const images: Array<{ data: Uint8Array; mediaType: string }> = [];
+        for (const m of media) {
+          if ('error' in m) return { status: 'error', message: m.error };
+          images.push(m);
         }
-        return runImage(editor, input.prompt, {}, [media], abortSignal);
+        return runImage(editor, input.prompt, {}, images, abortSignal);
       }
     });
     registered.push('edit_image');

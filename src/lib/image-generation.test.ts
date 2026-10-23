@@ -90,6 +90,13 @@ describe('a transparent background', () => {
     });
   });
 
+  it('is asked of Bedrock as its background-removal task', async () => {
+    await removeBackground([provider('bedrock')]);
+    expect(generateImageMock.mock.calls[0][0].providerOptions).toEqual({
+      bedrock: { taskType: 'BACKGROUND_REMOVAL' }
+    });
+  });
+
   it('passes over a provider that cannot make one, for the next that can', async () => {
     const result = await removeBackground([
       provider('xai'),

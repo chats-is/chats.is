@@ -162,7 +162,7 @@ export const MEDIA_TOOL_GUIDANCE: Record<ChatMediaToolName, string> = {
   generate_image:
     'Create a new image from a text description. Use when the user asks for a picture, illustration, photo, logo, or any visual.',
   edit_image:
-    "Modify an existing image from this conversation (a user upload or a previously generated image). Pass that image's URL as `imageUrl` and describe the change in `prompt`.",
+    'Modify an existing image from this conversation (a user upload or a previously generated image), or combine several into one. Pass their URLs as `imageUrls` — the one to change first — and describe the change in `prompt`.',
   remove_background:
     "Remove the background from an image in this conversation (a user upload or a previously generated image), leaving the subject on a transparent background — use this, not edit_image, when the user asks to remove or cut out the background or for a transparent image. Pass that image's URL as `imageUrl` and what to keep as `subject`.",
   generate_video:
@@ -430,13 +430,16 @@ export const GRACE_DAYS_CHOICES = Array.from(
 );
 
 /**
- * The providers whose image API can leave a background transparent. The
- * others take no such option: asked anyway, xAI's paints a checkerboard where
- * the background was, on a JPEG that has no transparency at all.
+ * The providers whose image API can leave a background transparent: OpenAI's
+ * and Azure's by an option, Bedrock's by a background-removal task of its
+ * own. The others take no such option: asked anyway, xAI's paints a
+ * checkerboard where the background was, on a JPEG that has no transparency
+ * at all.
  */
 export const TRANSPARENT_BACKGROUND_PROVIDERS: readonly ProviderType[] = [
   'openai',
-  'azure'
+  'azure',
+  'bedrock'
 ];
 
 export const MEDIA_TOOL_NAMES = [

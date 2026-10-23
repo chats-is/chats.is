@@ -189,7 +189,7 @@ const BACKGROUND_REMOVAL_MODEL_ROW: ModelRow = {
   key: 'backgroundRemoval.modelId',
   label: 'Background Removal Model',
   icon: Eraser,
-  hint: "The model the chat's background removal tool uses, whichever image model the user picked. Only image models that edit and are served through OpenAI or Azure are listed — no other image API can make a transparent background. None leaves the tool off.",
+  hint: "The model the chat's background removal tool uses, whichever image model the user picked. Only image models that edit and are served through OpenAI, Azure or Bedrock are listed — no other image API can make a transparent background. None leaves the tool off.",
   can: model =>
     model.capability === 'image' &&
     !!model.supportsImageEdit &&

@@ -6,7 +6,8 @@ import {
   type Candidate,
   type Model,
   type Provider,
-  type ProviderRequest
+  type ProviderRequest,
+  type ProviderType
 } from '@/types';
 import { TRANSPARENT_BACKGROUND_PROVIDERS } from '@/lib/constant';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
@@ -24,6 +25,16 @@ export type InputImage = {
   data: Uint8Array | string;
   mediaType: string;
 };
+
+/**
+ * How a provider's image API is asked for a transparent background: OpenAI
+ * and Azure as a PNG on one; Bedrock by its background-removal task, which
+ * finds the subject itself and reads no prompt.
+ */
+const transparentOptions = (type: ProviderType) =>
+  type === 'bedrock'
+    ? { taskType: 'BACKGROUND_REMOVAL' }
+    : { background: 'transparent', outputFormat: 'png' };
 
 export type ImageGenerationResult = StoredMedia & {
   inputTokens?: number;
@@ -154,7 +165,7 @@ export async function generateAndStoreImage(args: {
         const providerOpts = {
           ...provider.apiOptions,
           ...parts.provider,
-          ...(transparent && { background: 'transparent', outputFormat: 'png' })
+          ...(transparent && transparentOptions(provider.type))
         };
 
         const { image, usage, responses } = await generateImage({

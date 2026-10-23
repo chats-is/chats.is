@@ -275,6 +275,84 @@ describe('the background removal tool', () => {
   });
 });
 
+describe('the image editing tool', () => {
+  const person = 'https://blob.example/uploads/person.png';
+  const beach = 'https://blob.example/uploads/beach.jpg';
+  const withUploads = () =>
+    buildMediaTools({
+      userId: 'u1',
+      chatId: 'c1',
+      assistantMessageId: 'a1',
+      mediaOptions: { imageEdit: { modelId: 'remover' } },
+      chatMessages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'file', url: person, mediaType: 'image/png' },
+            { type: 'file', url: beach, mediaType: 'image/jpeg' }
+          ]
+        }
+      ]
+    });
+  const editWith = async (imageUrls: string[]) => {
+    const { tools } = await withUploads();
+    const execute = tools.edit_image.execute as unknown as (
+      input: { prompt: string; imageUrls: string[] },
+      options: Record<string, unknown>
+    ) => Promise<unknown>;
+    return execute(
+      { prompt: 'Put the person from the first on the beach', imageUrls },
+      { toolCallId: 't1', messages: [], context: {} }
+    );
+  };
+
+  beforeEach(() => {
+    tier('allow', []);
+    vi.mocked(isOwnBlobUrl).mockReturnValue(true);
+    vi.mocked(preflightCheck).mockResolvedValue({ ok: true });
+    vi.mocked(generateAndStoreImage).mockResolvedValue({
+      url: 'https://blob.example/x.png',
+      mediaType: 'image/png',
+      filename: 'x.png',
+      provider: { id: 'p1' },
+      providerRequests: []
+    } as unknown as Awaited<ReturnType<typeof generateAndStoreImage>>);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async url =>
+        new Response(new TextEncoder().encode(String(url)), {
+          headers: {
+            'content-type': String(url).endsWith('.png')
+              ? 'image/png'
+              : 'image/jpeg'
+          }
+        })
+    );
+  });
+
+  it('sends every image it is given to the editor, in their order', async () => {
+    const output = await editWith([person, beach]);
+
+    expect(output).toMatchObject({ status: 'done' });
+    const call = vi.mocked(generateAndStoreImage).mock.calls[0][0];
+    expect(call.dbModel.modelId).toBe('remover');
+    expect(call.inputImages).toEqual([
+      { data: new TextEncoder().encode(person), mediaType: 'image/png' },
+      { data: new TextEncoder().encode(beach), mediaType: 'image/jpeg' }
+    ]);
+  });
+
+  it('edits nothing when one of the images is not from the conversation', async () => {
+    const output = await editWith([
+      person,
+      'https://blob.example/uploads/elsewhere.png'
+    ]);
+
+    expect(output).toMatchObject({ status: 'error' });
+    expect(generateAndStoreImage).not.toHaveBeenCalled();
+  });
+});
+
 describe('buildMediaToolsSystemPrompt', () => {
   it('says nothing when there are no media tools', () => {
     expect(buildMediaToolsSystemPrompt([])).toBe('');

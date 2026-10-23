@@ -113,11 +113,14 @@ export const editImageInputSchema = z.object({
   prompt: z
     .string()
     .min(1)
-    .describe('A detailed description of what to change in the image'),
-  imageUrl: z
-    .url()
     .describe(
-      'URL of an image from this conversation (a user upload or a previously generated image)'
+      'A detailed description of what to change in the image — with several images, which is which (the first, the second…) and what to take from each'
+    ),
+  imageUrls: z
+    .array(z.url())
+    .min(1)
+    .describe(
+      'URLs of images from this conversation (user uploads or previously generated images): the one to change first, then any others the change draws on — a person or object to put into it, a style to follow'
     )
 });
 
