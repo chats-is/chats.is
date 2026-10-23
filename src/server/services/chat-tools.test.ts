@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type Artifact, type ChatMessage, type Model } from '@/types';
 import { generateAndStoreImage } from '@/lib/image-generation';
+import { generateAndStoreVideo } from '@/lib/video-generation';
 import { getArtifact } from '@/server/services/artifact';
 import { isOwnBlobUrl } from '@/server/services/blob';
 import { findModelByModelId, getAllModels } from '@/server/services/model';
@@ -87,6 +88,12 @@ const models = [
     ...image('remover'),
     supportsImageEdit: true,
     uiOptions: { sizes: ['auto', '1024x1024', '1536x1024', '1024x1536'] }
+  } as Model,
+  // A video model that also animates an image.
+  {
+    ...image('animator'),
+    capability: 'video',
+    supportsImageToVideo: true
   } as Model,
   // An editor served only through xAI, whose image API cannot make a
   // background transparent.
@@ -350,6 +357,104 @@ describe('the image editing tool', () => {
 
     expect(output).toMatchObject({ status: 'error' });
     expect(generateAndStoreImage).not.toHaveBeenCalled();
+  });
+});
+
+describe('the video tool', () => {
+  const start = 'https://blob.example/uploads/start.png';
+  const end = 'https://blob.example/uploads/end.png';
+  const generateWith = async (input: Record<string, unknown>) => {
+    const { tools } = await buildMediaTools({
+      userId: 'u1',
+      chatId: 'c1',
+      assistantMessageId: 'a1',
+      mediaOptions: { video: { modelId: 'animator' } },
+      chatMessages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'file', url: start, mediaType: 'image/png' },
+            { type: 'file', url: end, mediaType: 'image/png' }
+          ]
+        }
+      ]
+    });
+    const execute = tools.generate_video.execute as unknown as (
+      input: Record<string, unknown>,
+      options: Record<string, unknown>
+    ) => Promise<unknown>;
+    return execute(
+      { prompt: 'A flower opening', ...input },
+      { toolCallId: 't1', messages: [], context: {} }
+    );
+  };
+  const bytes = (url: string) => new TextEncoder().encode(url);
+
+  beforeEach(() => {
+    tier('allow', []);
+    vi.mocked(isOwnBlobUrl).mockReturnValue(true);
+    vi.mocked(preflightCheck).mockResolvedValue({ ok: true });
+    vi.mocked(generateAndStoreVideo).mockResolvedValue({
+      url: 'https://blob.example/x.mp4',
+      mediaType: 'video/mp4',
+      filename: 'x.mp4',
+      videoSeconds: 5,
+      provider: { id: 'p1' },
+      providerRequests: []
+    } as unknown as Awaited<ReturnType<typeof generateAndStoreVideo>>);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async url =>
+        new Response(bytes(String(url)), {
+          headers: { 'content-type': 'image/png' }
+        })
+    );
+  });
+
+  it('sends a first and a last frame, in that order', async () => {
+    const output = await generateWith({ imageUrl: start, lastImageUrl: end });
+
+    expect(output).toMatchObject({ status: 'done' });
+    const call = vi.mocked(generateAndStoreVideo).mock.calls[0][0];
+    expect(call.dbModel.modelId).toBe('animator');
+    expect(call.inputImage).toEqual({
+      data: bytes(start),
+      mediaType: 'image/png'
+    });
+    expect(call.lastImage).toEqual({
+      data: bytes(end),
+      mediaType: 'image/png'
+    });
+    expect(call.referenceImages).toBeUndefined();
+  });
+
+  it('sends reference images as references, with no frame', async () => {
+    await generateWith({ referenceImageUrls: [start, end] });
+
+    const call = vi.mocked(generateAndStoreVideo).mock.calls[0][0];
+    expect(call.referenceImages).toEqual([
+      { data: bytes(start), mediaType: 'image/png' },
+      { data: bytes(end), mediaType: 'image/png' }
+    ]);
+    expect(call.inputImage).toBeUndefined();
+    expect(call.lastImage).toBeUndefined();
+  });
+
+  it('refuses a last frame without a first', async () => {
+    const output = await generateWith({ lastImageUrl: end });
+
+    expect(output).toMatchObject({ status: 'error' });
+    expect(generateAndStoreVideo).not.toHaveBeenCalled();
+  });
+
+  it('refuses reference images beside a frame', async () => {
+    const output = await generateWith({
+      imageUrl: start,
+      referenceImageUrls: [end]
+    });
+
+    expect(output).toMatchObject({ status: 'error' });
+    expect(generateAndStoreVideo).not.toHaveBeenCalled();
   });
 });
 

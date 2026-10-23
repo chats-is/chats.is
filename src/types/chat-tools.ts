@@ -161,6 +161,18 @@ export const generateVideoInputSchema = z.object({
     .describe(
       'URL of an image from this conversation to animate — a user upload or an image generated earlier. Must be an image: to change an existing video, use edit_video instead. Omit to generate from the text alone.'
     ),
+  lastImageUrl: z
+    .string()
+    .optional()
+    .describe(
+      'URL of an image from this conversation for the last frame, the video running from `imageUrl` to it. Only with `imageUrl`.'
+    ),
+  referenceImageUrls: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'URLs of images from this conversation for a new video to draw on — people, objects, a style — rather than to start from. Not with `imageUrl` or `lastImageUrl`.'
+    ),
   size: z
     .string()
     .optional()

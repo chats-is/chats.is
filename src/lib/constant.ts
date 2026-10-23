@@ -166,7 +166,7 @@ export const MEDIA_TOOL_GUIDANCE: Record<ChatMediaToolName, string> = {
   remove_background:
     "Remove the background from an image in this conversation (a user upload or a previously generated image), leaving the subject on a transparent background — use this, not edit_image, when the user asks to remove or cut out the background or for a transparent image. Pass that image's URL as `imageUrl` and what to keep as `subject`.",
   generate_video:
-    'Create a video from a text description, or animate an image from this conversation by passing its URL as `imageUrl`.',
+    'Create a video from a text description, or animate an image from this conversation by passing its URL as `imageUrl` — with `lastImageUrl` as well, from that first frame to this last one. Or pass images as `referenceImageUrls` — people, objects, a style — for a new video that draws on them rather than starting from one; references do not combine with frames.',
   edit_video:
     "Modify an existing video from this conversation (a user upload or a previously generated one) — use this whenever the user asks to change a video that already exists, never generate_video. Pass that video's URL as `videoUrl` and describe the change in `prompt`. Length, aspect ratio and resolution are inherited from the source.",
   text_to_speech:

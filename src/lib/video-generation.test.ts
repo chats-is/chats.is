@@ -483,6 +483,76 @@ describe('generateAndStoreVideo — routing & failover', () => {
     await expect(pending).rejects.not.toBeInstanceOf(VideoTimeoutError);
   });
 
+  const first = { data: new Uint8Array([1]), mediaType: 'image/png' };
+  const last = { data: new Uint8Array([2]), mediaType: 'image/jpeg' };
+
+  it('sends a first and a last frame as frames, the prompt as text alone', async () => {
+    await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('veo-3'),
+      candidates: [failover({ type: 'google' })],
+      duration: 6,
+      inputImage: first,
+      lastImage: last
+    });
+
+    const call = generateVideoMock.mock.calls[0][0];
+    expect(call.prompt).toBe('p');
+    expect(call.frameImages).toEqual([
+      { image: first.data, frameType: 'first_frame' },
+      { image: last.data, frameType: 'last_frame' }
+    ]);
+    expect(call.inputReferences).toBeUndefined();
+  });
+
+  it('sends reference images as references', async () => {
+    await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('grok-imagine-video'),
+      candidates: [failover({ type: 'xai' })],
+      duration: 6,
+      referenceImages: [first, last]
+    });
+
+    const call = generateVideoMock.mock.calls[0][0];
+    expect(call.prompt).toBe('p');
+    expect(call.inputReferences).toEqual([first, last]);
+    expect(call.frameImages).toBeUndefined();
+  });
+
+  it('passes over a provider that cannot take them, for the next that can', async () => {
+    const out = await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('some-video'),
+      candidates: [
+        failover({ id: 'a', type: 'deepseek' }),
+        failover({ id: 'b', type: 'vertex' })
+      ],
+      duration: 6,
+      referenceImages: [first]
+    });
+
+    expect(generateVideoMock).toHaveBeenCalledTimes(1);
+    expect(out.provider.id).toBe('b');
+  });
+
+  it('refuses reference images on the Sora path, which sends text only', async () => {
+    await expect(
+      generateAndStoreVideo({
+        userId: 'u',
+        prompt: 'p',
+        dbModel: model('sora-2'),
+        candidates: [failover()],
+        duration: 8,
+        referenceImages: [first]
+      })
+    ).rejects.toThrow('generates from text only');
+    expect(videosCreate).not.toHaveBeenCalled();
+  });
+
   it('fails over to the next provider on a retryable error', async () => {
     videosCreate
       .mockRejectedValueOnce({ status: 429 })

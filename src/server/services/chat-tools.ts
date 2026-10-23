@@ -635,9 +635,33 @@ export async function buildMediaTools(args: {
         // image too. Neither means the platform has none configured for it,
         // which is worth saying rather than generating from the words alone
         // and letting the user wonder where their picture went.
+        //
+        // A last frame, or images to draw on, are images too and go the same
+        // way. Frames and references are one or the other: sent both, the AI
+        // SDK drops the references, saying so only in a warning.
+        const references = input.referenceImageUrls ?? [];
+        if (input.lastImageUrl && !input.imageUrl) {
+          return {
+            status: 'error',
+            message:
+              'A last frame needs a first one: pass the opening image as `imageUrl` too.'
+          };
+        }
+        if (references.length > 0 && input.imageUrl) {
+          return {
+            status: 'error',
+            message:
+              'Reference images do not combine with a first or last frame: use one or the other.'
+          };
+        }
         let on = video;
         let inputImage;
-        if (input.imageUrl) {
+        let lastImage;
+        let referenceImages;
+        const urls = [input.imageUrl, input.lastImageUrl, ...references].filter(
+          (url): url is string => !!url
+        );
+        if (urls.length > 0) {
           const animator =
             videoImage ?? (dbModel.supportsImageToVideo ? video : null);
           if (!animator) {
@@ -647,16 +671,17 @@ export async function buildMediaTools(args: {
                 'No video model that can animate an image is selected. Pick one under Advanced → Video from image.'
             };
           }
-          const media = await fetchKnownMedia(
-            input.imageUrl,
-            'image/',
-            abortSignal
+          const media = await Promise.all(
+            urls.map(url => fetchKnownMedia(url, 'image/', abortSignal))
           );
-          if ('error' in media) {
-            return { status: 'error', message: media.error };
+          const images: Array<{ data: Uint8Array; mediaType: string }> = [];
+          for (const m of media) {
+            if ('error' in m) return { status: 'error', message: m.error };
+            images.push(m);
           }
           on = animator;
-          inputImage = media;
+          if (references.length > 0) referenceImages = images;
+          else [inputImage, lastImage] = images;
         }
 
         // Gated on the model that will actually run, not the one selected for
@@ -672,6 +697,8 @@ export async function buildMediaTools(args: {
             dbModel: on.dbModel,
             candidates: on.candidates,
             inputImage,
+            lastImage,
+            referenceImages,
             size: pickSize(
               input.size,
               mediaOptions?.video?.size,

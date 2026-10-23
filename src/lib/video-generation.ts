@@ -8,7 +8,8 @@ import {
   type Model,
   type Provider,
   type ProviderConfig,
-  type ProviderRequest
+  type ProviderRequest,
+  type ProviderType
 } from '@/types';
 import { decrypt } from '@/lib/crypto';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
@@ -21,6 +22,14 @@ import {
 import { providerRequestsOf } from '@/lib/provider-request';
 import { toRequestParts } from '@/lib/provider-vocab';
 import { resolveVideoSeconds } from '@/lib/video-usage';
+
+/** The providers whose video models the AI SDK hands a last frame or
+ *  reference images to: Google's and Vertex's Veo, and xAI's. */
+const FRAME_AND_REFERENCE_PROVIDERS: readonly ProviderType[] = [
+  'google',
+  'vertex',
+  'xai'
+];
 
 /**
  * Raised when we stop waiting on a render — our own deadline, not a provider
@@ -269,6 +278,11 @@ export async function generateAndStoreVideo(args: {
   duration?: number;
   /** Animate this image instead of generating from the text alone. */
   inputImage?: { data: Uint8Array; mediaType: string };
+  /** With `inputImage`, the frame the video ends on. */
+  lastImage?: { data: Uint8Array; mediaType: string };
+  /** Images a new video draws on rather than starts from; never with a
+   *  frame. */
+  referenceImages?: Array<{ data: Uint8Array; mediaType: string }>;
   /** Edit this video instead of generating a new one. */
   inputVideoUrl?: string;
   abortSignal?: AbortSignal;
@@ -279,6 +293,8 @@ export async function generateAndStoreVideo(args: {
     dbModel,
     candidates,
     inputImage,
+    lastImage,
+    referenceImages,
     inputVideoUrl,
     abortSignal
   } = args;
@@ -306,11 +322,11 @@ export async function generateAndStoreVideo(args: {
             `${dbModel.name} cannot edit a video; it generates from text only.`
           );
         }
-        if (inputImage) {
+        if (inputImage || referenceImages?.length) {
           // The custom Sora path sends a prompt and nothing else, so an image
           // here would be dropped without a word — say so instead.
           throw new ProviderCannotError(
-            `${dbModel.name} cannot animate an image; it generates from text only.`
+            `${dbModel.name} cannot work from an image; it generates from text only.`
           );
         }
         // Neither of the two cases that arrive without one, so the option
@@ -351,6 +367,17 @@ export async function generateAndStoreVideo(args: {
             `${dbModel.name} cannot edit a video through ${provider.type}.`
           );
         }
+        // A last frame and reference images are read only by the video
+        // models of these; anywhere else the AI SDK drops them with a
+        // warning, and the video would be one not asked for.
+        if (
+          (lastImage || referenceImages?.length) &&
+          !FRAME_AND_REFERENCE_PROVIDERS.includes(provider.type)
+        ) {
+          throw new ProviderCannotError(
+            `${dbModel.name} cannot take a last frame or reference images through ${provider.type}.`
+          );
+        }
 
         // Duration, aspect ratio and resolution are inherited from the source
         // when editing, so the provider ignores them — don't send any.
@@ -383,10 +410,26 @@ export async function generateAndStoreVideo(args: {
           ({ video, providerMetadata, responses } = await generateVideo({
             model: getVideoModel(provider, modelId),
             // An image turns this into image-to-video: the picture is the
-            // opening frame and the text says what happens from there.
-            prompt: inputImage
-              ? { image: inputImage.data, text: prompt }
-              : prompt,
+            // opening frame and the text says what happens from there. With
+            // a last frame, both go as frames, and the text says how one
+            // becomes the other.
+            prompt:
+              inputImage && !lastImage
+                ? { image: inputImage.data, text: prompt }
+                : prompt,
+            ...(inputImage &&
+              lastImage && {
+                frameImages: [
+                  { image: inputImage.data, frameType: 'first_frame' },
+                  { image: lastImage.data, frameType: 'last_frame' }
+                ]
+              }),
+            ...(referenceImages?.length && {
+              inputReferences: referenceImages.map(image => ({
+                data: image.data,
+                mediaType: image.mediaType
+              }))
+            }),
             ...parts.top,
             abortSignal: signal,
             ...(Object.keys(providerOpts).length > 0 && {
