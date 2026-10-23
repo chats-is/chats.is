@@ -1130,9 +1130,6 @@ export const modelPricings = createTable(
     // `transcribe()` reports in seconds and providers price per minute: the
     // rate for a minute, as they quote it.
     audioMinute: numeric('audio_minute', { precision: 20, scale: 10 }),
-    // The rate per second it replaced, read by nothing now; kept until the
-    // release still reading it has gone, then dropped.
-    audioSeconds: numeric('audio_seconds', { precision: 20, scale: 10 }),
     source: varchar('source', { length: 50 })
       .notNull()
       .default('manual')
@@ -1254,11 +1251,6 @@ export const usage = createTable(
       scale: 10
     }),
     audioMinutePrice: numeric('audio_minute_price', {
-      precision: 20,
-      scale: 10
-    }),
-    // The rate per second it replaced, as `audio_seconds` above.
-    audioSecondsPrice: numeric('audio_seconds_price', {
       precision: 20,
       scale: 10
     }),

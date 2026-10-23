@@ -365,6 +365,13 @@
       "when": 1792768175863,
       "tag": "0051_audio_per_minute",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792769604297,
+      "tag": "0052_drop_audio_seconds",
+      "breakpoints": true
     }
   ]
 }

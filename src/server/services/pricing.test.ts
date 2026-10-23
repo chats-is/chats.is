@@ -37,7 +37,6 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     audioInput: null,
     audioOutput: null,
     audioCharacters: null,
-    audioSeconds: null,
     audioMinute: null,
     source: 'manual',
     createdAt: new Date(),
