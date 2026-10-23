@@ -129,6 +129,10 @@ describe('adminUsageStats', () => {
       modelId: 'img',
       capability: 'image',
       imageCount: 2,
+      inputTokens: 300,
+      outputTokens: 2000,
+      imageInputTokens: 250,
+      imageOutputTokens: 1800,
       spend: '0.5',
       cost: '0.25'
     });
@@ -159,8 +163,8 @@ describe('adminUsageStats', () => {
       days.reduce((n, d) => n + pick(d), 0);
     expect(total(d => d.spend)).toBeCloseTo(4.8);
     expect(total(d => d.cost)).toBeCloseTo(2.4);
-    expect(total(d => d.inputTokens)).toBe(140);
-    expect(total(d => d.outputTokens)).toBe(14);
+    expect(total(d => d.inputTokens)).toBe(440);
+    expect(total(d => d.outputTokens)).toBe(2014);
     expect(total(d => d.cacheReadTokens)).toBe(20);
     expect(total(d => d.reasoningTokens)).toBe(5);
   });
@@ -183,7 +187,13 @@ describe('adminUsageStats', () => {
       xPosts: 15,
       xProfiles: 3
     });
-    expect(of(s.models, 3, 'img')).toMatchObject({ images: 2, spend: 0.5 });
+    expect(of(s.models, 3, 'img')).toMatchObject({
+      images: 2,
+      inputTokens: 300,
+      imageInputTokens: 250,
+      imageOutputTokens: 1800,
+      spend: 0.5
+    });
     expect(of(s.providers, 2, 'p1')).toMatchObject({
       name: 'Primary',
       cost: 2

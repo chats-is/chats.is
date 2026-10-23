@@ -378,6 +378,8 @@ export async function adminUsageStats(
         cacheWriteTokens: usage.cacheWriteTokens,
         reasoningTokens: usage.reasoningTokens,
         imageCount: usage.imageCount,
+        imageInputTokens: usage.imageInputTokens,
+        imageOutputTokens: usage.imageOutputTokens,
         videoCount: usage.videoCount,
         webSearches: usage.webSearches,
         xPosts: usage.xPosts,
@@ -401,6 +403,9 @@ export async function adminUsageStats(
     cacheReadTokens: sumOf(used.cacheReadTokens),
     cacheWriteTokens: sumOf(used.cacheWriteTokens),
     reasoningTokens: sumOf(used.reasoningTokens),
+    // Of the input and output tokens, the pictures read and drawn.
+    imageInputTokens: sumOf(used.imageInputTokens),
+    imageOutputTokens: sumOf(used.imageOutputTokens),
     images: sumOf(used.imageCount),
     videos: sumOf(used.videoCount),
     // The calls that spoke or heard speech, however much of it.

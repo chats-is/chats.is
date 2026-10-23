@@ -41,6 +41,8 @@ const FIGURES = [
   'cacheReadTokens',
   'cacheWriteTokens',
   'reasoningTokens',
+  'imageInputTokens',
+  'imageOutputTokens',
   'images',
   'videos',
   'audios',

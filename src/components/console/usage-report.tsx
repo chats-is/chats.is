@@ -35,14 +35,26 @@ type DetailRow = {
   figures: Figures;
 };
 
-/** Each kind of token, as the table names it, in this order. */
-const TOKEN_KINDS = [
-  { key: 'inputTokens', label: 'Input' },
-  { key: 'outputTokens', label: 'Output' },
-  { key: 'reasoningTokens', label: 'Reasoning' },
-  { key: 'cacheReadTokens', label: 'Cache read' },
-  { key: 'cacheWriteTokens', label: 'Cache write' }
-] as const;
+/** Each kind of token, as the table names it, in this order, with how many
+ *  of it a row used: the input and output less the pictures read and drawn,
+ *  which are named apart, as the Logs name them. */
+const TOKEN_KINDS: Array<{
+  key: string;
+  label: string;
+  of: (f: Figures) => number;
+}> = [
+  { key: 'input', label: 'Input', of: f => f.inputTokens - f.imageInputTokens },
+  {
+    key: 'output',
+    label: 'Output',
+    of: f => f.outputTokens - f.imageOutputTokens
+  },
+  { key: 'imageInput', label: 'Image input', of: f => f.imageInputTokens },
+  { key: 'imageOutput', label: 'Image output', of: f => f.imageOutputTokens },
+  { key: 'reasoning', label: 'Reasoning', of: f => f.reasoningTokens },
+  { key: 'cacheRead', label: 'Cache read', of: f => f.cacheReadTokens },
+  { key: 'cacheWrite', label: 'Cache write', of: f => f.cacheWriteTokens }
+];
 
 const detailHelper = createAppColumnHelper<DetailRow>();
 
@@ -62,7 +74,7 @@ const money = {
 } as const;
 
 /** The kinds of token a row used. */
-const tokenKinds = (f: Figures) => TOKEN_KINDS.filter(k => f[k.key] > 0);
+const tokenKinds = (f: Figures) => TOKEN_KINDS.filter(k => k.of(f) > 0);
 
 /** Whether a row holds more than its closed line shows. */
 const opens = (f: Figures) =>
@@ -191,7 +203,7 @@ const detailColumns = (
                     <span className="text-left text-muted-foreground">
                       {k.label}
                     </span>
-                    <span>{formatNumber(f[k.key])}</span>
+                    <span>{formatNumber(k.of(f))}</span>
                   </Fragment>
                 ))}
               </div>
