@@ -42,6 +42,7 @@ import {
   GalleryCardSkeletons,
   GalleryGridSkeleton
 } from '@/components/gallery-skeleton';
+import { PlayDisc } from '@/components/play-disc';
 
 /** A card's actions, the same for every kind: for an artifact shared on its
  *  own, its link to copy; a download; and the chat it came from. */
@@ -370,11 +371,7 @@ function LibraryCard({ item }: { item: LibraryItem }) {
               playsInline
               className="size-full object-cover"
             />
-            <span className="absolute inset-0 flex items-center justify-center">
-              <span className="rounded-full bg-black/50 p-3 text-white">
-                <Play className="size-5 fill-current" />
-              </span>
-            </span>
+            <PlayDisc />
           </>
         }
       />

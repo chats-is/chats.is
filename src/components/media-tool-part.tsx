@@ -1,8 +1,14 @@
 import { usePreferencesIfAny } from '@/contexts/preferences-context';
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 
 import { type ChatMessage, type MediaToolName } from '@/types';
 import { MEDIA_TOOL_NAMES } from '@/lib/constant';
+import { downloadFileFromUrl } from '@/lib/download';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaLightbox } from '@/components/media-lightbox';
 import { MediaPlaceholder } from '@/components/media-placeholder';
@@ -62,6 +68,26 @@ export function TranscribeToolPart({ part }: { part: TranscribeToolUIPart }) {
   return null;
 }
 
+/** A generated picture's or video's download, in its lower corner while it
+ *  is pointed at, on the dark disc the Library's cards put over a picture. */
+function MediaDownload({ url, filename }: { url: string; filename?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label="Download"
+          onClick={() => downloadFileFromUrl(url, filename)}
+          className="absolute right-2 bottom-2 z-10 flex size-6 items-center justify-center rounded-full bg-black text-white opacity-0 transition-opacity group-hover/media:opacity-100 hover:bg-neutral-700 focus-visible:opacity-100"
+        >
+          <Download className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Download</TooltipContent>
+    </Tooltip>
+  );
+}
+
 /**
  * Renders a media generation tool call inline in the message stream: a
  * skeleton placeholder while the tool is executing, the media itself once
@@ -119,7 +145,8 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
 
   if (output.mediaType.startsWith('image/')) {
     return (
-      <div className="mb-2 max-w-80">
+      <div className="group/media relative mb-2 w-fit max-w-80">
+        <MediaDownload url={output.url} filename={output.filename} />
         <MediaLightbox
           type="image"
           src={output.url}
@@ -146,7 +173,8 @@ export function MediaToolPart({ part }: { part: MediaToolUIPart }) {
 
   if (output.mediaType.startsWith('video/')) {
     return (
-      <div className="mb-2 max-w-80">
+      <div className="group/media relative mb-2 max-w-80">
+        <MediaDownload url={output.url} filename={output.filename} />
         <VideoPlayer src={output.url} />
       </div>
     );

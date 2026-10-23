@@ -2,10 +2,14 @@ import { toast } from 'sonner';
 
 import { type Artifact } from '@/types';
 
-/** Trigger a browser download for a remote file URL. */
+/** Trigger a browser download for a remote file URL. Blob storage is another
+ *  origin, where a link's `download` is ignored and the file only opens in a
+ *  tab; asked with `download=1`, the store sends it as an attachment. */
 export function downloadFileFromUrl(url: string, filename?: string) {
+  const href = new URL(url);
+  href.searchParams.set('download', '1');
   const link = document.createElement('a');
-  link.href = url;
+  link.href = href.toString();
   link.download = filename || url.split('/').pop() || 'download';
   link.target = '_blank';
   document.body.appendChild(link);
