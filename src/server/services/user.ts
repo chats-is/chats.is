@@ -42,7 +42,8 @@ export async function makeFirstUserAdmin(userId: string) {
 }
 
 /**
- * The signed-in user's own row.
+ * The signed-in user as their own pages show them: who they are, and nothing
+ * of their plan, quota or tier, which are the console's.
  *
  * Throws rather than returning null: the middleware has already verified the
  * session, so a missing row means the session is stale. A bare Error would
@@ -50,7 +51,15 @@ export async function makeFirstUserAdmin(userId: string) {
  * 401 instead.
  */
 export async function getMe(userId: string) {
-  const user = await db.select().from(users).where(eq(users.id, userId));
+  const user = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      image: users.image
+    })
+    .from(users)
+    .where(eq(users.id, userId));
 
   if (!user[0]) {
     throw new Response('Session expired', { status: 401 });
