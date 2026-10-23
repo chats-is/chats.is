@@ -164,12 +164,12 @@ function TableTitle({ children }: { children: React.ReactNode }) {
  */
 export default function RevenuePage() {
   const queryClient = useQueryClient();
-  const { window, value, until, setWindow } = useReportWindow();
+  const { window, value, until, hourly, setWindow } = useReportWindow();
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useSearchFilter('page', 1);
 
   const report = useQuery(
-    revenueQueries.report({ from: window.start, to: until })
+    revenueQueries.report({ from: window.start, to: until, hourly })
   );
   const lossUsers = useQuery(
     revenueQueries.lossUsers({ from: window.start, to: until, page })
@@ -216,6 +216,7 @@ export default function RevenuePage() {
         >
           <RevenueFigures
             report={report.data}
+            hourly={hourly}
             lossUsers={lossUsers.isLoading ? undefined : lossUsers.data}
             lossUsersPending={lossUsers.isPlaceholderData}
             onPageChange={setPage}
@@ -230,11 +231,14 @@ export default function RevenuePage() {
 
 function RevenueFigures({
   report,
+  hourly,
   lossUsers,
   lossUsersPending,
   onPageChange
 }: {
   report: RevenueReport;
+  /** Each of the report's days an hour of one day. */
+  hourly: boolean;
   lossUsers?: LossUsers;
   lossUsersPending: boolean;
   onPageChange: (page: number) => void;
@@ -303,7 +307,7 @@ function RevenueFigures({
           )
         },
         {
-          label: 'Subscribers at day end',
+          label: hourly ? 'Subscribers at hour end' : 'Subscribers at day end',
           value: formatNumber(d.subscribers)
         }
       ]
@@ -315,7 +319,7 @@ function RevenueFigures({
       planRows,
       subscriptionDays
     };
-  }, [report]);
+  }, [report, hourly]);
   const { f } = view;
 
   return (
@@ -350,7 +354,9 @@ function RevenueFigures({
       </div>
 
       <DailyLineChart
-        title="Daily subscription changes"
+        title={
+          hourly ? 'Hourly subscription changes' : 'Daily subscription changes'
+        }
         series={[
           { label: 'New', color: COLOR.new.bar },
           { label: 'Churned', color: COLOR.churned.bar }
@@ -358,6 +364,7 @@ function RevenueFigures({
         rows={view.subscriptionDays}
         formatTick={formatNumber}
         whole
+        hourly={hourly}
         empty="No subscriptions begun or ended in this period."
       />
 
@@ -388,7 +395,7 @@ function RevenueFigures({
         />
       </div>
 
-      <RevenueCostChart days={report.days} />
+      <RevenueCostChart days={report.days} hourly={hourly} />
 
       <section className="space-y-3">
         <TableTitle>Plan profit and loss</TableTitle>

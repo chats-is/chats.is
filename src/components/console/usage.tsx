@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays } from 'date-fns';
 import { RefreshCw } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -25,10 +24,12 @@ import {
  */
 export default function UsagePage() {
   const queryClient = useQueryClient();
-  const { window, value, until, setWindow } = useReportWindow();
+  const { window, value, until, hourly, points, setWindow } = useReportWindow();
   const [refreshing, setRefreshing] = useState(false);
 
-  const stats = useQuery(usageQueries.stats({ from: window.start, to: until }));
+  const stats = useQuery(
+    usageQueries.stats({ from: window.start, to: until, hourly })
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -69,12 +70,7 @@ export default function UsagePage() {
             stats.isPlaceholderData && 'pointer-events-none opacity-60'
           )}
         >
-          <UsageReport
-            stats={stats.data}
-            dates={Array.from({ length: window.days }, (_, i) =>
-              addDays(window.start, i)
-            )}
-          />
+          <UsageReport stats={stats.data} dates={points} hourly={hourly} />
         </div>
       ) : (
         <UsageReportSkeleton />

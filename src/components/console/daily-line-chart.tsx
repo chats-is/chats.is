@@ -1,7 +1,12 @@
 import { useId } from 'react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
-import { formatDate, formatShortDate } from '@/lib/format-date';
+import {
+  formatDate,
+  formatDateHour,
+  formatHour,
+  formatShortDate
+} from '@/lib/format-date';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   ChartContainer,
@@ -36,7 +41,8 @@ export function DailyLineChart({
   rows,
   formatTick,
   empty,
-  whole = false
+  whole = false,
+  hourly = false
 }: {
   title: string;
   series: [Series, Series];
@@ -45,6 +51,8 @@ export function DailyLineChart({
   empty: string;
   /** Figures that are counts, so every tick is a whole number. */
   whole?: boolean;
+  /** Each row an hour of one day rather than a day. */
+  hourly?: boolean;
 }) {
   // Each area's gradient by an id of this chart's own, as a page shows
   // several; useId's punctuation is not an SVG id's.
@@ -55,7 +63,7 @@ export function DailyLineChart({
   } satisfies ChartConfig;
   const data = rows.map(r => ({
     ...r,
-    day: formatShortDate(r.date),
+    day: hourly ? formatHour(r.date) : formatShortDate(r.date),
     first: r.values[0],
     second: r.values[1]
   }));
@@ -91,7 +99,9 @@ export function DailyLineChart({
                 content={
                   <ChartTooltipContent
                     labelFormatter={(_, payload) =>
-                      formatDate((payload[0]?.payload as Day).date)
+                      (hourly ? formatDateHour : formatDate)(
+                        (payload[0]?.payload as Day).date
+                      )
                     }
                     // Each curve's own line, and under the last, what else
                     // the day adds up to.

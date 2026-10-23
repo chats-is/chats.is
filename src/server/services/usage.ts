@@ -335,7 +335,8 @@ export async function recordTranscriptionUsage(
 // calendar-day boundary. Nothing here does timezone maths: it filters
 // `createdAt >= since` on a timestamptz column, and numbers the days every
 // 86,400 seconds from `since` (`dayOf`), so each is one of the browser's
-// local days and the totals equal the sum of the days.
+// local days and the totals equal the sum of the days. Over a window of
+// one day, a "day" is an hour: `step` is the seconds between them.
 // =========================================================================
 
 /**
@@ -351,12 +352,13 @@ export async function recordTranscriptionUsage(
 export async function adminUsageStats(
   since: Date,
   until?: Date,
-  userId?: string
+  userId?: string,
+  step?: number
 ) {
   const used = db.$with('used').as(
     db
       .select({
-        day: dayOf(since, usage.createdAt).as('day'),
+        day: dayOf(since, usage.createdAt, step).as('day'),
         modelId: usage.modelId,
         providerId: usage.providerId,
         // The provider that served the call, as the row recorded it.
@@ -468,11 +470,11 @@ export async function adminUsageStats(
  * it, and on each of its days that had any. A user active on several days
  * is one user of the whole.
  */
-export async function activeUsers(since: Date, until?: Date) {
+export async function activeUsers(since: Date, until?: Date, step?: number) {
   const used = db.$with('used').as(
     db
       .select({
-        day: dayOf(since, usage.createdAt).as('day'),
+        day: dayOf(since, usage.createdAt, step).as('day'),
         userId: usage.userId
       })
       .from(usage)

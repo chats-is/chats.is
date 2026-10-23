@@ -10,7 +10,12 @@ import {
 
 import { type ModelCapability, type ProviderType } from '@/types';
 import { CAPABILITIES, USAGE_GROUPINGS } from '@/lib/constant';
-import { formatDate, formatShortDate } from '@/lib/format-date';
+import {
+  formatDate,
+  formatDateHour,
+  formatHour,
+  formatShortDate
+} from '@/lib/format-date';
 import { tokensOf } from '@/lib/usage-breakdown';
 import { formatCount, formatNumber, formatUsd } from '@/lib/utils';
 import { type adminUsageStats } from '@/server/functions/usage';
@@ -295,12 +300,16 @@ export function mediaText(f: Figures) {
 export function DailyUsageChart({
   stats,
   dates,
+  hourly = false,
   grouping: given,
   onGroupingChange
 }: {
   stats: UsageStats;
-  /** Each day of the window, as the page's own calendar has it. */
+  /** Each day of the window, as the page's own calendar has it — or each
+   *  hour of its one day. */
   dates: Date[];
+  /** Each of `dates` an hour of one day rather than a day. */
+  hourly?: boolean;
   /** The grouping, when the page keeps it for what follows the chart;
    *  without it the chart keeps its own. */
   grouping?: Grouping;
@@ -342,7 +351,7 @@ export function DailyUsageChart({
     }
     return {
       date,
-      label: formatShortDate(date),
+      label: hourly ? formatHour(date) : formatShortDate(date),
       values,
       figures,
       spend: figures.spend,
@@ -363,7 +372,9 @@ export function DailyUsageChart({
     <Card className="py-0">
       <CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-base font-medium">Daily usage</div>
+          <div className="text-base font-medium">
+            {hourly ? 'Hourly usage' : 'Daily usage'}
+          </div>
           {/* A pill, as the plans dialog's interval switch is. */}
           <Tabs value={grouping} onValueChange={v => choose(v as Grouping)}>
             <TabsList
@@ -426,7 +437,9 @@ export function DailyUsageChart({
                   content={
                     <ChartTooltipContent
                       labelFormatter={(_, payload) =>
-                        formatDate((payload[0]?.payload as Day).date)
+                        (hourly ? formatDateHour : formatDate)(
+                          (payload[0]?.payload as Day).date
+                        )
                       }
                       // Only the two lines come to the tooltip — the areas
                       // stay out of it — and above the first, what the day's

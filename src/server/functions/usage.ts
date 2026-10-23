@@ -9,6 +9,7 @@ import {
 } from '@/types/usage';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
+import { stepOf } from '@/server/services/db-utils';
 import * as usage from '@/server/services/usage';
 
 /** The console's usage over a window — on the Usage page everyone's, on a
@@ -17,7 +18,7 @@ export const adminUsageStats = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageStatsSchema)
   .handler(({ data }) =>
-    usage.adminUsageStats(data.from, data.to, data.userId)
+    usage.adminUsageStats(data.from, data.to, data.userId, stepOf(data.hourly))
   );
 
 export const adminUserModels = createServerFn({ method: 'GET' })
@@ -43,13 +44,19 @@ export const usageQueries = {
     userModels: () => ['usage', 'userModels'] as const,
     log: () => ['usage', 'log'] as const
   },
-  stats: (input: { from: Date; to?: Date; userId?: string }) =>
+  stats: (input: {
+    from: Date;
+    to?: Date;
+    userId?: string;
+    hourly?: boolean;
+  }) =>
     queryOptions({
       queryKey: [
         ...usageQueries.key.stats(),
         input.userId ?? null,
         input.from.toISOString(),
-        input.to?.toISOString() ?? null
+        input.to?.toISOString() ?? null,
+        input.hourly ?? false
       ] as const,
       queryFn: () => adminUsageStats({ data: input }),
       // A new window changes the key; the last one stays on screen until

@@ -236,6 +236,29 @@ describe('adminUsageStats', () => {
   });
 });
 
+describe('by the hour', () => {
+  const HOUR = 60 * 60;
+
+  it('numbers the hours of one day from its start, for the totals and the active users', async () => {
+    await use('a', day(1, 0.5));
+    await use('a', day(1, 5.2));
+    await use('b', day(1, 5.9));
+    await use('b', day(2)); // The next day: outside the window.
+
+    const stats = await adminUsageStats(day(1), day(2), undefined, HOUR);
+    expect(stats.days.map(d => d.day).sort((x, y) => x - y)).toEqual([1, 6]);
+
+    const active = await activeUsers(day(1), day(2), HOUR);
+    expect(active.total).toBe(2);
+    expect(active.days).toEqual(
+      expect.arrayContaining([
+        { day: 1, activeUsers: 1 },
+        { day: 6, activeUsers: 2 }
+      ])
+    );
+  });
+});
+
 describe('recordChatUsage', () => {
   it('writes the row under the id the call carried, with the provider’s ids', async () => {
     await recordChatUsage({

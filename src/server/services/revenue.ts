@@ -22,7 +22,7 @@ import { type revenueLossUsersSchema } from '@/types/revenue';
 import { BILLING_INTERVALS } from '@/lib/constant';
 import { db } from '@/db';
 import { payments, plans, subscriptions, usage, users } from '@/db/schema';
-import { dayOf, sumOf } from '@/server/services/db-utils';
+import { dayOf, stepOf, sumOf } from '@/server/services/db-utils';
 
 /*
  * The Revenue page's figures, summed in SQL so that only they leave the
@@ -48,23 +48,23 @@ import { dayOf, sumOf } from '@/server/services/db-utils';
  *   those that began and ended in the window.
  *
  * A window is two timestamps, `from` and `to`, as every report's is; its
- * days are every 86,400 seconds from `from`. Each table is read once, and
+ * days are every 86,400 seconds from `from` — or, over a window of one day,
+ * its hours, each "day" below then an hour. Each table is read once, and
  * summed by plan and day together.
  */
 
 /** A month, in days, as a monthly plan is billed. */
 const MONTH_DAYS = billingIntervalOf('month').days;
-const DAY_SECONDS = 24 * 60 * 60;
 
-/** A window, and where its days begin: every 86,400 seconds from `since`. */
-type Window = { since: Date; end: Date };
+/** A window, and where its days begin: every `step` seconds from `since`. */
+type Window = { since: Date; end: Date; step: number };
 
 /** A window from `since` to `until`, or now: never past now, since what a
  *  payment brings in accrues with time, and a range of days that takes in
  *  today ends tonight. */
-function windowOf(since: Date, until?: Date): Window {
+function windowOf(since: Date, until?: Date, step = stepOf()): Window {
   const now = new Date();
-  return { since, end: until && until < now ? until : now };
+  return { since, end: until && until < now ? until : now, step };
 }
 
 const seconds = (d: Date) => d.getTime() / 1000;
@@ -81,7 +81,7 @@ const intervalDays = sql<number>`(case ${plans.interval} ${sql.join(
 
 /** How many days the window has, the last perhaps cut short. */
 const dayCountOf = (w: Window) =>
-  Math.max(1, Math.ceil((seconds(w.end) - seconds(w.since)) / DAY_SECONDS));
+  Math.max(1, Math.ceil((seconds(w.end) - seconds(w.since)) / w.step));
 
 /**
  * The payments whose period reaches into the window: what each kept, the
@@ -109,14 +109,16 @@ function paidIn(w: Window) {
         end)::float8`.as('net'),
         starts: epochOf(payments.billedAt).as('starts'),
         ends: epochOf(periodEnd).as('ends'),
-        billedDay: dayOf(w.since, payments.billedAt).as('billed_day'),
+        billedDay: dayOf(w.since, payments.billedAt, w.step).as('billed_day'),
         firstDay: dayOf(
           w.since,
-          sql`greatest(${payments.billedAt}, ${w.since})`
+          sql`greatest(${payments.billedAt}, ${w.since})`,
+          w.step
         ).as('first_day'),
         lastDay: dayOf(
           w.since,
-          sql`least(${periodEnd}, ${w.end}) - interval '1 microsecond'`
+          sql`least(${periodEnd}, ${w.end}) - interval '1 microsecond'`,
+          w.step
         ).as('last_day')
       })
       .from(payments)
@@ -140,10 +142,10 @@ function coveredBy(w: Window, paid: ReturnType<typeof paidIn>) {
   return db
     .select({
       day: sql<number>`day`.as('day'),
-      starts: sql<number>`${since} + (day - 1) * ${DAY_SECONDS}`.as(
+      starts: sql<number>`${since} + (day - 1) * ${w.step}::float8`.as(
         'day_starts'
       ),
-      ends: sql<number>`least(${since} + day * ${DAY_SECONDS}, ${seconds(w.end)}::float8)`.as(
+      ends: sql<number>`least(${since} + day * ${w.step}::float8, ${seconds(w.end)}::float8)`.as(
         'day_ends'
       )
     })
@@ -167,7 +169,7 @@ function usedIn(w: Window) {
     db
       .select({
         userId: usage.userId,
-        day: dayOf(w.since, usage.createdAt).as('day'),
+        day: dayOf(w.since, usage.createdAt, w.step).as('day'),
         planId: usage.planId,
         cost: sql<number>`coalesce(${usage.cost}, 0)::float8`.as('cost'),
         spend: sql<number>`coalesce(${usage.spend}, 0)::float8`.as('spend')
@@ -188,11 +190,15 @@ function subscribedIn(w: Window) {
     db
       .select({
         planId: subscriptions.planId,
-        startedDay: dayOf(w.since, subscriptions.createdAt).as('started_day'),
+        startedDay: dayOf(w.since, subscriptions.createdAt, w.step).as(
+          'started_day'
+        ),
         endedDay: sql<
           number | null
         >`case when ${subscriptions.endedAt} < ${w.end}
-          then ${dayOf(w.since, subscriptions.endedAt)} end`.as('ended_day'),
+          then ${dayOf(w.since, subscriptions.endedAt, w.step)} end`.as(
+          'ended_day'
+        ),
         canceled:
           sql<boolean>`coalesce(${subscriptions.canceledAt} < ${w.end}, false)`.as(
             'canceled'
@@ -220,8 +226,8 @@ function subscribedIn(w: Window) {
  * one more under no plan, and each day's. Payments, calls and subscriptions
  * are each read once, summed by plan and day together.
  */
-export async function adminRevenue(since: Date, until?: Date) {
-  const w = windowOf(since, until);
+export async function adminRevenue(since: Date, until?: Date, step?: number) {
+  const w = windowOf(since, until, step);
   const paid = paidIn(w);
   const covered = coveredBy(w, paid);
   const used = usedIn(w);
@@ -276,7 +282,7 @@ export async function adminRevenue(since: Date, until?: Date) {
   ]);
 
   const dayRows = Array.from({ length: dayCountOf(w) }, (_, i) => ({
-    start: new Date(w.since.getTime() + i * DAY_SECONDS * 1000),
+    start: new Date(w.since.getTime() + i * w.step * 1000),
     revenue: 0,
     cost: 0,
     started: 0,

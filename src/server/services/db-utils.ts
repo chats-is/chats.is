@@ -41,11 +41,18 @@ export async function lockIn(tx: Tx, key: string) {
 }
 
 /**
- * Which day after `since` an instant falls on, counted from 1, a day being
- * every 86,400 seconds from `since`; before it, 0 or less.
+ * How far apart a report's points are, in seconds: a day, or an hour over a
+ * window of one day, which as days would be one point.
  */
-export const dayOf = (since: Date, instant: SQLWrapper) =>
-  sql<number>`(floor((extract(epoch from ${instant})::float8 - ${since.getTime() / 1000}::float8) / 86400) + 1)::int`;
+export const stepOf = (hourly?: boolean) => (hourly ? 60 * 60 : 24 * 60 * 60);
+
+/**
+ * Which day after `since` an instant falls on, counted from 1, a day being
+ * every 86,400 seconds from `since` — or every `step` seconds, an hour where
+ * the report goes by the hour; before it, 0 or less.
+ */
+export const dayOf = (since: Date, instant: SQLWrapper, step = stepOf()) =>
+  sql<number>`(floor((extract(epoch from ${instant})::float8 - ${since.getTime() / 1000}::float8) / ${step}::float8) + 1)::int`;
 
 /** A sum, as a number, and 0 over no rows. */
 export const sumOf = (value: SQLWrapper) =>

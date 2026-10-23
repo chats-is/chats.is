@@ -69,6 +69,12 @@ type OptionalReportWindowState = {
   window: ReportWindow | null;
   value: DateRangeValue | null;
   until: Date | undefined;
+  /** Whether the report goes by the hour: a window of one day, which as
+   *  days would be a single point. */
+  hourly: boolean;
+  /** Where each of a chart's points begins: each day of the window, or each
+   *  hour of its one day — up to now, where that day is today. */
+  points: Date[];
   /** A window, or null for none — the page's default. */
   setWindow: (next: DateRangeValue | null) => void;
 };
@@ -105,6 +111,12 @@ export function useReportWindow({
       : { days: window.days };
   // A chosen range ends at the close of its last day; a preset runs to now.
   const until = window?.custom ? addDays(window.last, 1) : undefined;
+  const hourly = window?.days === 1;
+  const points = !window
+    ? []
+    : hourly
+      ? hoursOf(window.start)
+      : Array.from({ length: window.days }, (_, i) => addDays(window.start, i));
 
   // One entry per choice, so the back button undoes it. Either kind of
   // window replaces the other, the default leaves the address clean, and a
@@ -129,7 +141,21 @@ export function useReportWindow({
       }
     });
 
-  return { window, value, until, setWindow };
+  return { window, value, until, hourly, points, setWindow };
+}
+
+/**
+ * Each hour of a day from its midnight, every 3,600 seconds as the server
+ * counts them — so a day the clocks change on has the 23 or 25 it had — and
+ * no further than now, where the day is today.
+ */
+function hoursOf(start: Date): Date[] {
+  const end = Math.min(addDays(start, 1).getTime(), Date.now());
+  const hours: Date[] = [];
+  for (let at = start.getTime(); at < end; at += 60 * 60 * 1000) {
+    hours.push(new Date(at));
+  }
+  return hours;
 }
 
 /**

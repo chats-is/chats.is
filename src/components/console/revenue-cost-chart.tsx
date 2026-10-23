@@ -5,11 +5,14 @@ import { formatUsd } from '@/lib/utils';
 import { Amount } from '@/components/console/amount';
 import { DailyLineChart } from '@/components/console/daily-line-chart';
 
-/** Each day's revenue against what its calls cost, with the profit left. */
+/** Each day's revenue against what its calls cost, with the profit left —
+ *  or each hour's, over a window of one day. */
 export function RevenueCostChart({
-  days
+  days,
+  hourly = false
 }: {
   days: Array<{ start: Date; revenue: number; cost: number }>;
+  hourly?: boolean;
 }) {
   const rows = days.map(d => ({
     key: format(d.start, 'yyyy-MM-dd'),
@@ -34,7 +37,7 @@ export function RevenueCostChart({
   }));
   return (
     <DailyLineChart
-      title="Daily revenue and cost"
+      title={hourly ? 'Hourly revenue and cost' : 'Daily revenue and cost'}
       series={[
         { label: 'Revenue', color: AMOUNT_COLORS.revenue.bar },
         { label: 'Cost', color: AMOUNT_COLORS.cost.bar }
@@ -43,6 +46,7 @@ export function RevenueCostChart({
       // Revenue and cost on one axis, read as the model's money is.
       formatTick={formatUsd}
       empty="No revenue or cost in this period."
+      hourly={hourly}
     />
   );
 }

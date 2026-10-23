@@ -13,6 +13,8 @@ import { format, formatDistanceToNowStrict } from 'date-fns';
  * - a day a bill falls on — a renewal, the end of a period — to the day:
  *   `Sep 29, 2026`;
  * - a day on a chart's axis, where the year goes without saying: `Sep 29`;
+ * - an hour on a chart of one day — on its axis, where the day goes without
+ *   saying, `14:00`, and pointed at, `Sep 29, 2026 14:00`;
  * - how long ago something was changed, where its age is what tells it from
  *   others like it — the versions of an artifact: `5 hours ago`.
  *
@@ -36,6 +38,14 @@ export const formatDate = (value: DateLike) =>
  *  `Sep 29`. */
 export const formatShortDate = (value: DateLike) =>
   format(new Date(value), 'MMM d');
+
+/** An hour on the axis of a chart of one day: `14:00`. */
+export const formatHour = (value: DateLike) => format(new Date(value), 'HH:mm');
+
+/** An hour, with its day, as a chart of one day names it: `Sep 29, 2026
+ *  14:00`. */
+export const formatDateHour = (value: DateLike) =>
+  format(new Date(value), 'MMM d, yyyy HH:mm');
 
 /** How long ago, from now: `5 hours ago`. */
 export const formatAgo = (value: DateLike) =>

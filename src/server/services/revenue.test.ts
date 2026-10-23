@@ -302,6 +302,42 @@ describe('adminRevenue', () => {
   });
 });
 
+describe('adminRevenue by the hour', () => {
+  const HOUR = 60 * 60;
+
+  it('spreads a payment, and puts calls and subscriptions, on the hours of one day', async () => {
+    // $20 over the day itself: a twenty-fourth of it each hour.
+    await pay(day(0), day(1));
+    await use('b', day(0, 3));
+    await use('b', day(0, 3.5));
+    await subscribe('c', day(0, 5));
+
+    const report = await adminRevenue(day(0), day(1), HOUR);
+    expect(report.days).toHaveLength(24);
+    expect(report.days[7].start).toEqual(day(0, 7));
+    for (const hour of report.days) {
+      expect(hour.revenue).toBeCloseTo(20 / 24);
+    }
+    expect(report.days.map(d => d.cost).filter(Boolean)).toEqual([2]);
+    expect(report.days[3].cost).toBe(2);
+    expect(report.days[5].started).toBe(1);
+    expect(report.days[4].subscribers).toBe(0);
+    expect(report.days[5].subscribers).toBe(1);
+  });
+
+  it('runs a day that is today to now, by the hour', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(day(0, 14.5));
+    try {
+      const report = await adminRevenue(day(0), undefined, HOUR);
+      // Midnight to half past two: fifteen hours, the last under way.
+      expect(report.days).toHaveLength(15);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('adminRevenueLossUsers', () => {
   it('pages the users who cost more than they brought in, the biggest loss first', async () => {
     // a paid $10 into the window and used $4: a profit, left out.

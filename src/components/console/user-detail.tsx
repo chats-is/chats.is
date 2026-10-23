@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useCanGoBack, useRouter } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays } from 'date-fns';
 import {
   ArrowLeft,
   RefreshCw,
@@ -63,7 +62,7 @@ const sourceLabel: Record<string, string> = {
  */
 export default function UserDetail({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
-  const { window, value, until, setWindow } = useReportWindow();
+  const { window, value, until, hourly, points, setWindow } = useReportWindow();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: user, isLoading: userLoading } = useQuery(
@@ -73,7 +72,7 @@ export default function UserDetail({ userId }: { userId: string }) {
     quotaQueries.byUser({ userId })
   );
   const usage = useQuery(
-    usageQueries.stats({ userId, from: window.start, to: until })
+    usageQueries.stats({ userId, from: window.start, to: until, hourly })
   );
   const { data: subscription } = useQuery(subscriptionQueries.user(userId));
 
@@ -273,12 +272,7 @@ export default function UserDetail({ userId }: { userId: string }) {
               usage.isPlaceholderData && 'pointer-events-none opacity-60'
             )}
           >
-            <UsageReport
-              stats={usage.data}
-              dates={Array.from({ length: window.days }, (_, i) =>
-                addDays(window.start, i)
-              )}
-            />
+            <UsageReport stats={usage.data} dates={points} hourly={hourly} />
           </div>
         ) : (
           <UsageReportSkeleton />

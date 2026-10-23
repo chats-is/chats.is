@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, format } from 'date-fns';
+import { format } from 'date-fns';
 import { RefreshCw } from 'lucide-react';
 
 import { cn, formatNumber } from '@/lib/utils';
@@ -40,11 +40,11 @@ const COLOR = {
  */
 export default function OverviewPage() {
   const queryClient = useQueryClient();
-  const { window, value, until, setWindow } = useReportWindow();
+  const { window, value, until, hourly, points, setWindow } = useReportWindow();
   const [refreshing, setRefreshing] = useState(false);
 
   const report = useQuery(
-    overviewQueries.report({ from: window.start, to: until })
+    overviewQueries.report({ from: window.start, to: until, hourly })
   );
 
   const handleRefresh = async () => {
@@ -88,9 +88,8 @@ export default function OverviewPage() {
         >
           <OverviewFigures
             report={report.data}
-            dates={Array.from({ length: window.days }, (_, i) =>
-              addDays(window.start, i)
-            )}
+            dates={points}
+            hourly={hourly}
           />
         </div>
       ) : (
@@ -121,11 +120,14 @@ function Block({
 
 function OverviewFigures({
   report,
-  dates
+  dates,
+  hourly
 }: {
   report: Overview;
-  /** Each day of the window, as the page's own calendar has it. */
+  /** Each day of the window, as the page's own calendar has it — or each
+   *  hour of its one day. */
   dates: Date[];
+  hourly: boolean;
 }) {
   const { users, active, usage, revenue } = report;
   // The money as the Revenue page totals it: each plan's, added up.
@@ -189,7 +191,11 @@ function OverviewFigures({
         }
         chart={
           <DailyLineChart
-            title="Daily new and active users"
+            title={
+              hourly
+                ? 'Hourly new and active users'
+                : 'Daily new and active users'
+            }
             series={[
               { label: 'New', color: COLOR.new.line },
               { label: 'Active', color: COLOR.active.line }
@@ -213,6 +219,7 @@ function OverviewFigures({
             }))}
             formatTick={formatNumber}
             whole
+            hourly={hourly}
             empty="No one signed up or called a model in this period."
           />
         }
@@ -247,12 +254,12 @@ function OverviewFigures({
             />
           </>
         }
-        chart={<RevenueCostChart days={days} />}
+        chart={<RevenueCostChart days={days} hourly={hourly} />}
       />
 
       <Block
         stats={<UsageTotals stats={usage} />}
-        chart={<DailyUsageChart stats={usage} dates={dates} />}
+        chart={<DailyUsageChart stats={usage} dates={dates} hourly={hourly} />}
       />
     </>
   );

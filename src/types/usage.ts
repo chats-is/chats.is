@@ -123,7 +123,10 @@ export const reportWindowSearchSchema = z.object({
  */
 export const usageRangeSchema = z.object({
   from: z.date(),
-  to: z.date().optional()
+  to: z.date().optional(),
+  /** By the hour rather than the day: a window of one day, which as days
+   *  would be a single point. */
+  hourly: z.boolean().optional()
 });
 
 /** The usage figures over a window: everyone's, or one user's. */

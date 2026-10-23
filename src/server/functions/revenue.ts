@@ -5,13 +5,16 @@ import { revenueLossUsersSchema } from '@/types/revenue';
 import { usageRangeSchema } from '@/types/usage';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constant';
 import { adminMiddleware } from '@/server/middleware';
+import { stepOf } from '@/server/services/db-utils';
 import * as revenue from '@/server/services/revenue';
 
 /** The console's Revenue page over a window. */
 export const adminRevenue = createServerFn({ method: 'GET' })
   .middleware([adminMiddleware])
   .validator(usageRangeSchema)
-  .handler(({ data }) => revenue.adminRevenue(data.from, data.to));
+  .handler(({ data }) =>
+    revenue.adminRevenue(data.from, data.to, stepOf(data.hourly))
+  );
 
 /** One page of the users the business lost money on over a window. */
 export const adminRevenueLossUsers = createServerFn({ method: 'GET' })
@@ -27,12 +30,13 @@ export const revenueQueries = {
     report: () => ['revenue', 'report'] as const,
     lossUsers: () => ['revenue', 'lossUsers'] as const
   },
-  report: (input: { from: Date; to?: Date }) =>
+  report: (input: { from: Date; to?: Date; hourly?: boolean }) =>
     queryOptions({
       queryKey: [
         ...revenueQueries.key.report(),
         input.from.toISOString(),
-        input.to?.toISOString() ?? null
+        input.to?.toISOString() ?? null,
+        input.hourly ?? false
       ] as const,
       queryFn: () => adminRevenue({ data: input }),
       // A new window changes the key; the last one stays on screen until

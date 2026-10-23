@@ -249,10 +249,10 @@ export async function getUserStats() {
  * those who signed up in it, summed in SQL, and how many signed up on each
  * of its days that had any.
  */
-export async function userSummary(since: Date, until?: Date) {
+export async function userSummary(since: Date, until?: Date, step?: number) {
   const joined = db.$with('joined').as(
     db
-      .select({ day: dayOf(since, users.createdAt).as('day') })
+      .select({ day: dayOf(since, users.createdAt, step).as('day') })
       .from(users)
       .where(
         and(

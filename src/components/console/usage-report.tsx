@@ -110,10 +110,13 @@ const detailColumns = (grouping: Grouping) =>
  */
 export function UsageReport({
   stats,
-  dates
+  dates,
+  hourly = false
 }: {
   stats: UsageStats;
   dates: Date[];
+  /** Each of `dates` an hour of one day rather than a day. */
+  hourly?: boolean;
 }) {
   // The chart's grouping, which the table follows.
   const [grouping, setGrouping] = useState<Grouping>('model');
@@ -125,6 +128,7 @@ export function UsageReport({
       <DailyUsageChart
         stats={stats}
         dates={dates}
+        hourly={hourly}
         grouping={grouping}
         onGroupingChange={setGrouping}
       />
