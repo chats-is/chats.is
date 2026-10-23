@@ -33,6 +33,24 @@ describe('providerRequestOf', () => {
     );
   });
 
+  it('takes the request id from the metadata where the headers have none, as xAI’s video polls do', () => {
+    expect(
+      providerRequestOf({
+        headers: {},
+        providerMetadata: {
+          xai: { requestId: 'job-1', videoUrl: 'https://x/v.mp4' }
+        }
+      })
+    ).toEqual({ requestId: 'job-1' });
+    // A header, where there is one, is what the provider's log is searched by.
+    expect(
+      providerRequestOf({
+        headers: { 'x-request-id': 'req_4' },
+        providerMetadata: { xai: { requestId: 'job-2' } }
+      })
+    ).toEqual({ requestId: 'req_4' });
+  });
+
   it('leaves out the id the SDK made up for a provider that sent none', () => {
     expect(providerRequestOf({ id: 'aitxt-abc', headers: {} })).toBeNull();
     expect(providerRequestOf(undefined)).toBeNull();

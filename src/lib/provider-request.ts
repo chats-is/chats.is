@@ -24,17 +24,32 @@ const REQUEST_ID_HEADERS = [
 export function providerRequestOf(response?: {
   id?: string;
   headers?: Record<string, string | undefined>;
+  providerMetadata?: Record<string, Record<string, unknown> | undefined>;
 }): ProviderRequest | null {
   const responseId =
     response?.id && !response.id.startsWith('aitxt-') ? response.id : undefined;
   const headers = response?.headers ?? {};
-  const requestId = REQUEST_ID_HEADERS.map(name => headers[name]).find(Boolean);
+  const requestId =
+    REQUEST_ID_HEADERS.map(name => headers[name]).find(Boolean) ??
+    metadataRequestId(response?.providerMetadata);
   if (!responseId && !requestId) return null;
   return {
     ...(responseId && { responseId }),
     ...(requestId && { requestId })
   };
 }
+
+/**
+ * The request id a call's provider metadata carries where its headers carry
+ * none. xAI's video is polled for, and the poll the SDK hands back answers
+ * with no id; the job's, the same as its request's, comes in the metadata.
+ */
+const metadataRequestId = (
+  metadata?: Record<string, Record<string, unknown> | undefined>
+) =>
+  Object.values(metadata ?? {})
+    .map(entry => entry?.requestId)
+    .find((id): id is string => typeof id === 'string' && id !== '');
 
 /** The ids of each call a result was made of, leaving out those with none. */
 export function providerRequestsOf(
