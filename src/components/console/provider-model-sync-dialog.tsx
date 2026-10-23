@@ -110,9 +110,8 @@ export function ProviderModelSyncDialog({
   useEffect(() => {
     if (!models) return;
 
-    setSelectedIds(
-      models.filter(model => !model.exists).map(model => model.modelId)
-    );
+    // Nothing is checked to begin with: a provider lists far more models than
+    // anyone means to add, and which ones is the admin's to pick.
     setCapabilities(
       Object.fromEntries(models.map(model => [model.modelId, 'chat']))
     );
