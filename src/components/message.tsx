@@ -3,7 +3,7 @@ import { type UseChatHelpers } from '@ai-sdk/react';
 import { User } from 'lucide-react';
 
 import { type Artifact, type ChatMessage } from '@/types';
-import { textRuns } from '@/lib/message-content';
+import { fileRows, textRuns } from '@/lib/message-content';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -99,6 +99,10 @@ export function Message({
   );
   const sources = useMemo(() => collectSources(message.parts), [message.parts]);
   const runs = useMemo(() => textRuns(message.parts), [message.parts]);
+  // The files a reply made, side by side in rows, each drawn from where it
+  // begins; a file that continues a row draws nothing where it stands.
+  const rows = useMemo(() => fileRows(message.parts), [message.parts]);
+  const inRow = useMemo(() => new Set([...rows.values()].flat()), [rows]);
   // The searches are shown as one block, where the first of them was made —
   // as the reasoning parts are, and for the same reason: several at once are
   // one thing happening, not several.
@@ -328,8 +332,22 @@ export function Message({
               )}
             >
               {message.parts.map((part, index) => {
-                if (isMediaToolPart(part)) {
-                  return <MediaToolPart key={index} part={part} />;
+                // A reply's files in a row, wrapping where the row runs out,
+                // as the user's attachments are.
+                if (message.role === 'assistant' && inRow.has(index)) {
+                  const row = rows.get(index);
+                  return row ? (
+                    <div key={index} className="flex flex-wrap gap-x-2">
+                      {row.map(i => {
+                        const file = message.parts[i];
+                        return isMediaToolPart(file) ? (
+                          <MediaToolPart key={i} part={file} />
+                        ) : file.type === 'file' ? (
+                          renderFilePart(file, i)
+                        ) : null;
+                      })}
+                    </div>
+                  ) : null;
                 }
 
                 if (isTranscribeToolPart(part)) {
@@ -418,12 +436,6 @@ export function Message({
                       streaming={run.streaming}
                     />
                   ) : null;
-                }
-
-                if (part.type === 'file') {
-                  return message.role === 'user'
-                    ? null
-                    : renderFilePart(part, index);
                 }
               })}
               {unpositionedArtifacts.map(artifact => (

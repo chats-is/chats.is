@@ -188,3 +188,37 @@ export function textRuns(
   });
   return runs;
 }
+
+/** The parts a reply's media tools leave in it. */
+const MEDIA_PARTS = new Set<string>(
+  MEDIA_TOOL_NAMES.map(name => `tool-${name}`)
+);
+
+/** Parts that draw nothing where they stand: where a step began, and a
+ *  source, which is listed under the reply. */
+const UNDRAWN_PARTS = new Set<string>([
+  'step-start',
+  'source-url',
+  'source-document'
+]);
+
+/**
+ * The files a reply made, as rows of them side by side, keyed by the part
+ * each row begins at: files next to each other — media a tool made, or a
+ * file the reply carries — are one row. A step beginning or a source between
+ * them draws nothing, and does not part them; anything else — words, a
+ * thought, another tool — does.
+ */
+export function fileRows(parts: Part[]): Map<number, number[]> {
+  const rows = new Map<number, number[]>();
+  let open: number[] | null = null;
+  parts.forEach((part, index) => {
+    if (part.type === 'file' || MEDIA_PARTS.has(part.type)) {
+      if (open) open.push(index);
+      else rows.set(index, (open = [index]));
+      return;
+    }
+    if (!UNDRAWN_PARTS.has(part.type)) open = null;
+  });
+  return rows;
+}

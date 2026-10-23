@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { type ChatMessage } from '@/types';
 
 import {
+  fileRows,
   forgetProviderItems,
   hasVisibleContent,
   markStopped,
@@ -281,6 +282,40 @@ describe('textRuns', () => {
     expect([...runs]).toEqual([
       [0, { text: 'Searching.', streaming: false }],
       [3, { text: 'Found it.', streaming: false }]
+    ]);
+  });
+});
+
+describe('fileRows', () => {
+  const file: Part = {
+    type: 'file',
+    url: 'https://blob/a.png',
+    mediaType: 'image/png'
+  };
+
+  it('puts files next to each other in one row, across the steps between them', () => {
+    const rows = fileRows([
+      { type: 'step-start' },
+      done,
+      { type: 'step-start' },
+      done,
+      file
+    ]);
+    expect([...rows]).toEqual([[1, [1, 3, 4]]]);
+  });
+
+  it('starts a new row after words or another tool', () => {
+    const rows = fileRows([
+      done,
+      { type: 'text', text: 'And another:', state: 'done' },
+      done,
+      running('s1'),
+      file
+    ]);
+    expect([...rows]).toEqual([
+      [0, [0]],
+      [2, [2]],
+      [4, [4]]
     ]);
   });
 });
