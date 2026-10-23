@@ -110,24 +110,53 @@ export function formatString(
  * misread.
  */
 export function formatLocalTime(timeZone?: string | null): string {
-  const now = new Date();
-  if (!timeZone) return now.toISOString();
+  return (
+    formatIn(timeZone, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZoneName: 'short'
+    }) ?? new Date().toISOString()
+  );
+}
+
+/**
+ * Today, told in `timeZone` as `formatLocalTime` tells the moment, without
+ * the time of day — "Friday, October 23, 2026 (GMT+8)": what the system prompt
+ * carries, which then reads the same all day and is read from a provider's
+ * cache. In UTC without a zone, or with one that is unknown.
+ */
+export function formatLocalDate(timeZone?: string | null): string {
+  const date = formatIn(timeZone, {});
+  const zone = formatIn(timeZone, { timeZoneName: 'short' }, 'timeZoneName');
+  return date && zone ? `${date} (${zone})` : `${formatIn('UTC', {})} (UTC)`;
+}
+
+/** Now in `timeZone`: its date, with what `fields` add — or, given `part`,
+ *  that part alone. Null without a zone, or with one that is unknown. */
+function formatIn(
+  timeZone: string | null | undefined,
+  fields: Intl.DateTimeFormatOptions,
+  part?: Intl.DateTimeFormatPartTypes
+): string | null {
+  if (!timeZone) return null;
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    const format = new Intl.DateTimeFormat('en-CA', {
       timeZone,
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZoneName: 'short'
-    }).format(now);
+      ...fields
+    });
+    const now = new Date();
+    return part
+      ? (format.formatToParts(now).find(p => p.type === part)?.value ?? null)
+      : format.format(now);
   } catch {
     // An unknown zone throws rather than falling back, and a prompt is not
     // worth failing a chat over.
-    return now.toISOString();
+    return null;
   }
 }
 

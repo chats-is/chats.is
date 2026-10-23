@@ -13,6 +13,7 @@ import {
   editVideoInputSchema,
   generateImageInputSchema,
   generateVideoInputSchema,
+  getCurrentTimeInputSchema,
   removeBackgroundInputSchema,
   textToSpeechInputSchema,
   transcribeAudioInputSchema,
@@ -48,7 +49,12 @@ import { allowsModel } from '@/lib/model-access';
 import { resolveModelId } from '@/lib/provider';
 import { generateAndStoreSpeech } from '@/lib/speech-generation';
 import { transcribeAudio } from '@/lib/transcription';
-import { generateUUID, isSttModel, isTtsModel } from '@/lib/utils';
+import {
+  formatLocalTime,
+  generateUUID,
+  isSttModel,
+  isTtsModel
+} from '@/lib/utils';
 import {
   generateAndStoreVideo,
   VideoTimeoutError
@@ -961,6 +967,23 @@ export async function buildMediaTools(args: {
   }
 
   return { tools, systemPrompt: buildMediaToolsSystemPrompt(registered) };
+}
+
+/**
+ * The time where the user is, to the minute, for the model to ask when it
+ * needs it. The system prompt tells only the date, so it reads the same all
+ * day and a provider reads it from its cache; told the time, it changed every
+ * minute, and no turn after the first was read from one.
+ */
+export function buildTimeTool(timeZone: string | undefined): ToolSet {
+  return {
+    get_current_time: tool({
+      description:
+        "Get the current date and time where the user is, to the minute. The system prompt gives only today's date: call this whenever the answer turns on the time of day — what time it is, how long until or since a moment — rather than guessing it.",
+      inputSchema: getCurrentTimeInputSchema,
+      execute: async () => ({ time: formatLocalTime(timeZone) })
+    })
+  };
 }
 
 /** The artifact an update_artifact call names, once the id's closing quote

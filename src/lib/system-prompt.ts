@@ -2,9 +2,9 @@
  * The part of the system prompt this app writes itself.
  *
  * It carries the facts only the running request knows — which model answered,
- * who serves it, when and where the user is — and the conventions that come
- * from this app's own renderer rather than from anyone's preference: Markdown
- * as GitHub writes it, mathematics through KaTeX.
+ * who serves it, what day it is where the user is — and the conventions that
+ * come from this app's own renderer rather than from anyone's preference:
+ * Markdown as GitHub writes it, mathematics through KaTeX.
  *
  * Built here, not filled from a template: a fact that is not known is left
  * out rather than left blank — "served by ." is worse than saying nothing of
@@ -15,7 +15,10 @@
 export function buildBaseSystemPrompt(facts: {
   modelId: string;
   provider?: string | null;
-  datetime: string;
+  /** Today's date, not the time: the prompt is then the same all day, and a
+   *  provider reads it from its cache; the time is the `get_current_time`
+   *  tool's to tell. */
+  date: string;
   language?: string | null;
 }): string {
   const provider = facts.provider?.trim();
@@ -23,7 +26,7 @@ export function buildBaseSystemPrompt(facts: {
 
   return [
     `You are a helpful assistant powered by ${facts.modelId}, a large language model${provider ? ` served by ${provider}` : ''}.`,
-    `Current time: ${facts.datetime}`,
+    `Current date: ${facts.date}`,
     language ? `User language: ${language}` : null,
     '',
     'Answer in the language the user writes in.',

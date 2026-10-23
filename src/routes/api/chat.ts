@@ -9,7 +9,9 @@ import {
   JsonToSseTransformStream,
   smoothStream,
   streamText,
-  UI_MESSAGE_STREAM_HEADERS
+  UI_MESSAGE_STREAM_HEADERS,
+  type JSONValue,
+  type ModelMessage
 } from 'ai';
 
 import {
@@ -62,7 +64,7 @@ import { buildBaseSystemPrompt } from '@/lib/system-prompt';
 import { estimateTokens } from '@/lib/token-estimate';
 import {
   convertToChatMessages,
-  formatLocalTime,
+  formatLocalDate,
   generateUUID
 } from '@/lib/utils';
 import { authedRequest } from '@/server/middleware';
@@ -70,7 +72,8 @@ import { carriesOnlyOwnFiles } from '@/server/services/blob';
 import * as chats from '@/server/services/chat';
 import {
   buildArtifactTools,
-  buildMediaTools
+  buildMediaTools,
+  buildTimeTool
 } from '@/server/services/chat-tools';
 import { readDocuments } from '@/server/services/document';
 import * as messages from '@/server/services/message';
@@ -146,6 +149,43 @@ function describeError(err: unknown): string {
   }
   if (e.stack) parts.push(`\n${e.stack}`);
   return parts.join(' ');
+}
+
+/** Anthropic's mark on what it is to keep in its cache. */
+const ANTHROPIC_CACHE = { type: 'ephemeral' } as const;
+
+/**
+ * The messages sent to Anthropic, with the turn before this one marked to be
+ * read from its cache. Anthropic caches only what a request marks. The request
+ * as a whole is marked (see `buildStream`), which keeps it up to its end, and
+ * the first request of the turn before ended at that turn's user message — so
+ * marked there too, this turn reads all of it from the cache, however many
+ * steps that turn took after it. Marked as the request is, since Anthropic
+ * refuses a mark kept for less time before one kept for longer.
+ */
+function markTurnBefore(
+  messages: ModelMessage[],
+  cacheControl: JSONValue
+): ModelMessage[] {
+  const asked = messages.flatMap((message, index) =>
+    message.role === 'user' ? [index] : []
+  );
+  const before = asked.at(-2);
+  if (before === undefined) return messages;
+  return messages.map((message, index) =>
+    index === before
+      ? {
+          ...message,
+          providerOptions: {
+            ...message.providerOptions,
+            anthropic: {
+              ...message.providerOptions?.anthropic,
+              cacheControl
+            }
+          }
+        }
+      : message
+  );
 }
 
 async function POST({
@@ -502,7 +542,7 @@ async function POST({
         // The server's clock, told in the user's zone. Sending their own
         // timestamp would carry their clock's errors with it; sending UTC
         // makes "today" wrong for most of the world.
-        datetime: formatLocalTime(timeZone),
+        date: formatLocalDate(timeZone),
         language
       }),
       systemPromptContent
@@ -585,6 +625,7 @@ async function POST({
           emit: emitTransient
         });
         replyArtifacts = artifactTools;
+        const timeTool = buildTimeTool(timeZone);
 
         // Transient: both are signals for the client (title/URL/sidebar, and
         // associating artifacts with this message), not content. Accumulating
@@ -672,8 +713,8 @@ async function POST({
         const writtenBy = new Map(
           historyMessages.map(message => [message.id, message.providerId])
         );
-        const sentTo = async (candidate: Provider) =>
-          convertToModelMessages<ChatMessage>(
+        const sentTo = async (candidate: Provider) => {
+          const converted = await convertToModelMessages<ChatMessage>(
             maskUnsupportedFileParts(
               history.map(message =>
                 message.role === 'assistant' &&
@@ -697,6 +738,13 @@ async function POST({
               convertDataPart: dataPartForModel
             }
           );
+          return candidate.type === 'anthropic'
+            ? markTurnBefore(
+                converted,
+                candidate.apiOptions?.cacheControl ?? ANTHROPIC_CACHE
+              )
+            : converted;
+        };
         const modelMessages = new Map(
           await Promise.all(
             candidates.map(
@@ -720,17 +768,26 @@ async function POST({
             tools: {
               ...artifactTools.tools,
               ...mediaTools.tools,
+              ...timeTool,
               // Which search a model gets depends on who serves it: its
               // provider's own where it has one, else the delegate tool.
               ...search.toolsFor(failoverProvider)
             },
-            // The admin's options, with the usage row's id laid in.
+            // The admin's options, with the usage row's id laid in — and
+            // Anthropic asked to keep the request in its cache, which it does
+            // only when asked (see `markTurnBefore`), unless the admin's
+            // options say otherwise.
             providerOptions: {
-              [failoverProvider.type]: withRequestTags(
-                failoverProvider.type,
-                usageId,
-                failoverProvider.apiOptions
-              )
+              [failoverProvider.type]: {
+                ...(failoverProvider.type === 'anthropic' && {
+                  cacheControl: ANTHROPIC_CACHE
+                }),
+                ...withRequestTags(
+                  failoverProvider.type,
+                  usageId,
+                  failoverProvider.apiOptions
+                )
+              }
             } as any,
             // The chain has already settled this against what the model
             // declared; the SDK hands it to whichever provider is behind the

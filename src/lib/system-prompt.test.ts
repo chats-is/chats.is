@@ -7,14 +7,18 @@ describe('buildBaseSystemPrompt', () => {
     const prompt = buildBaseSystemPrompt({
       modelId: 'grok-4.6',
       provider: 'xAI',
-      datetime: '2026-09-22 10:00',
+      date: 'Tuesday, September 22, 2026, GMT+8',
       language: 'zh-CN'
     });
 
     expect(prompt).toContain(
       'powered by grok-4.6, a large language model served by xAI.'
     );
-    expect(prompt).toContain('Current time: 2026-09-22 10:00');
+    // The date, and not the time, which changed it every minute.
+    expect(prompt).toContain(
+      'Current date: Tuesday, September 22, 2026, GMT+8'
+    );
+    expect(prompt).not.toContain('Current time');
     expect(prompt).toContain('User language: zh-CN');
   });
 
@@ -22,7 +26,7 @@ describe('buildBaseSystemPrompt', () => {
     const prompt = buildBaseSystemPrompt({
       modelId: 'grok-4.6',
       provider: '',
-      datetime: '2026-09-22 10:00',
+      date: 'Tuesday, September 22, 2026, GMT+8',
       language: undefined
     });
 

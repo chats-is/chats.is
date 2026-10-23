@@ -273,6 +273,12 @@ export const xSearchInputSchema = z.object({
 
 export type XSearchInput = z.infer<typeof xSearchInputSchema>;
 
+/** The time where the user is: asked of nothing, since the request already
+ *  says where they are. */
+export const getCurrentTimeInputSchema = z.object({});
+
+export type GetCurrentTimeInput = z.infer<typeof getCurrentTimeInputSchema>;
+
 /** A web search — or a search of X — made on the chat's behalf: what was
  *  found, and where. */
 export type WebSearchToolOutput =
@@ -299,4 +305,5 @@ export type ChatTools = {
   };
   web_search: { input: WebSearchInput; output: WebSearchToolOutput };
   x_search: { input: XSearchInput; output: WebSearchToolOutput };
+  get_current_time: { input: GetCurrentTimeInput; output: { time: string } };
 };

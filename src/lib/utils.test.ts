@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatLocalDate,
   formatLocalTime,
   formatNumber,
   formatString,
@@ -109,6 +110,19 @@ describe('formatString', () => {
 
   it('writes an absent value as nothing', () => {
     expect(formatString('[{a}]', { a: undefined })).toBe('[]');
+  });
+});
+
+describe('formatLocalDate', () => {
+  it('tells the day in the zone it was given, and the zone, but not the time', () => {
+    expect(formatLocalDate('Asia/Tokyo')).toMatch(
+      /^\w+day, \w+ \d{1,2}, \d{4} \(GMT\+9\)$/
+    );
+  });
+
+  it('tells it in UTC with no zone, or with one that does not exist', () => {
+    expect(formatLocalDate()).toMatch(/ \(UTC\)$/);
+    expect(formatLocalDate('Mars/Olympus_Mons')).toMatch(/ \(UTC\)$/);
   });
 });
 
