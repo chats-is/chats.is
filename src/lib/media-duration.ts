@@ -5,7 +5,7 @@ import { parseBuffer } from 'music-metadata';
 /**
  * How long a piece of audio runs, read from the file itself.
  *
- * Transcription bills per second, and whether a provider reports the length it
+ * Transcription bills by length, and whether a provider reports the length it
  * processed is up to that provider: some do, some do not. The bytes were
  * downloaded to be transcribed either way, so the length is measured from the
  * file rather than depending on what any particular model chose to send back.

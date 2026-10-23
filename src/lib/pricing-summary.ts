@@ -19,7 +19,7 @@ export type PricingRates = {
   audioInput?: string | null;
   audioOutput?: string | null;
   audioCharacters?: string | null;
-  audioSeconds?: string | null;
+  audioMinute?: string | null;
 };
 
 /** Like `formatUsd` but returns `null` for unset values so callers can skip
@@ -45,10 +45,11 @@ const fmt = (v: string | null | undefined): string | null => {
  *             [["Input: $5/1M", "Output: $10/1M"],
  *              ["Image Input: $8/1M", "Image Output: $32/1M"]]
  *   video  → [["Video: $0.5/video", "Per sec: $0.001/s"]]
- *   audio  → [["Per 1M chars: $15"]] or [["Input: $0.6/1M", "Output: $12/1M"]]
+ *   audio  → [["Per 1M chars: $15"]], [["Input: $0.6/1M", "Output: $12/1M"]]
+ *             or [["Per min: $0.006/min"]]
  *
  * Token rates are per 1M tokens, searches and X posts or profiles per 1K;
- * image/video/per-sec are per unit.
+ * image/video/per-sec are per unit, and transcription per minute.
  */
 export function summarizePricingRows(
   capability: string,
@@ -97,12 +98,12 @@ export function summarizePricingRows(
       break;
     }
     case 'audio': {
-      // Per-character (TTS), token-based (TTS), or per-second (STT) — show
+      // Per-character (TTS), token-based (TTS), or per-minute (STT) — show
       // whichever is set.
       push(main, 'Per 1M chars', pricing.audioCharacters, '');
       push(main, 'Input', pricing.audioInput, '/1M');
       push(main, 'Output', pricing.audioOutput, '/1M');
-      push(main, 'Per sec', pricing.audioSeconds, '/s');
+      push(main, 'Per min', pricing.audioMinute, '/min');
       break;
     }
   }

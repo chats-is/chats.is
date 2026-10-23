@@ -65,8 +65,8 @@ export type RecordAudioUsageInput = RecordUsageBase & {
 };
 
 export type RecordTranscriptionUsageInput = RecordUsageBase & {
-  // STT bills per second of input audio (transcribe() reports
-  // durationInSeconds; no token usage is exposed).
+  // STT bills by the length of the input audio, priced per minute
+  // (transcribe() reports durationInSeconds; no token usage is exposed).
   audioSeconds?: number;
 };
 
@@ -112,7 +112,7 @@ export type UsageRowLike = {
   audioInputPrice?: string | null;
   audioOutputPrice?: string | null;
   audioCharactersPrice?: string | null;
-  audioSecondsPrice?: string | null;
+  audioMinutePrice?: string | null;
 };
 
 /** A report window in the address: a preset of the last N days, or a range

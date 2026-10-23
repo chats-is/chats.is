@@ -45,7 +45,7 @@ const EMPTY_SNAPSHOT: PriceSnapshot = {
   audioInputPrice: null,
   audioOutputPrice: null,
   audioCharactersPrice: null,
-  audioSecondsPrice: null
+  audioMinutePrice: null
 };
 
 /** Coerce a numeric-column string to a number, defaulting to 0 (cost math
@@ -110,7 +110,7 @@ export class PricingMissingError extends Error {
  *            input and Output fall back to Input and Image output.
  *   video  → Either Per video OR Per second.
  *   audio  → direction-aware: TTS bills per character or per token; STT
- *            (opts.transcription) bills per second. Without the direction
+ *            (opts.transcription) bills per minute. Without the direction
  *            hint, any of the three satisfies (legacy callers).
  *
  * Returns the user-facing labels of the missing required fields, empty when valid.
@@ -138,18 +138,18 @@ export function pricingMissingFields(
         ? []
         : ['Per video / Per second'];
     case 'audio': {
-      // STT bills per second; TTS bills per character or per token. The
+      // STT bills per minute; TTS bills per character or per token. The
       // billed dimension must match the model's direction — a mismatched
       // style would pass the gate but compute $0 cost.
       if (opts?.transcription === true) {
-        return set(p.audioSeconds) ? [] : ['Per second'];
+        return set(p.audioMinute) ? [] : ['Per minute'];
       }
       if (opts?.transcription === false) {
         return set(p.audioCharacters) ? [] : ['Per 1M characters'];
       }
-      return set(p.audioCharacters) || set(p.audioSeconds)
+      return set(p.audioCharacters) || set(p.audioMinute)
         ? []
-        : ['Per 1M characters, Audio input / Audio output, or Per second'];
+        : ['Per 1M characters, Audio input / Audio output, or Per minute'];
     }
   }
 }
@@ -408,7 +408,8 @@ export function calculateAudioCost(
 }
 
 /**
- * Cost for a transcription (STT) call: audioSeconds × per-second rate.
+ * Cost for a transcription (STT) call: the minutes heard × the rate per
+ * minute, the audio's length being reported in seconds.
  */
 export function calculateTranscriptionCost(
   args: { audioSeconds?: number },
@@ -416,12 +417,12 @@ export function calculateTranscriptionCost(
 ): { cost: number; snapshot: PriceSnapshot } {
   if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
 
-  const perSecond = toNum(pricing.audioSeconds);
+  const perMinute = toNum(pricing.audioMinute);
   return {
-    cost: roundCost((args.audioSeconds ?? 0) * perSecond),
+    cost: roundCost(((args.audioSeconds ?? 0) / 60) * perMinute),
     snapshot: {
       ...EMPTY_SNAPSHOT,
-      audioSecondsPrice: numToStr(pricing.audioSeconds)
+      audioMinutePrice: numToStr(pricing.audioMinute)
     }
   };
 }
@@ -517,7 +518,7 @@ type BillingStyles = Partial<
     | 'audioCharacters'
     | 'audioInput'
     | 'audioOutput'
-    | 'audioSeconds',
+    | 'audioMinute',
     unknown
   >
 >;
@@ -547,14 +548,14 @@ export function pricingStyleConflict(
   }
 
   // Audio is one-of-three: per-character (classic TTS), per-token, or
-  // per-second (STT).
+  // per-minute (STT).
   const audioStyles = [
     p.audioCharacters != null,
     p.audioInput != null || p.audioOutput != null,
-    p.audioSeconds != null
+    p.audioMinute != null
   ].filter(Boolean).length;
   if (capability === 'audio' && audioStyles > 1) {
-    return 'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per second.';
+    return 'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per minute.';
   }
 
   // Video is the same either/or: per-video (flat) OR per-second.
@@ -642,7 +643,7 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
     audioInput: data.audioInput,
     audioOutput: data.audioOutput,
     audioCharacters: data.audioCharacters,
-    audioSeconds: data.audioSeconds,
+    audioMinute: data.audioMinute,
     source: data.source,
     updatedAt: now
   };

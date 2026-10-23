@@ -60,7 +60,8 @@ export type PriceSnapshot = {
   audioInputPrice: string | null;
   audioOutputPrice: string | null;
   audioCharactersPrice: string | null;
-  audioSecondsPrice: string | null;
+  /** Per minute of audio heard, as a transcription model is priced. */
+  audioMinutePrice: string | null;
 };
 
 /** Recognized external pricing data sources. */
@@ -130,7 +131,7 @@ export const pricingUpsertSchema = z.object({
   audioInput: priceNumberSchema,
   audioOutput: priceNumberSchema,
   audioCharacters: priceNumberSchema,
-  audioSeconds: priceNumberSchema,
+  audioMinute: priceNumberSchema,
   source: pricingSourceSchema.default('manual')
 });
 

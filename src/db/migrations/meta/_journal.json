@@ -358,6 +358,13 @@
       "when": 1792749669105,
       "tag": "0050_image_token_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792768175863,
+      "tag": "0051_audio_per_minute",
+      "breakpoints": true
     }
   ]
 }

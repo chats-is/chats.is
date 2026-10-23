@@ -1126,8 +1126,12 @@ export const modelPricings = createTable(
     audioInput: numeric('audio_input', { precision: 20, scale: 10 }),
     audioOutput: numeric('audio_output', { precision: 20, scale: 10 }),
     audioCharacters: numeric('audio_characters', { precision: 20, scale: 10 }),
-    // Transcription (STT) bills per second of input audio — the only
-    // dimension `transcribe()` reliably reports (durationInSeconds).
+    // Transcription (STT) bills by the length of the audio heard, which
+    // `transcribe()` reports in seconds and providers price per minute: the
+    // rate for a minute, as they quote it.
+    audioMinute: numeric('audio_minute', { precision: 20, scale: 10 }),
+    // The rate per second it replaced, read by nothing now; kept until the
+    // release still reading it has gone, then dropped.
     audioSeconds: numeric('audio_seconds', { precision: 20, scale: 10 }),
     source: varchar('source', { length: 50 })
       .notNull()
@@ -1249,6 +1253,11 @@ export const usage = createTable(
       precision: 20,
       scale: 10
     }),
+    audioMinutePrice: numeric('audio_minute_price', {
+      precision: 20,
+      scale: 10
+    }),
+    // The rate per second it replaced, as `audio_seconds` above.
     audioSecondsPrice: numeric('audio_seconds_price', {
       precision: 20,
       scale: 10

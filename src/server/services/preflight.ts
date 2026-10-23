@@ -36,7 +36,7 @@ export async function preflightCheck(args: {
   modelKey: string;
   modelLabel: string;
   capability: 'chat' | 'image' | 'video' | 'audio';
-  /** Audio direction: true = STT (per-second pricing), false = TTS. */
+  /** Audio direction: true = STT (per-minute pricing), false = TTS. */
   transcription?: boolean;
 }): Promise<PreflightResult> {
   try {

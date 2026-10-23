@@ -143,7 +143,7 @@ type PricingForm = {
   audioInput: string;
   audioOutput: string;
   audioCharacters: string;
-  audioSeconds: string;
+  audioMinute: string;
 };
 
 type PriceName = keyof PricingForm;
@@ -165,7 +165,7 @@ const EMPTY_PRICING: PricingForm = {
   audioInput: '',
   audioOutput: '',
   audioCharacters: '',
-  audioSeconds: ''
+  audioMinute: ''
 };
 
 const fromNum = (v: string | null | undefined) =>
@@ -524,7 +524,7 @@ export default function PricingPage() {
       audioInput: fromNum(row.pricing?.audioInput),
       audioOutput: fromNum(row.pricing?.audioOutput),
       audioCharacters: fromNum(row.pricing?.audioCharacters),
-      audioSeconds: fromNum(row.pricing?.audioSeconds)
+      audioMinute: fromNum(row.pricing?.audioMinute)
     };
     setDefaults(values);
     form.reset(values);
@@ -933,9 +933,9 @@ export default function PricingPage() {
                           disabled={
                             !!values.audioInput ||
                             !!values.audioOutput ||
-                            !!values.audioSeconds
+                            !!values.audioMinute
                           }
-                          clears={['audioInput', 'audioOutput', 'audioSeconds']}
+                          clears={['audioInput', 'audioOutput', 'audioMinute']}
                         />
                         <div className="col-span-2 text-xs text-muted-foreground">
                           Or token-based billing (gpt-4o-mini-tts) — set Audio
@@ -945,26 +945,26 @@ export default function PricingPage() {
                           name="audioInput"
                           label="Audio input / 1M tokens"
                           disabled={
-                            !!values.audioCharacters || !!values.audioSeconds
+                            !!values.audioCharacters || !!values.audioMinute
                           }
-                          clears={['audioCharacters', 'audioSeconds']}
+                          clears={['audioCharacters', 'audioMinute']}
                         />
                         <PriceField
                           name="audioOutput"
                           label="Audio output / 1M tokens"
                           disabled={
-                            !!values.audioCharacters || !!values.audioSeconds
+                            !!values.audioCharacters || !!values.audioMinute
                           }
-                          clears={['audioCharacters', 'audioSeconds']}
+                          clears={['audioCharacters', 'audioMinute']}
                         />
                         <div className="col-span-2 text-xs text-muted-foreground">
-                          Or per-second billing for STT models (whisper-1) — set
-                          Audio / second instead:
+                          Or per-minute billing for STT models (whisper-1) — set
+                          Audio / minute instead:
                         </div>
                         <PriceField
-                          name="audioSeconds"
-                          label="Audio / second"
-                          placeholder="per second of input audio (whisper-1: 0.0001)"
+                          name="audioMinute"
+                          label="Audio / minute"
+                          placeholder="per minute of input audio (whisper-1: 0.006)"
                           disabled={
                             !!values.audioCharacters ||
                             !!values.audioInput ||

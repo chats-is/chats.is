@@ -208,16 +208,16 @@ describe('setting prices', () => {
     ).rejects.toThrow(/either Per image OR token-based/);
   });
 
-  it('a speech model needs a per-1M-characters rate, a transcription model a per-second rate', async () => {
+  it('a speech model needs a per-1M-characters rate, a transcription model a per-minute rate', async () => {
     const tts = await addModel('audio', 'tts1');
-    await expect(savePrice(tts, { audioSeconds: '0.01' })).rejects.toThrow(
+    await expect(savePrice(tts, { audioMinute: '0.6' })).rejects.toThrow(
       /Per 1M characters/
     );
     const stt = await addModel('audio', 'stt1', {
       supportsTranscription: true
     });
     await expect(savePrice(stt, { audioCharacters: '15' })).rejects.toThrow(
-      /Per second/
+      /Per minute/
     );
   });
 });
@@ -377,11 +377,11 @@ describe('billing', () => {
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.00129, 10);
   });
 
-  it('transcription: bills seconds × the per-second rate', async () => {
+  it('transcription: bills the minutes heard × the per-minute rate', async () => {
     const id = await addModel('audio', 'stt1', {
       supportsTranscription: true
     });
-    await savePrice(id, { audioSeconds: '0.0001' });
+    await savePrice(id, { audioMinute: '0.006' });
     await recordTranscriptionUsage({
       ...call,
       modelId: 'stt1',

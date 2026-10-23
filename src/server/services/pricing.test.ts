@@ -38,6 +38,7 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     audioOutput: null,
     audioCharacters: null,
     audioSeconds: null,
+    audioMinute: null,
     source: 'manual',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -283,49 +284,49 @@ describe('PricingMissingError', () => {
 });
 
 describe('calculateTranscriptionCost', () => {
-  it('bills per second of input audio', () => {
+  it('bills the minutes of input audio, its length given in seconds', () => {
     const { cost, snapshot } = calculateTranscriptionCost(
       { audioSeconds: 90 },
-      pricing({ audioSeconds: '0.0001' })
+      pricing({ audioMinute: '0.006' })
     );
     expect(cost).toBeCloseTo(0.009, 10);
-    expect(snapshot.audioSecondsPrice).toBe('0.0001');
+    expect(snapshot.audioMinutePrice).toBe('0.006');
   });
 
   it('returns 0 for null pricing or missing duration', () => {
     expect(calculateTranscriptionCost({ audioSeconds: 60 }, null).cost).toBe(0);
     expect(
-      calculateTranscriptionCost({}, pricing({ audioSeconds: '0.0001' })).cost
+      calculateTranscriptionCost({}, pricing({ audioMinute: '0.006' })).cost
     ).toBe(0);
   });
 });
 
 describe('pricingMissingFields', () => {
-  it('audio accepts per-second (STT) as a valid pricing style', () => {
+  it('audio accepts per-minute (STT) as a valid pricing style', () => {
     expect(pricingMissingFields('audio', pricing())).toEqual([
-      'Per 1M characters, Audio input / Audio output, or Per second'
+      'Per 1M characters, Audio input / Audio output, or Per minute'
     ]);
     expect(
-      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }))
+      pricingMissingFields('audio', pricing({ audioMinute: '0.006' }))
     ).toEqual([]);
   });
 
   it('audio direction must match the billed dimension', () => {
-    // STT models must carry the per-second rate — a chars/token-only row
+    // STT models must carry the per-minute rate — a chars/token-only row
     // would pass the gate but bill $0.
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
         transcription: true
       })
-    ).toEqual(['Per second']);
+    ).toEqual(['Per minute']);
     expect(
-      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
+      pricingMissingFields('audio', pricing({ audioMinute: '0.006' }), {
         transcription: true
       })
     ).toEqual([]);
-    // TTS models must carry chars/tokens — a seconds-only row is invalid.
+    // TTS models must carry chars/tokens — a minutes-only row is invalid.
     expect(
-      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }), {
+      pricingMissingFields('audio', pricing({ audioMinute: '0.006' }), {
         transcription: false
       })
     ).toEqual(['Per 1M characters']);
@@ -381,7 +382,7 @@ describe('pricingMissingFields', () => {
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }))
     ).toEqual([]);
     expect(
-      pricingMissingFields('audio', pricing({ audioSeconds: '0.0001' }))
+      pricingMissingFields('audio', pricing({ audioMinute: '0.006' }))
     ).toEqual([]);
     expect(pricingMissingFields('audio', pricing())).not.toEqual([]);
   });

@@ -300,9 +300,9 @@ export async function recordTranscriptionUsage(
     const lookup = await resolveModelByKey(input.modelId, 'audio');
     const pricing = lookup?.pricing ?? null;
 
-    // Per-second billed: without a duration the cost would be 0 — surface it.
+    // Billed by length: without a duration the cost would be 0 — surface it.
     const secondsBilled =
-      pricing != null && parseNumber(pricing.audioSeconds) != null;
+      pricing != null && parseNumber(pricing.audioMinute) != null;
     if (secondsBilled && (input.audioSeconds ?? 0) === 0) {
       console.warn(
         `[transcription] no duration reported for model=${input.modelId}; cost will be 0`
@@ -636,7 +636,7 @@ export async function adminUsageLog(
       audioInputPrice: usage.audioInputPrice,
       audioOutputPrice: usage.audioOutputPrice,
       audioCharactersPrice: usage.audioCharactersPrice,
-      audioSecondsPrice: usage.audioSecondsPrice,
+      audioMinutePrice: usage.audioMinutePrice,
       cost: usage.cost,
       // The tier as it is named today; the multiplier as it stood then.
       tierName: tiers.name,

@@ -184,7 +184,16 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
           'char'
         );
       }
-      perUnit('Duration', num(row.audioSeconds), row.audioSecondsPrice, 's');
+      // Heard for so many seconds, priced per minute.
+      if (num(row.audioSeconds) > 0) {
+        const rate = priced(row.audioMinutePrice);
+        items.push({
+          label: 'Duration',
+          quantity: `${formatNumber(num(row.audioSeconds))} s`,
+          rate: `${formatUsd(rate)} / min`,
+          subtotal: round((num(row.audioSeconds) / 60) * (rate ?? 0))
+        });
+      }
       break;
   }
   return items;

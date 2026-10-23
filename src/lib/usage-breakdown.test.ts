@@ -192,7 +192,7 @@ describe('usageBreakdown', () => {
     expect(usageSummary(perSecond)).toBe('6 s');
   });
 
-  it('bills speech per character and transcription per second', () => {
+  it('bills speech per character and transcription per minute', () => {
     const speech = {
       capability: 'audio' as const,
       audioCharacters: 86,
@@ -211,13 +211,14 @@ describe('usageBreakdown', () => {
     const transcript = {
       capability: 'audio' as const,
       audioSeconds: '2.5',
-      audioSecondsPrice: '0.000075'
+      audioMinutePrice: '0.0045'
     };
+    // Seconds heard, at a rate per minute: 2.5 / 60 × $0.0045.
     expect(usageBreakdown(transcript)).toEqual([
       {
         label: 'Duration',
         quantity: '2.5 s',
-        rate: '$0.000075 / s',
+        rate: '$0.0045 / min',
         subtotal: 0.0001875
       }
     ]);

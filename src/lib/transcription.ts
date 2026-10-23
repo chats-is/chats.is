@@ -56,11 +56,11 @@ export async function transcribeAudio(args: {
     }
   );
 
-  // Transcription bills per second, and whether a provider reports the length
+  // Transcription bills by length, and whether a provider reports the length
   // it processed is up to that provider. The file is in hand either way, so
   // its own length stands in when none comes back.
   // Greater than zero, not merely present: a provider that answers 0 has told
-  // us nothing, and billing per second would charge nothing for real work.
+  // us nothing, and billing by length would charge nothing for real work.
   const durationInSeconds =
     result.durationInSeconds && result.durationInSeconds > 0
       ? result.durationInSeconds
