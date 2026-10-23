@@ -171,6 +171,7 @@ describe('createTurn', () => {
         parentId: 'u2',
         role: 'assistant' as const,
         parts: text(id),
+        providerId: null,
         createdAt: at(5),
         updatedAt: at(5)
       }

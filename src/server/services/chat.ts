@@ -112,7 +112,8 @@ export async function getChat(
             orderBy: (messages, { asc }) => [asc(messages.createdAt)],
             columns: {
               userId: false,
-              chatId: false
+              chatId: false,
+              providerId: false
             }
           }
         : undefined,

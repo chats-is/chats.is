@@ -134,6 +134,26 @@ export function forgetProviderItems(parts: Part[]): Part[] {
 }
 
 /**
+ * A reply without the tools its provider ran on its own side — its search,
+ * of the web or of X, and the code Anthropic runs to read what it found —
+ * for a provider other than the one that wrote it.
+ *
+ * Such a call is the provider's own item, under its own id and in its own
+ * shape, and another provider sent it reads it as one of its own: OpenAI
+ * looks the id up and finds nothing, Anthropic checks the result against its
+ * own search's and refuses it, and the turn fails, and every turn after it
+ * on that provider. What the search found is in the reply's words; the rest
+ * of the reply goes as it is.
+ */
+export function withoutServerTools(parts: Part[]): Part[] {
+  // A tool part of either kind: Anthropic's code runs as a tool the SDK has
+  // no schema for.
+  return parts.filter(
+    part => !(isToolUIPart(part) && part.providerExecuted === true)
+  );
+}
+
+/**
  * A reply without the calls that never ran: those whose input does not fit
  * their tool, refused before the tool was called. The model was told so at
  * the time, and tried again; sent on every turn after, a call that came to

@@ -169,7 +169,8 @@ export async function getSharedChat(id: string) {
             orderBy: (messages, { asc }) => [asc(messages.createdAt)],
             columns: {
               chatId: false,
-              userId: false
+              userId: false,
+              providerId: false
             }
           },
           artifacts: {

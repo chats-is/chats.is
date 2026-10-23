@@ -42,7 +42,8 @@ import { pickEffort } from '@/lib/media-options';
 import {
   forgetProviderItems,
   markStopped,
-  withoutRefusedCalls
+  withoutRefusedCalls,
+  withoutServerTools
 } from '@/lib/message-content';
 import {
   AllProvidersFailedError,
@@ -663,32 +664,59 @@ async function POST({
           })
         );
 
-        const modelMessages = await convertToModelMessages<ChatMessage>(
-          maskUnsupportedFileParts(history, {
-            supportsVision: dbModel.supportsVision,
-            names: attachedNames
-          }),
-          {
-            // A turn cut short mid-call is stored with the call and no result,
-            // and a call without a result is refused outright — by the SDK, and
-            // by the providers behind it. Left in, one interrupted turn would
-            // fail every turn after it in that chat.
-            ignoreIncompleteToolCalls: true,
-            // What a reader sent unseen is told to the model; every other
-            // data part is the page's.
-            convertDataPart: dataPartForModel
-          }
+        // What each provider is sent, since which one answers is not known
+        // yet. A reply another provider wrote goes without the tools that
+        // provider ran on its own side (see `withoutServerTools`), and so
+        // does one stored before its provider was kept, whose provider is
+        // not known.
+        const writtenBy = new Map(
+          historyMessages.map(message => [message.id, message.providerId])
+        );
+        const sentTo = async (candidate: Provider) =>
+          convertToModelMessages<ChatMessage>(
+            maskUnsupportedFileParts(
+              history.map(message =>
+                message.role === 'assistant' &&
+                writtenBy.get(message.id) !== candidate.id
+                  ? { ...message, parts: withoutServerTools(message.parts) }
+                  : message
+              ),
+              {
+                supportsVision: dbModel.supportsVision,
+                names: attachedNames
+              }
+            ),
+            {
+              // A turn cut short mid-call is stored with the call and no
+              // result, and a call without a result is refused outright — by
+              // the SDK, and by the providers behind it. Left in, one
+              // interrupted turn would fail every turn after it in that chat.
+              ignoreIncompleteToolCalls: true,
+              // What a reader sent unseen is told to the model; every other
+              // data part is the page's.
+              convertDataPart: dataPartForModel
+            }
+          );
+        const modelMessages = new Map(
+          await Promise.all(
+            candidates.map(
+              async candidate =>
+                [candidate.id, await sentTo(candidate)] as const
+            )
+          )
         );
         promptTokens =
           estimateTokens(instructions) +
-          estimateTokens(JSON.stringify(modelMessages));
+          estimateTokens(JSON.stringify(modelMessages.get(candidates[0].id)));
 
         const buildStream = (failoverProvider: Provider) =>
           streamText({
             model: getLanguageModel(failoverProvider, modelId),
             abortSignal: stopper.signal,
             instructions,
-            messages: modelMessages,
+            // Made above for every candidate, which is all this is called
+            // with.
+            messages: modelMessages.get(failoverProvider.id)!,
             tools: {
               ...artifactTools.tools,
               ...mediaTools.tools,
@@ -1030,6 +1058,8 @@ async function POST({
           role: 'assistant',
           parts: responseMessage.parts,
           reasonDuration: responseMessage.metadata?.reasonDuration,
+          // Whose tools' calls the reply may carry (see `withoutServerTools`).
+          providerId: (servedBy ?? lastCandidate)?.id ?? null,
           createdAt: responseMessage.metadata?.createdAt ?? finishedAt,
           updatedAt: responseMessage.metadata?.updatedAt ?? finishedAt
         },

@@ -10,7 +10,8 @@ import {
   hasVisibleContent,
   markStopped,
   textRuns,
-  withoutRefusedCalls
+  withoutRefusedCalls,
+  withoutServerTools
 } from './message-content';
 
 type Part = ChatMessage['parts'][number];
@@ -317,5 +318,47 @@ describe('fileRows', () => {
       [2, [2]],
       [4, [4]]
     ]);
+  });
+});
+
+describe('withoutServerTools', () => {
+  it('leaves out the tools the provider ran on its own side, and keeps the rest', () => {
+    // A provider's own search, stored in its shape rather than the
+    // delegate's.
+    const own = {
+      type: 'tool-web_search',
+      toolCallId: 'ws_1',
+      state: 'output-available',
+      input: {},
+      output: {},
+      providerExecuted: true
+    } as unknown as Part;
+    // Anthropic's code, which the SDK has no schema for.
+    const code: Part = {
+      type: 'dynamic-tool',
+      toolName: 'code_execution',
+      toolCallId: 'srvtoolu_1',
+      state: 'output-available',
+      input: {},
+      output: {},
+      providerExecuted: true
+    };
+    const delegated: Part = {
+      type: 'tool-web_search',
+      toolCallId: 'call_1',
+      state: 'output-available',
+      input: { query: 'q' },
+      output: { status: 'done', answer: 'a', sources: [] }
+    };
+    const words: Part = { type: 'text', text: 'Node 26.', state: 'done' };
+    const thought: Part = {
+      type: 'reasoning',
+      text: 'Look it up.',
+      state: 'done'
+    };
+
+    expect(
+      withoutServerTools([thought, own, code, delegated, done, words])
+    ).toEqual([thought, delegated, done, words]);
   });
 });

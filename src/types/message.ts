@@ -18,9 +18,11 @@ import {
 } from './content-part';
 import { type CustomUIDataTypes } from './ui-data';
 
+/** A message as the page is sent it: without whose it is, and without the
+ *  provider that wrote it, which is the server's to know. */
 export type DBMessage = Omit<
   InferSelectModel<typeof messages>,
-  'userId' | 'chatId'
+  'userId' | 'chatId' | 'providerId'
 >;
 
 export const messageMetadataSchema = z.object({

@@ -90,6 +90,13 @@ export const messages = createTable(
       .notNull()
       .references(() => chats.id, { onDelete: 'cascade' }),
     reasonDuration: integer('reason_duration'),
+    // The provider that wrote a reply, whose own tools' calls it may carry —
+    // which only that provider can be sent. Null: a user's message, a reply
+    // stored before this was kept, or one whose provider has since gone.
+    providerId: varchar('provider_id', { length: 255 }).references(
+      () => providers.id,
+      { onDelete: 'set null' }
+    ),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

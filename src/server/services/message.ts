@@ -341,6 +341,8 @@ export async function createTurn(
       role: 'assistant';
       parts: MessageParts;
       reasonDuration?: number;
+      /** The provider that wrote it, when one did. */
+      providerId: string | null;
       createdAt: Date;
       updatedAt: Date;
     };
@@ -375,6 +377,7 @@ export async function createTurn(
       chatId: input.chatId,
       userId,
       reasonDuration: input.message.reasonDuration,
+      providerId: input.message.providerId,
       createdAt: input.message.createdAt,
       updatedAt: input.message.updatedAt
     });

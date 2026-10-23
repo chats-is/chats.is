@@ -344,6 +344,13 @@
       "when": 1792730349774,
       "tag": "0048_x_search_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792734522406,
+      "tag": "0049_message_provider",
+      "breakpoints": true
     }
   ]
 }

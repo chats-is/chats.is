@@ -1,0 +1,2 @@
+ALTER TABLE "message" ADD COLUMN "provider_id" varchar(255);--> statement-breakpoint
+ALTER TABLE "message" ADD CONSTRAINT "message_provider_id_provider_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."provider"("id") ON DELETE set null ON UPDATE no action;
