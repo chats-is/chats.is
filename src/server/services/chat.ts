@@ -101,9 +101,15 @@ export async function getChat(
   const chat = await db.query.chats.findFirst({
     where: and(eq(chats.id, input.id), eq(chats.userId, userId)),
     with: {
+      // Only what tells whether the model can still answer: the rest of it,
+      // and of its providers — their keys among it — is the console's.
       model: {
+        columns: { modelId: true, isEnabled: true },
         with: {
-          providers: { with: { provider: true } }
+          providers: {
+            columns: { isEnabled: true },
+            with: { provider: { columns: { isEnabled: true } } }
+          }
         }
       },
       messages: input.includeMessages
@@ -137,16 +143,17 @@ export async function getChat(
 
   if (!chat) return null;
 
+  const { model, ...rest } = chat;
   return {
-    ...chat,
+    ...rest,
     // A chat keeps naming its model only while that model can still answer:
     // switched on, and with a provider of its own switched on.
     modelId:
-      chat.model?.isEnabled &&
-      chat.model.providers.some(
+      model?.isEnabled &&
+      model.providers.some(
         binding => binding.isEnabled && binding.provider?.isEnabled
       )
-        ? chat.model.modelId
+        ? model.modelId
         : null
   };
 }
