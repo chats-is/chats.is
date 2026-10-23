@@ -22,6 +22,10 @@ describe('providerRequestOf', () => {
     expect(
       providerRequestOf({ id: 'u-1', headers: { 'x-ds-trace-id': 't-1' } })
     ).toEqual({ responseId: 'u-1', requestId: 't-1' });
+    // xAI's transcription, which sends no x-request-id.
+    expect(providerRequestOf({ headers: { 'x-trace-id': 't-2' } })).toEqual({
+      requestId: 't-2'
+    });
   });
 
   it('keeps what there is: a Gemini response names no request, a media call no response', () => {

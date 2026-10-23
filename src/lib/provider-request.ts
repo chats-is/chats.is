@@ -5,13 +5,16 @@ import { type ProviderRequest, type ProviderType } from '@/types';
 /**
  * The headers a provider names a request by in its own logs: OpenAI's, Azure's
  * and xAI's `x-request-id`, Anthropic's `request-id`, Bedrock's
- * `x-amzn-requestid`, DeepSeek's `x-ds-trace-id`. Google sends none.
+ * `x-amzn-requestid`, DeepSeek's `x-ds-trace-id`, and the `x-trace-id` xAI's
+ * transcription answers with in place of its `x-request-id`. Google sends
+ * none.
  */
 const REQUEST_ID_HEADERS = [
   'x-request-id',
   'request-id',
   'x-amzn-requestid',
-  'x-ds-trace-id'
+  'x-ds-trace-id',
+  'x-trace-id'
 ];
 
 /**
