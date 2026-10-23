@@ -96,6 +96,9 @@ export function DailyLineChart({
                 tickFormatter={v => formatTick(Number(v))}
               />
               <ChartTooltip
+                // Over the legend, which comes after it and would otherwise be
+                // drawn on top of a tooltip reaching down to it.
+                wrapperStyle={{ zIndex: 1 }}
                 content={
                   <ChartTooltipContent
                     labelFormatter={(_, payload) =>

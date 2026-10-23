@@ -458,6 +458,9 @@ export function DailyUsageChart({
                   tickFormatter={v => formatUsd(Number(v))}
                 />
                 <ChartTooltip
+                  // Over the legend, which comes after it and would otherwise be
+                  // drawn on top of a tooltip reaching down to it.
+                  wrapperStyle={{ zIndex: 1 }}
                   content={
                     <ChartTooltipContent
                       labelFormatter={(_, payload) =>
@@ -599,23 +602,33 @@ export function DailyUsageChart({
                   />
                 ))}
                 {/* Named by the series' `name`, since an area's dataKey is
-                    a function. The groups in their order and the two lines
-                    last, at the right — put so by name, as recharts would
-                    otherwise list them as they mounted, and a switch of
-                    grouping mounts its new areas after the lines. */}
+                    a function. The groups in their order, put so by name, as
+                    recharts would otherwise list them as they mounted, and a
+                    switch of grouping mounts its new areas after the lines.
+                    The two lines apart at the right, level with the groups'
+                    first row however many rows the groups wrap onto. */}
                 <ChartLegend
                   itemSorter={item =>
-                    [
-                      ...series.map(s => s.id),
-                      ...LINES.map(l => l.key)
-                    ].indexOf(String(item.value))
+                    series.map(s => s.id).indexOf(String(item.value))
                   }
-                  content={
-                    <ChartLegendContent
-                      nameKey="value"
-                      className="flex-wrap justify-start [&>div:nth-last-child(2)]:ml-auto"
-                    />
-                  }
+                  content={({ payload = [] }) => {
+                    const isLine = (item: (typeof payload)[number]) =>
+                      LINES.some(l => l.key === String(item.value));
+                    return (
+                      <div className="flex items-start justify-between gap-4">
+                        <ChartLegendContent
+                          nameKey="value"
+                          payload={payload.filter(item => !isLine(item))}
+                          className="flex-wrap justify-start"
+                        />
+                        <ChartLegendContent
+                          nameKey="value"
+                          payload={payload.filter(isLine)}
+                          className="shrink-0"
+                        />
+                      </div>
+                    );
+                  }}
                 />
               </ComposedChart>
             </ChartContainer>
