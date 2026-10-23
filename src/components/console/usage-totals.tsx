@@ -4,6 +4,7 @@ import { type adminUsageStats } from '@/server/functions/usage';
 import {
   groupTotals,
   mediaText,
+  searchItems,
   totalOf
 } from '@/components/console/daily-usage-chart';
 import { StatCard } from '@/components/console/stat-card';
@@ -20,6 +21,9 @@ export function UsageTotals({
 }) {
   // The window's figures, every capability's added up.
   const whole = totalOf(groupTotals(stats, 'capability'));
+  // What searches of X fetched, beside the searches of the web the card
+  // counts.
+  const fetched = searchItems({ ...whole, webSearches: 0 }).join(' · ');
   return (
     <>
       <StatCard
@@ -33,16 +37,16 @@ export function UsageTotals({
         sub="Models called in this period"
       />
       <StatCard
-        title="Provider"
-        value={formatNumber(groupTotals(stats, 'provider').length)}
-        sub="Providers that served the calls"
-      />
-      <StatCard
         title="Media"
         // Images, videos and audio calls together, then each, as the
         // Usage page's table counts them.
         value={formatNumber(whole.images + whole.videos + whole.audios)}
         sub={mediaText(whole) || 'None in this period'}
+      />
+      <StatCard
+        title="Search"
+        value={formatNumber(whole.webSearches)}
+        sub={fetched || 'Searches of the web'}
       />
     </>
   );

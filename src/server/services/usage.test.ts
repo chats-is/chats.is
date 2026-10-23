@@ -119,6 +119,9 @@ describe('adminUsageStats', () => {
       ...chat,
       inputTokens: 40,
       outputTokens: 4,
+      webSearches: 2,
+      xPosts: 15,
+      xProfiles: 3,
       spend: '1',
       cost: '0.5'
     });
@@ -175,7 +178,10 @@ describe('adminUsageStats', () => {
       spend: 4,
       cost: 2,
       inputTokens: 140,
-      outputTokens: 14
+      outputTokens: 14,
+      webSearches: 2,
+      xPosts: 15,
+      xProfiles: 3
     });
     expect(of(s.models, 3, 'img')).toMatchObject({ images: 2, spend: 0.5 });
     expect(of(s.providers, 2, 'p1')).toMatchObject({

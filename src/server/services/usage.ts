@@ -374,7 +374,10 @@ export async function adminUsageStats(
         cacheWriteTokens: usage.cacheWriteTokens,
         reasoningTokens: usage.reasoningTokens,
         imageCount: usage.imageCount,
-        videoCount: usage.videoCount
+        videoCount: usage.videoCount,
+        webSearches: usage.webSearches,
+        xPosts: usage.xPosts,
+        xProfiles: usage.xProfiles
       })
       .from(usage)
       .leftJoin(providers, eq(providers.id, usage.providerId))
@@ -400,7 +403,10 @@ export async function adminUsageStats(
     audios:
       sql<number>`count(*) filter (where ${used.capability} = 'audio')`.mapWith(
         Number
-      )
+      ),
+    webSearches: sumOf(used.webSearches),
+    xPosts: sumOf(used.xPosts),
+    xProfiles: sumOf(used.xProfiles)
   };
 
   const [rows, modelsAdded, providersAdded] = await Promise.all([

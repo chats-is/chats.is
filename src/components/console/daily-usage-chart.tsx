@@ -43,9 +43,19 @@ const FIGURES = [
   'reasoningTokens',
   'images',
   'videos',
-  'audios'
+  'audios',
+  'webSearches',
+  'xPosts',
+  'xProfiles'
 ] as const;
 type Figures = Record<(typeof FIGURES)[number], number>;
+
+/** What searches fetched, each as the tooltip names it. */
+const SEARCH_KINDS = [
+  { key: 'webSearches', label: 'Web search' },
+  { key: 'xPosts', label: 'X posts' },
+  { key: 'xProfiles', label: 'X profiles' }
+] as const;
 
 const NONE = Object.fromEntries(FIGURES.map(f => [f, 0])) as Figures;
 const add = (a: Figures, b: Figures) =>
@@ -279,14 +289,28 @@ export function totalOf(groups: Array<{ figures: Figures }>) {
 
 /** What calls made besides tokens, each as how many: images, videos and
  *  audio calls — as the cards, the table and the chart all say it. */
-export function mediaText(f: Figures) {
+export function mediaItems(f: Figures) {
   return [
     f.images > 0 && formatCount(f.images, 'image'),
     f.videos > 0 && formatCount(f.videos, 'video'),
     f.audios > 0 && `${formatNumber(f.audios)} audio`
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  ].filter(item => item !== false);
+}
+
+/** `mediaItems` on one line. */
+export function mediaText(f: Figures) {
+  return mediaItems(f).join(' · ');
+}
+
+/** What searches fetched, each as how many: searches of the web, and the
+ *  posts and profiles a search of X read — each billed by its own count. */
+export function searchItems(f: Figures) {
+  return [
+    f.webSearches > 0 &&
+      `${formatNumber(f.webSearches)} web ${f.webSearches === 1 ? 'search' : 'searches'}`,
+    f.xPosts > 0 && formatCount(f.xPosts, 'X post'),
+    f.xProfiles > 0 && formatCount(f.xProfiles, 'X profile')
+  ].filter(item => item !== false);
 }
 
 /**
@@ -474,7 +498,15 @@ export function DailyUsageChart({
                                             value: media
                                           }
                                         ]
-                                      : [])
+                                      : []),
+                                    // Each kind of search a row of its own,
+                                    // named as the Logs name it.
+                                    ...SEARCH_KINDS.filter(
+                                      k => figures[k.key] > 0
+                                    ).map(k => ({
+                                      label: k.label,
+                                      value: whole(figures[k.key])
+                                    }))
                                   ]
                                 : []),
                               {
