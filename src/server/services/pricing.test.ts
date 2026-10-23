@@ -30,6 +30,8 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     xPost: null,
     xProfile: null,
     image: null,
+    imageInput: null,
+    imageOutput: null,
     video: null,
     videoSeconds: null,
     audioInput: null,
@@ -136,6 +138,51 @@ describe('calculateImageCost', () => {
     expect(snapshot.imagePrice).toBeNull();
     expect(snapshot.inputPrice).toBe('5');
     expect(snapshot.outputPrice).toBe('40');
+  });
+
+  it('bills the pictures read and drawn at their rates, and the words at theirs', () => {
+    // As gpt-image-1.5 edited one: 194 of 226 tokens read a picture, 272 of
+    // 390 written drew one.
+    const { cost, snapshot } = calculateImageCost(
+      {
+        imageCount: 1,
+        inputTokens: 226,
+        outputTokens: 390,
+        imageInputTokens: 194,
+        imageOutputTokens: 272
+      },
+      pricing({ input: '5', imageInput: '8', output: '10', imageOutput: '32' })
+    );
+    expect(cost).toBeCloseTo(
+      (32 * 5 + 194 * 8 + 118 * 10 + 272 * 32) / 1e6,
+      10
+    );
+    expect(snapshot).toMatchObject({
+      inputPrice: '5',
+      imageInputPrice: '8',
+      outputPrice: '10',
+      imageOutputPrice: '32'
+    });
+  });
+
+  it('bills a picture read with no rate of its own at input, and words written with none at image output', () => {
+    const { cost, snapshot } = calculateImageCost(
+      {
+        imageCount: 1,
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+        imageInputTokens: 600_000,
+        imageOutputTokens: 900_000
+      },
+      pricing({ input: '5', imageOutput: '40' })
+    );
+    expect(cost).toBe(45);
+    expect(snapshot).toMatchObject({
+      inputPrice: '5',
+      imageInputPrice: '5',
+      outputPrice: '40',
+      imageOutputPrice: '40'
+    });
   });
 
   it('per-image wins and does NOT double-charge when both styles set (misconfig)', () => {
@@ -302,13 +349,17 @@ describe('pricingMissingFields', () => {
     ).toEqual([]);
   });
 
-  it('image accepts per-image OR input+output', () => {
+  it('image accepts per-image OR input + image output', () => {
     expect(pricingMissingFields('image', pricing({ image: '0.04' }))).toEqual(
       []
     );
     expect(
-      pricingMissingFields('image', pricing({ input: '5', output: '40' }))
+      pricingMissingFields('image', pricing({ input: '5', imageOutput: '40' }))
     ).toEqual([]);
+    // The words' output rate is not the picture's.
+    expect(
+      pricingMissingFields('image', pricing({ input: '5', output: '40' }))
+    ).toEqual(['Image, or Input + Image output']);
     expect(pricingMissingFields('image', pricing({ input: '5' }))).not.toEqual(
       []
     );

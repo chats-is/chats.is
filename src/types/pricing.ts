@@ -51,6 +51,10 @@ export type PriceSnapshot = {
   xPostPrice: string | null;
   xProfilePrice: string | null;
   imagePrice: string | null;
+  /** The rates charged for the pictures an image model read and drew — each
+   *  as used, after falling back to `input` or `output`. */
+  imageInputPrice: string | null;
+  imageOutputPrice: string | null;
   videoPrice: string | null;
   videoSecondsPrice: string | null;
   audioInputPrice: string | null;
@@ -119,6 +123,8 @@ export const pricingUpsertSchema = z.object({
   xPost: priceNumberSchema,
   xProfile: priceNumberSchema,
   image: priceNumberSchema,
+  imageInput: priceNumberSchema,
+  imageOutput: priceNumberSchema,
   video: priceNumberSchema,
   videoSeconds: priceNumberSchema,
   audioInput: priceNumberSchema,

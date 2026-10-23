@@ -138,6 +138,32 @@ describe('usageBreakdown', () => {
     ).toBe('1 image · 4,416 tokens');
   });
 
+  it('bills the pictures read and drawn apart from the words', () => {
+    // gpt-image-1.5 editing one: 194 of 226 read a picture, 272 of 390 drew one.
+    const items = usageBreakdown({
+      capability: 'image',
+      imageCount: 1,
+      inputTokens: 226,
+      outputTokens: 390,
+      imageInputTokens: 194,
+      imageOutputTokens: 272,
+      inputPrice: '5',
+      imageInputPrice: '8',
+      outputPrice: '10',
+      imageOutputPrice: '32'
+    });
+    expect(items.map(i => [i.label, i.quantity])).toEqual([
+      ['Input', '32 tokens'],
+      ['Output', '118 tokens'],
+      ['Image input', '194 tokens'],
+      ['Image output', '272 tokens']
+    ]);
+    expect(total(items)).toBeCloseTo(
+      (32 * 5 + 194 * 8 + 118 * 10 + 272 * 32) / 1e6,
+      10
+    );
+  });
+
   it('bills video per clip when it has a clip price, else per second', () => {
     expect(
       usageBreakdown({

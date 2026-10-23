@@ -36,9 +36,54 @@ const transparentOptions = (type: ProviderType) =>
     ? { taskType: 'BACKGROUND_REMOVAL' }
     : { background: 'transparent', outputFormat: 'png' };
 
+/** One kind's share of a Gemini call's tokens, as `usageMetadata` lists it. */
+type ModalityCount = { modality?: string; tokenCount?: number };
+
+/** The pictures' share of a Gemini call's tokens, in or out — or undefined
+ *  when it does not list them by kind. */
+const imageShare = (details: unknown) =>
+  Array.isArray(details)
+    ? (details as ModalityCount[])
+        .filter(detail => detail.modality === 'IMAGE')
+        .reduce((sum, detail) => sum + (detail.tokenCount ?? 0), 0)
+    : undefined;
+
+/**
+ * Of an image call's tokens, those that were pictures, as its provider tells
+ * them apart: Gemini counts each kind read and written; OpenAI's image API
+ * counts the pictures read, and of what it wrote the AI SDK passes on no
+ * split, so all of it is taken as the picture — which, for every model but
+ * gpt-image-1.5, it is. What a provider does not tell apart is taken as it
+ * was billed before: what was read as words, what was written as the picture.
+ */
+function pictureTokens(
+  // A text call's metadata or an image call's, which the AI SDK types apart.
+  metadata: Record<string, unknown> | undefined,
+  outputTokens: number | undefined
+) {
+  const entries = Object.values(metadata ?? {}) as Array<
+    Record<string, unknown>
+  >;
+  const gemini = entries.find(entry => entry.usageMetadata)?.usageMetadata as
+    | { promptTokensDetails?: unknown; candidatesTokensDetails?: unknown }
+    | undefined;
+  const openai = entries.find(entry => Array.isArray(entry.images))?.images as
+    Array<{ imageTokens?: number }> | undefined;
+  return {
+    imageInputTokens: gemini
+      ? (imageShare(gemini.promptTokensDetails) ?? 0)
+      : (openai?.[0]?.imageTokens ?? 0),
+    imageOutputTokens:
+      (gemini && imageShare(gemini.candidatesTokensDetails)) ?? outputTokens
+  };
+}
+
 export type ImageGenerationResult = StoredMedia & {
   inputTokens?: number;
   outputTokens?: number;
+  /** Of those, the pictures read and drawn (see `pictureTokens`). */
+  imageInputTokens?: number;
+  imageOutputTokens?: number;
   provider: Provider;
   providerRequests: ProviderRequest[];
 };
@@ -111,6 +156,7 @@ export async function generateAndStoreImage(args: {
       // per-image pricing.
       let inputTokens: number | undefined;
       let outputTokens: number | undefined;
+      let pictures: ReturnType<typeof pictureTokens>;
       let providerRequests: ProviderRequest[];
 
       // Gemini serves images via generateText (multi-modal); other providers
@@ -159,6 +205,7 @@ export async function generateAndStoreImage(args: {
         imageMediaType = imageFile.mediaType;
         inputTokens = genResult.usage?.inputTokens;
         outputTokens = genResult.usage?.outputTokens;
+        pictures = pictureTokens(genResult.providerMetadata, outputTokens);
         providerRequests = providerRequestsOf([genResult.response]);
       } else {
         // Standard image models use generateImage API
@@ -168,25 +215,27 @@ export async function generateAndStoreImage(args: {
           ...(transparent && transparentOptions(provider.type))
         };
 
-        const { image, usage, responses } = await generateImage({
-          model: getImageModel(provider, modelId),
-          prompt: inputImages?.length
-            ? { text: prompt, images: inputImages.map(image => image.data) }
-            : prompt,
-          n: 1,
-          ...parts.top,
-          abortSignal,
-          ...(Object.keys(providerOpts).length > 0 && {
-            providerOptions: {
-              [provider.type]: providerOpts
-            }
-          })
-        });
+        const { image, usage, responses, providerMetadata } =
+          await generateImage({
+            model: getImageModel(provider, modelId),
+            prompt: inputImages?.length
+              ? { text: prompt, images: inputImages.map(image => image.data) }
+              : prompt,
+            n: 1,
+            ...parts.top,
+            abortSignal,
+            ...(Object.keys(providerOpts).length > 0 && {
+              providerOptions: {
+                [provider.type]: providerOpts
+              }
+            })
+          });
 
         imageBase64 = image.base64;
         imageMediaType = image.mediaType;
         inputTokens = usage?.inputTokens;
         outputTokens = usage?.outputTokens;
+        pictures = pictureTokens(providerMetadata, outputTokens);
         providerRequests = providerRequestsOf(responses);
       }
 
@@ -195,6 +244,7 @@ export async function generateAndStoreImage(args: {
         imageMediaType,
         inputTokens,
         outputTokens,
+        ...pictures,
         providerRequests
       };
     },
@@ -219,6 +269,8 @@ export async function generateAndStoreImage(args: {
     ...stored,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
+    imageInputTokens: result.imageInputTokens,
+    imageOutputTokens: result.imageOutputTokens,
     provider: usedProvider,
     providerRequests: result.providerRequests
   };

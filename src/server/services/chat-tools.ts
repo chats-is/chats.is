@@ -503,7 +503,9 @@ export async function buildMediaTools(args: {
         providerRequests: result.providerRequests,
         imageCount: 1,
         inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens
+        outputTokens: result.outputTokens,
+        imageInputTokens: result.imageInputTokens,
+        imageOutputTokens: result.imageOutputTokens
       });
 
       knownUrls.add(result.url);

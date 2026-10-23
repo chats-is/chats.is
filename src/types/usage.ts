@@ -43,9 +43,12 @@ export type RecordImageUsageInput = RecordUsageBase & {
   imageCount: number;
   // Token counts for token-billed image models (e.g. gpt-image-1). Ignored
   // when the model bills per image. Cached input is not exposed by the image
-  // API, so inputTokens is billed in full at the input rate.
+  // API, so inputTokens is billed in full at the input rates.
   inputTokens?: number;
   outputTokens?: number;
+  /** Of those, the pictures read and drawn, billed at the image rates. */
+  imageInputTokens?: number;
+  imageOutputTokens?: number;
 };
 
 export type RecordVideoUsageInput = RecordUsageBase & {
@@ -80,6 +83,8 @@ export type UsageRowLike = {
   xPosts?: number | null;
   xProfiles?: number | null;
   imageCount?: number | null;
+  imageInputTokens?: number | null;
+  imageOutputTokens?: number | null;
   videoCount?: number | null;
   videoSeconds?: string | number | null;
   audioInputTokens?: number | null;
@@ -100,6 +105,8 @@ export type UsageRowLike = {
   xPostPrice?: string | null;
   xProfilePrice?: string | null;
   imagePrice?: string | null;
+  imageInputPrice?: string | null;
+  imageOutputPrice?: string | null;
   videoPrice?: string | null;
   videoSecondsPrice?: string | null;
   audioInputPrice?: string | null;

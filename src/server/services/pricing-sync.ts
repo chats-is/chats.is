@@ -195,10 +195,15 @@ export async function previewPricingSync(args: {
   // One row per model, since a model has one price whichever provider serves
   // it.
   return allModels.map(m => {
+    // An image model's output, as the sources quote it, is the picture's.
     const current = m.pricings[0]
       ? {
           input: numOrUndef(m.pricings[0].input),
-          output: numOrUndef(m.pricings[0].output),
+          output: numOrUndef(
+            m.capability === 'image'
+              ? m.pricings[0].imageOutput
+              : m.pricings[0].output
+          ),
           cacheRead: numOrUndef(m.pricings[0].cacheRead),
           cacheWrite: numOrUndef(m.pricings[0].cacheWrite)
         }
@@ -287,14 +292,26 @@ export async function runPricingSync(args: {
         | 'cacheWrite'
         | 'reasoning'
         | 'image'
+        | 'imageOutput'
         | 'audioInput'
         | 'audioOutput'
     ): string | null => toNumeric(remoteValue) ?? existing?.[key] ?? null;
 
+    // An image model's output, as the sources quote it, is what a picture
+    // drawn costs; the words it writes, which they do not price, keep what
+    // they have.
+    const isImage = m.capability === 'image';
     const valuesToWrite = {
       modelId: m.modelId,
       input: kept(remote.cost.input, 'input'),
-      output: kept(remote.cost.output, 'output'),
+      output: isImage
+        ? (existing?.output ?? null)
+        : kept(remote.cost.output, 'output'),
+      imageOutput: isImage
+        ? kept(remote.cost.output, 'imageOutput')
+        : (existing?.imageOutput ?? null),
+      // No source prices a picture read; it is entered by hand, and kept.
+      imageInput: existing?.imageInput ?? null,
       // Cache R/W default to "0" (free) when neither the remote nor the row
       // has them, so the cost engine doesn't fall back to input rate.
       cacheRead: kept(remote.cost.cache_read, 'cacheRead') ?? '0',
@@ -317,7 +334,7 @@ export async function runPricingSync(args: {
     // changed how the model is billed; keeping the other rate beside it would
     // make every sync from then on a conflict, skipped for ever, with the
     // model charged at a style its provider has dropped.
-    if (m.capability === 'image') {
+    if (isImage) {
       const perToken =
         remote.cost.input !== undefined && remote.cost.output !== undefined;
       const perImage = remote.cost.per_image !== undefined;
@@ -325,6 +342,8 @@ export async function runPricingSync(args: {
       if (perImage && !perToken) {
         valuesToWrite.input = null;
         valuesToWrite.output = null;
+        valuesToWrite.imageInput = null;
+        valuesToWrite.imageOutput = null;
       }
     }
 
@@ -361,6 +380,8 @@ export async function runPricingSync(args: {
         !numEq(valuesToWrite.cacheWrite, existing.cacheWrite) ||
         !numEq(valuesToWrite.reasoning, existing.reasoning) ||
         !numEq(valuesToWrite.image, existing.image) ||
+        !numEq(valuesToWrite.imageInput, existing.imageInput) ||
+        !numEq(valuesToWrite.imageOutput, existing.imageOutput) ||
         !numEq(valuesToWrite.audioInput, existing.audioInput) ||
         !numEq(valuesToWrite.audioOutput, existing.audioOutput) ||
         existing.source !== args.source;

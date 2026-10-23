@@ -330,18 +330,20 @@ describe('billing', () => {
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.04, 10);
   });
 
-  it('image: a per-token rate bills on input and output tokens', async () => {
+  it('image: a per-token rate bills the words and the pictures each at theirs', async () => {
     const id = await addModel('image', 'i1');
-    await savePrice(id, { input: '5', output: '40' });
+    await savePrice(id, { input: '5', imageInput: '10', imageOutput: '40' });
     await recordImageUsage({
       ...call,
       modelId: 'i1',
       imageCount: 1,
       inputTokens: 1000,
-      outputTokens: 4000
+      outputTokens: 4000,
+      imageInputTokens: 800,
+      imageOutputTokens: 4000
     });
-    // 1,000 × $5/1M + 4,000 × $40/1M
-    expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.165, 10);
+    // 200 × $5/1M + 800 × $10/1M + 4,000 × $40/1M
+    expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.169, 10);
   });
 
   it('video: a per-second rate bills on the seconds', async () => {

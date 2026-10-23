@@ -131,6 +131,9 @@ describe('price sync', () => {
     expect(result.skipped).toEqual([]);
     expect(price.image).toBeNull();
     expect(Number(price.input)).toBe(5);
+    // The source's output is the picture's; the words' is not its to say.
+    expect(Number(price.imageOutput)).toBe(40);
+    expect(price.output).toBeNull();
     expect(pricingMissingFields('image', price)).toEqual([]);
   });
 

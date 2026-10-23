@@ -38,6 +38,8 @@ const EMPTY_SNAPSHOT: PriceSnapshot = {
   xPostPrice: null,
   xProfilePrice: null,
   imagePrice: null,
+  imageInputPrice: null,
+  imageOutputPrice: null,
   videoPrice: null,
   videoSecondsPrice: null,
   audioInputPrice: null,
@@ -103,8 +105,9 @@ export class PricingMissingError extends Error {
  * in `server/api/routers/pricing.ts`. Cache R/W are not required (default 0).
  *
  *   chat   → Input + Output (both must be set).
- *   image  → Image (per item) OR token-based (Input + Output), e.g.
- *            gpt-image-1 bills per token while DALL-E bills per image.
+ *   image  → Image (per item) OR token-based (Input + Image output), e.g.
+ *            gpt-image-1 bills per token while DALL-E bills per image. Image
+ *            input and Output fall back to Input and Image output.
  *   video  → Either Per video OR Per second.
  *   audio  → direction-aware: TTS bills per character or per token; STT
  *            (opts.transcription) bills per second. Without the direction
@@ -127,9 +130,9 @@ export function pricingMissingFields(
     }
     case 'image':
       // Per-image OR token-based pricing satisfies an image model.
-      return set(p.image) || (set(p.input) && set(p.output))
+      return set(p.image) || (set(p.input) && set(p.imageOutput))
         ? []
-        : ['Image, or Input + Output'];
+        : ['Image, or Input + Image output'];
     case 'video':
       return set(p.video) || set(p.videoSeconds)
         ? []
@@ -284,12 +287,22 @@ export function calculateChatCost(
 
 /**
  * Cost for an image generation call.
+ *
+ * Billed per image, or per token. Per token, the pictures read and drawn are
+ * priced apart from the words, as providers price them: of the input and
+ * output tokens, `imageInputTokens` and `imageOutputTokens` were pictures and
+ * the rest words. A picture read with no rate of its own is billed at the
+ * input rate, and words written with none at the image output rate — a row
+ * priced on two rates is billed as one priced on all four would be, with the
+ * missing ones equal to those.
  */
 export function calculateImageCost(
   args: {
     imageCount: number;
     inputTokens?: number;
     outputTokens?: number;
+    imageInputTokens?: number;
+    imageOutputTokens?: number;
   },
   pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
@@ -299,7 +312,7 @@ export function calculateImageCost(
 
   // Two mutually-exclusive billing styles, image-price wins:
   //   - per-image  (DALL-E / imagen): imageCount × image
-  //   - per-token  (gpt-image-1 ...): inputTokens × input + outputTokens × output
+  //   - per-token  (gpt-image-1 ...): each kind of token at its rate
   // A model only ever configures one. Checking per-image first avoids
   // double-charging if both happen to be set (misconfig / dirty sync).
   if (perImage > 0) {
@@ -309,20 +322,31 @@ export function calculateImageCost(
     };
   }
 
-  const inputRate = toNum(pricing.input);
-  const outputRate = toNum(pricing.output);
+  const inputRate = pricing.input;
+  const imageInputRate = pricing.imageInput ?? pricing.input;
+  const imageOutputRate = pricing.imageOutput ?? pricing.output;
+  const outputRate = pricing.output ?? pricing.imageOutput;
   const inputTokens = args.inputTokens ?? 0;
   const outputTokens = args.outputTokens ?? 0;
+  // A provider's count of pictures is never more than its count in all; held
+  // to it all the same, so the words never come out below none.
+  const imageInputTokens = Math.min(args.imageInputTokens ?? 0, inputTokens);
+  const imageOutputTokens = Math.min(args.imageOutputTokens ?? 0, outputTokens);
   const cost = roundCost(
-    (inputTokens * inputRate) / 1_000_000 +
-      (outputTokens * outputRate) / 1_000_000
+    ((inputTokens - imageInputTokens) * toNum(inputRate) +
+      imageInputTokens * toNum(imageInputRate) +
+      (outputTokens - imageOutputTokens) * toNum(outputRate) +
+      imageOutputTokens * toNum(imageOutputRate)) /
+      1_000_000
   );
   return {
     cost,
     snapshot: {
       ...EMPTY_SNAPSHOT,
-      inputPrice: numToStr(pricing.input),
-      outputPrice: numToStr(pricing.output)
+      inputPrice: numToStr(inputRate),
+      outputPrice: numToStr(outputRate),
+      imageInputPrice: numToStr(imageInputRate),
+      imageOutputPrice: numToStr(imageOutputRate)
     }
   };
 }
@@ -486,6 +510,8 @@ type BillingStyles = Partial<
     | 'input'
     | 'output'
     | 'image'
+    | 'imageInput'
+    | 'imageOutput'
     | 'video'
     | 'videoSeconds'
     | 'audioCharacters'
@@ -512,9 +538,12 @@ export function pricingStyleConflict(
   if (
     capability === 'image' &&
     p.image != null &&
-    (p.input != null || p.output != null)
+    (p.input != null ||
+      p.output != null ||
+      p.imageInput != null ||
+      p.imageOutput != null)
   ) {
-    return 'Image pricing must be either Per image OR token-based (Input + Output), not both.';
+    return 'Image pricing must be either Per image OR token-based (Input + Image output), not both.';
   }
 
   // Audio is one-of-three: per-character (classic TTS), per-token, or
@@ -606,6 +635,8 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
     xPost: data.xPost,
     xProfile: data.xProfile,
     image: data.image,
+    imageInput: data.imageInput,
+    imageOutput: data.imageOutput,
     video: data.video,
     videoSeconds: data.videoSeconds,
     audioInput: data.audioInput,

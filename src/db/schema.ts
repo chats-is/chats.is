@@ -1112,6 +1112,12 @@ export const modelPricings = createTable(
     xPost: numeric('x_post', { precision: 20, scale: 10 }),
     xProfile: numeric('x_profile', { precision: 20, scale: 10 }),
     image: numeric('image', { precision: 20, scale: 10 }),
+    // Image models billed per token: the pictures read and drawn, which a
+    // provider prices apart from the words. `input` and `output` are then the
+    // words; a picture read with no rate of its own is billed at `input`, and
+    // words written with none at `image_output`.
+    imageInput: numeric('image_input', { precision: 20, scale: 10 }),
+    imageOutput: numeric('image_output', { precision: 20, scale: 10 }),
     video: numeric('video', { precision: 20, scale: 10 }),
     videoSeconds: numeric('video_seconds', { precision: 20, scale: 10 }),
     // Audio bills EITHER per character (classic TTS: tts-1, Google, Azure,
@@ -1199,6 +1205,10 @@ export const usage = createTable(
     xPosts: integer('x_posts').notNull().default(0),
     xProfiles: integer('x_profiles').notNull().default(0),
     imageCount: integer('image_count').notNull().default(0),
+    // Of `input_tokens` and `output_tokens`, those that were pictures: read,
+    // and drawn. The rest were words.
+    imageInputTokens: integer('image_input_tokens').notNull().default(0),
+    imageOutputTokens: integer('image_output_tokens').notNull().default(0),
     videoCount: integer('video_count').notNull().default(0),
     videoSeconds: numeric('video_seconds', { precision: 12, scale: 3 })
       .notNull()
@@ -1220,6 +1230,11 @@ export const usage = createTable(
     xPostPrice: numeric('x_post_price', { precision: 20, scale: 10 }),
     xProfilePrice: numeric('x_profile_price', { precision: 20, scale: 10 }),
     imagePrice: numeric('image_price', { precision: 20, scale: 10 }),
+    imageInputPrice: numeric('image_input_price', { precision: 20, scale: 10 }),
+    imageOutputPrice: numeric('image_output_price', {
+      precision: 20,
+      scale: 10
+    }),
     videoPrice: numeric('video_price', { precision: 20, scale: 10 }),
     videoSecondsPrice: numeric('video_seconds_price', {
       precision: 20,

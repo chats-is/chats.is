@@ -351,6 +351,13 @@
       "when": 1792734522406,
       "tag": "0049_message_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792749669105,
+      "tag": "0050_image_token_pricing",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,8 @@ export type PricingRates = {
   xPost?: string | null;
   xProfile?: string | null;
   image?: string | null;
+  imageInput?: string | null;
+  imageOutput?: string | null;
   video?: string | null;
   videoSeconds?: string | null;
   audioInput?: string | null;
@@ -30,15 +32,18 @@ const fmt = (v: string | null | undefined): string | null => {
 
 /**
  * Capability-aware pricing lines for the table, in rows: what the model is
- * billed for on every call first, then the cache rates and the search rates —
- * which apply only to some calls — each on a row of its own. Each entry is
+ * billed for on every call first — an image model's words, then its pictures
+ * — then the cache rates and the search rates, which apply only to some
+ * calls, each on a row of its own. Each entry is
  * `"Label: $X/unit"`; a rate that is not set is left out, and so is a row
  * with nothing in it.
  *
  *   chat   → [["Input: $2.5/1M", "Output: $15/1M", "Reasoning: $15/1M"],
  *             ["Cache Read: $0.25/1M", "Cache Write: $0/1M"],
  *             ["Web Search: $10/1K", "X Posts: $5/1K", "X Profiles: $10/1K"]]
- *   image  → [["Image: $0.04/image"]]
+ *   image  → [["Image: $0.04/image"]] or
+ *             [["Input: $5/1M", "Output: $10/1M"],
+ *              ["Image Input: $8/1M", "Image Output: $32/1M"]]
  *   video  → [["Video: $0.5/video", "Per sec: $0.001/s"]]
  *   audio  → [["Per 1M chars: $15"]] or [["Input: $0.6/1M", "Output: $12/1M"]]
  *
@@ -51,6 +56,7 @@ export function summarizePricingRows(
 ): string[][] {
   if (!pricing) return [];
   const main: string[] = [];
+  const pictures: string[] = [];
   const cache: string[] = [];
   const search: string[] = [];
   // `unit` is the pricing basis suffix (e.g. /1M, /image) appended after the
@@ -81,6 +87,8 @@ export function summarizePricingRows(
       push(main, 'Image', pricing.image, '/image');
       push(main, 'Input', pricing.input, '/1M');
       push(main, 'Output', pricing.output, '/1M');
+      push(pictures, 'Image Input', pricing.imageInput, '/1M');
+      push(pictures, 'Image Output', pricing.imageOutput, '/1M');
       break;
     }
     case 'video': {
@@ -98,7 +106,7 @@ export function summarizePricingRows(
       break;
     }
   }
-  return [main, cache, search].filter(row => row.length > 0);
+  return [main, pictures, cache, search].filter(row => row.length > 0);
 }
 
 /**

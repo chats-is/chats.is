@@ -149,8 +149,23 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
       if (num(row.imagePrice) > 0) {
         perUnit('Image', num(row.imageCount), row.imagePrice, 'image');
       } else {
-        perMillion('Input', num(row.inputTokens), row.inputPrice, 'token');
-        perMillion('Output', num(row.outputTokens), row.outputPrice, 'token');
+        // The pictures read and drawn apart from the words, each at its rate.
+        const imageInput = num(row.imageInputTokens);
+        const imageOutput = num(row.imageOutputTokens);
+        perMillion(
+          'Input',
+          num(row.inputTokens) - imageInput,
+          row.inputPrice,
+          'token'
+        );
+        perMillion(
+          'Output',
+          num(row.outputTokens) - imageOutput,
+          row.outputPrice,
+          'token'
+        );
+        perMillion('Image input', imageInput, row.imageInputPrice, 'token');
+        perMillion('Image output', imageOutput, row.imageOutputPrice, 'token');
       }
       break;
     case 'video':

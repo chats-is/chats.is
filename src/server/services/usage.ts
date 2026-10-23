@@ -148,7 +148,7 @@ export async function recordImageUsage(
       pricing != null &&
       parseNumber(pricing.image) == null &&
       (parseNumber(pricing.input) != null ||
-        parseNumber(pricing.output) != null);
+        parseNumber(pricing.imageOutput) != null);
     const noTokens =
       (input.inputTokens ?? 0) === 0 && (input.outputTokens ?? 0) === 0;
     if (tokenBilled && noTokens) {
@@ -161,7 +161,9 @@ export async function recordImageUsage(
       {
         imageCount: input.imageCount,
         inputTokens: input.inputTokens,
-        outputTokens: input.outputTokens
+        outputTokens: input.outputTokens,
+        imageInputTokens: input.imageInputTokens,
+        imageOutputTokens: input.imageOutputTokens
       },
       pricing
     );
@@ -179,6 +181,8 @@ export async function recordImageUsage(
       imageCount: input.imageCount,
       inputTokens: input.inputTokens ?? 0,
       outputTokens: input.outputTokens ?? 0,
+      imageInputTokens: input.imageInputTokens ?? 0,
+      imageOutputTokens: input.imageOutputTokens ?? 0,
       ...spent(cost, tier),
       planId: await planOf(input.userId),
       ...snapshot
@@ -603,6 +607,8 @@ export async function adminUsageLog(
       xPosts: usage.xPosts,
       xProfiles: usage.xProfiles,
       imageCount: usage.imageCount,
+      imageInputTokens: usage.imageInputTokens,
+      imageOutputTokens: usage.imageOutputTokens,
       videoCount: usage.videoCount,
       videoSeconds: usage.videoSeconds,
       audioInputTokens: usage.audioInputTokens,
@@ -618,6 +624,8 @@ export async function adminUsageLog(
       xPostPrice: usage.xPostPrice,
       xProfilePrice: usage.xProfilePrice,
       imagePrice: usage.imagePrice,
+      imageInputPrice: usage.imageInputPrice,
+      imageOutputPrice: usage.imageOutputPrice,
       videoPrice: usage.videoPrice,
       videoSecondsPrice: usage.videoSecondsPrice,
       audioInputPrice: usage.audioInputPrice,

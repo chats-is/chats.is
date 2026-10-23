@@ -136,6 +136,8 @@ type PricingForm = {
   xPost: string;
   xProfile: string;
   image: string;
+  imageInput: string;
+  imageOutput: string;
   video: string;
   videoSeconds: string;
   audioInput: string;
@@ -156,6 +158,8 @@ const EMPTY_PRICING: PricingForm = {
   xPost: '',
   xProfile: '',
   image: '',
+  imageInput: '',
+  imageOutput: '',
   video: '',
   videoSeconds: '',
   audioInput: '',
@@ -513,6 +517,8 @@ export default function PricingPage() {
       xPost: fromNum(row.pricing?.xPost),
       xProfile: fromNum(row.pricing?.xProfile),
       image: fromNum(row.pricing?.image),
+      imageInput: fromNum(row.pricing?.imageInput),
+      imageOutput: fromNum(row.pricing?.imageOutput),
       video: fromNum(row.pricing?.video),
       videoSeconds: fromNum(row.pricing?.videoSeconds),
       audioInput: fromNum(row.pricing?.audioInput),
@@ -850,12 +856,23 @@ export default function PricingPage() {
                           name="image"
                           label="Per image"
                           placeholder="per-image (DALL-E, imagen)"
-                          disabled={!!values.input || !!values.output}
-                          clears={['input', 'output']}
+                          disabled={
+                            !!values.input ||
+                            !!values.imageInput ||
+                            !!values.output ||
+                            !!values.imageOutput
+                          }
+                          clears={[
+                            'input',
+                            'imageInput',
+                            'output',
+                            'imageOutput'
+                          ]}
                         />
                         <div className="col-span-2 text-xs text-muted-foreground">
-                          Or token-based billing (gpt-image-1) — set Input +
-                          Output instead of Per image:
+                          Or token-based billing (gpt-image, Gemini), the words
+                          and the pictures priced apart — set at least Input +
+                          Image output instead of Per image:
                         </div>
                         <PriceField
                           name="input"
@@ -866,6 +883,20 @@ export default function PricingPage() {
                         <PriceField
                           name="output"
                           label="Output / 1M tokens"
+                          placeholder="defaults to image output rate"
+                          disabled={!!values.image}
+                          clears={['image']}
+                        />
+                        <PriceField
+                          name="imageInput"
+                          label="Image input / 1M tokens"
+                          placeholder="defaults to input rate"
+                          disabled={!!values.image}
+                          clears={['image']}
+                        />
+                        <PriceField
+                          name="imageOutput"
+                          label="Image output / 1M tokens"
                           disabled={!!values.image}
                           clears={['image']}
                         />
