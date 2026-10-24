@@ -888,9 +888,11 @@ export async function buildMediaTools(args: {
             providerId: result.provider.id,
             providerModelId: resolveModelId(result.provider, dbModel.modelId),
             providerRequests: result.providerRequests,
-            // TTS bills per input character (generateSpeech reports no
-            // token usage).
-            audioCharacters: result.characters
+            // TTS bills per input character, or per token where the
+            // provider counted them.
+            audioCharacters: result.characters,
+            inputTokens: result.inputTokens,
+            audioOutputTokens: result.audioOutputTokens
           });
 
           // Same-response transcribe_audio may reference this output.
@@ -949,7 +951,10 @@ export async function buildMediaTools(args: {
             providerId: result.provider.id,
             providerModelId: resolveModelId(result.provider, dbModel.modelId),
             providerRequests: result.providerRequests,
-            audioSeconds: result.durationInSeconds
+            audioSeconds: result.durationInSeconds,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            audioInputTokens: result.audioInputTokens
           });
 
           return {

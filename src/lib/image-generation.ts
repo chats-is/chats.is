@@ -11,6 +11,7 @@ import {
 } from '@/types';
 import { TRANSPARENT_BACKGROUND_PROVIDERS } from '@/lib/constant';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
+import { modalityTokens } from '@/lib/modality-tokens';
 import {
   getImageModel,
   getLanguageModel,
@@ -36,18 +37,6 @@ const transparentOptions = (type: ProviderType) =>
     ? { taskType: 'BACKGROUND_REMOVAL' }
     : { background: 'transparent', outputFormat: 'png' };
 
-/** One kind's share of a Gemini call's tokens, as `usageMetadata` lists it. */
-type ModalityCount = { modality?: string; tokenCount?: number };
-
-/** The pictures' share of a Gemini call's tokens, in or out — or undefined
- *  when it does not list them by kind. */
-const imageShare = (details: unknown) =>
-  Array.isArray(details)
-    ? (details as ModalityCount[])
-        .filter(detail => detail.modality === 'IMAGE')
-        .reduce((sum, detail) => sum + (detail.tokenCount ?? 0), 0)
-    : undefined;
-
 /**
  * Of an image call's tokens, those that were pictures, as its provider tells
  * them apart: Gemini counts each kind read and written; OpenAI's image API
@@ -71,10 +60,11 @@ function pictureTokens(
     Array<{ imageTokens?: number }> | undefined;
   return {
     imageInputTokens: gemini
-      ? (imageShare(gemini.promptTokensDetails) ?? 0)
+      ? (modalityTokens(gemini.promptTokensDetails, 'IMAGE') ?? 0)
       : (openai?.[0]?.imageTokens ?? 0),
     imageOutputTokens:
-      (gemini && imageShare(gemini.candidatesTokensDetails)) ?? outputTokens
+      (gemini && modalityTokens(gemini.candidatesTokensDetails, 'IMAGE')) ??
+      outputTokens
   };
 }
 

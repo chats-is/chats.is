@@ -246,6 +246,21 @@ describe('calculateAudioCost', () => {
     expect(snapshot.audioInputPrice).toBeNull();
   });
 
+  it('per-token mode (Gemini TTS): the words read and the audio spoken, each at its rate', () => {
+    // As gemini-2.5-flash-preview-tts answered: 11 text tokens in, 91 audio
+    // tokens out. Its characters are counted too, and not billed.
+    const { cost, snapshot } = calculateAudioCost(
+      { audioCharacters: 44, inputTokens: 11, audioOutputTokens: 91 },
+      pricing({ input: '0.5', audioOutput: '10' })
+    );
+    expect(cost).toBeCloseTo((11 * 0.5 + 91 * 10) / 1e6, 10);
+    expect(snapshot).toMatchObject({
+      inputPrice: '0.5',
+      audioOutputPrice: '10',
+      audioCharactersPrice: null
+    });
+  });
+
   it('returns 0 when pricing is null', () => {
     expect(calculateAudioCost({ audioCharacters: 1000 }, null).cost).toBe(0);
   });
@@ -292,6 +307,21 @@ describe('calculateTranscriptionCost', () => {
     expect(snapshot.audioMinutePrice).toBe('0.006');
   });
 
+  it('per-token mode (gpt-4o-transcribe): the audio heard and the words written, each at its rate', () => {
+    // As gpt-4o-transcribe answered: 45 audio tokens in, 13 text tokens out.
+    // Its seconds are counted too, and not billed.
+    const { cost, snapshot } = calculateTranscriptionCost(
+      { audioSeconds: 2.6, audioInputTokens: 45, outputTokens: 13 },
+      pricing({ audioInput: '2.5', output: '10' })
+    );
+    expect(cost).toBeCloseTo((45 * 2.5 + 13 * 10) / 1e6, 10);
+    expect(snapshot).toMatchObject({
+      audioInputPrice: '2.5',
+      outputPrice: '10',
+      audioMinutePrice: null
+    });
+  });
+
   it('returns 0 for null pricing or missing duration', () => {
     expect(calculateTranscriptionCost({ audioSeconds: 60 }, null).cost).toBe(0);
     expect(
@@ -303,7 +333,7 @@ describe('calculateTranscriptionCost', () => {
 describe('pricingMissingFields', () => {
   it('audio accepts per-minute (STT) as a valid pricing style', () => {
     expect(pricingMissingFields('audio', pricing())).toEqual([
-      'Per 1M characters, Audio input / Audio output, or Per minute'
+      'Per 1M characters, Per minute, or per-token rates'
     ]);
     expect(
       pricingMissingFields('audio', pricing({ audioMinute: '0.006' }))
@@ -311,24 +341,47 @@ describe('pricingMissingFields', () => {
   });
 
   it('audio direction must match the billed dimension', () => {
-    // STT models must carry the per-minute rate — a chars/token-only row
-    // would pass the gate but bill $0.
+    // STT models must carry the per-minute rate or the audio heard and the
+    // words written — a chars-only row would pass the gate but bill $0.
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
         transcription: true
       })
-    ).toEqual(['Per minute']);
+    ).toEqual(['Per minute, or Audio input + Output']);
+    expect(
+      pricingMissingFields(
+        'audio',
+        pricing({ audioInput: '2.5', output: '10' }),
+        { transcription: true }
+      )
+    ).toEqual([]);
+    // The words read and the audio spoken are a speech's, not a transcript's.
+    expect(
+      pricingMissingFields(
+        'audio',
+        pricing({ input: '0.5', audioOutput: '10' }),
+        { transcription: true }
+      )
+    ).not.toEqual([]);
     expect(
       pricingMissingFields('audio', pricing({ audioMinute: '0.006' }), {
         transcription: true
       })
     ).toEqual([]);
-    // TTS models must carry chars/tokens — a minutes-only row is invalid.
+    // TTS models must carry chars or the words read and the audio spoken — a
+    // minutes-only row is invalid.
     expect(
       pricingMissingFields('audio', pricing({ audioMinute: '0.006' }), {
         transcription: false
       })
-    ).toEqual(['Per 1M characters']);
+    ).toEqual(['Per 1M characters, or Input + Audio output']);
+    expect(
+      pricingMissingFields(
+        'audio',
+        pricing({ input: '0.5', audioOutput: '10' }),
+        { transcription: false }
+      )
+    ).toEqual([]);
     expect(
       pricingMissingFields('audio', pricing({ audioCharacters: '15' }), {
         transcription: false

@@ -15,9 +15,40 @@ import { providerRequestsOf } from '@/lib/provider-request';
 export type TranscriptionOutput = {
   text: string;
   durationInSeconds?: number;
+  /** The audio heard, any words given with it, and the words written, in
+   *  tokens, where the provider counts them (see `transcriptTokens`). */
+  audioInputTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
   provider: Provider;
   providerRequests: ProviderRequest[];
 };
+
+/**
+ * The tokens a transcription took, where its provider counts them: OpenAI's
+ * token-priced models, in the `usage` of the answer the AI SDK hands back
+ * whole, the audio heard and the words written. A model priced by length
+ * answers with its seconds instead, and is billed by those.
+ */
+function transcriptTokens(body: unknown) {
+  const usage = (
+    body as {
+      usage?: {
+        type?: string;
+        input_tokens?: number;
+        input_token_details?: { audio_tokens?: number; text_tokens?: number };
+        output_tokens?: number;
+      };
+    } | null
+  )?.usage;
+  if (usage?.type !== 'tokens') return {};
+  return {
+    audioInputTokens:
+      usage.input_token_details?.audio_tokens ?? usage.input_tokens,
+    inputTokens: usage.input_token_details?.text_tokens,
+    outputTokens: usage.output_tokens
+  };
+}
 
 /**
  * Transcribe audio (STT) with provider failover. Returns plain text — nothing
@@ -51,6 +82,11 @@ export async function transcribeAudio(args: {
       return {
         text: transcript.text,
         durationInSeconds: transcript.durationInSeconds,
+        // The answer is handed back whole, though the SDK's type for a
+        // transcription's response leaves it out.
+        ...transcriptTokens(
+          (transcript.responses[0] as { body?: unknown } | undefined)?.body
+        ),
         providerRequests: providerRequestsOf(transcript.responses)
       };
     }

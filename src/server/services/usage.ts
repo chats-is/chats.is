@@ -241,6 +241,18 @@ export async function recordVideoUsage(
   }
 }
 
+/** How many tokens an audio call reported, of any kind. */
+const tokensOf = (tokens: {
+  inputTokens?: number;
+  outputTokens?: number;
+  audioInputTokens?: number;
+  audioOutputTokens?: number;
+}) =>
+  (tokens.inputTokens ?? 0) +
+  (tokens.outputTokens ?? 0) +
+  (tokens.audioInputTokens ?? 0) +
+  (tokens.audioOutputTokens ?? 0);
+
 /**
  * Record usage for an audio (TTS / STT / audio chat) call.
  */
@@ -251,21 +263,20 @@ export async function recordAudioUsage(
     const lookup = await resolveModelByKey(input.modelId, 'audio');
     const pricing = lookup?.pricing ?? null;
 
-    // Speech bills per character. No quantity means a cost of 0 — surface it.
-    if (
-      pricing != null &&
-      parseNumber(pricing.audioCharacters) != null &&
-      (input.audioCharacters ?? 0) === 0
-    ) {
+    // Speech bills per character, or per token where the provider counts
+    // them. No quantity means a cost of 0 — surface it.
+    const billable =
+      pricing == null ||
+      (parseNumber(pricing.audioCharacters) != null
+        ? (input.audioCharacters ?? 0) > 0
+        : tokensOf(input) > 0);
+    if (!billable) {
       console.warn(
         `[audio] no billable quantity for model=${input.modelId}; cost will be 0`
       );
     }
 
-    const { cost, snapshot } = calculateAudioCost(
-      { audioCharacters: input.audioCharacters },
-      pricing
-    );
+    const { cost, snapshot } = calculateAudioCost(input, pricing);
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
@@ -278,6 +289,8 @@ export async function recordAudioUsage(
       providerModelId: input.providerModelId ?? null,
       capability: 'audio',
       audioCharacters: input.audioCharacters ?? 0,
+      inputTokens: input.inputTokens ?? 0,
+      outputTokens: input.outputTokens ?? 0,
       audioInputTokens: input.audioInputTokens ?? 0,
       audioOutputTokens: input.audioOutputTokens ?? 0,
       ...spent(cost, tier),
@@ -300,19 +313,20 @@ export async function recordTranscriptionUsage(
     const lookup = await resolveModelByKey(input.modelId, 'audio');
     const pricing = lookup?.pricing ?? null;
 
-    // Billed by length: without a duration the cost would be 0 — surface it.
-    const secondsBilled =
-      pricing != null && parseNumber(pricing.audioMinute) != null;
-    if (secondsBilled && (input.audioSeconds ?? 0) === 0) {
+    // Billed by length, or per token where the provider counts them:
+    // without either the cost would be 0 — surface it.
+    const billable =
+      pricing == null ||
+      (parseNumber(pricing.audioMinute) != null
+        ? (input.audioSeconds ?? 0) > 0
+        : tokensOf(input) > 0);
+    if (!billable) {
       console.warn(
-        `[transcription] no duration reported for model=${input.modelId}; cost will be 0`
+        `[transcription] nothing billable reported for model=${input.modelId}; cost will be 0`
       );
     }
 
-    const { cost, snapshot } = calculateTranscriptionCost(
-      { audioSeconds: input.audioSeconds },
-      pricing
-    );
+    const { cost, snapshot } = calculateTranscriptionCost(input, pricing);
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
@@ -325,6 +339,9 @@ export async function recordTranscriptionUsage(
       providerModelId: input.providerModelId ?? null,
       capability: 'audio',
       audioSeconds: (input.audioSeconds ?? 0).toString(),
+      inputTokens: input.inputTokens ?? 0,
+      outputTokens: input.outputTokens ?? 0,
+      audioInputTokens: input.audioInputTokens ?? 0,
       ...spent(cost, tier),
       planId: await planOf(input.userId),
       ...snapshot

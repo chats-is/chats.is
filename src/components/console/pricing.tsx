@@ -929,18 +929,47 @@ export default function PricingPage() {
                         <PriceField
                           name="audioCharacters"
                           label="Per 1M characters"
-                          placeholder="classic TTS (tts-1, ElevenLabs)"
+                          placeholder="classic TTS (tts-1, xAI)"
                           disabled={
+                            !!values.input ||
+                            !!values.output ||
                             !!values.audioInput ||
                             !!values.audioOutput ||
                             !!values.audioMinute
                           }
-                          clears={['audioInput', 'audioOutput', 'audioMinute']}
+                          clears={[
+                            'input',
+                            'output',
+                            'audioInput',
+                            'audioOutput',
+                            'audioMinute'
+                          ]}
                         />
                         <div className="col-span-2 text-xs text-muted-foreground">
-                          Or token-based billing (gpt-4o-mini-tts) — set Audio
-                          input + output instead of Per 1M characters:
+                          Or token-based billing (Gemini TTS,
+                          gpt-4o-transcribe), the words and the audio priced
+                          apart — a speech model at least Input + Audio output,
+                          a transcription model Audio input + Output. Only for
+                          models whose provider reports the tokens:
+                          gpt-4o-mini-tts reports none, and priced this way
+                          would cost nothing — price it per character instead:
                         </div>
+                        <PriceField
+                          name="input"
+                          label="Input / 1M tokens"
+                          disabled={
+                            !!values.audioCharacters || !!values.audioMinute
+                          }
+                          clears={['audioCharacters', 'audioMinute']}
+                        />
+                        <PriceField
+                          name="output"
+                          label="Output / 1M tokens"
+                          disabled={
+                            !!values.audioCharacters || !!values.audioMinute
+                          }
+                          clears={['audioCharacters', 'audioMinute']}
+                        />
                         <PriceField
                           name="audioInput"
                           label="Audio input / 1M tokens"
@@ -967,11 +996,15 @@ export default function PricingPage() {
                           placeholder="per minute of input audio (whisper-1: 0.006)"
                           disabled={
                             !!values.audioCharacters ||
+                            !!values.input ||
+                            !!values.output ||
                             !!values.audioInput ||
                             !!values.audioOutput
                           }
                           clears={[
                             'audioCharacters',
+                            'input',
+                            'output',
                             'audioInput',
                             'audioOutput'
                           ]}

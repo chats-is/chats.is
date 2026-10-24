@@ -144,6 +144,20 @@ function findRemoteCost(
 }
 
 /** Every name a model goes by: its id, then its aliases. */
+/**
+ * Whether a source's output rate for a model is what its audio costs: a
+ * speech model the source prices only in and out (Gemini's), whose output is
+ * the audio it speaks. One priced in audio as well names that rate apart, and
+ * its output is the words it writes.
+ */
+const outputIsSpeech = (
+  model: { capability: string; supportsTranscription: boolean | null },
+  cost: RemoteCost | undefined
+) =>
+  model.capability === 'audio' &&
+  !model.supportsTranscription &&
+  cost?.output_audio === undefined;
+
 const namesOf = (model: { modelId: string; aliases: string[] | null }) => [
   model.modelId,
   ...(model.aliases ?? [])
@@ -195,23 +209,28 @@ export async function previewPricingSync(args: {
   // One row per model, since a model has one price whichever provider serves
   // it.
   return allModels.map(m => {
-    // An image model's output, as the sources quote it, is the picture's.
-    const current = m.pricings[0]
-      ? {
-          input: numOrUndef(m.pricings[0].input),
-          output: numOrUndef(
-            m.capability === 'image'
-              ? m.pricings[0].imageOutput
-              : m.pricings[0].output
-          ),
-          cacheRead: numOrUndef(m.pricings[0].cacheRead),
-          cacheWrite: numOrUndef(m.pricings[0].cacheWrite)
-        }
-      : null;
-
     // A model with no provider still shows, as a row nothing can price.
     const first = m.providers[0]?.provider;
     const remote = first ? findRemoteCost(data, first.type, namesOf(m)) : null;
+
+    // An image model's output, as the sources quote it, is the picture's, and
+    // a speech model's the audio's (see `outputIsSpeech`).
+    const price = m.pricings[0];
+    const current = price
+      ? {
+          input: numOrUndef(price.input),
+          output: numOrUndef(
+            m.capability === 'image'
+              ? price.imageOutput
+              : outputIsSpeech(m, remote?.cost)
+                ? price.audioOutput
+                : price.output
+          ),
+          cacheRead: numOrUndef(price.cacheRead),
+          cacheWrite: numOrUndef(price.cacheWrite)
+        }
+      : null;
+
     return {
       modelDbId: m.id,
       modelId: m.modelId,
@@ -298,15 +317,18 @@ export async function runPricingSync(args: {
     ): string | null => toNumeric(remoteValue) ?? existing?.[key] ?? null;
 
     // An image model's output, as the sources quote it, is what a picture
-    // drawn costs; the words it writes, which they do not price, keep what
-    // they have.
+    // drawn costs, and a speech model's what its audio does (see
+    // `outputIsSpeech`); the words either writes, which they do not price,
+    // keep what they have.
     const isImage = m.capability === 'image';
+    const isSpeech = outputIsSpeech(m, remote.cost);
     const valuesToWrite = {
       modelId: m.modelId,
       input: kept(remote.cost.input, 'input'),
-      output: isImage
-        ? (existing?.output ?? null)
-        : kept(remote.cost.output, 'output'),
+      output:
+        isImage || isSpeech
+          ? (existing?.output ?? null)
+          : kept(remote.cost.output, 'output'),
       imageOutput: isImage
         ? kept(remote.cost.output, 'imageOutput')
         : (existing?.imageOutput ?? null),
@@ -319,11 +341,13 @@ export async function runPricingSync(args: {
       // Reasoning stays null when not provided — calc falls back to output rate.
       reasoning: kept(remote.cost.reasoning, 'reasoning'),
       image: kept(remote.cost.per_image, 'image'),
-      // Token-based audio rates (gpt-4o-mini-tts, omni). Classic TTS bills per
-      // character — the remote sources don't list a per-character rate, so
-      // audioCharacters is configured manually (left untouched by sync).
+      // Token-based audio rates (Gemini's speech, realtime). Classic TTS bills
+      // per character — the remote sources don't list a per-character rate,
+      // so audioCharacters is configured manually (left untouched by sync).
       audioInput: kept(remote.cost.input_audio, 'audioInput'),
-      audioOutput: kept(remote.cost.output_audio, 'audioOutput'),
+      audioOutput: isSpeech
+        ? kept(remote.cost.output, 'audioOutput')
+        : kept(remote.cost.output_audio, 'audioOutput'),
       source: args.source,
       updatedAt: new Date()
     };

@@ -224,4 +224,20 @@ describe('usageBreakdown', () => {
     ]);
     expect(usageSummary(transcript)).toBe('2.5 s');
   });
+
+  it('bills speech priced per token on its words and its audio, not its characters', () => {
+    const items = usageBreakdown({
+      capability: 'audio',
+      audioCharacters: 44,
+      inputTokens: 11,
+      audioOutputTokens: 91,
+      inputPrice: '0.5',
+      audioOutputPrice: '10'
+    });
+    expect(items.map(i => [i.label, i.quantity])).toEqual([
+      ['Input', '11 tokens'],
+      ['Audio output', '91 tokens']
+    ]);
+    expect(total(items)).toBeCloseTo((11 * 0.5 + 91 * 10) / 1e6, 10);
+  });
 });

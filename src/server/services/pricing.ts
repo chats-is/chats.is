@@ -138,18 +138,29 @@ export function pricingMissingFields(
         ? []
         : ['Per video / Per second'];
     case 'audio': {
-      // STT bills per minute; TTS bills per character or per token. The
+      // TTS bills per character, STT per minute, and either per token: the
+      // words and the audio each at its rate — a speech reads words and
+      // speaks audio, a transcription hears audio and writes words. The
       // billed dimension must match the model's direction — a mismatched
       // style would pass the gate but compute $0 cost.
+      const speechTokens = set(p.input) && set(p.audioOutput);
+      const transcriptTokens = set(p.audioInput) && set(p.output);
       if (opts?.transcription === true) {
-        return set(p.audioMinute) ? [] : ['Per minute'];
+        return set(p.audioMinute) || transcriptTokens
+          ? []
+          : ['Per minute, or Audio input + Output'];
       }
       if (opts?.transcription === false) {
-        return set(p.audioCharacters) ? [] : ['Per 1M characters'];
+        return set(p.audioCharacters) || speechTokens
+          ? []
+          : ['Per 1M characters, or Input + Audio output'];
       }
-      return set(p.audioCharacters) || set(p.audioMinute)
+      return set(p.audioCharacters) ||
+        set(p.audioMinute) ||
+        speechTokens ||
+        transcriptTokens
         ? []
-        : ['Per 1M characters, Audio input / Audio output, or Per minute'];
+        : ['Per 1M characters, Per minute, or per-token rates'];
     }
   }
 }
@@ -383,18 +394,48 @@ export function calculateVideoCost(
   };
 }
 
+/** The tokens an audio call took: the words and the audio, read and written. */
+type AudioTokens = {
+  inputTokens?: number;
+  outputTokens?: number;
+  audioInputTokens?: number;
+  audioOutputTokens?: number;
+};
+
+/** An audio call priced per token: each kind at its rate, per million. */
+function audioTokenCost(
+  tokens: AudioTokens,
+  pricing: PricingRecord
+): { cost: number; snapshot: PriceSnapshot } {
+  return {
+    cost: roundCost(
+      ((tokens.inputTokens ?? 0) * toNum(pricing.input) +
+        (tokens.outputTokens ?? 0) * toNum(pricing.output) +
+        (tokens.audioInputTokens ?? 0) * toNum(pricing.audioInput) +
+        (tokens.audioOutputTokens ?? 0) * toNum(pricing.audioOutput)) /
+        1_000_000
+    ),
+    snapshot: {
+      ...EMPTY_SNAPSHOT,
+      inputPrice: numToStr(pricing.input),
+      outputPrice: numToStr(pricing.output),
+      audioInputPrice: numToStr(pricing.audioInput),
+      audioOutputPrice: numToStr(pricing.audioOutput)
+    }
+  };
+}
+
 /**
- * Cost for a speech (TTS) call: characters × the per-1M-character rate.
- *
- * Characters are what speech generation measures — `generateSpeech` returns
- * no usage, so no provider's token counts reach us. A token rate was once
- * accepted here and always multiplied by zero.
+ * Cost for a speech (TTS) call: characters × the per-1M-character rate, or,
+ * for a model priced per token, the words read and the audio spoken each at
+ * its rate — counted by the providers that say (see `speechTokens`).
  */
 export function calculateAudioCost(
-  args: { audioCharacters?: number },
+  args: { audioCharacters?: number } & AudioTokens,
   pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
   if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
+  if (pricing.audioCharacters == null) return audioTokenCost(args, pricing);
 
   return {
     cost: roundCost(
@@ -409,13 +450,15 @@ export function calculateAudioCost(
 
 /**
  * Cost for a transcription (STT) call: the minutes heard × the rate per
- * minute, the audio's length being reported in seconds.
+ * minute, the audio's length being reported in seconds — or, for a model
+ * priced per token, the audio heard and the words written each at its rate.
  */
 export function calculateTranscriptionCost(
-  args: { audioSeconds?: number },
+  args: { audioSeconds?: number } & AudioTokens,
   pricing: PricingRecord | null
 ): { cost: number; snapshot: PriceSnapshot } {
   if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
+  if (pricing.audioMinute == null) return audioTokenCost(args, pricing);
 
   const perMinute = toNum(pricing.audioMinute);
   return {
@@ -547,15 +590,18 @@ export function pricingStyleConflict(
     return 'Image pricing must be either Per image OR token-based (Input + Image output), not both.';
   }
 
-  // Audio is one-of-three: per-character (classic TTS), per-token, or
-  // per-minute (STT).
+  // Audio is one-of-three: per-character (classic TTS), per-token — the
+  // words and the audio — or per-minute (STT).
   const audioStyles = [
     p.audioCharacters != null,
-    p.audioInput != null || p.audioOutput != null,
+    p.input != null ||
+      p.output != null ||
+      p.audioInput != null ||
+      p.audioOutput != null,
     p.audioMinute != null
   ].filter(Boolean).length;
   if (capability === 'audio' && audioStyles > 1) {
-    return 'Audio pricing must be exactly one style: Per 1M characters, token-based (Audio data / output), or Per minute.';
+    return 'Audio pricing must be exactly one style: Per 1M characters, token-based (Input / Output, Audio input / Audio output), or Per minute.';
   }
 
   // Video is the same either/or: per-video (flat) OR per-second.

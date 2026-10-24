@@ -82,11 +82,13 @@ beforeEach(async () => {
   });
   await h.db.insert(schema.models).values([
     { id: 'm-chat', name: 'Chat', modelId: 'gpt-x', capability: 'chat' },
-    { id: 'm-image', name: 'Image', modelId: 'img-x', capability: 'image' }
+    { id: 'm-image', name: 'Image', modelId: 'img-x', capability: 'image' },
+    { id: 'm-tts', name: 'Speech', modelId: 'tts-x', capability: 'audio' }
   ]);
   await h.db.insert(schema.modelProviders).values([
     { id: 'b1', modelId: 'gpt-x', providerId: 'p1' },
-    { id: 'b2', modelId: 'img-x', providerId: 'p1' }
+    { id: 'b2', modelId: 'img-x', providerId: 'p1' },
+    { id: 'b-tts', modelId: 'tts-x', providerId: 'p1' }
   ]);
   // Both priced by hand, and both working.
   await h.db.insert(schema.modelPricings).values([
@@ -135,6 +137,21 @@ describe('price sync', () => {
     expect(Number(price.imageOutput)).toBe(40);
     expect(price.output).toBeNull();
     expect(pricingMissingFields('image', price)).toEqual([]);
+  });
+
+  it('reads a speech model’s output as the audio it speaks, where the source prices no audio apart', async () => {
+    // As the sources list Gemini's speech: in and out, and nothing more.
+    remote({ 'tts-x': { cost: { input: 0.5, output: 10 } } });
+
+    await sync.runPricingSync({ source: 'models.dev', modelDbIds: ['m-tts'] });
+    const price = await priceOf('tts-x');
+
+    expect(Number(price.input)).toBe(0.5);
+    expect(Number(price.audioOutput)).toBe(10);
+    expect(price.output).toBeNull();
+    expect(
+      pricingMissingFields('audio', price, { transcription: false })
+    ).toEqual([]);
   });
 
   it('finds a model the source lists only under its one version', async () => {

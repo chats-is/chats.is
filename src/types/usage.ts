@@ -58,16 +58,23 @@ export type RecordVideoUsageInput = RecordUsageBase & {
 
 export type RecordAudioUsageInput = RecordUsageBase & {
   // Classic TTS bills per character (input text length). Token-based audio
-  // models bill per input/output token. Mutually exclusive per model.
+  // models bill per token, the words and the audio each at its rate.
+  // Mutually exclusive per model.
   audioCharacters?: number;
+  inputTokens?: number;
+  outputTokens?: number;
   audioInputTokens?: number;
   audioOutputTokens?: number;
 };
 
 export type RecordTranscriptionUsageInput = RecordUsageBase & {
-  // STT bills by the length of the input audio, priced per minute
-  // (transcribe() reports durationInSeconds; no token usage is exposed).
+  // STT bills by the length of the input audio, priced per minute, or per
+  // token where the model is priced that way: the audio heard, any words
+  // given with it, and the words written.
   audioSeconds?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  audioInputTokens?: number;
 };
 
 /** Minimal row shape the usage breakdown (`lib/usage-breakdown.ts`) reads.

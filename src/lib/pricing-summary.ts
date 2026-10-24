@@ -32,9 +32,9 @@ const fmt = (v: string | null | undefined): string | null => {
 
 /**
  * Capability-aware pricing lines for the table, in rows: what the model is
- * billed for on every call first — an image model's words, then its pictures
- * — then the cache rates and the search rates, which apply only to some
- * calls, each on a row of its own. Each entry is
+ * billed for on every call first — an image or audio model's words, then its
+ * pictures or audio — then the cache rates and the search rates, which apply
+ * only to some calls, each on a row of its own. Each entry is
  * `"Label: $X/unit"`; a rate that is not set is left out, and so is a row
  * with nothing in it.
  *
@@ -45,8 +45,8 @@ const fmt = (v: string | null | undefined): string | null => {
  *             [["Input: $5/1M", "Output: $10/1M"],
  *              ["Image Input: $8/1M", "Image Output: $32/1M"]]
  *   video  → [["Video: $0.5/video", "Per sec: $0.001/s"]]
- *   audio  → [["Per 1M chars: $15"]], [["Input: $0.6/1M", "Output: $12/1M"]]
- *             or [["Per min: $0.006/min"]]
+ *   audio  → [["Per 1M chars: $15"]], [["Per min: $0.006/min"]] or
+ *             [["Input: $0.5/1M"], ["Audio Output: $10/1M"]]
  *
  * Token rates are per 1M tokens, searches and X posts or profiles per 1K;
  * image/video/per-sec are per unit, and transcription per minute.
@@ -57,7 +57,8 @@ export function summarizePricingRows(
 ): string[][] {
   if (!pricing) return [];
   const main: string[] = [];
-  const pictures: string[] = [];
+  // An image or audio model's pictures or audio, apart from its words.
+  const media: string[] = [];
   const cache: string[] = [];
   const search: string[] = [];
   // `unit` is the pricing basis suffix (e.g. /1M, /image) appended after the
@@ -88,8 +89,8 @@ export function summarizePricingRows(
       push(main, 'Image', pricing.image, '/image');
       push(main, 'Input', pricing.input, '/1M');
       push(main, 'Output', pricing.output, '/1M');
-      push(pictures, 'Image Input', pricing.imageInput, '/1M');
-      push(pictures, 'Image Output', pricing.imageOutput, '/1M');
+      push(media, 'Image Input', pricing.imageInput, '/1M');
+      push(media, 'Image Output', pricing.imageOutput, '/1M');
       break;
     }
     case 'video': {
@@ -98,16 +99,18 @@ export function summarizePricingRows(
       break;
     }
     case 'audio': {
-      // Per-character (TTS), token-based (TTS), or per-minute (STT) — show
-      // whichever is set.
+      // Per-character (TTS), per-minute (STT), or token-based — the words,
+      // then the audio — show whichever is set.
       push(main, 'Per 1M chars', pricing.audioCharacters, '');
-      push(main, 'Input', pricing.audioInput, '/1M');
-      push(main, 'Output', pricing.audioOutput, '/1M');
       push(main, 'Per min', pricing.audioMinute, '/min');
+      push(main, 'Input', pricing.input, '/1M');
+      push(main, 'Output', pricing.output, '/1M');
+      push(media, 'Audio Input', pricing.audioInput, '/1M');
+      push(media, 'Audio Output', pricing.audioOutput, '/1M');
       break;
     }
   }
-  return [main, pictures, cache, search].filter(row => row.length > 0);
+  return [main, media, cache, search].filter(row => row.length > 0);
 }
 
 /**

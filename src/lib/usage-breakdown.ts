@@ -176,7 +176,9 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
       }
       break;
     case 'audio':
-      if (num(row.audioCharacters) > 0 || has(row.audioCharactersPrice)) {
+      // Each line where the call was priced that way: a speech priced per
+      // token still counts its characters, a transcription its seconds.
+      if (has(row.audioCharactersPrice)) {
         perMillion(
           'Characters',
           num(row.audioCharacters),
@@ -184,8 +186,23 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
           'char'
         );
       }
+      // Per token: the words, then the audio, each at its rate.
+      perMillion('Input', num(row.inputTokens), row.inputPrice, 'token');
+      perMillion('Output', num(row.outputTokens), row.outputPrice, 'token');
+      perMillion(
+        'Audio input',
+        num(row.audioInputTokens),
+        row.audioInputPrice,
+        'token'
+      );
+      perMillion(
+        'Audio output',
+        num(row.audioOutputTokens),
+        row.audioOutputPrice,
+        'token'
+      );
       // Heard for so many seconds, priced per minute.
-      if (num(row.audioSeconds) > 0) {
+      if (has(row.audioMinutePrice)) {
         const rate = priced(row.audioMinutePrice);
         items.push({
           label: 'Duration',

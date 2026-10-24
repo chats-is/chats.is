@@ -389,6 +389,20 @@ describe('billing', () => {
     });
     expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.006, 10);
   });
+
+  it('speech priced per token: the words read and the audio spoken, each at its rate', async () => {
+    const id = await addModel('audio', 'tts1');
+    await savePrice(id, { input: '0.5', audioOutput: '10' });
+    await recordAudioUsage({
+      ...call,
+      modelId: 'tts1',
+      audioCharacters: 44,
+      inputTokens: 11,
+      audioOutputTokens: 91
+    });
+    // 11 × $0.5/1M + 91 × $10/1M; the characters counted, not billed.
+    expect(Number((await usageRows())[0].cost)).toBeCloseTo(0.0009155, 10);
+  });
 });
 
 describe('tier', () => {
