@@ -30,7 +30,8 @@ export type Vocabulary = Partial<
  * - google image + voices: `@ai-sdk/google` `imageConfig`, `DEFAULT_VOICE`
  * - google video: `@ai-sdk/google` inline video part (`resolution`)
  * - xai resolutions: `@ai-sdk/xai` `xaiImageModelOptions`, `resolutionSchema`
- * - xai ratios and voices: docs.x.ai (its SDK types them as bare strings)
+ * - xai ratios: docs.x.ai (its SDK types them as bare strings)
+ * - xai voices: `GET /v1/tts/voices`, each multilingual
  */
 const PROVIDER_VOCAB = {
   openai: {
@@ -149,7 +150,39 @@ const PROVIDER_VOCAB = {
       resolution: ['480p', '720p', '1080p'],
       duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     },
-    audio: { voice: ['eve', 'ara', 'rex'] },
+    // Its default first, then the rest as `GET /v1/tts/voices` lists them.
+    audio: {
+      voice: [
+        'eve',
+        'altair',
+        'ara',
+        'atlas',
+        'aurora',
+        'carina',
+        'castor',
+        'celeste',
+        'cosmo',
+        'helios',
+        'helix',
+        'iris',
+        'kepler',
+        'leo',
+        'liora',
+        'lumen',
+        'luna',
+        'lux',
+        'naksh',
+        'orion',
+        'perseus',
+        'rex',
+        'rigel',
+        'sal',
+        'sirius',
+        'ursa',
+        'zagan',
+        'zenith'
+      ]
+    },
     chat: { effort: EFFORTS }
   },
   anthropic: { chat: { effort: EFFORTS } },
