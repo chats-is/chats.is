@@ -51,6 +51,9 @@ const TOKEN_KINDS: Array<{
   },
   { key: 'imageInput', label: 'Image input', of: f => f.imageInputTokens },
   { key: 'imageOutput', label: 'Image output', of: f => f.imageOutputTokens },
+  { key: 'videoOutput', label: 'Video output', of: f => f.videoTokens },
+  { key: 'audioInput', label: 'Audio input', of: f => f.audioInputTokens },
+  { key: 'audioOutput', label: 'Audio output', of: f => f.audioOutputTokens },
   { key: 'reasoning', label: 'Reasoning', of: f => f.reasoningTokens },
   { key: 'cacheRead', label: 'Cache read', of: f => f.cacheReadTokens },
   { key: 'cacheWrite', label: 'Cache write', of: f => f.cacheWriteTokens }

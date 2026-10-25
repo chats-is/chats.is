@@ -72,15 +72,11 @@ function callIds(input: Pick<RecordChatUsageInput, 'id' | 'providerRequests'>) {
  */
 function reasonOf(issues: BillingIssues): string | null {
   if (issues.unsupported) {
-    return `This model does not support ${issues.unsupported} — change its pricing.`;
+    return `${issues.unsupported} not supported — change the pricing.`;
   }
   const names = issues.unpriced;
   if (names.length === 0) return null;
-  if (names.length === 1) {
-    return `Used ${names[0]}, but it has no price — set its price.`;
-  }
-  const list = `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-  return `Used ${list}, but they have no price — set their prices.`;
+  return `${names.join(', ')}: no price — set ${names.length === 1 ? 'it' : 'them'}.`;
 }
 
 /**
@@ -372,6 +368,9 @@ export async function adminUsageStats(
         imageInputTokens: usage.imageInputTokens,
         imageOutputTokens: usage.imageOutputTokens,
         videoCount: usage.videoCount,
+        videoTokens: usage.videoTokens,
+        audioInputTokens: usage.audioInputTokens,
+        audioOutputTokens: usage.audioOutputTokens,
         webSearches: usage.webSearches,
         xPosts: usage.xPosts,
         xProfiles: usage.xProfiles
@@ -397,6 +396,10 @@ export async function adminUsageStats(
     // Of the input and output tokens, the pictures read and drawn.
     imageInputTokens: sumOf(used.imageInputTokens),
     imageOutputTokens: sumOf(used.imageOutputTokens),
+    // A video's tokens, and the audio read and spoken, beside the words.
+    videoTokens: sumOf(used.videoTokens),
+    audioInputTokens: sumOf(used.audioInputTokens),
+    audioOutputTokens: sumOf(used.audioOutputTokens),
     images: sumOf(used.imageCount),
     videos: sumOf(used.videoCount),
     // The calls that spoke or heard speech, however much of it.

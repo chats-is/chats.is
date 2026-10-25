@@ -167,9 +167,7 @@ describe('setting prices', () => {
     });
     const [row] = await usageRows();
     expect(Number(row.cost)).toBeCloseTo(3, 10);
-    expect(row.reason).toBe(
-      'Used Cache read, but it has no price — set its price.'
-    );
+    expect(row.reason).toBe('Cache read: no price — set it.');
   });
 
   it('a reasoning rate left blank is stored empty and bills at the output rate', async () => {

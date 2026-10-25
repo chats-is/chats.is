@@ -130,14 +130,14 @@ bills; the usage service writes it.
    quantity the model does not report: priced per token with no tokens
    reported, or per second, per resolution or per minute with no length. The
    call is billed nothing.
-   > This model does not support Per token — change its pricing.
+   > Per token not supported — change the pricing.
 2. **Used with no price — set it.** The call used something whose rate is not
    set, with nothing standing in for it. That part is billed nothing; the rest
    as priced.
 
-   > Used Web search, but it has no price — set its price.
+   > Cache read: no price — set it.
 
-   > Used Input and Output, but they have no price — set their prices.
+   > Web search, X posts: no price — set them.
 
 The way is named by its tab, and what was used by its rate's field. A rate set
 to 0 says nothing. Nothing is said of a cost above or below what the provider

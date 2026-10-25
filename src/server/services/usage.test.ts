@@ -140,6 +140,8 @@ describe('adminUsageStats', () => {
       modelId: 'tts',
       capability: 'audio',
       audioCharacters: 300,
+      inputTokens: 12,
+      audioOutputTokens: 900,
       spend: '0.1',
       cost: '0.05'
     });
@@ -147,8 +149,18 @@ describe('adminUsageStats', () => {
       modelId: 'stt',
       capability: 'audio',
       audioSeconds: '3.5',
+      audioInputTokens: 400,
       spend: '0.2',
       cost: '0.1'
+    });
+    await use('a', day(3, 2), {
+      modelId: 'vid',
+      capability: 'video',
+      videoCount: 1,
+      videoSeconds: '10.027',
+      videoTokens: 19310,
+      spend: '0.3',
+      cost: '0.15'
     });
     await use('a', day(10), { ...chat, spend: '9', cost: '9' });
   }
@@ -161,12 +173,16 @@ describe('adminUsageStats', () => {
     expect(days[0]).toMatchObject({ spend: 4, cost: 2, inputTokens: 140 });
     const total = (pick: (d: (typeof days)[number]) => number) =>
       days.reduce((n, d) => n + pick(d), 0);
-    expect(total(d => d.spend)).toBeCloseTo(4.8);
-    expect(total(d => d.cost)).toBeCloseTo(2.4);
-    expect(total(d => d.inputTokens)).toBe(440);
+    expect(total(d => d.spend)).toBeCloseTo(5.1);
+    expect(total(d => d.cost)).toBeCloseTo(2.55);
+    expect(total(d => d.inputTokens)).toBe(452);
     expect(total(d => d.outputTokens)).toBe(2014);
     expect(total(d => d.cacheReadTokens)).toBe(20);
     expect(total(d => d.reasoningTokens)).toBe(5);
+    // A video's tokens and the audio read and spoken, beside the words.
+    expect(total(d => d.videoTokens)).toBe(19310);
+    expect(total(d => d.audioInputTokens)).toBe(400);
+    expect(total(d => d.audioOutputTokens)).toBe(900);
   });
 
   it('sums each day by model, provider and capability', async () => {

@@ -4,21 +4,28 @@ import { formatCount, formatNumber, formatUsd, parseNumber } from '@/lib/utils';
 
 /** Every token a day's or a window's calls used. The buckets are stored
  *  apart — input is the uncached part only, output the text only (see
- *  normalizeChatUsage) — so the total is their sum, and matches what the
- *  usage log counts per row. */
+ *  normalizeChatUsage), a video's tokens and the audio read and spoken apart
+ *  from the words — so the total is their sum, and matches what the usage
+ *  log counts per row. */
 export function tokensOf(t: {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
   reasoningTokens: number;
+  videoTokens: number;
+  audioInputTokens: number;
+  audioOutputTokens: number;
 }) {
   return (
     t.inputTokens +
     t.cacheReadTokens +
     t.cacheWriteTokens +
     t.outputTokens +
-    t.reasoningTokens
+    t.reasoningTokens +
+    t.videoTokens +
+    t.audioInputTokens +
+    t.audioOutputTokens
   );
 }
 
