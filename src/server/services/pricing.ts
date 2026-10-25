@@ -20,6 +20,7 @@ import {
 } from '@/types';
 import { pageWindow } from '@/types/pagination';
 import {
+  strayRatesOf,
   type PricingKind,
   type pricingListSchema,
   type pricingUpsertSchema
@@ -835,15 +836,20 @@ export async function getModelPricing(modelDbId: string) {
   return { ...model, pricing: model.pricings[0] ?? null };
 }
 
-export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
+export async function upsertPricing(form: z.infer<typeof pricingUpsertSchema>) {
   const model = await db.query.models.findFirst({
-    where: eq(models.id, data.modelDbId)
+    where: eq(models.id, form.modelDbId)
   });
   if (!model) throw new PublicError('Model not found');
 
   // Capability-aware required-field check. Reuses `pricingMissingFields`
   // from lib/pricing so admin-side and runtime gate share the same rule.
   const cap = model.capability;
+  // A rate a model of its kind does not carry is not kept, whatever sent it.
+  const data = {
+    ...form,
+    ...strayRatesOf(cap, !!model.supportsTranscription)
+  };
 
   const conflict = pricingStyleConflict(cap, data);
   if (conflict) throw new PublicError(conflict);

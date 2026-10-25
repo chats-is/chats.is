@@ -89,15 +89,15 @@ export type PricingMode = {
 
 /** The kinds of model with ways of pricing of their own — an audio model by
  *  its direction. */
-export type PricingKind = 'image' | 'video' | 'speech' | 'transcription';
+export type PricingKind =
+  'chat' | 'image' | 'video' | 'speech' | 'transcription';
 
-/** The ways a model can be priced, one of which it is: none for a chat
- *  model, whose rates all add up. */
+/** The ways a model can be priced, one of which it is: a chat model's one,
+ *  its rates added together. */
 export function pricingModesOf(
   capability: ModelCapability,
   transcription: boolean
 ): PricingMode[] {
-  if (capability === 'chat') return [];
   return PRICING_MODES[
     capability === 'audio'
       ? transcription
@@ -105,6 +105,30 @@ export function pricingModesOf(
         : 'speech'
       : capability
   ];
+}
+
+/**
+ * Of a price, every rate a model of its kind does not carry, as null: it
+ * carries those of its kind's ways of pricing — of which, alone, the one it is
+ * priced by — and rates per resolution only where a way of its kind is priced
+ * by them. Whatever saves a price, the console or a sync, clears these.
+ */
+export function strayRatesOf(
+  capability: ModelCapability,
+  transcription: boolean
+): Partial<Record<PricingRate, null>> & { resolutionPrices?: null } {
+  const modes = pricingModesOf(capability, transcription);
+  const own = new Set<PricingRate>(modes.flatMap(mode => mode.rates));
+  const rates = Object.keys(pricingUpsertSchema.shape).filter(
+    (key): key is PricingRate =>
+      !['modelDbId', 'resolutionPrices', 'source'].includes(key)
+  );
+  return {
+    ...Object.fromEntries(
+      rates.filter(rate => !own.has(rate)).map(rate => [rate, null])
+    ),
+    ...(!modes.some(mode => mode.byResolution) && { resolutionPrices: null })
+  };
 }
 
 /** Aggregated outcome of a `syncPricing` run. */

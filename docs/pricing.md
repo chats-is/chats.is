@@ -6,7 +6,8 @@ billed, and what a usage row says when its price could not bill everything.
 ## Principles
 
 1. **A model is priced one way.** Each kind of model has a few ways of being
-   priced (below); a model has the rates of exactly one.
+   priced (below); a model has the rates of exactly one, and no rate its kind
+   does not carry — an image model no cache rate, a chat model no audio rate.
 2. **A price is used as it is set.** The code does not stand in for a price
    that is not set, except where a rule below says which rate stands in:
    - a chat model's Reasoning, not set, is billed at its Output rate;
@@ -23,7 +24,8 @@ billed, and what a usage row says when its price could not bill everything.
 ## Ways of pricing
 
 A chat model has one way, its rates added together. Every other kind chooses
-one of its ways. The ways and their rates are defined once, in `PRICING_MODES`
+one of its ways. The ways and their rates — a chat model's one among them, and
+so every rate each kind carries — are defined once, in `PRICING_MODES`
 (`src/lib/constant.ts`), for the console and the price sync alike.
 
 | Kind          | Way                     | Required                           | Optional                                                            |
@@ -56,6 +58,8 @@ X posts and X profiles are offered only for a model served through xAI.
   `pricingMissingFields`): rates of two ways at once, or a required rate
   missing, are refused.
 - A blank rate is stored as null; nothing is filled in for it.
+- A rate the model's kind does not carry is stored as null, whatever sent it
+  (`strayRatesOf`).
 - The form names no provider or model. A way with a single rate titles its
   field as its tab is titled; the form carries no notes beyond its
   placeholders, which say which rate stands in for one left blank.
@@ -81,6 +85,9 @@ prices or nothing (`src/server/services/pricing-sync.ts`).
 3. A model that worked before and would be left missing a required rate is not
    written, and is reported as skipped with the reason.
 4. A chat model has its listed rates written, and keeps the rest.
+5. A rate the model's kind does not carry is not written, and one already
+   there is cleared — a cache rate listed for an image model, an audio rate
+   for a chat model.
 
 ## Billing a call
 

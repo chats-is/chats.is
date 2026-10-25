@@ -496,12 +496,30 @@ const AUDIO_TOKENS: PricingMode = {
 };
 
 /**
- * The ways each kind of model is priced, and the rates each reads. A model is
- * priced one way: the console saves the rates of the way chosen alone, and a
- * price sync that names another way clears them. The first is the way a model
- * with no price yet starts on, but a video's, which is per second.
+ * The ways each kind of model is priced, and the rates each reads — all the
+ * rates a model of that kind carries. A model is priced one way: the console
+ * saves the rates of the way chosen alone, and a price sync that names another
+ * way clears them. A chat model has the one way, its rates added together.
+ * The first is the way a model with no price yet starts on, but a video's,
+ * which is per second.
  */
 export const PRICING_MODES: Record<PricingKind, PricingMode[]> = {
+  chat: [
+    {
+      value: 'tokens',
+      label: 'Per token',
+      rates: [
+        'input',
+        'output',
+        'reasoning',
+        'cacheRead',
+        'cacheWrite',
+        'webSearch',
+        'xPost',
+        'xProfile'
+      ]
+    }
+  ],
   image: [
     { value: 'image', label: 'Per image', rates: ['image'] },
     {

@@ -139,6 +139,31 @@ describe('price sync', () => {
     expect(pricingMissingFields('image', price)).toEqual([]);
   });
 
+  it('writes no rate a model of its kind does not carry, and clears one there', async () => {
+    await h.db
+      .update(schema.modelPricings)
+      .set({ cacheRead: '1.25' })
+      .where(eq(schema.modelPricings.modelId, 'img-x'));
+    catalogue({
+      openai: {
+        'img-x': { cost: { input: 5, output: 30, cache_read: 1.25 } },
+        'gpt-x': { cost: { input: 2, output: 8, input_audio: 40 } }
+      }
+    });
+
+    await sync.runPricingSync({
+      source: 'models.dev',
+      modelDbIds: ['m-image', 'm-chat']
+    });
+    const image = await priceOf('img-x');
+    const chat = await priceOf('gpt-x');
+
+    expect(image.cacheRead).toBeNull();
+    expect(Number(image.imageOutput)).toBe(30);
+    expect(chat.audioInput).toBeNull();
+    expect(Number(chat.input)).toBe(2);
+  });
+
   it('reads a speech model’s output as the audio it speaks, where the source prices no audio apart', async () => {
     // As the sources list Gemini's speech: in and out, and nothing more.
     remote({ 'tts-x': { cost: { input: 0.5, output: 10 } } });

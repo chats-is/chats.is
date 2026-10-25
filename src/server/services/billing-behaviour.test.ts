@@ -170,6 +170,15 @@ describe('setting prices', () => {
     expect(row.reason).toBe('Cache read: no price — set it.');
   });
 
+  it('a rate a model of its kind does not carry is not kept', async () => {
+    const id = await addModel('image', 'i1');
+    await savePrice(id, { image: '0.04', cacheRead: '0.5', reasoning: '2' });
+    const price = await priceRow('i1');
+    expect(Number(price.image)).toBe(0.04);
+    expect(price.cacheRead).toBeNull();
+    expect(price.reasoning).toBeNull();
+  });
+
   it('a reasoning rate left blank is stored empty and bills at the output rate', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, { input: '1', output: '10', reasoning: '' });

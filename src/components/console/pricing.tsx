@@ -128,8 +128,7 @@ type EditTarget = {
   /** The sizes or resolutions the model takes, each of which an image or a
    *  second of video may be priced at apart. */
   tiers: string[];
-  /** The ways it can be priced, of `PRICING_MODES`; none for a chat model,
-   *  whose rates all add up. */
+  /** The ways it can be priced, of `PRICING_MODES`: a chat model's one. */
   modes: PricingMode[];
 };
 
@@ -732,28 +731,30 @@ export default function PricingPage() {
   );
 
   /** Which way the model is priced, of the ways its kind can be. */
-  const PricingModeField = () => (
-    <form.AppField name="mode">
-      {field => (
-        <div className="col-span-2">
-          {/* A pill, as the usage chart's grouping switch is. */}
-          <Tabs value={field.state.value} onValueChange={field.handleChange}>
-            <TabsList className="rounded-full border bg-muted/50 p-0.5 group-data-[orientation=horizontal]/tabs:h-8">
-              {(edit?.modes ?? []).map(mode => (
-                <TabsTrigger
-                  key={mode.value}
-                  value={mode.value}
-                  className="rounded-full px-3"
-                >
-                  {mode.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
-      )}
-    </form.AppField>
-  );
+  const PricingModeField = () =>
+    // One way, as a chat model's, is nothing to choose between.
+    (edit?.modes.length ?? 0) < 2 ? null : (
+      <form.AppField name="mode">
+        {field => (
+          <div className="col-span-2">
+            {/* A pill, as the usage chart's grouping switch is. */}
+            <Tabs value={field.state.value} onValueChange={field.handleChange}>
+              <TabsList className="rounded-full border bg-muted/50 p-0.5 group-data-[orientation=horizontal]/tabs:h-8">
+                {(edit?.modes ?? []).map(mode => (
+                  <TabsTrigger
+                    key={mode.value}
+                    value={mode.value}
+                    className="rounded-full px-3"
+                  >
+                    {mode.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+      </form.AppField>
+    );
 
   /**
    * Priced per resolution: the rate of each size or resolution the model

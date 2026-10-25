@@ -7,7 +7,11 @@ import {
   type PricingSyncResult,
   type ProviderType
 } from '@/types';
-import { pricingModesOf, type PricingRate } from '@/types/pricing';
+import {
+  pricingModesOf,
+  strayRatesOf,
+  type PricingRate
+} from '@/types/pricing';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, models } from '@/db/schema';
@@ -381,10 +385,15 @@ export async function runPricingSync(args: {
             .map(rate => [rate, null])
         )
       : {};
+    // And a rate a model of its kind does not carry — a chat model's cache
+    // rates listed for an image model, an audio rate for a chat model — is
+    // not written, and one there is cleared.
+    const strays = strayRatesOf(m.capability, m.supportsTranscription ?? false);
     const write = {
       ...valuesToWrite,
       ...cleared,
-      ...(named && { resolutionPrices: null })
+      ...(named && { resolutionPrices: null }),
+      ...strays
     };
 
     // Keeping what was there can still leave a row priced two ways at once —
@@ -425,7 +434,7 @@ export async function runPricingSync(args: {
         !numEq(write.imageOutput, existing.imageOutput) ||
         !numEq(write.audioInput, existing.audioInput) ||
         !numEq(write.audioOutput, existing.audioOutput) ||
-        (Object.keys(cleared) as PricingRate[]).some(
+        (Object.keys({ ...cleared, ...strays }) as PricingRate[]).some(
           rate => existing[rate] !== null
         ) ||
         existing.source !== args.source;

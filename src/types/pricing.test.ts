@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   pricingUpsertSchema,
   remoteSearchSchema,
+  strayRatesOf,
   syncRunSchema,
   syncTargetSchema
 } from './pricing';
@@ -60,5 +61,33 @@ describe('pricing', () => {
     expect(
       remoteSearchSchema.safeParse({ source: 'models.dev', limit: 201 }).success
     ).toBe(false);
+  });
+});
+
+describe('strayRatesOf', () => {
+  it('clears what a model of its kind does not carry', () => {
+    const image = strayRatesOf('image', false);
+    expect(image).toMatchObject({
+      cacheRead: null,
+      reasoning: null,
+      webSearch: null,
+      audioInput: null,
+      videoTokens: null
+    });
+    expect(image).not.toHaveProperty('input');
+    expect(image).not.toHaveProperty('imageOutput');
+    expect(image).not.toHaveProperty('resolutionPrices');
+
+    const chat = strayRatesOf('chat', false);
+    expect(chat).toMatchObject({
+      image: null,
+      audioInput: null,
+      resolutionPrices: null
+    });
+    expect(chat).not.toHaveProperty('cacheRead');
+    expect(chat).not.toHaveProperty('webSearch');
+
+    expect(strayRatesOf('audio', false)).toHaveProperty('audioMinute', null);
+    expect(strayRatesOf('audio', true)).toHaveProperty('audioCharacters', null);
   });
 });
