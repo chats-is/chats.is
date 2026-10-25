@@ -1120,6 +1120,15 @@ export const modelPricings = createTable(
     imageOutput: numeric('image_output', { precision: 20, scale: 10 }),
     video: numeric('video', { precision: 20, scale: 10 }),
     videoSeconds: numeric('video_seconds', { precision: 20, scale: 10 }),
+    // Video models billed per token (Seedance): the rate for a million of the
+    // tokens the provider counts a clip as.
+    videoTokens: numeric('video_tokens', { precision: 20, scale: 10 }),
+    // Priced per resolution: an image's rate, or a video's per second, for
+    // each size or resolution the model takes, keyed as the model names it
+    // (`1024x1024`, `2K`, `720p`). One not listed, and a call that sends
+    // none, is billed at the highest of them.
+    resolutionPrices:
+      jsonb('resolution_prices').$type<Record<string, string>>(),
     // Audio bills EITHER per character (classic TTS: tts-1, Google, Azure,
     // Polly, ElevenLabs) OR per token (token-based: gpt-4o-mini-tts, gpt-audio,
     // omni). Mutually exclusive — see calculateAudioCost / pricing router.
@@ -1165,7 +1174,9 @@ export const modelPricingsRelations = relations(modelPricings, ({ one }) => ({
  *     / reasoning_tokens → chat (per 1M tokens). `reasoning_tokens` is billed
  *     at the `output_price` rate (no separate price).
  *   - image_count → image generations (per item).
- *   - video_count / video_seconds → video generations (per item or per second).
+ *   - video_count / video_seconds / video_tokens → video generations (per
+ *     item, per second or per 1M tokens).
+ *   - resolution → the size or resolution an image or video was billed at.
  *   - audio_input_tokens / audio_output_tokens → token-based audio models
  *     (per 1M tokens); audio_characters → classic TTS (per character).
  *     Mutually exclusive per model.
@@ -1214,6 +1225,10 @@ export const usage = createTable(
     videoSeconds: numeric('video_seconds', { precision: 12, scale: 3 })
       .notNull()
       .default('0'),
+    videoTokens: integer('video_tokens').notNull().default(0),
+    // The size or resolution an image or video was asked for, which a rate
+    // per resolution is looked up by. Null where none was sent.
+    resolution: varchar('resolution', { length: 32 }),
     audioInputTokens: integer('audio_input_tokens').notNull().default(0),
     audioOutputTokens: integer('audio_output_tokens').notNull().default(0),
     audioCharacters: integer('audio_characters').notNull().default(0),
@@ -1238,6 +1253,10 @@ export const usage = createTable(
     }),
     videoPrice: numeric('video_price', { precision: 20, scale: 10 }),
     videoSecondsPrice: numeric('video_seconds_price', {
+      precision: 20,
+      scale: 10
+    }),
+    videoTokensPrice: numeric('video_tokens_price', {
       precision: 20,
       scale: 10
     }),
@@ -1277,6 +1296,10 @@ export const usage = createTable(
     spend: numeric('spend', { precision: 20, scale: 10 })
       .notNull()
       .default('0'),
+    // Why a call, or part of it, was billed nothing: its model is priced by a
+    // quantity it does not report, or it searched where no price is set — a
+    // pricing to change. Null otherwise.
+    reason: text('reason'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow()

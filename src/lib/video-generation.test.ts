@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type Model, type Provider, type ProviderConfig } from '@/types';
 
@@ -71,14 +71,19 @@ vi.mock('@/lib/provider', async importOriginal => {
   return { ...actual, getVideoModel: getVideoModelMock };
 });
 
-// resolveVideoSeconds is exercised in its own suite — here just echo the
-// requested duration so the AI SDK path has a deterministic billable value.
+// The provider reports no length here: the video's own is billed (below).
 vi.mock('@/lib/video-usage', () => ({
-  resolveVideoSeconds: (_meta: unknown, duration?: number) => duration ?? 5
+  extractVideoDurationSeconds: () => undefined,
+  extractVideoTokens: () => undefined
 }));
 
 // media-upload pulls in @/lib/env at load; stub it and return a fake blob.
 vi.mock('@/lib/media-upload', () => ({ uploadGeneratedMedia: uploadMock }));
+
+// The length read from a video file, for the paths that report none.
+vi.mock('@/lib/media-duration', () => ({
+  audioDurationInSeconds: async () => 3.03
+}));
 
 function azureProvider(
   overrides: Partial<ProviderConfig> = {}
@@ -166,7 +171,8 @@ describe('generateWithSora — Azure', () => {
     );
 
     expect(result.mediaType).toBe('video/mp4');
-    expect(result.seconds).toBe(8);
+    // Sora said no length of what it made, and none is guessed.
+    expect(result.seconds).toBeUndefined();
     expect(result.buffer.toString()).toBe('video-bytes');
   });
 
@@ -369,7 +375,7 @@ describe('generateAndStoreVideo — routing & failover', () => {
     expect(videosCreate).toHaveBeenCalledTimes(1);
     expect(generateVideoMock).not.toHaveBeenCalled();
     expect(out.url).toBe('https://blob/x.mp4');
-    expect(out.videoSeconds).toBe(8); // sora bucketed duration
+    expect(out.videoSeconds).toBe(3.03); // none from Sora: the video's own
     expect(out.provider.id).toBe('p1');
   });
 
@@ -399,8 +405,62 @@ describe('generateAndStoreVideo — routing & failover', () => {
 
     expect(generateVideoMock).toHaveBeenCalledTimes(1);
     expect(videosCreate).not.toHaveBeenCalled();
-    expect(out.videoSeconds).toBe(6); // from the resolveVideoSeconds stub
+    expect(out.videoSeconds).toBe(3.03); // none reported: the video's own
     expect(out.providerRequests).toEqual([{ requestId: 'req-video' }]);
+  });
+
+  it('keeps the resolution it sent, which the price is looked up by', async () => {
+    const made = await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('grok-imagine-video'),
+      candidates: [failover({ type: 'xai' })],
+      resolution: '720p',
+      duration: 6
+    });
+    expect(made.resolution).toBe('720p');
+
+    // An edit sends none: the source's stands.
+    const edited = await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('grok-imagine-video'),
+      candidates: [failover({ type: 'xai' })],
+      resolution: '720p',
+      inputVideoUrl: 'https://blob/source.mp4'
+    });
+    expect(edited.resolution).toBeUndefined();
+  });
+
+  it('asks xAI for 720p from reference images, the most it makes from them', async () => {
+    const reference = { data: new Uint8Array([1]), mediaType: 'image/png' };
+    const fromReferences = await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('grok-imagine-video-1.5'),
+      candidates: [failover({ type: 'xai' })],
+      resolution: '1080p',
+      duration: 6,
+      referenceImages: [reference]
+    });
+    expect(
+      generateVideoMock.mock.calls[0][0].providerOptions.xai.resolution
+    ).toBe('720p');
+    expect(fromReferences.resolution).toBe('720p');
+
+    // From text alone, 1080p goes as asked.
+    const fromText = await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'p',
+      dbModel: model('grok-imagine-video-1.5'),
+      candidates: [failover({ type: 'xai' })],
+      resolution: '1080p',
+      duration: 6
+    });
+    expect(
+      generateVideoMock.mock.calls[1][0].providerOptions.xai.resolution
+    ).toBe('1080p');
+    expect(fromText.resolution).toBe('1080p');
   });
 
   it('does not fail over on our own timeout — a fresh render would not help', async () => {
@@ -568,5 +628,141 @@ describe('generateAndStoreVideo — routing & failover', () => {
 
     expect(videosCreate).toHaveBeenCalledTimes(2);
     expect(out.provider.id).toBe('b');
+  });
+});
+
+describe('generateAndStoreVideo — Gemini Omni', () => {
+  const answer = {
+    id: 'v1_abc',
+    status: 'completed',
+    usage: {
+      total_input_tokens: 17,
+      total_output_tokens: 5793,
+      output_tokens_by_modality: [{ modality: 'video', tokens: 5793 }],
+      total_thought_tokens: 980
+    },
+    steps: [
+      {
+        type: 'model_output',
+        content: [
+          {
+            type: 'video',
+            mime_type: 'video/mp4',
+            data: Buffer.from('omni').toString('base64')
+          }
+        ]
+      }
+    ]
+  };
+  const fetchMock = vi.fn();
+  beforeEach(() => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(answer)));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const sent = () => JSON.parse(fetchMock.mock.calls[0][1].body);
+
+  it('asks the Interactions API, not the AI SDK, and keeps what it counted', async () => {
+    const out = await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'a balloon',
+      dbModel: model('gemini-omni-1.1-flash'),
+      candidates: [failover({ type: 'google' })],
+      resolution: '360p',
+      aspectRatio: '16:9',
+      duration: 4
+    });
+
+    expect(generateVideoMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/interactions'
+    );
+    expect(fetchMock.mock.calls[0][1].headers['x-goog-api-key']).toBe(
+      'dec:enc'
+    );
+    // No length: Omni takes none.
+    expect(sent()).toEqual({
+      model: 'gemini-omni-1.1-flash',
+      input: 'a balloon',
+      response_format: {
+        type: 'video',
+        resolution: '360p',
+        aspect_ratio: '16:9'
+      },
+      store: false
+    });
+    expect(out).toMatchObject({
+      // Read from the video, which says how long it runs.
+      videoSeconds: 3.03,
+      videoTokens: 5793,
+      inputTokens: 17,
+      outputTokens: 0,
+      reasoningTokens: 980,
+      resolution: '360p',
+      providerRequests: [{ responseId: 'v1_abc' }]
+    });
+    expect(uploadMock.mock.calls[0][0].buffer.toString()).toBe('omni');
+  });
+
+  it('starts from a picture as image-to-video', async () => {
+    await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'a balloon',
+      dbModel: model('gemini-omni-1.1-flash'),
+      candidates: [failover({ type: 'google' })],
+      inputImage: { data: new Uint8Array([1]), mediaType: 'image/png' }
+    });
+    expect(sent().input).toEqual([
+      { type: 'image', data: 'AQ==', mime_type: 'image/png' },
+      { type: 'text', text: 'a balloon' }
+    ]);
+    expect(sent().generation_config).toEqual({
+      video_config: { task: 'image_to_video' }
+    });
+  });
+
+  it('edits a clip of ours by sending it inline, with no shape of its own', async () => {
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([7, 7]), {
+          headers: { 'content-type': 'video/mp4' }
+        })
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(answer)));
+    const out = await generateAndStoreVideo({
+      userId: 'u',
+      prompt: 'make it night',
+      dbModel: model('gemini-omni-1.1-flash'),
+      candidates: [failover({ type: 'google' })],
+      resolution: '720p',
+      inputVideoUrl: 'https://blob/source.mp4'
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe('https://blob/source.mp4');
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body.input).toEqual([
+      { type: 'video', data: 'Bwc=', mime_type: 'video/mp4' },
+      { type: 'text', text: 'make it night' }
+    ]);
+    expect(body.generation_config).toEqual({ video_config: { task: 'edit' } });
+    expect(body.response_format).toEqual({ type: 'video' });
+    expect(out.resolution).toBeUndefined();
+  });
+
+  it('reports a refusal as the AI SDK would, so failover can read it', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'quota' } }), {
+        status: 429
+      })
+    );
+    await expect(
+      generateAndStoreVideo({
+        userId: 'u',
+        prompt: 'a balloon',
+        dbModel: model('gemini-omni-1.1-flash'),
+        candidates: [failover({ type: 'google' })]
+      })
+    ).rejects.toMatchObject({ statusCode: 429, message: 'quota' });
   });
 });

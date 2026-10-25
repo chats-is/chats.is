@@ -20,9 +20,11 @@ import {
 } from '@/types';
 import { pageWindow } from '@/types/pagination';
 import {
+  type PricingKind,
   type pricingListSchema,
   type pricingUpsertSchema
 } from '@/types/pricing';
+import { PRICING_MODES } from '@/lib/constant';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, modelProviders, models, providers } from '@/db/schema';
@@ -42,6 +44,7 @@ const EMPTY_SNAPSHOT: PriceSnapshot = {
   imageOutputPrice: null,
   videoPrice: null,
   videoSecondsPrice: null,
+  videoTokensPrice: null,
   audioInputPrice: null,
   audioOutputPrice: null,
   audioCharactersPrice: null,
@@ -102,13 +105,15 @@ export class PricingMissingError extends Error {
 
 /**
  * Required-field rules per capability — must match the admin-side validation
- * in `server/api/routers/pricing.ts`. Cache R/W are not required (default 0).
+ * in `server/api/routers/pricing.ts`. Cache R/W are not required.
  *
  *   chat   → Input + Output (both must be set).
- *   image  → Image (per item) OR token-based (Input + Image output), e.g.
- *            gpt-image-1 bills per token while DALL-E bills per image. Image
- *            input and Output fall back to Input and Image output.
- *   video  → Either Per video OR Per second.
+ *   image  → Image (per item), a rate for one resolution at least, OR
+ *            token-based (Input + Image output), e.g. gpt-image-1 bills per
+ *            token while DALL-E bills per image. Image input and Output fall
+ *            back to Input and Image output.
+ *   video  → Per video, Per second, a rate for one resolution at least, or
+ *            Per 1M tokens.
  *   audio  → direction-aware: TTS bills per character or per token; STT
  *            (opts.transcription) bills per minute. Without the direction
  *            hint, any of the three satisfies (legacy callers).
@@ -130,13 +135,18 @@ export function pricingMissingFields(
     }
     case 'image':
       // Per-image OR token-based pricing satisfies an image model.
-      return set(p.image) || (set(p.input) && set(p.imageOutput))
+      return set(p.image) ||
+        pricedByResolution(p) ||
+        (set(p.input) && set(p.imageOutput))
         ? []
-        : ['Image, or Input + Image output'];
+        : ['Image, a resolution, or Input + Image output'];
     case 'video':
-      return set(p.video) || set(p.videoSeconds)
+      return set(p.video) ||
+        set(p.videoSeconds) ||
+        pricedByResolution(p) ||
+        set(p.videoTokens)
         ? []
-        : ['Per video / Per second'];
+        : ['Per video / Per second / a resolution / Per 1M tokens'];
     case 'audio': {
       // TTS bills per character, STT per minute, and either per token: the
       // words and the audio each at its rate — a speech reads words and
@@ -223,6 +233,34 @@ export const resolveModelByKey = cache(
 );
 
 /**
+ * What a call's price did not bill, for its usage row to say:
+ *   - `unsupported`: the way it is priced, by its name in the console, where
+ *     the model does not report what that way needs — the call billed
+ *     nothing, a pricing to change;
+ *   - `unpriced`: what it used, by its rate's name in the console, where that
+ *     rate is not set — those billed nothing, a price to set.
+ * A rate set to 0 is free, and says nothing.
+ */
+export type BillingIssues = { unsupported?: string; unpriced: string[] };
+
+type Billed = { cost: number; snapshot: PriceSnapshot; issues: BillingIssues };
+
+const UNPRICED_NONE: BillingIssues = { unpriced: [] };
+
+/** A way of pricing by the name the console's tab gives it. */
+const modeName = (kind: PricingKind, value: string): string =>
+  PRICING_MODES[kind].find(mode => mode.value === value)?.label ?? value;
+
+/** Of what a call used, by its rate's name, how much, and the rate billed:
+ *  the names of those used whose rate is not set. */
+const unpricedOf = (
+  used: Array<[name: string, count: number, rate: string | null]>
+): string[] =>
+  used
+    .filter(([, count, rate]) => count > 0 && rate === null)
+    .map(([name]) => name);
+
+/**
  * Calculate the cost of a chat completion in USD.
  *
  * `usage` MUST be the normalized, mutually-exclusive buckets produced by
@@ -232,9 +270,8 @@ export const resolveModelByKey = cache(
  * subtraction, so the cached/reasoning portions can never be double-billed.
  *
  * Token counts are absolute (not per-million).
- *   - Cache R/W: billed strictly at their configured rate. Default to 0 at
- *     write-time (see pricing router / sync), so an unconfigured cache rate
- *     means "free" — snapshot stays consistent with the rate used.
+ *   - Cache R/W: billed strictly at their configured rate, never at the
+ *     input rate; one not set bills its tokens at nothing, and says so.
  *   - Reasoning: billed at `pricing.reasoning` when set; otherwise falls back
  *     to `pricing.output` (the convention for OpenAI o-series, Anthropic
  *     thinking, Google, DeepSeek). Qwen-style models with a distinct rate
@@ -244,8 +281,10 @@ export const resolveModelByKey = cache(
 export function calculateChatCost(
   usage: ChatUsage,
   pricing: PricingRecord | null
-): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
+): Billed {
+  if (!pricing) {
+    return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT }, issues: UNPRICED_NONE };
+  }
 
   const inputRate = toNum(pricing.input);
   const outputRate = toNum(pricing.output);
@@ -292,16 +331,53 @@ export function calculateChatCost(
       webSearchPrice: numToStr(pricing.webSearch),
       xPostPrice: numToStr(pricing.xPost),
       xProfilePrice: numToStr(pricing.xProfile)
+    },
+    issues: {
+      unpriced: unpricedOf([
+        ['Input', inputTokens, pricing.input],
+        ['Output', outputTokens, pricing.output],
+        ['Reasoning', reasoningTokens, reasoningRateStr],
+        ['Cache read', cacheReadTokens, pricing.cacheRead],
+        ['Cache write', cacheWriteTokens, pricing.cacheWrite],
+        ['Web search', webSearches, pricing.webSearch],
+        ['X posts', xPosts, pricing.xPost],
+        ['X profiles', xProfiles, pricing.xProfile]
+      ])
     }
   };
+}
+
+/** Priced per resolution: a rate set for one size or resolution at least. */
+export const pricedByResolution = (pricing: {
+  resolutionPrices?: Record<string, string> | null;
+}): boolean => Object.keys(pricing.resolutionPrices ?? {}).length > 0;
+
+/**
+ * Priced per resolution, the rate of the size or resolution a call was made
+ * at — or, where it has none set or the call sent none (an edit keeps its
+ * source's), the highest of those set.
+ */
+function resolutionRate(
+  pricing: PricingRecord,
+  resolution: string | undefined
+): string | null {
+  const prices = pricing.resolutionPrices ?? {};
+  const own = resolution !== undefined ? prices[resolution] : undefined;
+  if (own !== undefined) return own;
+  return Object.values(prices).reduce<string | null>(
+    (highest, rate) =>
+      highest === null || toNum(rate) > toNum(highest) ? rate : highest,
+    null
+  );
 }
 
 /**
  * Cost for an image generation call.
  *
- * Billed per image, or per token. Per token, the pictures read and drawn are
- * priced apart from the words, as providers price them: of the input and
- * output tokens, `imageInputTokens` and `imageOutputTokens` were pictures and
+ * Billed per image, per image at the rate of the size or resolution it was
+ * made at (see `resolutionRate`), or per token. Per token, the pictures read
+ * and drawn are priced apart from the words, as providers price them: of the
+ * input and output tokens, `imageInputTokens` and `imageOutputTokens` were pictures and
  * the rest words. A picture read with no rate of its own is billed at the
  * input rate, and words written with none at the image output rate — a row
  * priced on two rates is billed as one priced on all four would be, with the
@@ -314,22 +390,31 @@ export function calculateImageCost(
     outputTokens?: number;
     imageInputTokens?: number;
     imageOutputTokens?: number;
+    /** The size or resolution sent. */
+    resolution?: string;
   },
   pricing: PricingRecord | null
-): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
+): Billed {
+  if (!pricing) {
+    return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT }, issues: UNPRICED_NONE };
+  }
 
-  const perImage = toNum(pricing.image);
-
-  // Two mutually-exclusive billing styles, image-price wins:
-  //   - per-image  (DALL-E / imagen): imageCount × image
+  // Mutually-exclusive billing styles, per resolution and per image first:
+  //   - per resolution (xAI): imageCount × the rate of its resolution
+  //   - per-image  (DALL-E / imagen): imageCount × the image rate
   //   - per-token  (gpt-image-1 ...): each kind of token at its rate
   // A model only ever configures one. Checking per-image first avoids
   // double-charging if both happen to be set (misconfig / dirty sync).
-  if (perImage > 0) {
+  // A per-image rate of 0 is set, and bills each image at nothing.
+  const byResolution = pricedByResolution(pricing);
+  if (byResolution || pricing.image != null) {
+    const perImage = byResolution
+      ? resolutionRate(pricing, args.resolution)
+      : pricing.image;
     return {
-      cost: roundCost(args.imageCount * perImage),
-      snapshot: { ...EMPTY_SNAPSHOT, imagePrice: numToStr(pricing.image) }
+      cost: roundCost(args.imageCount * toNum(perImage)),
+      snapshot: { ...EMPTY_SNAPSHOT, imagePrice: numToStr(perImage) },
+      issues: UNPRICED_NONE
     };
   }
 
@@ -358,39 +443,116 @@ export function calculateImageCost(
       outputPrice: numToStr(outputRate),
       imageInputPrice: numToStr(imageInputRate),
       imageOutputPrice: numToStr(imageOutputRate)
-    }
+    },
+    // A model that counts no tokens cannot be priced by them.
+    issues:
+      inputTokens + outputTokens === 0
+        ? { unsupported: modeName('image', 'tokens'), unpriced: [] }
+        : {
+            unpriced: unpricedOf([
+              ['Input', inputTokens - imageInputTokens, inputRate],
+              ['Image input', imageInputTokens, imageInputRate],
+              ['Output', outputTokens - imageOutputTokens, outputRate],
+              ['Image output', imageOutputTokens, imageOutputRate]
+            ])
+          }
   };
 }
 
 /**
- * Cost for a video generation call. Two mutually-exclusive billing styles,
+ * Cost for a video generation call. Four mutually-exclusive billing styles,
  * per-video wins (mirrors calculateImageCost / calculateAudioCost):
  *   - per-video (flat per clip): Kling, Sora-base → videoCount × video
+ *   - per-token:                 Gemini Omni, Seedance → the video's tokens
+ *     at videoTokens, any read at input, and any words written or thought
+ *     at output, per 1M
  *   - per-second (duration):     Sora, Veo, Runway → videoSeconds × videoSeconds
+ *   - per resolution:            xAI → videoSeconds × the rate of the
+ *     resolution it was made at, or the highest set where it has none or
+ *     none was sent (see `resolutionRate`)
  * Every real video model picks ONE basis (no provider charges a flat fee AND
  * per second). Checking per-video first avoids double-charging on misconfig.
+ * A per-video rate of 0 is set, and bills each video at nothing.
  */
 export function calculateVideoCost(
-  args: { videoCount?: number; videoSeconds?: number },
+  args: {
+    videoCount?: number;
+    videoSeconds?: number;
+    videoTokens?: number;
+    /** What the provider read, wrote and thought to make it, where it
+     *  counts those apart. */
+    inputTokens?: number;
+    outputTokens?: number;
+    reasoningTokens?: number;
+    /** The resolution sent. */
+    resolution?: string;
+  },
   pricing: PricingRecord | null
-): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
+): Billed {
+  if (!pricing) {
+    return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT }, issues: UNPRICED_NONE };
+  }
 
-  const perVideo = toNum(pricing.video);
-  if (perVideo > 0) {
+  if (pricing.video != null) {
     return {
-      cost: roundCost((args.videoCount ?? 0) * perVideo),
-      snapshot: { ...EMPTY_SNAPSHOT, videoPrice: numToStr(pricing.video) }
+      cost: roundCost((args.videoCount ?? 0) * toNum(pricing.video)),
+      snapshot: { ...EMPTY_SNAPSHOT, videoPrice: numToStr(pricing.video) },
+      issues: UNPRICED_NONE
     };
   }
 
-  const perSecond = toNum(pricing.videoSeconds);
+  if (pricing.videoTokens != null) {
+    const videoTokens = args.videoTokens ?? 0;
+    return {
+      cost: roundCost(
+        ((args.inputTokens ?? 0) * toNum(pricing.input) +
+          ((args.outputTokens ?? 0) + (args.reasoningTokens ?? 0)) *
+            toNum(pricing.output) +
+          (args.videoTokens ?? 0) * toNum(pricing.videoTokens)) /
+          1_000_000
+      ),
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        inputPrice: numToStr(pricing.input),
+        outputPrice: numToStr(pricing.output),
+        reasoningPrice: numToStr(pricing.output),
+        videoTokensPrice: numToStr(pricing.videoTokens)
+      },
+      // A model that counts no tokens for its video cannot be priced by them.
+      issues:
+        videoTokens === 0
+          ? { unsupported: modeName('video', 'tokens'), unpriced: [] }
+          : {
+              unpriced: unpricedOf([
+                ['Input', args.inputTokens ?? 0, pricing.input],
+                [
+                  'Output',
+                  (args.outputTokens ?? 0) + (args.reasoningTokens ?? 0),
+                  pricing.output
+                ]
+              ])
+            }
+    };
+  }
+
+  const byResolution = pricedByResolution(pricing);
+  const perSecond = byResolution
+    ? resolutionRate(pricing, args.resolution)
+    : pricing.videoSeconds;
   return {
-    cost: roundCost((args.videoSeconds ?? 0) * perSecond),
-    snapshot: {
-      ...EMPTY_SNAPSHOT,
-      videoSecondsPrice: numToStr(pricing.videoSeconds)
-    }
+    cost: roundCost((args.videoSeconds ?? 0) * toNum(perSecond)),
+    snapshot: { ...EMPTY_SNAPSHOT, videoSecondsPrice: numToStr(perSecond) },
+    // A length is always to be had; one not found cannot be priced by it.
+    issues:
+      (args.videoSeconds ?? 0) === 0
+        ? {
+            unsupported: modeName(
+              'video',
+              byResolution ? 'resolution' : 'seconds'
+            ),
+            unpriced: []
+          }
+        : UNPRICED_NONE
   };
 }
 
@@ -404,9 +566,16 @@ type AudioTokens = {
 
 /** An audio call priced per token: each kind at its rate, per million. */
 function audioTokenCost(
+  kind: 'speech' | 'transcription',
   tokens: AudioTokens,
   pricing: PricingRecord
-): { cost: number; snapshot: PriceSnapshot } {
+): Billed {
+  const used: Array<[string, number, string | null]> = [
+    ['Input', tokens.inputTokens ?? 0, pricing.input],
+    ['Output', tokens.outputTokens ?? 0, pricing.output],
+    ['Audio input', tokens.audioInputTokens ?? 0, pricing.audioInput],
+    ['Audio output', tokens.audioOutputTokens ?? 0, pricing.audioOutput]
+  ];
   return {
     cost: roundCost(
       ((tokens.inputTokens ?? 0) * toNum(pricing.input) +
@@ -421,7 +590,11 @@ function audioTokenCost(
       outputPrice: numToStr(pricing.output),
       audioInputPrice: numToStr(pricing.audioInput),
       audioOutputPrice: numToStr(pricing.audioOutput)
-    }
+    },
+    // A model that counts no tokens cannot be priced by them.
+    issues: used.every(([, count]) => count === 0)
+      ? { unsupported: modeName(kind, 'tokens'), unpriced: [] }
+      : { unpriced: unpricedOf(used) }
   };
 }
 
@@ -433,10 +606,15 @@ function audioTokenCost(
 export function calculateAudioCost(
   args: { audioCharacters?: number } & AudioTokens,
   pricing: PricingRecord | null
-): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
-  if (pricing.audioCharacters == null) return audioTokenCost(args, pricing);
+): Billed {
+  if (!pricing) {
+    return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT }, issues: UNPRICED_NONE };
+  }
+  if (pricing.audioCharacters == null) {
+    return audioTokenCost('speech', args, pricing);
+  }
 
+  // Characters are counted from the text read, which is never empty.
   return {
     cost: roundCost(
       ((args.audioCharacters ?? 0) * toNum(pricing.audioCharacters)) / 1_000_000
@@ -444,7 +622,8 @@ export function calculateAudioCost(
     snapshot: {
       ...EMPTY_SNAPSHOT,
       audioCharactersPrice: numToStr(pricing.audioCharacters)
-    }
+    },
+    issues: UNPRICED_NONE
   };
 }
 
@@ -456,9 +635,13 @@ export function calculateAudioCost(
 export function calculateTranscriptionCost(
   args: { audioSeconds?: number } & AudioTokens,
   pricing: PricingRecord | null
-): { cost: number; snapshot: PriceSnapshot } {
-  if (!pricing) return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT } };
-  if (pricing.audioMinute == null) return audioTokenCost(args, pricing);
+): Billed {
+  if (!pricing) {
+    return { cost: 0, snapshot: { ...EMPTY_SNAPSHOT }, issues: UNPRICED_NONE };
+  }
+  if (pricing.audioMinute == null) {
+    return audioTokenCost('transcription', args, pricing);
+  }
 
   const perMinute = toNum(pricing.audioMinute);
   return {
@@ -466,7 +649,12 @@ export function calculateTranscriptionCost(
     snapshot: {
       ...EMPTY_SNAPSHOT,
       audioMinutePrice: numToStr(pricing.audioMinute)
-    }
+    },
+    // A length is always to be had; one not found cannot be priced by it.
+    issues:
+      (args.audioSeconds ?? 0) === 0
+        ? { unsupported: modeName('transcription', 'minute'), unpriced: [] }
+        : UNPRICED_NONE
   };
 }
 
@@ -558,13 +746,14 @@ type BillingStyles = Partial<
     | 'imageOutput'
     | 'video'
     | 'videoSeconds'
+    | 'videoTokens'
     | 'audioCharacters'
     | 'audioInput'
     | 'audioOutput'
     | 'audioMinute',
     unknown
   >
->;
+> & { resolutionPrices?: Record<string, string> | null };
 
 /**
  * Why a set of rates cannot be billed from, or null when it can.
@@ -577,17 +766,19 @@ export function pricingStyleConflict(
   capability: 'chat' | 'image' | 'video' | 'audio',
   p: BillingStyles
 ): string | null {
-  // Image models bill EITHER per-image OR per-token, never both — the two
-  // styles are mutually exclusive (see calculateImageCost).
-  if (
-    capability === 'image' &&
-    p.image != null &&
-    (p.input != null ||
+  // Image models bill per-image, per resolution OR per-token, only one —
+  // the styles are mutually exclusive (see calculateImageCost).
+  const byResolution = pricedByResolution(p);
+  const imageStyles = [
+    p.image != null,
+    byResolution,
+    p.input != null ||
       p.output != null ||
       p.imageInput != null ||
-      p.imageOutput != null)
-  ) {
-    return 'Image pricing must be either Per image OR token-based (Input + Image output), not both.';
+      p.imageOutput != null
+  ].filter(Boolean).length;
+  if (capability === 'image' && imageStyles > 1) {
+    return 'Image pricing must be exactly one style: Per image, Per resolution, or token-based (Input + Image output).';
   }
 
   // Audio is one-of-three: per-character (classic TTS), per-token — the
@@ -604,9 +795,16 @@ export function pricingStyleConflict(
     return 'Audio pricing must be exactly one style: Per 1M characters, token-based (Input / Output, Audio input / Audio output), or Per minute.';
   }
 
-  // Video is the same either/or: per-video (flat) OR per-second.
-  if (capability === 'video' && p.video != null && p.videoSeconds != null) {
-    return 'Video pricing must be either Per video OR Per second, not both.';
+  // Video is the same one-of: per-video (flat), per-second, per resolution
+  // or per-token — the video's tokens, and any it read, wrote or thought.
+  const videoStyles = [
+    p.video != null,
+    p.videoSeconds != null,
+    byResolution,
+    (p.videoTokens ?? p.input ?? p.output) != null
+  ].filter(Boolean).length;
+  if (capability === 'video' && videoStyles > 1) {
+    return 'Video pricing must be exactly one style: Per video, Per second, Per resolution, or per token (Input, Output, Video output).';
   }
 
   return null;
@@ -643,10 +841,8 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
   });
   if (!model) throw new PublicError('Model not found');
 
-  // Capability-aware required-field check. Cache R/W are auto-defaulted
-  // to 0 below, so they don't need to be in the required list. Reuses
-  // `pricingMissingFields` from lib/pricing so admin-side and runtime
-  // gate share the same rule.
+  // Capability-aware required-field check. Reuses `pricingMissingFields`
+  // from lib/pricing so admin-side and runtime gate share the same rule.
   const cap = model.capability;
 
   const conflict = pricingStyleConflict(cap, data);
@@ -666,16 +862,13 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
   }
 
   const now = new Date();
-  // Cache R/W default to "0" (free) when not set, so the cost engine
-  // never falls back to data rate. All other fields stay null when unset.
-  const cacheDefault = (v: string | null | undefined): string =>
-    v === null || v === undefined || v === '' ? '0' : v;
+  // A rate not set stays null: what it bills is the cost engine's to say.
   const values = {
     modelId: model.modelId,
     input: data.input,
     output: data.output,
-    cacheRead: cacheDefault(data.cacheRead),
-    cacheWrite: cacheDefault(data.cacheWrite),
+    cacheRead: data.cacheRead,
+    cacheWrite: data.cacheWrite,
     // Reasoning stays null when not set — cost engine falls back to output.
     reasoning: data.reasoning,
     webSearch: data.webSearch,
@@ -686,6 +879,8 @@ export async function upsertPricing(data: z.infer<typeof pricingUpsertSchema>) {
     imageOutput: data.imageOutput,
     video: data.video,
     videoSeconds: data.videoSeconds,
+    videoTokens: data.videoTokens,
+    resolutionPrices: data.resolutionPrices,
     audioInput: data.audioInput,
     audioOutput: data.audioOutput,
     audioCharacters: data.audioCharacters,

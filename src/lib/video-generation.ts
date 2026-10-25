@@ -1,6 +1,6 @@
 import '@tanstack/react-start/server-only';
 
-import { experimental_generateVideo as generateVideo } from 'ai';
+import { APICallError, experimental_generateVideo as generateVideo } from 'ai';
 import OpenAI, { AzureOpenAI } from 'openai';
 
 import {
@@ -12,6 +12,7 @@ import {
   type ProviderType
 } from '@/types';
 import { decrypt } from '@/lib/crypto';
+import { audioDurationInSeconds } from '@/lib/media-duration';
 import { uploadGeneratedMedia, type StoredMedia } from '@/lib/media-upload';
 import {
   getVideoModel,
@@ -20,8 +21,11 @@ import {
   runWithProviderFailover
 } from '@/lib/provider';
 import { providerRequestsOf } from '@/lib/provider-request';
-import { toRequestParts } from '@/lib/provider-vocab';
-import { resolveVideoSeconds } from '@/lib/video-usage';
+import { sentResolution, toRequestParts } from '@/lib/provider-vocab';
+import {
+  extractVideoDurationSeconds,
+  extractVideoTokens
+} from '@/lib/video-usage';
 
 /** The providers whose video models the AI SDK hands a last frame or
  *  reference images to: Google's and Vertex's Veo, and xAI's. */
@@ -92,8 +96,9 @@ function deadlineSignal(ms: number): {
 export type VideoGenerationResult = {
   buffer: Buffer;
   mediaType: string;
-  /** The duration Sora actually generated (request is bucketed to 4/8/12s). */
-  seconds: number;
+  /** The duration Sora says it generated (request is bucketed to 4/8/12s),
+   *  where it says. */
+  seconds: number | undefined;
   providerRequests: ProviderRequest[];
 };
 
@@ -200,7 +205,7 @@ export async function generateWithSora(args: {
   return {
     buffer: videoBuffer,
     mediaType: 'video/mp4',
-    seconds: Number.isFinite(generated) ? generated : Number(seconds),
+    seconds: Number.isFinite(generated) ? generated : undefined,
     // The job is the response; the request that made it, its own id.
     providerRequests: [
       {
@@ -254,8 +259,179 @@ async function pollSoraJob(
   );
 }
 
+/** Gemini's API, where a provider names no address of its own — as the AI
+ *  SDK's Google provider defaults. */
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta';
+
+/** A picture or a clip as the Interactions API takes it, inline. */
+const inlinePart = (
+  type: 'image' | 'video',
+  media: { data: Uint8Array; mediaType: string }
+) => ({
+  type,
+  data: Buffer.from(media.data).toString('base64'),
+  mime_type: media.mediaType
+});
+
+type OmniUsage = {
+  total_input_tokens?: number;
+  total_output_tokens?: number;
+  total_thought_tokens?: number;
+  output_tokens_by_modality?: Array<{ modality?: string; tokens?: number }>;
+};
+
+export type OmniResult = {
+  buffer: Buffer;
+  mediaType: string;
+  /** What it read — the prompt, and any picture or clip given. */
+  inputTokens: number;
+  /** The video, apart from any words it wrote. */
+  videoTokens: number;
+  outputTokens: number;
+  /** What it thought before it drew, billed at the words' rate. */
+  reasoningTokens: number;
+  providerRequests: ProviderRequest[];
+};
+
+/**
+ * Generate a video with Gemini Omni, through Google's Interactions API —
+ * which the AI SDK does not reach: its Google video model calls Veo's
+ * endpoint, and Omni answers on this one alone.
+ *
+ * One call, answered when the video is made, with the video inline. A picture
+ * makes it image-to-video, reference pictures reference-to-video, and a clip
+ * an edit of it. It takes no length: the model chooses one of three to ten
+ * seconds, which the prompt may ask for. Billed by the tokens it reports, or
+ * by the length of the video it makes.
+ */
+export async function generateWithOmni(args: {
+  model: string;
+  prompt: string;
+  provider: ProviderConfig;
+  resolution?: string;
+  aspectRatio?: string;
+  inputImage?: { data: Uint8Array; mediaType: string };
+  referenceImages?: Array<{ data: Uint8Array; mediaType: string }>;
+  inputVideo?: { data: Uint8Array; mediaType: string };
+  abortSignal?: AbortSignal;
+}): Promise<OmniResult> {
+  const { model, prompt, provider, inputImage, referenceImages, inputVideo } =
+    args;
+  const media = [
+    ...(inputVideo ? [inlinePart('video', inputVideo)] : []),
+    ...(inputImage ? [inlinePart('image', inputImage)] : []),
+    ...(referenceImages ?? []).map(image => inlinePart('image', image))
+  ];
+  const task = inputVideo
+    ? 'edit'
+    : referenceImages?.length
+      ? 'reference_to_video'
+      : inputImage
+        ? 'image_to_video'
+        : undefined;
+  const url = `${provider.baseUrl || GEMINI_API}/interactions`;
+  const body = {
+    model,
+    input: media.length ? [...media, { type: 'text', text: prompt }] : prompt,
+    response_format: {
+      type: 'video',
+      ...(args.resolution && { resolution: args.resolution }),
+      ...(args.aspectRatio && { aspect_ratio: args.aspectRatio })
+    },
+    ...(task && { generation_config: { video_config: { task } } }),
+    // Answered in the one call, and kept nowhere at Google's end.
+    store: false
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(provider.apiKey && { 'x-goog-api-key': decrypt(provider.apiKey) })
+    },
+    body: JSON.stringify(body),
+    signal: args.abortSignal
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    // As the AI SDK reports a provider's refusal, so failover reads it alike.
+    let message = text;
+    try {
+      message =
+        (JSON.parse(text) as { error?: { message?: string } }).error?.message ??
+        text;
+    } catch {
+      // Not JSON: the body as it came.
+    }
+    throw new APICallError({
+      message,
+      url,
+      requestBodyValues: { model, task },
+      statusCode: response.status,
+      responseBody: text
+    });
+  }
+
+  const result = JSON.parse(text) as {
+    id?: string;
+    usage?: OmniUsage;
+    steps?: Array<{
+      type?: string;
+      content?: Array<{
+        type?: string;
+        data?: string;
+        uri?: string;
+        mime_type?: string;
+      }>;
+    }>;
+  };
+  const video = result.steps
+    ?.flatMap(step => step.content ?? [])
+    .find(part => part.type === 'video');
+  let buffer: Buffer;
+  if (video?.data) {
+    buffer = Buffer.from(video.data, 'base64');
+  } else if (video?.uri) {
+    // A video too large to come inline comes as a file to fetch.
+    const file = await fetch(video.uri, {
+      headers: provider.apiKey
+        ? { 'x-goog-api-key': decrypt(provider.apiKey) }
+        : undefined
+    });
+    if (!file.ok) {
+      throw new Error(`Gemini Omni video download failed: ${file.status}`);
+    }
+    buffer = Buffer.from(await file.arrayBuffer());
+  } else {
+    throw new Error('Gemini Omni returned no video');
+  }
+
+  const usage = result.usage ?? {};
+  const videoTokens =
+    usage.output_tokens_by_modality?.find(each => each.modality === 'video')
+      ?.tokens ?? 0;
+  return {
+    buffer,
+    mediaType: video.mime_type ?? 'video/mp4',
+    inputTokens: usage.total_input_tokens ?? 0,
+    videoTokens,
+    outputTokens: Math.max((usage.total_output_tokens ?? 0) - videoTokens, 0),
+    reasoningTokens: usage.total_thought_tokens ?? 0,
+    providerRequests: result.id ? [{ responseId: result.id }] : []
+  };
+}
+
 export type VideoGenerationOutput = StoredMedia & {
   videoSeconds?: number;
+  /** The tokens the provider counted the clip as, where it says, and what
+   *  it read, wrote and thought to make it. */
+  videoTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  /** The size or resolution sent, which a rate per resolution is looked up
+   *  by; none where the provider was sent neither, as for an edit. */
+  resolution?: string;
   provider: Provider;
   providerRequests: ProviderRequest[];
 };
@@ -263,7 +439,8 @@ export type VideoGenerationOutput = StoredMedia & {
 /**
  * Generate a video with provider failover and upload it to Vercel Blob.
  * Shared by the standalone /api/video route and the chat `generate_video`
- * tool. Keeps the Sora custom path (no AI SDK support yet) inside.
+ * tool. Keeps the custom paths of Sora and Gemini Omni, which the AI SDK does
+ * not reach, inside.
  */
 export async function generateAndStoreVideo(args: {
   userId: string;
@@ -308,8 +485,13 @@ export async function generateAndStoreVideo(args: {
       let videoBuffer: Buffer;
       let videoMediaType: string;
       // Billable duration in seconds — actual generated length when the
-      // provider reports it, else the requested duration.
+      // provider reports it, else read from the video itself.
       let videoSeconds: number | undefined;
+      let videoTokens: number | undefined;
+      let tokens:
+        | Pick<OmniResult, 'inputTokens' | 'outputTokens' | 'reasoningTokens'>
+        | undefined;
+      let resolutionSent: string | undefined;
       let providerRequests: ProviderRequest[];
 
       // Sora has no AI SDK support yet — use the custom path. Azure exposes
@@ -352,10 +534,81 @@ export async function generateAndStoreVideo(args: {
         });
         videoBuffer = soraResult.buffer;
         videoMediaType = soraResult.mediaType;
-        // Sora returns no duration metadata — bill the bucketed duration the
-        // request actually used (4/8/12s), not the raw client input.
-        videoSeconds = soraResult.seconds;
+        // The length Sora says it made, else the video's own.
+        videoSeconds =
+          soraResult.seconds ??
+          (await audioDurationInSeconds(videoBuffer, videoMediaType));
+        resolutionSent = sentResolution(provider.type, 'video', { size });
         providerRequests = soraResult.providerRequests;
+      } else if (
+        provider.type === 'google' &&
+        providerModelId.startsWith('gemini-omni')
+      ) {
+        if (lastImage) {
+          throw new ProviderCannotError(
+            `${dbModel.name} cannot end on a last frame; it starts from one.`
+          );
+        }
+        // The clip to edit goes inline: it is one of ours, stored by us,
+        // which Google cannot fetch for itself.
+        let inputVideo: { data: Uint8Array; mediaType: string } | undefined;
+        if (inputVideoUrl) {
+          const source = await fetch(inputVideoUrl, { signal: abortSignal });
+          if (!source.ok) {
+            throw new Error(`Could not load the video: ${source.status}`);
+          }
+          inputVideo = {
+            data: new Uint8Array(await source.arrayBuffer()),
+            mediaType: source.headers.get('content-type') ?? 'video/mp4'
+          };
+        }
+        // An edit keeps the source's shape, as for every provider.
+        const parts = inputVideoUrl
+          ? { top: {} as Record<string, string | number> }
+          : toRequestParts(provider.type, 'video', { aspectRatio, resolution });
+
+        const deadline = deadlineSignal(VIDEO_DEADLINE_MS);
+        const signal = abortSignal
+          ? AbortSignal.any([abortSignal, deadline.signal])
+          : deadline.signal;
+        let omni: OmniResult;
+        try {
+          omni = await generateWithOmni({
+            model: providerModelId,
+            prompt,
+            provider,
+            resolution: parts.top.resolution as string | undefined,
+            aspectRatio: parts.top.aspectRatio as string | undefined,
+            inputImage,
+            referenceImages,
+            inputVideo,
+            abortSignal: signal
+          });
+        } catch (err) {
+          if (deadline.signal.aborted && !abortSignal?.aborted) {
+            throw new VideoTimeoutError(
+              `${modelId} video generation timed out after ${VIDEO_DEADLINE_MS / 1000}s`
+            );
+          }
+          throw err;
+        } finally {
+          deadline.cancel();
+        }
+
+        videoBuffer = omni.buffer;
+        videoMediaType = omni.mediaType;
+        // It takes no length and reports none: the length is read from the
+        // video itself, as a transcription's is from the audio it heard.
+        videoSeconds = await audioDurationInSeconds(
+          omni.buffer,
+          omni.mediaType
+        );
+        videoTokens = omni.videoTokens;
+        tokens = omni;
+        resolutionSent = inputVideoUrl
+          ? undefined
+          : sentResolution(provider.type, 'video', { resolution });
+        providerRequests = omni.providerRequests;
       } else {
         // Editing a video is provider-specific: the AI SDK has no standard
         // parameter for it, and xAI takes the source as a URL in its own
@@ -379,13 +632,24 @@ export async function generateAndStoreVideo(args: {
           );
         }
 
+        // xAI makes a video from reference images at 720p at most, and its
+        // SDK lowers a 1080p asked for to 720p before sending, out of our
+        // sight — lowered here instead, so the resolution sent is the one
+        // billed.
+        const asked =
+          provider.type === 'xai' &&
+          referenceImages?.length &&
+          resolution === '1080p'
+            ? '720p'
+            : resolution;
+
         // Duration, aspect ratio and resolution are inherited from the source
         // when editing, so the provider ignores them — don't send any.
         const parts = inputVideoUrl
           ? { top: {}, provider: {}, imageConfig: {} }
           : toRequestParts(provider.type, 'video', {
               aspectRatio,
-              resolution,
+              resolution: asked,
               duration
             });
 
@@ -451,19 +715,29 @@ export async function generateAndStoreVideo(args: {
 
         videoBuffer = Buffer.from(video.uint8Array);
         videoMediaType = 'video/mp4';
-        // What is charged is what was asked of the provider, not what was
-        // settled before the vocabulary had its say — a length the provider
-        // was never sent is not one it rendered.
-        videoSeconds = resolveVideoSeconds(
-          providerMetadata,
-          // Falls back to the settled length when none could be sent: an
-          // estimate, but a per-second model charged for no seconds is free.
-          parts.top.duration ?? duration
-        );
+        // The length the provider reports it made, else the video's own —
+        // never one asked for, which it may not have rendered.
+        videoSeconds =
+          extractVideoDurationSeconds(providerMetadata) ??
+          (await audioDurationInSeconds(videoBuffer, videoMediaType));
+        videoTokens = extractVideoTokens(providerMetadata);
+        resolutionSent = inputVideoUrl
+          ? undefined
+          : sentResolution(provider.type, 'video', { resolution: asked });
         providerRequests = providerRequestsOf(responses);
       }
 
-      return { videoBuffer, videoMediaType, videoSeconds, providerRequests };
+      return {
+        videoBuffer,
+        videoMediaType,
+        videoSeconds,
+        videoTokens,
+        inputTokens: tokens?.inputTokens,
+        outputTokens: tokens?.outputTokens,
+        reasoningTokens: tokens?.reasoningTokens,
+        resolution: resolutionSent,
+        providerRequests
+      };
     },
     {
       // Our own deadline is not a provider fault: the default classifier treats
@@ -491,6 +765,11 @@ export async function generateAndStoreVideo(args: {
   return {
     ...stored,
     videoSeconds: result.videoSeconds,
+    videoTokens: result.videoTokens,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    reasoningTokens: result.reasoningTokens,
+    resolution: result.resolution,
     provider: usedProvider,
     providerRequests: result.providerRequests
   };

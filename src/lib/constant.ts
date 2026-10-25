@@ -34,6 +34,7 @@ import {
   type SubscriptionReason,
   type SubscriptionStatus
 } from '@/types/payment';
+import { type PricingKind, type PricingMode } from '@/types/pricing';
 import { type ProviderType } from '@/types/provider';
 import { type MediaOptionKey } from '@/lib/media-settings';
 
@@ -485,6 +486,64 @@ export const GEMINI_WEB_SEARCH_TOOL_NAME = 'server:GOOGLE_SEARCH_WEB';
  * boundary does it resolve to "omit the parameter" via `resolveAutoOption`.
  */
 export const AUTO_OPTION = 'auto';
+
+/** An audio model priced per token: the words and the audio, read and
+ *  written. */
+const AUDIO_TOKENS: PricingMode = {
+  value: 'tokens',
+  label: 'Per token',
+  rates: ['input', 'output', 'audioInput', 'audioOutput']
+};
+
+/**
+ * The ways each kind of model is priced, and the rates each reads. A model is
+ * priced one way: the console saves the rates of the way chosen alone, and a
+ * price sync that names another way clears them. The first is the way a model
+ * with no price yet starts on, but a video's, which is per second.
+ */
+export const PRICING_MODES: Record<PricingKind, PricingMode[]> = {
+  image: [
+    { value: 'image', label: 'Per image', rates: ['image'] },
+    {
+      value: 'resolution',
+      label: 'Per resolution / image',
+      rates: [],
+      byResolution: true
+    },
+    {
+      value: 'tokens',
+      label: 'Per token',
+      rates: ['input', 'output', 'imageInput', 'imageOutput']
+    }
+  ],
+  video: [
+    { value: 'video', label: 'Per video', rates: ['video'] },
+    { value: 'seconds', label: 'Per second', rates: ['videoSeconds'] },
+    {
+      value: 'resolution',
+      label: 'Per resolution / second',
+      rates: [],
+      byResolution: true
+    },
+    {
+      value: 'tokens',
+      label: 'Per token',
+      rates: ['input', 'output', 'videoTokens']
+    }
+  ],
+  speech: [
+    {
+      value: 'characters',
+      label: 'Per 1M characters',
+      rates: ['audioCharacters']
+    },
+    AUDIO_TOKENS
+  ],
+  transcription: [
+    { value: 'minute', label: 'Per minute', rates: ['audioMinute'] },
+    AUDIO_TOKENS
+  ]
+};
 
 /**
  * The colour palettes a user may draw the app in, the first the default.

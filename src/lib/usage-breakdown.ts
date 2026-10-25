@@ -43,8 +43,9 @@ const round = (n: number) => Math.round(n * 1e10) / 1e10;
  *
  * Follows the cost engine's rules (`services/pricing.ts`): an image or video
  * priced per unit bills on the count alone, otherwise on its tokens or
- * seconds; a chat's reasoning rate is stored already resolved. An item with no
- * quantity is left out. Prices are the user's own — the cost price at their
+ * seconds, at the rate stored for the size or resolution it was made at; a
+ * chat's reasoning rate is stored already resolved. An item with no quantity
+ * is left out. Prices are the user's own — the cost price at their
  * tier's multiplier — so the items add up to what they spent.
  */
 export function usageBreakdown(row: UsageRowLike): UsageItem[] {
@@ -89,21 +90,25 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
       subtotal: round((quantity * (rate ?? 0)) / 1_000)
     });
   };
-  /** Images, videos or seconds, priced one by one. */
+  /** Images, videos or seconds, priced one by one — with the size or
+   *  resolution they were made at, which an image or a second may be priced
+   *  by. */
   const perUnit = (
     label: string,
     quantity: number,
     price: string | null | undefined,
-    unit: 'image' | 'video' | 's'
+    unit: 'image' | 'video' | 's',
+    resolution?: string | null
   ) => {
     if (quantity <= 0) return;
     const rate = priced(price);
+    const counted =
+      unit === 's'
+        ? `${formatNumber(quantity)} s`
+        : formatCount(quantity, unit);
     items.push({
       label,
-      quantity:
-        unit === 's'
-          ? `${formatNumber(quantity)} s`
-          : formatCount(quantity, unit),
+      quantity: resolution ? `${counted} · ${resolution}` : counted,
       rate: `${formatUsd(rate)} / ${unit}`,
       subtotal: round(quantity * (rate ?? 0))
     });
@@ -146,8 +151,14 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
       );
       break;
     case 'image':
-      if (num(row.imagePrice) > 0) {
-        perUnit('Image', num(row.imageCount), row.imagePrice, 'image');
+      if (has(row.imagePrice)) {
+        perUnit(
+          'Image',
+          num(row.imageCount),
+          row.imagePrice,
+          'image',
+          row.resolution
+        );
       } else {
         // The pictures read and drawn apart from the words, each at its rate.
         const imageInput = num(row.imageInputTokens);
@@ -169,10 +180,31 @@ export function usageBreakdown(row: UsageRowLike): UsageItem[] {
       }
       break;
     case 'video':
-      if (num(row.videoPrice) > 0) {
+      if (has(row.videoPrice)) {
         perUnit('Video', num(row.videoCount), row.videoPrice, 'video');
+      } else if (has(row.videoTokensPrice)) {
+        perMillion('Input', num(row.inputTokens), row.inputPrice, 'token');
+        perMillion('Output', num(row.outputTokens), row.outputPrice, 'token');
+        perMillion(
+          'Reasoning',
+          num(row.reasoningTokens),
+          row.reasoningPrice,
+          'token'
+        );
+        perMillion(
+          'Video output',
+          num(row.videoTokens),
+          row.videoTokensPrice,
+          'token'
+        );
       } else {
-        perUnit('Duration', num(row.videoSeconds), row.videoSecondsPrice, 's');
+        perUnit(
+          'Duration',
+          num(row.videoSeconds),
+          row.videoSecondsPrice,
+          's',
+          row.resolution
+        );
       }
       break;
     case 'audio':
@@ -236,14 +268,23 @@ export function usageSummary(row: UsageRowLike): string {
       // Billed on tokens, it says so, so the items beneath add up to it.
       const tokens = num(row.inputTokens) + num(row.outputTokens);
       const images = formatCount(num(row.imageCount), 'image');
-      return num(row.imagePrice) > 0 || tokens === 0
+      return has(row.imagePrice) || tokens === 0
         ? images
         : `${images} · ${formatCount(tokens, 'token')}`;
     }
-    case 'video':
-      return num(row.videoSeconds) > 0
-        ? `${formatNumber(num(row.videoSeconds))} s`
-        : formatCount(num(row.videoCount), 'video');
+    case 'video': {
+      const made =
+        num(row.videoSeconds) > 0
+          ? `${formatNumber(num(row.videoSeconds))} s`
+          : formatCount(num(row.videoCount), 'video');
+      // Billed on tokens, it says so, as an image does.
+      const tokens =
+        num(row.inputTokens) +
+        num(row.outputTokens) +
+        num(row.reasoningTokens) +
+        num(row.videoTokens);
+      return tokens > 0 ? `${made} · ${formatCount(tokens, 'token')}` : made;
+    }
     case 'audio':
       return num(row.audioCharacters) > 0
         ? formatCount(num(row.audioCharacters), 'char')

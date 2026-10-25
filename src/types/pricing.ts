@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
+import { PRICING_MODES } from '@/lib/constant';
 import { type modelPricings } from '@/db/schema';
 
-import { modelCapabilitySchema } from './model';
+import { modelCapabilitySchema, type ModelCapability } from './model';
 import { paginationSchema } from './pagination';
 
 /** A row in `model_pricing`. Inferred from the Drizzle schema. */
@@ -56,7 +57,11 @@ export type PriceSnapshot = {
   imageInputPrice: string | null;
   imageOutputPrice: string | null;
   videoPrice: string | null;
+  /** The rate per second it was billed at: priced per second, that rate;
+   *  per resolution, its resolution's, or the highest where it had none. As
+   *  `imagePrice` is per image. */
   videoSecondsPrice: string | null;
+  videoTokensPrice: string | null;
   audioInputPrice: string | null;
   audioOutputPrice: string | null;
   audioCharactersPrice: string | null;
@@ -66,6 +71,41 @@ export type PriceSnapshot = {
 
 /** Recognized external pricing data sources. */
 export type PricingSource = 'models.dev' | 'llm-metadata';
+
+/** A rate a model's price carries, by its name in the pricing row. */
+export type PricingRate = Exclude<
+  keyof z.infer<typeof pricingUpsertSchema>,
+  'modelDbId' | 'resolutionPrices' | 'source'
+>;
+
+/** A way a model is priced, and the rates it reads. */
+export type PricingMode = {
+  value: string;
+  label: string;
+  rates: PricingRate[];
+  /** Priced by a rate for each resolution, in `resolutionPrices`. */
+  byResolution?: boolean;
+};
+
+/** The kinds of model with ways of pricing of their own — an audio model by
+ *  its direction. */
+export type PricingKind = 'image' | 'video' | 'speech' | 'transcription';
+
+/** The ways a model can be priced, one of which it is: none for a chat
+ *  model, whose rates all add up. */
+export function pricingModesOf(
+  capability: ModelCapability,
+  transcription: boolean
+): PricingMode[] {
+  if (capability === 'chat') return [];
+  return PRICING_MODES[
+    capability === 'audio'
+      ? transcription
+        ? 'transcription'
+        : 'speech'
+      : capability
+  ];
+}
 
 /** Aggregated outcome of a `syncPricing` run. */
 export type PricingSyncResult = {
@@ -100,6 +140,19 @@ const priceNumberSchema = z
     return n.toString();
   });
 
+/** A rate for each size or resolution, as the form supplies them: blanks
+ *  dropped, and none at all stored as null. */
+const resolutionPricesSchema = z
+  .record(z.string(), priceNumberSchema)
+  .optional()
+  .nullable()
+  .transform(prices => {
+    const set = Object.entries(prices ?? {}).filter(
+      (entry): entry is [string, string] => entry[1] !== null
+    );
+    return set.length > 0 ? Object.fromEntries(set) : null;
+  });
+
 /** What the pricing server functions accept. The console's pricing table is
  *  narrowed, then cut to one page. */
 export const pricingListSchema = z.object({
@@ -128,6 +181,8 @@ export const pricingUpsertSchema = z.object({
   imageOutput: priceNumberSchema,
   video: priceNumberSchema,
   videoSeconds: priceNumberSchema,
+  videoTokens: priceNumberSchema,
+  resolutionPrices: resolutionPricesSchema,
   audioInput: priceNumberSchema,
   audioOutput: priceNumberSchema,
   audioCharacters: priceNumberSchema,

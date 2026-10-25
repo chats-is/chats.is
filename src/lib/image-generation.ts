@@ -19,7 +19,7 @@ import {
   runWithProviderFailover
 } from '@/lib/provider';
 import { providerRequestsOf } from '@/lib/provider-request';
-import { toRequestParts } from '@/lib/provider-vocab';
+import { sentResolution, toRequestParts } from '@/lib/provider-vocab';
 import { ProviderCannotError } from '@/lib/video-generation';
 
 export type InputImage = {
@@ -74,6 +74,9 @@ export type ImageGenerationResult = StoredMedia & {
   /** Of those, the pictures read and drawn (see `pictureTokens`). */
   imageInputTokens?: number;
   imageOutputTokens?: number;
+  /** The size or resolution sent, which a rate per resolution is looked up
+   *  by; none where the provider was sent neither. */
+  resolution?: string;
   provider: Provider;
   providerRequests: ProviderRequest[];
 };
@@ -235,6 +238,12 @@ export async function generateAndStoreImage(args: {
         inputTokens,
         outputTokens,
         ...pictures,
+        resolution: sentResolution(
+          provider.type,
+          'image',
+          { size, resolution },
+          { inline }
+        ),
         providerRequests
       };
     },
@@ -261,6 +270,7 @@ export async function generateAndStoreImage(args: {
     outputTokens: result.outputTokens,
     imageInputTokens: result.imageInputTokens,
     imageOutputTokens: result.imageOutputTokens,
+    resolution: result.resolution,
     provider: usedProvider,
     providerRequests: result.providerRequests
   };

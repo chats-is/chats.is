@@ -192,6 +192,59 @@ describe('usageBreakdown', () => {
     expect(usageSummary(perSecond)).toBe('6 s');
   });
 
+  it('names the size or resolution an image or a second was billed at', () => {
+    expect(
+      usageBreakdown({
+        capability: 'image',
+        imageCount: 1,
+        imagePrice: '0.06',
+        resolution: '2048x2048'
+      })
+    ).toEqual([
+      {
+        label: 'Image',
+        quantity: '1 image · 2048x2048',
+        rate: '$0.06 / image',
+        subtotal: 0.06
+      }
+    ]);
+    expect(
+      usageBreakdown({
+        capability: 'video',
+        videoCount: 1,
+        videoSeconds: '8',
+        videoSecondsPrice: '0.12',
+        resolution: '1080p'
+      })
+    ).toEqual([
+      {
+        label: 'Duration',
+        quantity: '8 s · 1080p',
+        rate: '$0.12 / s',
+        subtotal: 0.96
+      }
+    ]);
+  });
+
+  it('bills a video priced per token on its tokens', () => {
+    const row = {
+      capability: 'video' as const,
+      videoCount: 1,
+      videoSeconds: '5',
+      videoTokens: 100_000,
+      videoTokensPrice: '4.3'
+    };
+    expect(usageBreakdown(row)).toEqual([
+      {
+        label: 'Video output',
+        quantity: '100,000 tokens',
+        rate: '$4.3 / 1M tokens',
+        subtotal: 0.43
+      }
+    ]);
+    expect(usageSummary(row)).toBe('5 s · 100,000 tokens');
+  });
+
   it('bills speech per character and transcription per minute', () => {
     const speech = {
       capability: 'audio' as const,

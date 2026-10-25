@@ -143,7 +143,7 @@ const PROVIDER_VOCAB = {
         '21:9',
         '5:2'
       ],
-      resolution: ['1k', '2k']
+      resolution: ['1k', '1.5k', '2k']
     },
     video: {
       aspectRatio: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
@@ -405,4 +405,24 @@ export function toRequestParts(
   }
 
   return parts;
+}
+
+/**
+ * The size or resolution a call sends: whichever of the two its provider
+ * takes, and only a value it takes — what a rate per resolution is looked up
+ * by. Undefined where neither is sent, and the provider makes its own.
+ */
+export function sentResolution(
+  type: ProviderType,
+  capability: ModelCapability,
+  values: { size?: string; resolution?: string },
+  options?: { inline?: boolean }
+): string | undefined {
+  const parts = toRequestParts(type, capability, values, options);
+  const [sent] = [
+    ...Object.values(parts.top),
+    ...Object.values(parts.provider),
+    ...Object.values(parts.imageConfig)
+  ];
+  return sent === undefined ? undefined : String(sent);
 }

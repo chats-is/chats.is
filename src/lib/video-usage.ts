@@ -6,8 +6,8 @@
  * providers report the real clip length under provider-specific metadata, e.g.
  *   providerMetadata.fal.videos[0].duration  // { duration: 5, fps: 24, ... }
  * We scan each provider entry for a `videos[].duration` or a top-level
- * `duration`. Returns undefined when no provider surfaced it — callers fall
- * back to the requested duration.
+ * `duration`. Returns undefined when no provider surfaced it — callers read
+ * the length from the video itself.
  */
 export function extractVideoDurationSeconds(
   providerMetadata: unknown
@@ -32,18 +32,26 @@ export function extractVideoDurationSeconds(
 }
 
 /**
- * Resolve the billable video duration in seconds: prefer the provider-reported
- * actual duration, fall back to the duration the client requested. Returns
- * undefined when neither is available (caller should treat as "unknown" and
- * surface it, not silently bill 0).
+ * The tokens a video model counted a clip as, where it prices clips by the
+ * token and says how many — ByteDance's Seedance, under
+ * `providerMetadata.bytedance.usage.completion_tokens`. Undefined when no
+ * provider reported any.
  */
-export function resolveVideoSeconds(
-  providerMetadata: unknown,
-  requestedDuration: unknown
+export function extractVideoTokens(
+  providerMetadata: unknown
 ): number | undefined {
-  const actual = extractVideoDurationSeconds(providerMetadata);
-  if (actual !== undefined) return actual;
-  return typeof requestedDuration === 'number' && requestedDuration > 0
-    ? requestedDuration
-    : undefined;
+  if (!providerMetadata || typeof providerMetadata !== 'object') {
+    return undefined;
+  }
+  for (const entry of Object.values(
+    providerMetadata as Record<string, unknown>
+  )) {
+    if (!entry || typeof entry !== 'object') continue;
+    const tokens = (entry as { usage?: { completion_tokens?: unknown } | null })
+      .usage?.completion_tokens;
+    if (typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0) {
+      return tokens;
+    }
+  }
+  return undefined;
 }

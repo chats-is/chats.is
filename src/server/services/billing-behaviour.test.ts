@@ -148,7 +148,7 @@ async function spent(cost: string, at = new Date(), capability = 'chat') {
 const call = { userId: 'u1', messageId: 'm1', providerId: 'prov1' };
 
 describe('setting prices', () => {
-  it('a chat model’s cache read and cache write left blank are stored as 0', async () => {
+  it('a chat model’s cache read and cache write left blank are stored empty, and bill nothing with a reason', async () => {
     const id = await addModel('chat', 'c1');
     await savePrice(id, {
       input: '3',
@@ -156,9 +156,20 @@ describe('setting prices', () => {
       cacheRead: '',
       cacheWrite: ''
     });
-    const row = await priceRow('c1');
-    expect(Number(row.cacheRead)).toBe(0);
-    expect(Number(row.cacheWrite)).toBe(0);
+    const price = await priceRow('c1');
+    expect(price.cacheRead).toBeNull();
+    expect(price.cacheWrite).toBeNull();
+
+    await recordChatUsage({
+      ...call,
+      modelId: 'c1',
+      usage: { inputTokens: 1_000_000, cacheReadTokens: 1_000_000 }
+    });
+    const [row] = await usageRows();
+    expect(Number(row.cost)).toBeCloseTo(3, 10);
+    expect(row.reason).toBe(
+      'Used Cache read, but it has no price — set its price.'
+    );
   });
 
   it('a reasoning rate left blank is stored empty and bills at the output rate', async () => {
@@ -205,7 +216,7 @@ describe('setting prices', () => {
     const id = await addModel('image', 'i1');
     await expect(
       savePrice(id, { image: '0.04', input: '5', output: '40' })
-    ).rejects.toThrow(/either Per image OR token-based/);
+    ).rejects.toThrow(/exactly one style: Per image, Per resolution/);
   });
 
   it('a speech model needs a per-1M-characters rate, a transcription model a per-minute rate', async () => {

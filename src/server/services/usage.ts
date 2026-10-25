@@ -23,7 +23,7 @@ import {
 } from '@/types';
 import { type usageLogFilterSchema } from '@/types/usage';
 import { applyMultiplier } from '@/lib/billing';
-import { generateUUID, parseNumber } from '@/lib/utils';
+import { generateUUID } from '@/lib/utils';
 import { db } from '@/db';
 import { models, providers, tiers, usage, users } from '@/db/schema';
 import { dayOf, sumOf } from '@/server/services/db-utils';
@@ -33,7 +33,8 @@ import {
   calculateImageCost,
   calculateTranscriptionCost,
   calculateVideoCost,
-  resolveModelByKey
+  resolveModelByKey,
+  type BillingIssues
 } from '@/server/services/pricing';
 import { getUserTier } from '@/server/services/tier';
 
@@ -64,6 +65,32 @@ function callIds(input: Pick<RecordChatUsageInput, 'id' | 'providerRequests'>) {
   };
 }
 
+/**
+ * What a usage row says of a price that did not bill (see `BillingIssues`):
+ * a way of pricing the model does not support, to change; or what was used
+ * with no price set, to set. Null where the price billed everything.
+ */
+function reasonOf(issues: BillingIssues): string | null {
+  if (issues.unsupported) {
+    return `This model does not support ${issues.unsupported} — change its pricing.`;
+  }
+  const names = issues.unpriced;
+  if (names.length === 0) return null;
+  if (names.length === 1) {
+    return `Used ${names[0]}, but it has no price — set its price.`;
+  }
+  const list = `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `Used ${list}, but they have no price — set their prices.`;
+}
+
+/**
+ * A length in seconds as the usage row keeps it, to three places: billed as
+ * kept, so a length read from a file — with places beyond those — is
+ * itemized in the Logs at what it was billed.
+ */
+const keptSeconds = (seconds: number | undefined) =>
+  seconds === undefined ? undefined : Math.round(seconds * 1000) / 1000;
+
 /** The plan a user is on as the call is recorded; null when on none. */
 async function planOf(userId: string) {
   const [row] = await db
@@ -83,26 +110,11 @@ export async function recordChatUsage(
   try {
     const lookup = await resolveModelByKey(input.modelId, 'chat');
 
-    // Chat is always token-billed (input + output required). A row with no
-    // tokens at all would bill 0 — surface it (the route already returns early
-    // when usage is entirely absent; this catches a present-but-empty usage).
-    const u = input.usage;
-    const noTokens =
-      (u.inputTokens ?? 0) === 0 &&
-      (u.outputTokens ?? 0) === 0 &&
-      (u.cacheReadTokens ?? 0) === 0 &&
-      (u.cacheWriteTokens ?? 0) === 0 &&
-      (u.reasoningTokens ?? 0) === 0;
-    if (noTokens) {
-      console.warn(
-        `[chat] no token usage for model=${input.modelId}; cost will be 0`
-      );
-    }
-
-    const { cost, snapshot } = calculateChatCost(
+    const { cost, snapshot, issues } = calculateChatCost(
       input.usage,
       lookup?.pricing ?? null
     );
+    const reason = reasonOf(issues);
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
@@ -124,6 +136,7 @@ export async function recordChatUsage(
       xProfiles: input.usage.xProfiles ?? 0,
       ...spent(cost, tier),
       planId: await planOf(input.userId),
+      reason,
       ...snapshot
     });
   } catch (err) {
@@ -141,32 +154,18 @@ export async function recordImageUsage(
     const lookup = await resolveModelByKey(input.modelId, 'image');
     const pricing = lookup?.pricing ?? null;
 
-    // Token-billed image model (per-image price unset, but input/output rates
-    // set, e.g. gpt-image-1 / Gemini) that reported no token usage would bill
-    // 0 — surface the gap instead of silently under-charging.
-    const tokenBilled =
-      pricing != null &&
-      parseNumber(pricing.image) == null &&
-      (parseNumber(pricing.input) != null ||
-        parseNumber(pricing.imageOutput) != null);
-    const noTokens =
-      (input.inputTokens ?? 0) === 0 && (input.outputTokens ?? 0) === 0;
-    if (tokenBilled && noTokens) {
-      console.warn(
-        `[image] no token usage for token-billed model=${input.modelId}; cost will be 0`
-      );
-    }
-
-    const { cost, snapshot } = calculateImageCost(
+    const { cost, snapshot, issues } = calculateImageCost(
       {
         imageCount: input.imageCount,
         inputTokens: input.inputTokens,
         outputTokens: input.outputTokens,
         imageInputTokens: input.imageInputTokens,
-        imageOutputTokens: input.imageOutputTokens
+        imageOutputTokens: input.imageOutputTokens,
+        resolution: input.resolution
       },
       pricing
     );
+    const reason = reasonOf(issues);
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
@@ -183,8 +182,10 @@ export async function recordImageUsage(
       outputTokens: input.outputTokens ?? 0,
       imageInputTokens: input.imageInputTokens ?? 0,
       imageOutputTokens: input.imageOutputTokens ?? 0,
+      resolution: input.resolution ?? null,
       ...spent(cost, tier),
       planId: await planOf(input.userId),
+      reason,
       ...snapshot
     });
   } catch (err) {
@@ -201,24 +202,21 @@ export async function recordVideoUsage(
   try {
     const lookup = await resolveModelByKey(input.modelId, 'video');
     const pricing = lookup?.pricing ?? null;
+    const videoSeconds = keptSeconds(input.videoSeconds);
 
-    // Per-second-billed model (flat per-video price unset, per-second set) that
-    // got no duration would bill 0 — surface it. Per-video models bill on
-    // videoCount (always present), so they don't warn.
-    const perSecondBilled =
-      pricing != null &&
-      parseNumber(pricing.video) == null &&
-      parseNumber(pricing.videoSeconds) != null;
-    if (perSecondBilled && (input.videoSeconds ?? 0) === 0) {
-      console.warn(
-        `[video] no duration for per-second model=${input.modelId}; cost will be 0`
-      );
-    }
-
-    const { cost, snapshot } = calculateVideoCost(
-      { videoCount: input.videoCount, videoSeconds: input.videoSeconds },
+    const { cost, snapshot, issues } = calculateVideoCost(
+      {
+        videoCount: input.videoCount,
+        videoSeconds,
+        videoTokens: input.videoTokens,
+        inputTokens: input.inputTokens,
+        outputTokens: input.outputTokens,
+        reasoningTokens: input.reasoningTokens,
+        resolution: input.resolution
+      },
       pricing
     );
+    const reason = reasonOf(issues);
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
@@ -231,27 +229,21 @@ export async function recordVideoUsage(
       providerModelId: input.providerModelId ?? null,
       capability: 'video',
       videoCount: input.videoCount,
-      videoSeconds: (input.videoSeconds ?? 0).toString(),
+      videoSeconds: (videoSeconds ?? 0).toString(),
+      videoTokens: input.videoTokens ?? 0,
+      inputTokens: input.inputTokens ?? 0,
+      outputTokens: input.outputTokens ?? 0,
+      reasoningTokens: input.reasoningTokens ?? 0,
+      resolution: input.resolution ?? null,
       ...spent(cost, tier),
       planId: await planOf(input.userId),
+      reason,
       ...snapshot
     });
   } catch (err) {
     console.error('Failed to record video usage:', err);
   }
 }
-
-/** How many tokens an audio call reported, of any kind. */
-const tokensOf = (tokens: {
-  inputTokens?: number;
-  outputTokens?: number;
-  audioInputTokens?: number;
-  audioOutputTokens?: number;
-}) =>
-  (tokens.inputTokens ?? 0) +
-  (tokens.outputTokens ?? 0) +
-  (tokens.audioInputTokens ?? 0) +
-  (tokens.audioOutputTokens ?? 0);
 
 /**
  * Record usage for an audio (TTS / STT / audio chat) call.
@@ -263,20 +255,8 @@ export async function recordAudioUsage(
     const lookup = await resolveModelByKey(input.modelId, 'audio');
     const pricing = lookup?.pricing ?? null;
 
-    // Speech bills per character, or per token where the provider counts
-    // them. No quantity means a cost of 0 — surface it.
-    const billable =
-      pricing == null ||
-      (parseNumber(pricing.audioCharacters) != null
-        ? (input.audioCharacters ?? 0) > 0
-        : tokensOf(input) > 0);
-    if (!billable) {
-      console.warn(
-        `[audio] no billable quantity for model=${input.modelId}; cost will be 0`
-      );
-    }
-
-    const { cost, snapshot } = calculateAudioCost(input, pricing);
+    const { cost, snapshot, issues } = calculateAudioCost(input, pricing);
+    const reason = reasonOf(issues);
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
@@ -295,6 +275,7 @@ export async function recordAudioUsage(
       audioOutputTokens: input.audioOutputTokens ?? 0,
       ...spent(cost, tier),
       planId: await planOf(input.userId),
+      reason,
       ...snapshot
     });
   } catch (err) {
@@ -312,21 +293,13 @@ export async function recordTranscriptionUsage(
   try {
     const lookup = await resolveModelByKey(input.modelId, 'audio');
     const pricing = lookup?.pricing ?? null;
+    const audioSeconds = keptSeconds(input.audioSeconds);
 
-    // Billed by length, or per token where the provider counts them:
-    // without either the cost would be 0 — surface it.
-    const billable =
-      pricing == null ||
-      (parseNumber(pricing.audioMinute) != null
-        ? (input.audioSeconds ?? 0) > 0
-        : tokensOf(input) > 0);
-    if (!billable) {
-      console.warn(
-        `[transcription] nothing billable reported for model=${input.modelId}; cost will be 0`
-      );
-    }
-
-    const { cost, snapshot } = calculateTranscriptionCost(input, pricing);
+    const { cost, snapshot, issues } = calculateTranscriptionCost(
+      { ...input, audioSeconds },
+      pricing
+    );
+    const reason = reasonOf(issues);
     const tier = await getUserTier(input.userId);
 
     await db.insert(usage).values({
@@ -338,12 +311,13 @@ export async function recordTranscriptionUsage(
       providerId: input.providerId,
       providerModelId: input.providerModelId ?? null,
       capability: 'audio',
-      audioSeconds: (input.audioSeconds ?? 0).toString(),
+      audioSeconds: (audioSeconds ?? 0).toString(),
       inputTokens: input.inputTokens ?? 0,
       outputTokens: input.outputTokens ?? 0,
       audioInputTokens: input.audioInputTokens ?? 0,
       ...spent(cost, tier),
       planId: await planOf(input.userId),
+      reason,
       ...snapshot
     });
   } catch (err) {
@@ -633,6 +607,8 @@ export async function adminUsageLog(
       imageOutputTokens: usage.imageOutputTokens,
       videoCount: usage.videoCount,
       videoSeconds: usage.videoSeconds,
+      videoTokens: usage.videoTokens,
+      resolution: usage.resolution,
       audioInputTokens: usage.audioInputTokens,
       audioOutputTokens: usage.audioOutputTokens,
       audioCharacters: usage.audioCharacters,
@@ -650,6 +626,7 @@ export async function adminUsageLog(
       imageOutputPrice: usage.imageOutputPrice,
       videoPrice: usage.videoPrice,
       videoSecondsPrice: usage.videoSecondsPrice,
+      videoTokensPrice: usage.videoTokensPrice,
       audioInputPrice: usage.audioInputPrice,
       audioOutputPrice: usage.audioOutputPrice,
       audioCharactersPrice: usage.audioCharactersPrice,
@@ -658,7 +635,8 @@ export async function adminUsageLog(
       // The tier as it is named today; the multiplier as it stood then.
       tierName: tiers.name,
       priceMultiplier: usage.priceMultiplier,
-      spend: usage.spend
+      spend: usage.spend,
+      reason: usage.reason
     })
     .from(usage)
     .leftJoin(users, eq(users.id, usage.userId))

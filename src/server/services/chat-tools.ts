@@ -511,7 +511,8 @@ export async function buildMediaTools(args: {
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         imageInputTokens: result.imageInputTokens,
-        imageOutputTokens: result.imageOutputTokens
+        imageOutputTokens: result.imageOutputTokens,
+        resolution: result.resolution
       });
 
       knownUrls.add(result.url);
@@ -742,7 +743,12 @@ export async function buildMediaTools(args: {
             ),
             providerRequests: result.providerRequests,
             videoCount: 1,
-            videoSeconds: result.videoSeconds
+            videoSeconds: result.videoSeconds,
+            videoTokens: result.videoTokens,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            reasoningTokens: result.reasoningTokens,
+            resolution: result.resolution
           });
 
           knownUrls.add(result.url);
@@ -829,7 +835,12 @@ export async function buildMediaTools(args: {
             providerModelId: resolveModelId(result.provider, dbModel.modelId),
             providerRequests: result.providerRequests,
             videoCount: 1,
-            videoSeconds: result.videoSeconds
+            videoSeconds: result.videoSeconds,
+            videoTokens: result.videoTokens,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            reasoningTokens: result.reasoningTokens,
+            resolution: result.resolution
           });
 
           knownUrls.add(result.url);

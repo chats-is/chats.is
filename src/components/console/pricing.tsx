@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { CAPABILITIES } from '@/lib/constant';
+import { pricingModesOf, type PricingMode } from '@/types/pricing';
+import { AUTO_OPTION, CAPABILITIES } from '@/lib/constant';
 import { mutating } from '@/lib/mutation';
 import { summarizePricingRows } from '@/lib/pricing-summary';
 import { cn, formatUsd } from '@/lib/utils';
@@ -61,6 +62,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Tooltip,
   TooltipContent,
@@ -123,6 +125,12 @@ type EditTarget = {
   capability: 'chat' | 'image' | 'video' | 'audio';
   /** Served through xAI, and so able to search X, which is priced apart. */
   searchesX: boolean;
+  /** The sizes or resolutions the model takes, each of which an image or a
+   *  second of video may be priced at apart. */
+  tiers: string[];
+  /** The ways it can be priced, of `PRICING_MODES`; none for a chat model,
+   *  whose rates all add up. */
+  modes: PricingMode[];
 };
 
 /** Every rate a model can carry, as typed. Blank means "not priced". */
@@ -140,13 +148,58 @@ type PricingForm = {
   imageOutput: string;
   video: string;
   videoSeconds: string;
+  videoTokens: string;
   audioInput: string;
   audioOutput: string;
   audioCharacters: string;
   audioMinute: string;
+  /** Priced per resolution, the rate of each of the model's, in
+   *  `EditTarget.tiers` order: held by place rather than by name, since a
+   *  form path reads the dot in a name like `1.5k` as a step into it. */
+  resolutionPrices: string[];
+  /** Which of `EditTarget.modes` the model is priced by. */
+  mode: string;
 };
 
-type PriceName = keyof PricingForm;
+type PriceName = Exclude<keyof PricingForm, 'resolutionPrices' | 'mode'>;
+
+/** The ways a model can be priced: per resolution only where it takes
+ *  some. */
+function pricingModesFor(
+  capability: EditTarget['capability'],
+  transcription: boolean,
+  tiers: string[]
+): PricingMode[] {
+  return pricingModesOf(capability, transcription).filter(
+    mode => !mode.byResolution || tiers.length > 0
+  );
+}
+
+/** The way a model is priced now: per resolution where it has a rate for
+ *  one, else the first whose rates it has any of. */
+function pricingModeOf(
+  modes: PricingMode[],
+  pricing:
+    | (Partial<Record<PriceName, unknown>> & {
+        resolutionPrices?: Record<string, string> | null;
+      })
+    | null
+    | undefined
+): string {
+  if (modes.length === 0) return '';
+  const byResolution = modes.find(mode => mode.byResolution);
+  if (byResolution && Object.keys(pricing?.resolutionPrices ?? {}).length) {
+    return byResolution.value;
+  }
+  const priced = modes.find(mode =>
+    mode.rates.some(rate => pricing?.[rate] != null)
+  );
+  return (
+    priced?.value ??
+    modes.find(mode => mode.value === 'seconds')?.value ??
+    modes[0].value
+  );
+}
 
 const EMPTY_PRICING: PricingForm = {
   input: '',
@@ -162,10 +215,13 @@ const EMPTY_PRICING: PricingForm = {
   imageOutput: '',
   video: '',
   videoSeconds: '',
+  videoTokens: '',
   audioInput: '',
   audioOutput: '',
   audioCharacters: '',
-  audioMinute: ''
+  audioMinute: '',
+  resolutionPrices: [],
+  mode: ''
 };
 
 const fromNum = (v: string | null | undefined) =>
@@ -482,16 +538,30 @@ export default function PricingPage() {
       if (!edit) return;
       // A blank field is not a zero rate — it means the model is not priced
       // that way at all, so it is stored as null.
+      const { resolutionPrices, mode, ...prices } = value;
       const rates = Object.fromEntries(
-        (Object.keys(value) as Array<PriceName>).map(name => [
+        (Object.keys(prices) as Array<PriceName>).map(name => [
           name,
-          value[name] || null
+          prices[name] || null
         ])
       ) as Record<PriceName, string | null>;
+      // Only the way chosen is saved: what was typed under another is let go.
+      const chosen = edit.modes.find(each => each.value === mode);
+      for (const other of edit.modes) {
+        for (const rate of other.rates) {
+          if (!chosen?.rates.includes(rate)) rates[rate] = null;
+        }
+      }
 
       await upsertMutation.mutateAsync({
         modelDbId: edit.modelDbId,
         ...rates,
+        // Per resolution, a rate for each the model takes now.
+        resolutionPrices: chosen?.byResolution
+          ? Object.fromEntries(
+              edit.tiers.map((tier, i) => [tier, resolutionPrices[i] || null])
+            )
+          : null,
         source: 'manual'
       });
     }
@@ -499,13 +569,24 @@ export default function PricingPage() {
 
   /** Fill the form from a model and its price. */
   const fill = (row: EditableRow) => {
+    const tiers = [
+      ...(row.uiOptions?.sizes ?? []),
+      ...(row.uiOptions?.resolutions ?? [])
+    ].filter(tier => tier !== AUTO_OPTION);
+    const modes = pricingModesFor(
+      row.capability,
+      !!row.supportsTranscription,
+      tiers
+    );
     setEdit({
       modelDbId: row.id,
       modelName: row.name,
       capability: row.capability,
       searchesX: (row.providers ?? []).some(
         binding => binding.provider?.type === 'xai'
-      )
+      ),
+      tiers,
+      modes
     });
     const values = {
       input: fromNum(row.pricing?.input),
@@ -521,10 +602,16 @@ export default function PricingPage() {
       imageOutput: fromNum(row.pricing?.imageOutput),
       video: fromNum(row.pricing?.video),
       videoSeconds: fromNum(row.pricing?.videoSeconds),
+      videoTokens: fromNum(row.pricing?.videoTokens),
       audioInput: fromNum(row.pricing?.audioInput),
       audioOutput: fromNum(row.pricing?.audioOutput),
       audioCharacters: fromNum(row.pricing?.audioCharacters),
-      audioMinute: fromNum(row.pricing?.audioMinute)
+      audioMinute: fromNum(row.pricing?.audioMinute),
+      // Every one the model takes, blank or not, so each has a field.
+      resolutionPrices: tiers.map(tier =>
+        fromNum(row.pricing?.resolutionPrices?.[tier])
+      ),
+      mode: pricingModeOf(modes, row.pricing)
     };
     setDefaults(values);
     form.reset(values);
@@ -622,46 +709,72 @@ export default function PricingPage() {
     []
   );
 
-  /**
-   * One rate. Several rates are mutually exclusive billing styles — typing in
-   * one clears the others, which `clears` names.
-   */
+  /** One rate. */
   const PriceField = ({
     name,
     label,
-    placeholder = '0.00',
-    disabled,
-    clears
+    placeholder = '0.00'
   }: {
     name: PriceName;
     label: string;
     placeholder?: string;
-    disabled?: boolean;
-    clears?: Array<PriceName>;
   }) => (
-    <form.AppField
-      name={name}
-      listeners={{
-        // Guarded: clearing counts as a change, so two fields that clear each
-        // other would take turns doing it forever. Skipping the write when
-        // there is nothing to clear ends the exchange after one step — and
-        // stops the recursion from wiping what was just typed.
-        onChange: () =>
-          clears?.forEach(other => {
-            if (form.getFieldValue(other)) form.setFieldValue(other, '');
-          })
-      }}
-    >
+    <form.AppField name={name}>
       {field => (
         <field.TextField
           label={label}
           prefix="$"
           inputMode="decimal"
           placeholder={placeholder}
-          disabled={disabled}
         />
       )}
     </form.AppField>
+  );
+
+  /** Which way the model is priced, of the ways its kind can be. */
+  const PricingModeField = () => (
+    <form.AppField name="mode">
+      {field => (
+        <div className="col-span-2">
+          {/* A pill, as the usage chart's grouping switch is. */}
+          <Tabs value={field.state.value} onValueChange={field.handleChange}>
+            <TabsList className="rounded-full border bg-muted/50 p-0.5 group-data-[orientation=horizontal]/tabs:h-8">
+              {(edit?.modes ?? []).map(mode => (
+                <TabsTrigger
+                  key={mode.value}
+                  value={mode.value}
+                  className="rounded-full px-3"
+                >
+                  {mode.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+    </form.AppField>
+  );
+
+  /**
+   * Priced per resolution: the rate of each size or resolution the model
+   * takes. One left blank, and a call that sends none, is billed at the
+   * highest set.
+   */
+  const TierFields = ({ unit }: { unit: 'image' | 'second' }) => (
+    <>
+      {(edit?.tiers ?? []).map((tier, i) => (
+        <form.AppField key={tier} name={`resolutionPrices[${i}]`}>
+          {field => (
+            <field.TextField
+              label={`${tier} / ${unit}`}
+              prefix="$"
+              inputMode="decimal"
+              placeholder="0.00"
+            />
+          )}
+        </form.AppField>
+      ))}
+    </>
   );
 
   const toggleSource = (src: PricingSource, on: boolean) => {
@@ -850,165 +963,99 @@ export default function PricingPage() {
                     )}
                     {edit.capability === 'image' && (
                       <>
-                        {/* Two mutually-exclusive billing styles. Typing in one
-                            side disables (and clears) the other. */}
-                        <PriceField
-                          name="image"
-                          label="Per image"
-                          placeholder="per-image (DALL-E, imagen)"
-                          disabled={
-                            !!values.input ||
-                            !!values.imageInput ||
-                            !!values.output ||
-                            !!values.imageOutput
-                          }
-                          clears={[
-                            'input',
-                            'imageInput',
-                            'output',
-                            'imageOutput'
-                          ]}
-                        />
-                        <div className="col-span-2 text-xs text-muted-foreground">
-                          Or token-based billing (gpt-image, Gemini), the words
-                          and the pictures priced apart — set at least Input +
-                          Image output instead of Per image:
-                        </div>
-                        <PriceField
-                          name="input"
-                          label="Input / 1M tokens"
-                          disabled={!!values.image}
-                          clears={['image']}
-                        />
-                        <PriceField
-                          name="output"
-                          label="Output / 1M tokens"
-                          placeholder="defaults to image output rate"
-                          disabled={!!values.image}
-                          clears={['image']}
-                        />
-                        <PriceField
-                          name="imageInput"
-                          label="Image input / 1M tokens"
-                          placeholder="defaults to input rate"
-                          disabled={!!values.image}
-                          clears={['image']}
-                        />
-                        <PriceField
-                          name="imageOutput"
-                          label="Image output / 1M tokens"
-                          disabled={!!values.image}
-                          clears={['image']}
-                        />
+                        <PricingModeField />
+                        {values.mode === 'image' && (
+                          <PriceField name="image" label="Per image" />
+                        )}
+                        {values.mode === 'resolution' && (
+                          <TierFields unit="image" />
+                        )}
+                        {values.mode === 'tokens' && (
+                          <>
+                            <PriceField
+                              name="input"
+                              label="Input / 1M tokens"
+                            />
+                            <PriceField
+                              name="output"
+                              label="Output / 1M tokens"
+                              placeholder="defaults to image output rate"
+                            />
+                            <PriceField
+                              name="imageInput"
+                              label="Image input / 1M tokens"
+                              placeholder="defaults to input rate"
+                            />
+                            <PriceField
+                              name="imageOutput"
+                              label="Image output / 1M tokens"
+                            />
+                          </>
+                        )}
                       </>
                     )}
                     {edit.capability === 'video' && (
                       <>
-                        {/* Two mutually-exclusive billing styles. Typing in one
-                            side disables (and clears) the other. */}
-                        <PriceField
-                          name="video"
-                          label="Per video"
-                          placeholder="flat per clip (Kling, Sora base)"
-                          disabled={!!values.videoSeconds}
-                          clears={['videoSeconds']}
-                        />
-                        <PriceField
-                          name="videoSeconds"
-                          label="Video / second"
-                          placeholder="per second (Sora, Veo, Runway)"
-                          disabled={!!values.video}
-                          clears={['video']}
-                        />
+                        <PricingModeField />
+                        {values.mode === 'video' && (
+                          <PriceField name="video" label="Per video" />
+                        )}
+                        {values.mode === 'seconds' && (
+                          <PriceField name="videoSeconds" label="Per second" />
+                        )}
+                        {values.mode === 'resolution' && (
+                          <TierFields unit="second" />
+                        )}
+                        {values.mode === 'tokens' && (
+                          <>
+                            <PriceField
+                              name="input"
+                              label="Input / 1M tokens"
+                            />
+                            <PriceField
+                              name="output"
+                              label="Output / 1M tokens"
+                            />
+                            <PriceField
+                              name="videoTokens"
+                              label="Video output / 1M tokens"
+                            />
+                          </>
+                        )}
                       </>
                     )}
                     {edit.capability === 'audio' && (
                       <>
-                        {/* Three mutually-exclusive billing styles. Typing in
-                            one style disables (and clears) the others. */}
-                        <PriceField
-                          name="audioCharacters"
-                          label="Per 1M characters"
-                          placeholder="classic TTS (tts-1, xAI)"
-                          disabled={
-                            !!values.input ||
-                            !!values.output ||
-                            !!values.audioInput ||
-                            !!values.audioOutput ||
-                            !!values.audioMinute
-                          }
-                          clears={[
-                            'input',
-                            'output',
-                            'audioInput',
-                            'audioOutput',
-                            'audioMinute'
-                          ]}
-                        />
-                        <div className="col-span-2 text-xs text-muted-foreground">
-                          Or token-based billing (Gemini TTS,
-                          gpt-4o-transcribe), the words and the audio priced
-                          apart — a speech model at least Input + Audio output,
-                          a transcription model Audio input + Output. Only for
-                          models whose provider reports the tokens:
-                          gpt-4o-mini-tts reports none, and priced this way
-                          would cost nothing — price it per character instead:
-                        </div>
-                        <PriceField
-                          name="input"
-                          label="Input / 1M tokens"
-                          disabled={
-                            !!values.audioCharacters || !!values.audioMinute
-                          }
-                          clears={['audioCharacters', 'audioMinute']}
-                        />
-                        <PriceField
-                          name="output"
-                          label="Output / 1M tokens"
-                          disabled={
-                            !!values.audioCharacters || !!values.audioMinute
-                          }
-                          clears={['audioCharacters', 'audioMinute']}
-                        />
-                        <PriceField
-                          name="audioInput"
-                          label="Audio input / 1M tokens"
-                          disabled={
-                            !!values.audioCharacters || !!values.audioMinute
-                          }
-                          clears={['audioCharacters', 'audioMinute']}
-                        />
-                        <PriceField
-                          name="audioOutput"
-                          label="Audio output / 1M tokens"
-                          disabled={
-                            !!values.audioCharacters || !!values.audioMinute
-                          }
-                          clears={['audioCharacters', 'audioMinute']}
-                        />
-                        <div className="col-span-2 text-xs text-muted-foreground">
-                          Or per-minute billing for STT models (whisper-1) — set
-                          Audio / minute instead:
-                        </div>
-                        <PriceField
-                          name="audioMinute"
-                          label="Audio / minute"
-                          placeholder="per minute of input audio (whisper-1: 0.006)"
-                          disabled={
-                            !!values.audioCharacters ||
-                            !!values.input ||
-                            !!values.output ||
-                            !!values.audioInput ||
-                            !!values.audioOutput
-                          }
-                          clears={[
-                            'audioCharacters',
-                            'input',
-                            'output',
-                            'audioInput',
-                            'audioOutput'
-                          ]}
-                        />
+                        <PricingModeField />
+                        {values.mode === 'characters' && (
+                          <PriceField
+                            name="audioCharacters"
+                            label="Per 1M characters"
+                          />
+                        )}
+                        {values.mode === 'minute' && (
+                          <PriceField name="audioMinute" label="Per minute" />
+                        )}
+                        {values.mode === 'tokens' && (
+                          <>
+                            <PriceField
+                              name="input"
+                              label="Input / 1M tokens"
+                            />
+                            <PriceField
+                              name="output"
+                              label="Output / 1M tokens"
+                            />
+                            <PriceField
+                              name="audioInput"
+                              label="Audio input / 1M tokens"
+                            />
+                            <PriceField
+                              name="audioOutput"
+                              label="Audio output / 1M tokens"
+                            />
+                          </>
+                        )}
                       </>
                     )}
                   </fieldset>

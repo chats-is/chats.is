@@ -7,6 +7,7 @@ import {
   type PricingSyncResult,
   type ProviderType
 } from '@/types';
+import { pricingModesOf, type PricingRate } from '@/types/pricing';
 import { generateUUID, parseNumber } from '@/lib/utils';
 import { db } from '@/db';
 import { modelPricings, models } from '@/db/schema';
@@ -334,13 +335,14 @@ export async function runPricingSync(args: {
         : (existing?.imageOutput ?? null),
       // No source prices a picture read; it is entered by hand, and kept.
       imageInput: existing?.imageInput ?? null,
-      // Cache R/W default to "0" (free) when neither the remote nor the row
-      // has them, so the cost engine doesn't fall back to input rate.
-      cacheRead: kept(remote.cost.cache_read, 'cacheRead') ?? '0',
-      cacheWrite: kept(remote.cost.cache_write, 'cacheWrite') ?? '0',
+      cacheRead: kept(remote.cost.cache_read, 'cacheRead'),
+      cacheWrite: kept(remote.cost.cache_write, 'cacheWrite'),
       // Reasoning stays null when not provided — calc falls back to output rate.
       reasoning: kept(remote.cost.reasoning, 'reasoning'),
       image: kept(remote.cost.per_image, 'image'),
+      // No source prices a size or resolution apart; entered by hand, and kept
+      // — unless the source names another way of pricing (below).
+      resolutionPrices: existing?.resolutionPrices ?? null,
       // Token-based audio rates (Gemini's speech, realtime). Classic TTS bills
       // per character — the remote sources don't list a per-character rate,
       // so audioCharacters is configured manually (left untouched by sync).
@@ -352,30 +354,44 @@ export async function runPricingSync(args: {
       updatedAt: new Date()
     };
 
-    // One case where what was there has to give way. An image model bills per
-    // image or per token, never both, and which one is the provider's to say.
-    // When the source names one style completely and only that one, it has
-    // changed how the model is billed; keeping the other rate beside it would
-    // make every sync from then on a conflict, skipped for ever, with the
-    // model charged at a style its provider has dropped.
-    if (isImage) {
-      const perToken =
-        remote.cost.input !== undefined && remote.cost.output !== undefined;
-      const perImage = remote.cost.per_image !== undefined;
-      if (perToken && !perImage) valuesToWrite.image = null;
-      if (perImage && !perToken) {
-        valuesToWrite.input = null;
-        valuesToWrite.output = null;
-        valuesToWrite.imageInput = null;
-        valuesToWrite.imageOutput = null;
-      }
-    }
+    // Where what was there has to give way. A model is priced one way, and
+    // which one is its provider's to say: the way the source names, by the
+    // rates it lists, replaces any other, whose rates — those entered by hand
+    // too, per resolution among them — are cleared. Kept beside it, they
+    // would price the model two ways at once.
+    const listed: Partial<Record<PricingRate, boolean>> = {
+      input: remote.cost.input !== undefined,
+      output: !isImage && !isSpeech && remote.cost.output !== undefined,
+      imageOutput: isImage && remote.cost.output !== undefined,
+      image: remote.cost.per_image !== undefined,
+      audioInput: remote.cost.input_audio !== undefined,
+      audioOutput:
+        (isSpeech ? remote.cost.output : remote.cost.output_audio) !== undefined
+    };
+    const modes = pricingModesOf(
+      m.capability,
+      m.supportsTranscription ?? false
+    );
+    const named = modes.find(mode => mode.rates.some(rate => listed[rate]));
+    const cleared: Partial<Record<PricingRate, null>> = named
+      ? Object.fromEntries(
+          modes
+            .flatMap(mode => mode.rates)
+            .filter(rate => !named.rates.includes(rate))
+            .map(rate => [rate, null])
+        )
+      : {};
+    const write = {
+      ...valuesToWrite,
+      ...cleared,
+      ...(named && { resolutionPrices: null })
+    };
 
     // Keeping what was there can still leave a row priced two ways at once —
     // per image by hand, per token from the source. A model that works today
     // is not traded for one that does not: it is left alone and reported.
     if (existing) {
-      const merged = { ...existing, ...valuesToWrite };
+      const merged = { ...existing, ...write };
       const direction = { transcription: m.supportsTranscription ?? false };
       const worked =
         pricingMissingFields(m.capability, existing, direction).length === 0 &&
@@ -398,16 +414,20 @@ export async function runPricingSync(args: {
       const numEq = (a: string | null, b: string | null) =>
         parseNumber(a) === parseNumber(b);
       const changed =
-        !numEq(valuesToWrite.input, existing.input) ||
-        !numEq(valuesToWrite.output, existing.output) ||
-        !numEq(valuesToWrite.cacheRead, existing.cacheRead) ||
-        !numEq(valuesToWrite.cacheWrite, existing.cacheWrite) ||
-        !numEq(valuesToWrite.reasoning, existing.reasoning) ||
-        !numEq(valuesToWrite.image, existing.image) ||
-        !numEq(valuesToWrite.imageInput, existing.imageInput) ||
-        !numEq(valuesToWrite.imageOutput, existing.imageOutput) ||
-        !numEq(valuesToWrite.audioInput, existing.audioInput) ||
-        !numEq(valuesToWrite.audioOutput, existing.audioOutput) ||
+        !numEq(write.input, existing.input) ||
+        !numEq(write.output, existing.output) ||
+        !numEq(write.cacheRead, existing.cacheRead) ||
+        !numEq(write.cacheWrite, existing.cacheWrite) ||
+        !numEq(write.reasoning, existing.reasoning) ||
+        !numEq(write.image, existing.image) ||
+        write.resolutionPrices !== existing.resolutionPrices ||
+        !numEq(write.imageInput, existing.imageInput) ||
+        !numEq(write.imageOutput, existing.imageOutput) ||
+        !numEq(write.audioInput, existing.audioInput) ||
+        !numEq(write.audioOutput, existing.audioOutput) ||
+        (Object.keys(cleared) as PricingRate[]).some(
+          rate => existing[rate] !== null
+        ) ||
         existing.source !== args.source;
 
       if (!changed) {
@@ -417,13 +437,13 @@ export async function runPricingSync(args: {
 
       await db
         .update(modelPricings)
-        .set(valuesToWrite)
+        .set(write)
         .where(eq(modelPricings.id, existing.id));
       result.updated += 1;
     } else {
       await db.insert(modelPricings).values({
         id: generateUUID(),
-        ...valuesToWrite,
+        ...write,
         createdAt: new Date()
       });
       result.created += 1;

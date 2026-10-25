@@ -259,10 +259,12 @@ describe('price sync', () => {
     expect(Number((await priceOf('gpt-x')).input)).toBe(3);
   });
 
-  it('leaves a working model alone rather than price it two ways', async () => {
-    // The source lists both styles at once, which says nothing about which
-    // one applies — and both written down is a row with no defined cost.
-    remote({ 'img-x': { cost: { input: 5, output: 40, per_image: 0.05 } } });
+  it('replaces prices entered by hand per resolution with the way the source names', async () => {
+    await h.db
+      .update(schema.modelPricings)
+      .set({ image: null, resolutionPrices: { '1k': '0.07', '2k': '0.09' } })
+      .where(eq(schema.modelPricings.modelId, 'img-x'));
+    remote({ 'img-x': { cost: { per_image: 0.05 } } });
 
     const result = await sync.runPricingSync({
       source: 'models.dev',
@@ -270,9 +272,60 @@ describe('price sync', () => {
     });
     const price = await priceOf('img-x');
 
+    expect(result.updated).toBe(1);
+    expect(Number(price.image)).toBe(0.05);
+    expect(price.resolutionPrices).toBeNull();
+  });
+
+  it('clears a speech model’s price per character when the source prices it per token', async () => {
+    await h.db.insert(schema.modelPricings).values({
+      id: 'pr-tts',
+      modelId: 'tts-x',
+      audioCharacters: '15',
+      source: 'manual'
+    });
+    remote({ 'tts-x': { cost: { input: 0.5, output: 10 } } });
+
+    const result = await sync.runPricingSync({
+      source: 'models.dev',
+      modelDbIds: ['m-tts']
+    });
+    const price = await priceOf('tts-x');
+
+    expect(result.updated).toBe(1);
+    expect(price.audioCharacters).toBeNull();
+    expect(Number(price.input)).toBe(0.5);
+    expect(Number(price.audioOutput)).toBe(10);
+  });
+
+  it('leaves a working model alone where the way the source names lacks a price it needs', async () => {
+    await h.db.insert(schema.models).values({
+      id: 'm-video',
+      name: 'Video',
+      modelId: 'vid-x',
+      capability: 'video'
+    });
+    await h.db
+      .insert(schema.modelProviders)
+      .values({ id: 'b-video', modelId: 'vid-x', providerId: 'p1' });
+    await h.db.insert(schema.modelPricings).values({
+      id: 'pr-video',
+      modelId: 'vid-x',
+      resolutionPrices: { '720p': '0.07' },
+      source: 'manual'
+    });
+    // Per token, but with no rate for the video itself.
+    remote({ 'vid-x': { cost: { input: 1.5, output: 9 } } });
+
+    const result = await sync.runPricingSync({
+      source: 'models.dev',
+      modelDbIds: ['m-video']
+    });
+    const price = await priceOf('vid-x');
+
     expect(result.updated).toBe(0);
-    expect(result.skipped.map(entry => entry.modelId)).toEqual(['img-x']);
+    expect(result.skipped.map(entry => entry.modelId)).toEqual(['vid-x']);
+    expect(price.resolutionPrices).toEqual({ '720p': '0.07' });
     expect(price.input).toBeNull();
-    expect(Number(price.image)).toBe(0.04);
   });
 });

@@ -16,6 +16,8 @@ export type PricingRates = {
   imageOutput?: string | null;
   video?: string | null;
   videoSeconds?: string | null;
+  videoTokens?: string | null;
+  resolutionPrices?: Record<string, string> | null;
   audioInput?: string | null;
   audioOutput?: string | null;
   audioCharacters?: string | null;
@@ -30,6 +32,15 @@ const fmt = (v: string | null | undefined): string | null => {
   return formatUsd(v);
 };
 
+/** How big a size or resolution is, to put them in order: the pixels of a
+ *  `1024x1536`, the number of a `720p` or a `512`, and a `2K` as 2048. */
+function tierSize(tier: string): number {
+  const pixels = /^(\d+)x(\d+)$/.exec(tier);
+  if (pixels) return Number(pixels[1]) * Number(pixels[2]);
+  const n = parseFloat(tier);
+  return /k$/i.test(tier) ? n * 1024 : n;
+}
+
 /**
  * Capability-aware pricing lines for the table, in rows: what the model is
  * billed for on every call first — an image or audio model's words, then its
@@ -41,15 +52,20 @@ const fmt = (v: string | null | undefined): string | null => {
  *   chat   → [["Input: $2.5/1M", "Output: $15/1M", "Reasoning: $15/1M"],
  *             ["Cache Read: $0.25/1M", "Cache Write: $0/1M"],
  *             ["Web Search: $10/1K", "X Posts: $5/1K", "X Profiles: $10/1K"]]
- *   image  → [["Image: $0.04/image"]] or
+ *   image  → [["Image: $0.04/image"]],
+ *             [["1024x1024: $0.04/image", "2048x2048: $0.06/image"]] or
  *             [["Input: $5/1M", "Output: $10/1M"],
  *              ["Image Input: $8/1M", "Image Output: $32/1M"]]
- *   video  → [["Video: $0.5/video", "Per sec: $0.001/s"]]
+ *   video  → [["Per sec: $0.1/s"]],
+ *             [["720p: $0.1/s", "1080p: $0.12/s"]],
+ *             [["Video: $0.5/video"]] or
+ *             [["Input: $1.5/1M", "Output: $9/1M", "Video Output: $17.5/1M"]]
  *   audio  → [["Per 1M chars: $15"]], [["Per min: $0.006/min"]] or
  *             [["Input: $0.5/1M"], ["Audio Output: $10/1M"]]
  *
  * Token rates are per 1M tokens, searches and X posts or profiles per 1K;
- * image/video/per-sec are per unit, and transcription per minute.
+ * image/video/per-sec are per unit, and transcription per minute; a rate per
+ * size or resolution per image or per second.
  */
 export function summarizePricingRows(
   capability: string,
@@ -72,6 +88,12 @@ export function summarizePricingRows(
     const f = fmt(v);
     if (f) row.push(`${label}: ${f}${unit}`);
   };
+  // Priced per resolution, each size or resolution's rate, in `unit`,
+  // smallest first.
+  const tiers = (unit: string) =>
+    Object.entries(pricing.resolutionPrices ?? {})
+      .sort(([a], [b]) => tierSize(a) - tierSize(b))
+      .forEach(([tier, v]) => push(main, tier, v, unit));
   switch (capability) {
     case 'chat': {
       push(main, 'Input', pricing.input, '/1M');
@@ -87,6 +109,7 @@ export function summarizePricingRows(
     case 'image': {
       // Per-image OR token-based (gpt-image-1) — show whichever is set.
       push(main, 'Image', pricing.image, '/image');
+      tiers('/image');
       push(main, 'Input', pricing.input, '/1M');
       push(main, 'Output', pricing.output, '/1M');
       push(media, 'Image Input', pricing.imageInput, '/1M');
@@ -96,6 +119,10 @@ export function summarizePricingRows(
     case 'video': {
       push(main, 'Video', pricing.video, '/video');
       push(main, 'Per sec', pricing.videoSeconds, '/s');
+      tiers('/s');
+      push(main, 'Input', pricing.input, '/1M');
+      push(main, 'Output', pricing.output, '/1M');
+      push(main, 'Video Output', pricing.videoTokens, '/1M');
       break;
     }
     case 'audio': {

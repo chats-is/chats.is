@@ -28,6 +28,24 @@ describe('pricing', () => {
     expect(r.source).toBe('manual');
   });
 
+  it('keeps the rates by resolution that are set, and none as null', () => {
+    expect(
+      pricingUpsertSchema.parse({
+        modelDbId: 'm',
+        resolutionPrices: { '720p': '0.1', '1080p': '', '4k': 0.4 }
+      }).resolutionPrices
+    ).toEqual({ '720p': '0.1', '4k': '0.4' });
+    expect(
+      pricingUpsertSchema.parse({
+        modelDbId: 'm',
+        resolutionPrices: { '720p': '' }
+      }).resolutionPrices
+    ).toBeNull();
+    expect(
+      pricingUpsertSchema.parse({ modelDbId: 'm' }).resolutionPrices
+    ).toBeNull();
+  });
+
   it('defaults onlyMissing to false, and keeps it off the preview shape', () => {
     expect(syncRunSchema.parse({ source: 'models.dev' }).onlyMissing).toBe(
       false

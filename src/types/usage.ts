@@ -49,11 +49,22 @@ export type RecordImageUsageInput = RecordUsageBase & {
   /** Of those, the pictures read and drawn, billed at the image rates. */
   imageInputTokens?: number;
   imageOutputTokens?: number;
+  /** The size or resolution sent, for a model priced per image at a rate
+   *  for each. */
+  resolution?: string;
 };
 
 export type RecordVideoUsageInput = RecordUsageBase & {
   videoCount: number;
   videoSeconds?: number;
+  /** The tokens the provider counted the clip as, for a model priced so,
+   *  and those it counted what it read, wrote and thought as. */
+  videoTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  /** The resolution sent, for a model priced per second at a rate for each. */
+  resolution?: string;
 };
 
 export type RecordAudioUsageInput = RecordUsageBase & {
@@ -94,6 +105,8 @@ export type UsageRowLike = {
   imageOutputTokens?: number | null;
   videoCount?: number | null;
   videoSeconds?: string | number | null;
+  videoTokens?: number | null;
+  resolution?: string | null;
   audioInputTokens?: number | null;
   audioOutputTokens?: number | null;
   audioCharacters?: number | null;
@@ -116,6 +129,7 @@ export type UsageRowLike = {
   imageOutputPrice?: string | null;
   videoPrice?: string | null;
   videoSecondsPrice?: string | null;
+  videoTokensPrice?: string | null;
   audioInputPrice?: string | null;
   audioOutputPrice?: string | null;
   audioCharactersPrice?: string | null;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   defaultVoice,
+  sentResolution,
   toRequestParts,
   vocabularyFor
 } from '@/lib/provider-vocab';
@@ -167,5 +168,28 @@ describe('defaultVoice', () => {
 
   it('has none for a provider that does not speak', () => {
     expect(defaultVoice('anthropic')).toBeUndefined();
+  });
+});
+
+describe('sentResolution', () => {
+  it('is the one of size and resolution the provider takes', () => {
+    const settled = { size: '1024x1536', resolution: '2K' };
+    expect(sentResolution('openai', 'image', settled)).toBe('1024x1536');
+    expect(sentResolution('google', 'image', settled, { inline: true })).toBe(
+      '2K'
+    );
+    expect(sentResolution('xai', 'video', { resolution: '720p' })).toBe('720p');
+    expect(sentResolution('xai', 'image', { resolution: '1.5k' })).toBe('1.5k');
+  });
+
+  it('is undefined where neither is sent', () => {
+    // Imagen takes a ratio and no size; a resolution xAI does not name is
+    // dropped.
+    expect(
+      sentResolution('google', 'image', { size: '1024x1024', resolution: '2K' })
+    ).toBeUndefined();
+    expect(
+      sentResolution('xai', 'image', { resolution: '480p' })
+    ).toBeUndefined();
   });
 });

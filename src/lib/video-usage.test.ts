@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  extractVideoDurationSeconds,
-  resolveVideoSeconds
-} from './video-usage';
+import { extractVideoDurationSeconds, extractVideoTokens } from './video-usage';
 
 describe('extractVideoDurationSeconds', () => {
   it('reads provider duration from videos[].duration (fal shape)', () => {
@@ -28,21 +25,18 @@ describe('extractVideoDurationSeconds', () => {
   });
 });
 
-describe('resolveVideoSeconds', () => {
-  it('prefers the provider-reported actual duration over requested', () => {
+describe('extractVideoTokens', () => {
+  it('reads the tokens Seedance counted a clip as', () => {
     expect(
-      resolveVideoSeconds({ fal: { videos: [{ duration: 6 }] } }, 10)
-    ).toBe(6);
+      extractVideoTokens({
+        bytedance: { taskId: 't', usage: { completion_tokens: 108_900 } }
+      })
+    ).toBe(108_900);
   });
 
-  it('falls back to the requested duration when provider has none', () => {
-    expect(resolveVideoSeconds({}, 10)).toBe(10);
-    expect(resolveVideoSeconds(undefined, 8)).toBe(8);
-  });
-
-  it('returns undefined when neither is available (caller must surface it)', () => {
-    expect(resolveVideoSeconds({}, undefined)).toBeUndefined();
-    expect(resolveVideoSeconds(undefined, 0)).toBeUndefined();
-    expect(resolveVideoSeconds(undefined, 'bad')).toBeUndefined();
+  it('is undefined when no provider counted any', () => {
+    expect(extractVideoTokens({ xai: { duration: 6 } })).toBeUndefined();
+    expect(extractVideoTokens(undefined)).toBeUndefined();
+    expect(extractVideoTokens({ bytedance: { usage: null } })).toBeUndefined();
   });
 });

@@ -372,6 +372,13 @@
       "when": 1792769604297,
       "tag": "0052_drop_audio_seconds",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792815360294,
+      "tag": "0053_resolution_pricing",
+      "breakpoints": true
     }
   ]
 }

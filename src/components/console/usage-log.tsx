@@ -15,6 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { Amount } from '@/components/console/amount';
 import { createAppColumnHelper } from '@/components/console/data-table';
 import { LocalTime } from '@/components/local-time';
 
@@ -98,9 +99,12 @@ export const usageLogColumns = ({
       meta: {
         align: 'right',
         headClassName: 'w-36',
-        cellClassName: 'font-mono whitespace-nowrap text-muted-foreground'
+        cellClassName: 'whitespace-nowrap tabular-nums'
       },
-      cell: ({ row }) => formatUsd(row.original.cost)
+      // As the usage report shows a cost.
+      cell: ({ row }) => (
+        <Amount kind="cost" value={Number(row.original.cost)} />
+      )
     }),
     helper.accessor('spend', {
       header: 'Spend',
@@ -109,7 +113,13 @@ export const usageLogColumns = ({
         headClassName: 'w-36',
         cellClassName: 'font-mono whitespace-nowrap'
       },
-      cell: ({ row }) => formatUsd(row.original.spend)
+      // Red where the row says why it was billed as it was: a pricing to
+      // change.
+      cell: ({ row }) => (
+        <span className={cn(row.original.reason != null && 'text-destructive')}>
+          {formatUsd(row.original.spend)}
+        </span>
+      )
     })
   ]);
 
@@ -166,7 +176,13 @@ export function UsageItems({
   const via = <>via {row.providerName ?? 'an unknown provider'}</>;
   // Each call's ids at its provider, on a line of their own after the items.
   const requests = row.providerRequests ?? [];
-  const lineCount = Math.max(items.length, 1) + (requests.length > 0 ? 1 : 0);
+  // Why it was billed as it was, where the row says: in place of the items
+  // when there are none, else on a line of its own after them.
+  const reasonLine = row.reason != null && items.length > 0;
+  const lineCount =
+    Math.max(items.length, 1) +
+    (reasonLine ? 1 : 0) +
+    (requests.length > 0 ? 1 : 0);
   // The cells before a line's own: on the first, the id under the time and
   // the provider under the user. Without a user column both go under the
   // time, the id on the line after the provider's — or beneath it, where
@@ -192,7 +208,7 @@ export function UsageItems({
   const ids = requests.length > 0 && (
     <TableRow className="hover:bg-muted/30">
       {lead(lineCount - 1)}
-      <TableCell colSpan={3} className={cn(cell, 'space-y-2')}>
+      <TableCell colSpan={4} className={cn(cell, 'space-y-2')}>
         {requests.map((request, index) => (
           <ProviderRequestIds key={index} request={request} />
         ))}
@@ -207,8 +223,15 @@ export function UsageItems({
           className={cn('border-b hover:bg-muted/30', ids && 'border-b-0')}
         >
           {lead(0)}
-          <TableCell colSpan={3} className={cn(cell, 'text-muted-foreground')}>
-            No rate was recorded for this call, so nothing was billed.
+          <TableCell
+            colSpan={4}
+            className={cn(
+              cell,
+              row.reason != null ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          >
+            {row.reason ??
+              'No rate was recorded for this call, so nothing was billed.'}
           </TableCell>
         </TableRow>
         {ids}
@@ -222,7 +245,7 @@ export function UsageItems({
       key={item.label}
       className={cn(
         'hover:bg-muted/30',
-        (index < items.length - 1 || ids) && 'border-b-0'
+        (index < items.length - 1 || reasonLine || ids) && 'border-b-0'
       )}
     >
       {lead(index)}
@@ -233,6 +256,8 @@ export function UsageItems({
       <TableCell className={cn(cell, 'text-right tabular-nums')}>
         {item.quantity}
       </TableCell>
+      {/* Under Cost, nothing: the items are at the user's prices. */}
+      <TableCell className={cell} />
       <TableCell className={cn(cell, 'text-right font-mono')}>
         {formatUsd(item.subtotal)}
       </TableCell>
@@ -241,6 +266,14 @@ export function UsageItems({
   return (
     <>
       {lines}
+      {reasonLine && (
+        <TableRow className={cn('hover:bg-muted/30', ids && 'border-b-0')}>
+          {lead(items.length)}
+          <TableCell colSpan={4} className={cn(cell, 'text-destructive')}>
+            {row.reason}
+          </TableCell>
+        </TableRow>
+      )}
       {ids}
     </>
   );

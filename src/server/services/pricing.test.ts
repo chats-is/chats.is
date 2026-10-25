@@ -9,7 +9,8 @@ import {
   calculateTranscriptionCost,
   calculateVideoCost,
   PricingMissingError,
-  pricingMissingFields
+  pricingMissingFields,
+  pricingStyleConflict
 } from './pricing';
 
 // pricing.ts imports `@/db` (which opens a Neon Pool + validates env)
@@ -34,6 +35,8 @@ function pricing(overrides: Partial<PricingRecord> = {}): PricingRecord {
     imageOutput: null,
     video: null,
     videoSeconds: null,
+    videoTokens: null,
+    resolutionPrices: null,
     audioInput: null,
     audioOutput: null,
     audioCharacters: null,
@@ -199,6 +202,42 @@ describe('calculateImageCost', () => {
   it('returns 0 when pricing is null', () => {
     expect(calculateImageCost({ imageCount: 5 }, null).cost).toBe(0);
   });
+
+  it('per resolution: the rate of the size it was made at, else the highest set', () => {
+    const p = pricing({
+      resolutionPrices: { '1024x1024': '0.04', '2048x2048': '0.06' }
+    });
+    const big = calculateImageCost(
+      { imageCount: 2, resolution: '2048x2048' },
+      p
+    );
+    expect(big.cost).toBeCloseTo(0.12, 10);
+    expect(big.snapshot.imagePrice).toBe('0.06');
+    const small = calculateImageCost(
+      { imageCount: 2, resolution: '1024x1024' },
+      p
+    );
+    expect(small.cost).toBeCloseTo(0.08, 10);
+    expect(small.snapshot.imagePrice).toBe('0.04');
+    // One with no rate set, and none sent: the highest.
+    expect(
+      calculateImageCost({ imageCount: 1, resolution: '1536x1024' }, p).snapshot
+        .imagePrice
+    ).toBe('0.06');
+    expect(calculateImageCost({ imageCount: 1 }, p).snapshot.imagePrice).toBe(
+      '0.06'
+    );
+  });
+
+  it('per resolution, a free one bills nothing', () => {
+    const p = pricing({ resolutionPrices: { '1k': '0', '2k': '0.09' } });
+    expect(
+      calculateImageCost({ imageCount: 1, resolution: '2k' }, p).cost
+    ).toBeCloseTo(0.09, 10);
+    expect(
+      calculateImageCost({ imageCount: 1, resolution: '1k' }, p).cost
+    ).toBe(0);
+  });
 });
 
 describe('calculateVideoCost', () => {
@@ -232,6 +271,53 @@ describe('calculateVideoCost', () => {
 
   it('returns 0 when pricing is null', () => {
     expect(calculateVideoCost({ videoCount: 1 }, null).cost).toBe(0);
+  });
+
+  it('per resolution: the rate of the resolution it was made at, else the highest set', () => {
+    const p = pricing({
+      resolutionPrices: { '720p': '0.1', '1080p': '0.12' }
+    });
+    const hd = calculateVideoCost(
+      { videoCount: 1, videoSeconds: 8, resolution: '1080p' },
+      p
+    );
+    expect(hd.cost).toBeCloseTo(0.96, 10);
+    expect(hd.snapshot.videoSecondsPrice).toBe('0.12');
+    const sd = calculateVideoCost(
+      { videoCount: 1, videoSeconds: 8, resolution: '720p' },
+      p
+    );
+    expect(sd.cost).toBeCloseTo(0.8, 10);
+    expect(sd.snapshot.videoSecondsPrice).toBe('0.1');
+    // An edit sends none: the highest.
+    const edit = calculateVideoCost({ videoCount: 1, videoSeconds: 8 }, p);
+    expect(edit.cost).toBeCloseTo(0.96, 10);
+    expect(edit.snapshot.videoSecondsPrice).toBe('0.12');
+  });
+
+  it('per token: the tokens counted × the rate per 1M', () => {
+    const { cost, snapshot } = calculateVideoCost(
+      { videoCount: 1, videoSeconds: 5, videoTokens: 100_000 },
+      pricing({ videoTokens: '4.3' })
+    );
+    expect(cost).toBeCloseTo(0.43, 10);
+    expect(snapshot.videoTokensPrice).toBe('4.3');
+    expect(snapshot.videoSecondsPrice).toBeNull();
+  });
+
+  it('per token: what it read, wrote and thought, beside the video', () => {
+    const { cost, snapshot } = calculateVideoCost(
+      {
+        videoCount: 1,
+        videoTokens: 5793,
+        inputTokens: 17,
+        reasoningTokens: 980
+      },
+      pricing({ input: '1.5', output: '9', videoTokens: '17.5' })
+    );
+    expect(cost).toBeCloseTo((17 * 1.5 + 980 * 9 + 5793 * 17.5) / 1e6, 10);
+    expect(snapshot.inputPrice).toBe('1.5');
+    expect(snapshot.reasoningPrice).toBe('9');
   });
 });
 
@@ -412,19 +498,28 @@ describe('pricingMissingFields', () => {
     // The words' output rate is not the picture's.
     expect(
       pricingMissingFields('image', pricing({ input: '5', output: '40' }))
-    ).toEqual(['Image, or Input + Image output']);
+    ).toEqual(['Image, a resolution, or Input + Image output']);
     expect(pricingMissingFields('image', pricing({ input: '5' }))).not.toEqual(
       []
     );
     expect(pricingMissingFields('image', pricing())).not.toEqual([]);
   });
 
-  it('video accepts per-video OR per-second', () => {
+  it('video accepts per-video, per-second, per resolution OR per-token', () => {
     expect(pricingMissingFields('video', pricing({ video: '0.5' }))).toEqual(
       []
     );
     expect(
       pricingMissingFields('video', pricing({ videoSeconds: '0.1' }))
+    ).toEqual([]);
+    expect(
+      pricingMissingFields(
+        'video',
+        pricing({ resolutionPrices: { '720p': '0.07' } })
+      )
+    ).toEqual([]);
+    expect(
+      pricingMissingFields('video', pricing({ videoTokens: '4.3' }))
     ).toEqual([]);
     expect(pricingMissingFields('video', pricing())).not.toEqual([]);
   });
@@ -437,5 +532,141 @@ describe('pricingMissingFields', () => {
       pricingMissingFields('audio', pricing({ audioMinute: '0.006' }))
     ).toEqual([]);
     expect(pricingMissingFields('audio', pricing())).not.toEqual([]);
+  });
+});
+
+describe('pricingStyleConflict', () => {
+  it('takes one video style only', () => {
+    expect(pricingStyleConflict('video', { videoSeconds: '0.1' })).toBeNull();
+    expect(
+      pricingStyleConflict('video', { videoSeconds: '0.1', videoTokens: '4' })
+    ).not.toBeNull();
+    expect(
+      pricingStyleConflict('video', { video: '0.5', videoTokens: '4' })
+    ).not.toBeNull();
+    expect(
+      pricingStyleConflict('video', { input: '1.5', videoTokens: '17.5' })
+    ).toBeNull();
+    expect(
+      pricingStyleConflict('video', { input: '1.5', videoSeconds: '0.1' })
+    ).not.toBeNull();
+  });
+
+  it('takes rates by resolution as a style of their own', () => {
+    const resolutionPrices = { '720p': '0.1' };
+    expect(pricingStyleConflict('video', { resolutionPrices })).toBeNull();
+    expect(
+      pricingStyleConflict('video', { videoSeconds: '0.1', resolutionPrices })
+    ).not.toBeNull();
+    expect(
+      pricingStyleConflict('video', { videoTokens: '4', resolutionPrices })
+    ).not.toBeNull();
+    expect(pricingStyleConflict('image', { resolutionPrices })).toBeNull();
+    expect(
+      pricingStyleConflict('image', { image: '0.04', resolutionPrices })
+    ).not.toBeNull();
+    expect(
+      pricingStyleConflict('image', {
+        input: '5',
+        imageOutput: '40',
+        resolutionPrices
+      })
+    ).not.toBeNull();
+  });
+});
+
+describe('what a price did not bill', () => {
+  it('bills a per-image or per-video rate of 0 as set, at nothing', () => {
+    const image = calculateImageCost(
+      { imageCount: 2 },
+      pricing({ image: '0' })
+    );
+    expect(image.cost).toBe(0);
+    expect(image.snapshot.imagePrice).toBe('0');
+    expect(image.issues).toEqual({ unpriced: [] });
+
+    const video = calculateVideoCost(
+      { videoCount: 1 },
+      pricing({ video: '0' })
+    );
+    expect(video.snapshot.videoPrice).toBe('0');
+    expect(video.issues).toEqual({ unpriced: [] });
+  });
+
+  it('names a way of pricing the model does not report what it needs for', () => {
+    expect(
+      calculateImageCost(
+        { imageCount: 1 },
+        pricing({ input: '5', imageOutput: '40' })
+      ).issues.unsupported
+    ).toBe('Per token');
+    expect(
+      calculateVideoCost(
+        { videoCount: 1, videoSeconds: 4 },
+        pricing({ videoTokens: '17.5' })
+      ).issues.unsupported
+    ).toBe('Per token');
+    expect(
+      calculateVideoCost({ videoCount: 1 }, pricing({ videoSeconds: '0.1' }))
+        .issues.unsupported
+    ).toBe('Per second');
+    expect(
+      calculateVideoCost(
+        { videoCount: 1 },
+        pricing({ resolutionPrices: { '720p': '0.07' } })
+      ).issues.unsupported
+    ).toBe('Per resolution / second');
+    expect(
+      calculateAudioCost({}, pricing({ input: '0.5', audioOutput: '10' }))
+        .issues.unsupported
+    ).toBe('Per token');
+    expect(
+      calculateTranscriptionCost({}, pricing({ audioMinute: '0.006' })).issues
+        .unsupported
+    ).toBe('Per minute');
+  });
+
+  it('names what was used with no price set, and not what is priced at 0', () => {
+    const chat = calculateChatCost(
+      {
+        inputTokens: 100,
+        outputTokens: 10,
+        cacheReadTokens: 50,
+        cacheWriteTokens: 20,
+        webSearches: 2
+      },
+      pricing({ input: '1', output: '4', cacheWrite: '0' })
+    );
+    expect(chat.issues.unpriced).toEqual(['Cache read', 'Web search']);
+
+    const omni = calculateVideoCost(
+      {
+        videoCount: 1,
+        videoTokens: 5793,
+        inputTokens: 17,
+        reasoningTokens: 980
+      },
+      pricing({ videoTokens: '17.5' })
+    );
+    expect(omni.issues).toEqual({ unpriced: ['Input', 'Output'] });
+
+    const transcript = calculateTranscriptionCost(
+      { inputTokens: 12, audioInputTokens: 400, outputTokens: 30 },
+      pricing({ audioInput: '2.5', output: '10' })
+    );
+    expect(transcript.issues).toEqual({ unpriced: ['Input'] });
+
+    // Image rates stand in for each other, so none goes unpriced.
+    expect(
+      calculateImageCost(
+        {
+          imageCount: 1,
+          inputTokens: 300,
+          outputTokens: 1100,
+          imageOutputTokens: 1000
+        },
+        pricing({ input: '5', imageOutput: '40' })
+      ).issues
+    ).toEqual({ unpriced: [] });
   });
 });
